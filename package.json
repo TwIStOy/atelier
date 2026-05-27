@@ -19,10 +19,11 @@
     "eslint": "^10.4.0",
     "prettier": "^3.8.3",
     "typescript": "^6.0.0",
-    "typescript-eslint": "^8.59.4"
+    "typescript-eslint": "^8.59.4",
+    "vitest": "^4.1.7"
   },
   "scripts": {
-    "test": "npx tsx scripts/test.ts"
+    "test": "vitest run"
   },
   "dependencies": {
     "cli-table3": "^0.6.5",
