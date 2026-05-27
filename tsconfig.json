@@ -1,4 +1,7 @@
 {
   "files": [],
-  "references": [{ "path": "extensions/zai-coding-plan" }]
+  "references": [
+    { "path": "extensions/zai-coding-plan" },
+    { "path": "extensions/inference-self-host" }
+  ]
 }

@@ -4,7 +4,8 @@
   "type": "module",
   "pi": {
     "extensions": [
-      "extensions/zai-coding-plan"
+      "extensions/zai-coding-plan",
+      "extensions/inference-self-host"
     ],
     "skills": [],
     "themes": []
