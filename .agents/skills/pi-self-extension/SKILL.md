@@ -191,6 +191,120 @@ pi
 /reload
 ```
 
+## Provider Registration
+
+### When to Use
+
+- Register a custom LLM provider (OpenAI-compatible, Anthropic, etc.)
+- Proxy multiple upstream providers through a single endpoint
+- Add models not included in pi's built-in providers
+
+### Basic Provider Registration
+
+```typescript
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+
+export default function (pi: ExtensionAPI) {
+  pi.registerProvider("my-provider", {
+    name: "My Provider",
+    baseUrl: "https://api.example.com/v1",
+    apiKey: "MY_API_KEY",
+    api: "openai-completions",
+    authHeader: true,
+    models: [
+      {
+        id: "model-id",
+        name: "Display Name",
+        reasoning: true,
+        input: ["text"],
+        cost: { input: 1.0, output: 3.0, cacheRead: 0.2, cacheWrite: 0 },
+        contextWindow: 200000,
+        maxTokens: 128000,
+        compat: {
+          // Optional: override auto-detected compat
+        },
+      },
+    ],
+  });
+}
+```
+
+### Model Spec Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Model identifier used in API calls |
+| `name` | string | Display name |
+| `reasoning` | boolean | Whether model supports thinking/reasoning |
+| `input` | ("text"\|"image")[] | Input modalities |
+| `cost` | object | Per-token costs: input, output, cacheRead, cacheWrite |
+| `contextWindow` | number | Maximum context tokens |
+| `maxTokens` | number | Maximum output tokens |
+| `compat` | object | Optional compatibility overrides |
+
+### Compat Auto-Detection Gotcha
+
+Pi-ai's `openai-completions.js` auto-detects provider-specific compat based on `provider` name and `baseUrl`. **When using a proxy URL that doesn't match any detection pattern, ALL models get generic OpenAI defaults which may be wrong.**
+
+Detection matches `provider === "zai"`, `baseUrl.includes("deepseek.com")`, etc. A proxy like `inference.twistoy.cn` matches **nothing**.
+
+**Always set `compat` explicitly for each model family when building a proxy provider:**
+
+```typescript
+// Shared compat objects per upstream family
+const zaiCompat = {
+  supportsDeveloperRole: false,
+  thinkingFormat: "zai" as const,
+  zaiToolStream: true,
+};
+
+const deepseekCompat = {
+  supportsDeveloperRole: false,
+  thinkingFormat: "deepseek" as const,
+  requiresReasoningContentOnAssistantMessages: true,
+};
+
+const moonshotCompat = {
+  supportsDeveloperRole: false,
+  supportsReasoningEffort: false,
+  maxTokensField: "max_tokens" as const,
+};
+
+const qwenCompat = {
+  supportsDeveloperRole: false,
+  thinkingFormat: "qwen" as const,
+};
+```
+
+**Key compat fields:**
+
+| Field | Default | Notes |
+|-------|---------|-------|
+| `supportsDeveloperRole` | true | DeepSeek, ZAI, Moonshot, Qwen: false |
+| `thinkingFormat` | "openai" | ZAI: "zai", DeepSeek: "deepseek", Qwen: "qwen" |
+| `zaiToolStream` | false | ZAI/GLM: true |
+| `requiresReasoningContentOnAssistantMessages` | false | DeepSeek: true |
+| `supportsReasoningEffort` | true | Moonshot: false |
+| `maxTokensField` | "max_completion_tokens" | Moonshot: "max_tokens" |
+
+### Model Specs from models.dev
+
+Use the JSON API at `https://models.dev/api.json` to source model specs (context window, costs, reasoning support). Structure:
+
+```typescript
+type ModelsDevResponse = Record<string, {
+  name: string;
+  models: Record<string, {
+    id: string; name: string; reasoning: boolean;
+    modalities: { input: string[] };
+    cost: { input?: number; output?: number; cache_read?: number; cache_write?: number };
+    limit: { context: number; output: number };
+  }>;
+}>;
+```
+
+The `opencode-go` provider aggregates models from multiple upstreams and is a good primary source.
+
 ## Prompt Templates
 
 ### When to Use
@@ -344,6 +458,13 @@ Before considering an extension complete:
 - [ ] Output truncation implemented
 - [ ] Cancellation support via `signal`
 - [ ] Tested with `pi -e ./extension.ts`
+
+**Providers:**
+- [ ] Models have correct `contextWindow` and `maxTokens` from models.dev
+- [ ] `compat` overrides set for all non-standard model families
+- [ ] `supportsDeveloperRole: false` for DeepSeek, ZAI, Moonshot, Qwen
+- [ ] `thinkingFormat` matches upstream provider (not "openai" for ZAI/DeepSeek/Qwen)
+- [ ] `apiKey` points to correct environment variable
 
 **Prompt Templates:**
 - [ ] File in `~/.pi/agent/prompts/`

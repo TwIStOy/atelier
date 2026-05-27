@@ -14,6 +14,7 @@ import { StringEnum } from "@mariozechner/pi-ai";
 |--------|---------|---------|
 | `pi.registerTool(def)` | Register LLM-callable tool | See tool definition below |
 | `pi.registerCommand(name, opts)` | Add slash command | `/mycommand` handler |
+| `pi.registerProvider(id, config)` | Register LLM provider | See provider registration below |
 | `pi.registerShortcut(key, opts)` | Keyboard shortcut | `ctrl+shift+p` |
 | `pi.registerFlag(name, opts)` | CLI flag | `--my-flag` |
 | `pi.on(event, handler)` | Event subscription | Intercept tool calls |
@@ -259,6 +260,44 @@ pi.registerCommand("my-cmd", {
   }
 });
 ```
+
+## Provider Registration
+
+```typescript
+pi.registerProvider("provider-id", {
+  name: "Display Name",
+  baseUrl: "https://api.example.com/v1",
+  apiKey: "ENV_VAR_NAME",        // Environment variable holding the API key
+  api: "openai-completions",      // API protocol
+  authHeader: true,               // Send key in Authorization header
+  models: [
+    {
+      id: "model-id",
+      name: "Model Display Name",
+      reasoning: true,
+      input: ["text"],            // ["text"] or ["text", "image"]
+      cost: { input: 1.0, output: 3.0, cacheRead: 0.2, cacheWrite: 0 },
+      contextWindow: 200000,
+      maxTokens: 128000,
+      compat: {                   // Optional: override auto-detected compat
+        supportsDeveloperRole: false,
+        thinkingFormat: "zai",
+      },
+    },
+  ],
+});
+```
+
+### Compat Override Fields
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `supportsDeveloperRole` | boolean | true | Whether API accepts `developer` role messages |
+| `thinkingFormat` | string | "openai" | Thinking parameter format: "openai", "zai", "deepseek", "qwen" |
+| `zaiToolStream` | boolean | false | ZAI-specific tool streaming protocol |
+| `requiresReasoningContentOnAssistantMessages` | boolean | false | Include reasoning content in assistant messages |
+| `supportsReasoningEffort` | boolean | true | Whether `reasoning_effort` parameter is supported |
+| `maxTokensField` | string | "max_completion_tokens" | Field name for max output tokens |
 
 ## Output Truncation
 
