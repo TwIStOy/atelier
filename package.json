@@ -5,7 +5,8 @@
   "pi": {
     "extensions": [
       "extensions/zai-coding-plan",
-      "extensions/inference-self-host"
+      "extensions/inference-self-host",
+      "extensions/protect-secrets"
     ],
     "skills": [],
     "themes": []
@@ -21,6 +22,7 @@
     "typescript-eslint": "^8.59.4"
   },
   "dependencies": {
-    "cli-table3": "^0.6.5"
+    "cli-table3": "^0.6.5",
+    "unbash": "^3.0.0"
   }
 }
