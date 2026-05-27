@@ -1,5 +1,28 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
+const zaiCompat = {
+  supportsDeveloperRole: false,
+  thinkingFormat: "zai" as const,
+  zaiToolStream: true,
+};
+
+const deepseekCompat = {
+  supportsDeveloperRole: false,
+  thinkingFormat: "deepseek" as const,
+  requiresReasoningContentOnAssistantMessages: true,
+};
+
+const moonshotCompat = {
+  supportsDeveloperRole: false,
+  supportsReasoningEffort: false,
+  maxTokensField: "max_tokens" as const,
+};
+
+const qwenCompat = {
+  supportsDeveloperRole: false,
+  thinkingFormat: "qwen" as const,
+};
+
 export default function (pi: ExtensionAPI) {
   pi.registerProvider("inference-self-host", {
     name: "Inference(Self Host)",
@@ -25,6 +48,7 @@ export default function (pi: ExtensionAPI) {
         cost: { input: 1, output: 3.2, cacheRead: 0.2, cacheWrite: 0 },
         contextWindow: 200000,
         maxTokens: 128000,
+        compat: zaiCompat,
       },
       {
         id: "glm-4.5-air",
@@ -52,6 +76,7 @@ export default function (pi: ExtensionAPI) {
         cost: { input: 0.4, output: 2.4, cacheRead: 0, cacheWrite: 0 },
         contextWindow: 1000000,
         maxTokens: 65536,
+        compat: qwenCompat,
       },
       {
         id: "glm-5.1",
@@ -61,6 +86,7 @@ export default function (pi: ExtensionAPI) {
         cost: { input: 1.4, output: 4.4, cacheRead: 0.26, cacheWrite: 0 },
         contextWindow: 200000,
         maxTokens: 128000,
+        compat: zaiCompat,
       },
       {
         id: "qwen3.7-max",
@@ -70,6 +96,7 @@ export default function (pi: ExtensionAPI) {
         cost: { input: 2.5, output: 7.5, cacheRead: 0.5, cacheWrite: 0 },
         contextWindow: 1000000,
         maxTokens: 65536,
+        compat: qwenCompat,
       },
       {
         id: "glm-5-turbo",
@@ -79,6 +106,7 @@ export default function (pi: ExtensionAPI) {
         cost: { input: 1.2, output: 4.0, cacheRead: 0.24, cacheWrite: 0 },
         contextWindow: 200000,
         maxTokens: 16384,
+        compat: zaiCompat,
       },
       {
         id: "mimo-v2-omni",
@@ -97,6 +125,7 @@ export default function (pi: ExtensionAPI) {
         cost: { input: 0.95, output: 4, cacheRead: 0.16, cacheWrite: 0 },
         contextWindow: 262144,
         maxTokens: 262144,
+        compat: moonshotCompat,
       },
       {
         id: "deepseek-v4-pro",
@@ -106,11 +135,7 @@ export default function (pi: ExtensionAPI) {
         cost: { input: 0.435, output: 0.87, cacheRead: 0.003625, cacheWrite: 0 },
         contextWindow: 1000000,
         maxTokens: 384000,
-        compat: {
-          supportsDeveloperRole: false,
-          thinkingFormat: "deepseek",
-          requiresReasoningContentOnAssistantMessages: true,
-        },
+        compat: deepseekCompat,
       },
       {
         id: "minimax-m2.5",
@@ -147,6 +172,7 @@ export default function (pi: ExtensionAPI) {
         cost: { input: 0.6, output: 3, cacheRead: 0.1, cacheWrite: 0 },
         contextWindow: 262144,
         maxTokens: 262144,
+        compat: moonshotCompat,
       },
       {
         id: "mimo-v2.5",
@@ -165,6 +191,7 @@ export default function (pi: ExtensionAPI) {
         cost: { input: 0.5, output: 3, cacheRead: 0.05, cacheWrite: 0 },
         contextWindow: 1000000,
         maxTokens: 65536,
+        compat: qwenCompat,
       },
       {
         id: "mimo-v2.5-pro",
@@ -183,11 +210,7 @@ export default function (pi: ExtensionAPI) {
         cost: { input: 0.14, output: 0.28, cacheRead: 0.0028, cacheWrite: 0 },
         contextWindow: 1000000,
         maxTokens: 384000,
-        compat: {
-          supportsDeveloperRole: false,
-          thinkingFormat: "deepseek",
-          requiresReasoningContentOnAssistantMessages: true,
-        },
+        compat: deepseekCompat,
       },
       {
         id: "glm-4.7",
@@ -206,6 +229,7 @@ export default function (pi: ExtensionAPI) {
         cost: { input: 0.6, output: 2.2, cacheRead: 0.11, cacheWrite: 0 },
         contextWindow: 204800,
         maxTokens: 131072,
+        compat: zaiCompat,
       },
     ],
   });

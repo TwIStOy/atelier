@@ -1,6 +1,6 @@
 # Inference (Self Host) Extension
 
-A pi extension that registers the "Inference(Self Host)" provider with models from various providers.
+A pi extension that registers the "Inference(Self Host)" provider, proxying to various upstream LLM providers through `https://inference.twistoy.cn`.
 
 ## Configuration
 
@@ -8,7 +8,47 @@ Set these environment variables:
 
 - `INFERENCE_TWISTOY_API_KEY` — your API key
 
-The base URL is `https://inference.twistoy.cn`.
+The base URL is `https://inference.twistoy.cn/v1`.
+
+## Models
+
+21 models from 7 upstream provider families:
+
+| Local ID | Upstream Family | Reasoning |
+|---|---|---|
+| `glm-5.1` | ZAI (GLM) | yes |
+| `glm-5` | ZAI (GLM) | yes |
+| `glm-5-turbo` | ZAI (GLM) | yes |
+| `glm-4.6` | ZAI (GLM) | yes |
+| `glm-4.7` | ZAI (GLM) | no |
+| `glm-4.5` | ZAI (GLM) | no |
+| `glm-4.5-air` | ZAI (GLM) | no |
+| `deepseek-v4-pro` | DeepSeek | yes |
+| `deepseek-v4-flash` | DeepSeek | yes |
+| `kimi-k2.6` | Moonshot | yes |
+| `kimi-k2.5` | Moonshot | yes |
+| `qwen3.7-max` | Qwen (Alibaba) | yes |
+| `qwen3.6-plus` | Qwen (Alibaba) | yes |
+| `qwen3.5-plus` | Qwen (Alibaba) | yes |
+| `mimo-v2.5-pro` | Xiaomi | yes |
+| `mimo-v2.5` | Xiaomi | yes |
+| `mimo-v2-pro` | Xiaomi | yes |
+| `mimo-v2-omni` | Xiaomi | yes |
+| `minimax-m2.7` | MiniMax | yes |
+| `minimax-m2.5` | MiniMax | yes |
+| `hy3-preview` | Tencent | yes |
+
+## API Compatibility
+
+Since `inference.twistoy.cn` doesn't match any auto-detection pattern in pi-ai, all models that need non-standard compat have explicit overrides:
+
+| Family | Compat Overrides |
+|---|---|
+| **ZAI (GLM)** | `supportsDeveloperRole: false`, `thinkingFormat: "zai"`, `zaiToolStream: true` |
+| **DeepSeek** | `supportsDeveloperRole: false`, `thinkingFormat: "deepseek"`, `requiresReasoningContentOnAssistantMessages: true` |
+| **Moonshot (Kimi)** | `supportsDeveloperRole: false`, `supportsReasoningEffort: false`, `maxTokensField: "max_tokens"` |
+| **Qwen** | `supportsDeveloperRole: false`, `thinkingFormat: "qwen"` |
+| Xiaomi, MiniMax, Tencent | Standard OpenAI compat, no overrides needed |
 
 ## Syncing Model Parameters from models.dev
 
@@ -16,44 +56,31 @@ Model specs (context window, max output, cost, reasoning support) are sourced fr
 
 ### Provider mapping
 
-Each model is mapped to a specific provider in models.dev. The mapping is defined in `sync.ts` → `MODEL_SOURCES`:
+Most models use `opencode-go` as the primary provider. GLM models not available in `opencode-go` fall back to `zai-coding-plan` or `zhipuai`.
 
-| Local ID | Provider | models.dev Model ID | Notes |
+| Local ID | Primary Provider | Fallbacks | Compat Family |
 |---|---|---|---|
-| `mimo-v2-pro` | `xiaomi` | `mimo-v2-pro` | |
-| `glm-5` | `zai-coding-plan` | `glm-5` | Fallback: `zhipuai` → `glm-5` |
-| `glm-4.5-air` | `zai-coding-plan` | `glm-4.5-air` | |
-| `glm-4.5` | `zhipuai` | `glm-4.5` | |
-| `qwen3.5-plus` | `alibaba` | `qwen3.5-plus` | |
-| `glm-5.1` | `zai-coding-plan` | `glm-5.1` | |
-| `qwen3.7-max` | `alibaba` | `qwen3.7-max` | |
-| `glm-5-turbo` | `zai-coding-plan` | `glm-5-turbo` | |
-| `mimo-v2-omni` | `xiaomi` | `mimo-v2-omni` | |
-| `kimi-k2.6` | `moonshotai` | `kimi-k2.6` | |
-| `deepseek-v4-pro` | `deepseek` | `deepseek-v4-pro` | |
-| `minimax-m2.5` | `minimax` | `MiniMax-M2.5` | |
-| `minimax-m2.7` | `minimax` | `MiniMax-M2.7` | |
-| `hy3-preview` | `tencent-tokenhub` | `hy3-preview` | |
-| `kimi-k2.5` | `moonshotai` | `kimi-k2.5` | |
-| `mimo-v2.5` | `xiaomi` | `mimo-v2.5` | |
-| `qwen3.6-plus` | `alibaba` | `qwen3.6-plus` | |
-| `mimo-v2.5-pro` | `xiaomi` | `mimo-v2.5-pro` | |
-| `deepseek-v4-flash` | `deepseek` | `deepseek-v4-flash` | |
-| `glm-4.7` | `zai-coding-plan` | `glm-4.7` | |
-| `glm-4.6` | `zhipuai` | `glm-4.6` | |
-
-### Field mapping
-
-| models.dev API Field | Extension Config Field |
-|---|---|
-| `reasoning` | `reasoning` |
-| `modalities.input` | `input` |
-| `cost.input` | `cost.input` |
-| `cost.output` | `cost.output` |
-| `cost.cache_read` | `cost.cacheRead` |
-| `cost.cache_write` | `cost.cacheWrite` |
-| `limit.context` | `contextWindow` |
-| `limit.output` | `maxTokens` |
+| `mimo-v2-pro` | `opencode-go` | — | — |
+| `glm-5` | `opencode-go` | `zai-coding-plan`, `zhipuai` | `zai` |
+| `glm-4.5-air` | `zai-coding-plan` | `zhipuai` | `zai` |
+| `glm-4.5` | `zhipuai` | — | `zai` |
+| `qwen3.5-plus` | `opencode-go` | — | `qwen` |
+| `glm-5.1` | `opencode-go` | `zai-coding-plan` | `zai` |
+| `qwen3.7-max` | `opencode-go` | — | `qwen` |
+| `glm-5-turbo` | `zai-coding-plan` | — | `zai` |
+| `mimo-v2-omni` | `opencode-go` | — | — |
+| `kimi-k2.6` | `opencode-go` | — | `moonshot` |
+| `deepseek-v4-pro` | `opencode-go` | — | `deepseek` |
+| `minimax-m2.5` | `opencode-go` | — | — |
+| `minimax-m2.7` | `opencode-go` | — | — |
+| `hy3-preview` | `tencent-tokenhub` | — | — |
+| `kimi-k2.5` | `opencode-go` | — | `moonshot` |
+| `mimo-v2.5` | `opencode-go` | — | — |
+| `qwen3.6-plus` | `opencode-go` | — | `qwen` |
+| `mimo-v2.5-pro` | `opencode-go` | — | — |
+| `deepseek-v4-flash` | `opencode-go` | — | `deepseek` |
+| `glm-4.7` | `zai-coding-plan` | `zhipuai` | `zai` |
+| `glm-4.6` | `zhipuai` | — | `zai` |
 
 ### Running the sync
 
@@ -62,9 +89,3 @@ npx tsx extensions/inference-self-host/sync-cli.ts
 ```
 
 This fetches from `https://models.dev/api.json`, resolves each model through its provider mapping (with fallback support), and outputs the full `ProviderModelConfig[]` JSON. Use this output to update the `models` array in `index.ts`.
-
-### Notes
-
-- The `zai-coding-plan` provider has `cost: 0` for all models since it's a subscription plan.
-- Some providers use tiered pricing (e.g., `context_over_200k`). The sync only stores the base tier cost.
-- Models not found in the primary provider fall back to the `fallbacks` chain before emitting a warning.
