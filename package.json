@@ -3,16 +3,11 @@
   "version": "0.1.0",
   "type": "module",
   "pi": {
-    "extensions": ["extensions/zai-coding-plan"],
+    "extensions": [
+      "extensions/zai-coding-plan"
+    ],
     "skills": [],
     "themes": []
-  },
-  "scripts": {
-    "build": "tsc",
-    "format": "prettier --write src",
-    "format:check": "prettier --check src",
-    "lint": "eslint src",
-    "lint:fix": "eslint src --fix"
   },
   "devDependencies": {
     "@earendil-works/pi-ai": "^0.75.1",
@@ -23,5 +18,7 @@
     "typescript": "^6.0.0",
     "typescript-eslint": "^8.59.4"
   },
-  "dependencies": {}
+  "dependencies": {
+    "cli-table3": "^0.6.5"
+  }
 }

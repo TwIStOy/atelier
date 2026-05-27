@@ -1,3 +1,5 @@
+import Table from "cli-table3";
+
 const MONITOR_ENDPOINTS = {
   quotaLimit: "https://api.z.ai/api/monitor/usage/quota/limit",
   modelUsage: "https://api.z.ai/api/monitor/usage/model-usage",
@@ -7,8 +9,21 @@ const MONITOR_ENDPOINTS = {
 function getTimeWindowQueryParams(): string {
   const now = new Date();
   const fmt = (d: Date) => d.toISOString().replace("T", " ").slice(0, 19);
-  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, now.getHours());
-  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), 59, 59, 999);
+  const start = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate() - 1,
+    now.getHours(),
+  );
+  const end = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+    now.getHours(),
+    59,
+    59,
+    999,
+  );
   return `startTime=${encodeURIComponent(fmt(start))}&endTime=${encodeURIComponent(fmt(end))}`;
 }
 
@@ -28,7 +43,9 @@ async function fetchEndpoint(
   if (!resp.ok) {
     throw new Error(`API error ${resp.status}: ${await resp.text()}`);
   }
-  const json = (await resp.json()) as { data?: Record<string, unknown> } & Record<string, unknown>;
+  const json = (await resp.json()) as {
+    data?: Record<string, unknown>;
+  } & Record<string, unknown>;
   return json.data ?? json;
 }
 
@@ -60,7 +77,57 @@ const TOKENS_LIMIT_LABELS: Record<string, string> = {
 
 function getTokensLimitLabel(limit: Record<string, unknown>): string {
   const key = `${limit.unit}_${limit.number}`;
-  return TOKENS_LIMIT_LABELS[key] ?? `Token usage (unit=${limit.unit}, number=${limit.number})`;
+  return (
+    TOKENS_LIMIT_LABELS[key] ??
+    `Token usage (unit=${limit.unit}, number=${limit.number})`
+  );
+}
+
+const TABLE_OPTS = {
+  chars: {
+    top: "─",
+    "top-mid": "┬",
+    "top-left": "┌",
+    "top-right": "┐",
+    bottom: "─",
+    "bottom-mid": "┴",
+    "bottom-left": "└",
+    "bottom-right": "┘",
+    left: "│",
+    "left-mid": "├",
+    mid: "─",
+    "mid-mid": "┼",
+    right: "│",
+    "right-mid": "┤",
+    middle: "│",
+  },
+  style: {
+    "padding-left": 1,
+    "padding-right": 1,
+    compact: true,
+    head: ["hex(#FFA500)"],
+    border: [],
+  },
+  wordWrap: true,
+};
+
+function makeTable(head: string[], colWidths?: number[]): Table.Table {
+  return new Table({ ...TABLE_OPTS, head, colWidths });
+}
+
+function terminalWidth(): number {
+  return process.stdout.columns && process.stdout.columns > 0
+    ? process.stdout.columns
+    : 80;
+}
+
+function fitColWidths(colCount: number, ...minWidths: number[]): number[] {
+  const totalMin = minWidths.reduce((a, b) => a + b, 0);
+  const borderOverhead = colCount + 1 + 2 * colCount;
+  const available = terminalWidth() - borderOverhead;
+  if (available >= totalMin) return minWidths;
+  const scale = available / totalMin;
+  return minWidths.map((w) => Math.max(Math.floor(w * scale), 5));
 }
 
 function formatQuotaOutput(
@@ -68,14 +135,17 @@ function formatQuotaOutput(
   model: Record<string, unknown> | null,
   tool: Record<string, unknown> | null,
 ): string {
-  const lines: string[] = [];
+  const parts: string[] = [];
 
-  const level = typeof quota?.level === "string" ? ` (${(quota.level as string).charAt(0).toUpperCase()}${(quota.level as string).slice(1)})` : "";
-  lines.push(`### Z.AI Coding Plan Usage${level}\n`);
+  const level =
+    typeof quota?.level === "string"
+      ? ` (${(quota.level as string).charAt(0).toUpperCase()}${(quota.level as string).slice(1)})`
+      : "";
+  parts.push(`Z.AI Coding Plan Usage${level}`, "");
 
   if (quota?.limits && Array.isArray(quota.limits)) {
-    lines.push("| Window | Usage | Resets In |");
-    lines.push("|--------|------:|-----------|");
+    const widths = fitColWidths(3, 24, 8, 10);
+    const t = makeTable(["Window", "Usage", "Resets In"], widths);
     for (const limit of quota.limits as Array<Record<string, unknown>>) {
       let label: string;
       if (limit.type === "TOKENS_LIMIT") {
@@ -85,52 +155,55 @@ function formatQuotaOutput(
       } else {
         label = typeof limit.type === "string" ? limit.type : "Unknown";
       }
-      const pct = formatPercentage(limit.percentage);
-      const reset = formatResetTime(limit.nextResetTime as number | undefined);
-      lines.push(`| ${label} | ${pct} | ${reset} |`);
+      t.push([
+        label,
+        formatPercentage(limit.percentage),
+        formatResetTime(limit.nextResetTime as number | undefined),
+      ]);
     }
-    lines.push("");
+    parts.push(t.toString(), "");
   }
 
   if (model?.totalUsage) {
     const u = model.totalUsage as Record<string, unknown>;
-    lines.push("### Model Usage\n");
-    lines.push("| Metric | Value |");
-    lines.push("|--------|------:|");
+    const widths = fitColWidths(2, 22, 14);
+    const t = makeTable(["Metric", "Value"], widths);
     if (typeof u.totalTokensUsage === "number") {
-      lines.push(`| Total Tokens | ${formatNumber(u.totalTokensUsage)} |`);
+      t.push(["Total Tokens", formatNumber(u.totalTokensUsage)]);
     }
     if (typeof u.totalModelCallCount === "number") {
-      lines.push(`| Total Calls | ${formatNumber(u.totalModelCallCount)} |`);
+      t.push(["Total Calls", formatNumber(u.totalModelCallCount)]);
     }
     if (Array.isArray(u.modelSummaryList)) {
       for (const m of u.modelSummaryList as Array<Record<string, unknown>>) {
-        if (typeof m.modelName === "string" && typeof m.totalTokens === "number") {
-          lines.push(`| ${m.modelName} Tokens | ${formatNumber(m.totalTokens)} |`);
+        if (
+          typeof m.modelName === "string" &&
+          typeof m.totalTokens === "number"
+        ) {
+          t.push([`${m.modelName} Tokens`, formatNumber(m.totalTokens)]);
         }
       }
     }
-    lines.push("");
+    parts.push("Model Usage", "", t.toString(), "");
   }
 
   if (tool?.totalUsage) {
     const u = tool.totalUsage as Record<string, unknown>;
-    lines.push("### Tool Usage\n");
-    lines.push("| Tool | Count |");
-    lines.push("|------|------:|");
+    const widths = fitColWidths(2, 20, 14);
+    const t = makeTable(["Tool", "Count"], widths);
     if (typeof u.totalNetworkSearchCount === "number") {
-      lines.push(`| Network Searches | ${formatNumber(u.totalNetworkSearchCount)} |`);
+      t.push(["Network Searches", formatNumber(u.totalNetworkSearchCount)]);
     }
     if (typeof u.totalWebReadMcpCount === "number") {
-      lines.push(`| Web Reads | ${formatNumber(u.totalWebReadMcpCount)} |`);
+      t.push(["Web Reads", formatNumber(u.totalWebReadMcpCount)]);
     }
     if (typeof u.totalZreadMcpCount === "number") {
-      lines.push(`| ZRead Calls | ${formatNumber(u.totalZreadMcpCount)} |`);
+      t.push(["ZRead Calls", formatNumber(u.totalZreadMcpCount)]);
     }
-    lines.push("");
+    parts.push("Tool Usage", "", t.toString(), "");
   }
 
-  return lines.join("\n");
+  return parts.join("\n");
 }
 
 export async function queryUsage(apiKey: string): Promise<string> {
@@ -138,8 +211,12 @@ export async function queryUsage(apiKey: string): Promise<string> {
 
   const [quota, model, tool] = await Promise.all([
     fetchEndpoint(MONITOR_ENDPOINTS.quotaLimit, apiKey).catch(() => null),
-    fetchEndpoint(MONITOR_ENDPOINTS.modelUsage, apiKey, queryParams).catch(() => null),
-    fetchEndpoint(MONITOR_ENDPOINTS.toolUsage, apiKey, queryParams).catch(() => null),
+    fetchEndpoint(MONITOR_ENDPOINTS.modelUsage, apiKey, queryParams).catch(
+      () => null,
+    ),
+    fetchEndpoint(MONITOR_ENDPOINTS.toolUsage, apiKey, queryParams).catch(
+      () => null,
+    ),
   ]);
 
   return formatQuotaOutput(quota, model, tool);
