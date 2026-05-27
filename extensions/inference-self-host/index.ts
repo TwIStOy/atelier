@@ -106,6 +106,11 @@ export default function (pi: ExtensionAPI) {
         cost: { input: 0.435, output: 0.87, cacheRead: 0.003625, cacheWrite: 0 },
         contextWindow: 1000000,
         maxTokens: 384000,
+        compat: {
+          supportsDeveloperRole: false,
+          thinkingFormat: "deepseek",
+          requiresReasoningContentOnAssistantMessages: true,
+        },
       },
       {
         id: "minimax-m2.5",
@@ -178,6 +183,11 @@ export default function (pi: ExtensionAPI) {
         cost: { input: 0.14, output: 0.28, cacheRead: 0.0028, cacheWrite: 0 },
         contextWindow: 1000000,
         maxTokens: 384000,
+        compat: {
+          supportsDeveloperRole: false,
+          thinkingFormat: "deepseek",
+          requiresReasoningContentOnAssistantMessages: true,
+        },
       },
       {
         id: "glm-4.7",
