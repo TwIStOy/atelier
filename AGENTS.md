@@ -6,6 +6,7 @@ This is **hawtian-pi-extensions** -- a collection of [pi](https://github.com/ear
 
 - `extensions/zai-coding-plan/` -- Z.AI provider (GLM models) + `zai-quota` command. Reads `ZAI_API_KEY` env var.
 - `extensions/inference-self-host/` -- Self-hosted proxy provider aggregating models from multiple upstreams (GLM, Qwen, DeepSeek, MiMo, Kimi, MiniMax, etc). Reads `INFERENCE_TWISTOY_API_KEY` env var.
+- `extensions/protect-secrets/` -- Blocks read-like tool calls targeting files under `/run/agenix`. Uses `unbash` AST parser to analyze bash commands and distinguish secret exposure (e.g. `cat`) from safe capture (e.g. `VAR=$(cat ...) curl`).
 - `.agents/skills/pi-self-extension/` -- skill with authoritative guidance for building pi extensions (API reference, compat gotchas, validation checklist).
 
 ## Architecture
@@ -18,10 +19,16 @@ This is **hawtian-pi-extensions** -- a collection of [pi](https://github.com/ear
 
 ## Commands
 
-No build/test/lint scripts configured. Typecheck with:
+No build/lint scripts configured. Typecheck with:
 
 ```bash
 npx tsc --build
+```
+
+Run tests with:
+
+```bash
+npm test
 ```
 
 ## Conventions
