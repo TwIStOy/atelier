@@ -89,7 +89,7 @@ Need to extend pi?
 Location: `~/.pi/agent/extensions/web-search.ts`
 
 ```typescript
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 
 export default function (pi: ExtensionAPI) {
@@ -143,7 +143,7 @@ export default function (pi: ExtensionAPI) {
 - ✅ Return proper result shapes with `content` and `details`
 - ✅ Support cancellation via `signal`
 - ✅ Truncate output (50KB/2000 lines max)
-- ✅ Use `StringEnum` from `@mariozechner/pi-ai` for enums
+- ✅ Use `StringEnum` from `@earendil-works/pi-ai` for enums
 
 ### Output Truncation (Mandatory)
 
@@ -155,7 +155,7 @@ import {
   DEFAULT_MAX_BYTES,
   DEFAULT_MAX_LINES,
   formatSize,
-} from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-coding-agent";
 
 async execute(toolCallId, params, signal, onUpdate, ctx) {
   const output = await runCommand();
@@ -353,7 +353,7 @@ Current (non-standard):
 Standard migration:
 ```typescript
 // ~/.pi/agent/extensions/web-search.ts
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 
 export default function (pi: ExtensionAPI) {
@@ -426,7 +426,7 @@ pi.registerTool({
 
 ```typescript
 // ~/.pi/agent/extensions/safety.ts
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 export default function (pi: ExtensionAPI) {
   pi.on("tool_call", async (event, ctx) => {
@@ -472,6 +472,9 @@ Before considering an extension complete:
 - [ ] Filename = command name
 - [ ] Arguments tested
 
+**Dependencies:**
+- [ ] All imported `@earendil-works/*` packages listed as explicit `devDependencies` in `package.json` (transitive deps like `pi-tui` are resolved at runtime by jiti but the LSP cannot find type declarations without them)
+
 ## References
 
 **Official Documentation:**
@@ -479,7 +482,7 @@ Before considering an extension complete:
 - Prompt Templates: See [prompt-templates.md](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/prompt-templates.md)
 
 **Example Collections:**
-- Extensions: `/usr/local/lib/node_modules/@mariozechner/pi-coding-agent/examples/extensions/`
+- Extensions: `/usr/local/lib/node_modules/@earendil-works/pi-coding-agent/examples/extensions/`
 
 ## Quick Commands
 
