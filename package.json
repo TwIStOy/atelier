@@ -14,7 +14,9 @@
       "packages/statusline"
     ],
     "skills": [],
-    "themes": []
+    "themes": [
+      "themes/catppuccin-mocha.json"
+    ]
   },
   "devDependencies": {
     "@earendil-works/pi-ai": "^0.76.0",

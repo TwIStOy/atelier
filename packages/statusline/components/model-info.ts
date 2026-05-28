@@ -18,7 +18,7 @@ export class ModelInfoComponent implements StatusLineComponent {
 
         const parts: string[] = [];
 
-        parts.push(theme.fg("text", model.name));
+        parts.push(theme.fg("mdHeading", model.name));
 
         if (reasoning) {
             parts.push("🧠");

@@ -4,6 +4,7 @@ import { ContextUsageComponent } from "./components/context-usage.ts";
 import { ModelInfoComponent } from "./components/model-info.ts";
 import { PathComponent } from "./components/path.ts";
 import { GitComponent } from "./components/git.ts";
+import { TokensComponent } from "./components/tokens.ts";
 import type { StatusLineComponent } from "./components/base.ts";
 
 export function makeAboveWidget(
@@ -12,9 +13,10 @@ export function makeAboveWidget(
 ): (tui: TUI, theme: Theme) => Component & { dispose?(): void } {
     const components: StatusLineComponent[] = [
         new ModelInfoComponent(ctx, pi),
-        new ContextUsageComponent(ctx),
         new PathComponent(ctx),
         new GitComponent(ctx),
+        new ContextUsageComponent(ctx),
+        new TokensComponent(ctx),
     ];
 
     return (_tui, theme) => ({
