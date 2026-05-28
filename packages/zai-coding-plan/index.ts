@@ -1,6 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { queryUsage } from "./quota.ts";
-import { resetForegroundBeforeText } from "../utils/terminal.ts";
+import { resetForegroundBeforeText } from "@htwang-contrib/common";
 
 export default function (pi: ExtensionAPI) {
   pi.registerProvider("zai-coding-plan", {

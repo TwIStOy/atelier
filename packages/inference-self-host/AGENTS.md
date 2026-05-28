@@ -16,5 +16,5 @@ See `.agents/skills/pi-self-extension/SKILL.md` for full compat field reference.
 ## Sync Tooling
 
 - `sync.ts` -- fetches model specs from `https://models.dev/api.json` with a fallback chain per model.
-- `sync-cli.ts` -- CLI runner: `npx tsx extensions/inference-self-host/sync-cli.ts`
+- `sync-cli.ts` -- CLI runner: `npx tsx packages/inference-self-host/sync-cli.ts`
 - Model specs (costs, context windows) should be sourced from `models.dev`, not hardcoded.

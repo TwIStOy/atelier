@@ -1,0 +1,16 @@
+{
+  "name": "@htwang-contrib/protect-secrets",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "index.ts",
+  "types": "index.ts",
+  "dependencies": {
+    "unbash": "^3.0.0"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "latest",
+    "@types/node": "^25.9.1",
+    "typescript": "^6.0.0",
+    "vitest": "^4.1.7"
+  }
+}

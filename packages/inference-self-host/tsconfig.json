@@ -8,10 +8,11 @@
     "skipLibCheck": true,
     "allowImportingTsExtensions": true,
     "composite": true,
+    "emitDeclarationOnly": true,
     "types": ["node"],
     "outDir": "dist"
   },
   "include": ["./**/*.ts"],
   "exclude": ["node_modules", "dist"],
-  "references": [{ "path": "../utils" }]
+  "references": []
 }

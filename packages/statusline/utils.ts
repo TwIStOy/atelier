@@ -1,7 +1,7 @@
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 
-export { formatTokens, formatCwd } from "../utils/format.ts";
+export { formatTokens, formatCwd } from "@htwang-contrib/common";
 
 export function getSessionStats(ctx: ExtensionContext) {
     let input = 0;

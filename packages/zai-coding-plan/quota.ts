@@ -1,5 +1,10 @@
-import { formatProgressBar, formatNumber } from "../utils/format.ts";
-import { terminalWidth, fitColWidths, makeTable } from "../utils/terminal.ts";
+import {
+  formatProgressBar,
+  formatNumber,
+  terminalWidth,
+  fitColWidths,
+  makeTable,
+} from "@htwang-contrib/common";
 
 const MONITOR_ENDPOINTS = {
   quotaLimit: "https://api.z.ai/api/monitor/usage/quota/limit",
@@ -70,14 +75,20 @@ const LIMIT_ORDER: Record<string, number> = {
 };
 
 function getLimitOrder(limit: Record<string, unknown>): number {
-  const key = limit.type === "TIME_LIMIT" ? "TIME_LIMIT" : `${limit.unit}_${limit.number}`;
+  const key =
+    limit.type === "TIME_LIMIT"
+      ? "TIME_LIMIT"
+      : `${limit.unit}_${limit.number}`;
   return LIMIT_ORDER[key as string] ?? 99;
 }
 
 function getLimitLabel(limit: Record<string, unknown>): string {
   if (limit.type === "TOKENS_LIMIT") {
     const key = `${limit.unit}_${limit.number}`;
-    return TOKENS_LIMIT_LABELS[key] ?? `Limit (unit=${limit.unit}, number=${limit.number})`;
+    return (
+      TOKENS_LIMIT_LABELS[key] ??
+      `Limit (unit=${limit.unit}, number=${limit.number})`
+    );
   }
   if (limit.type === "TIME_LIMIT") return "Monthly limit";
   return typeof limit.type === "string" ? limit.type : "Unknown";
@@ -109,7 +120,8 @@ function formatQuotaOutput(
       const bar = formatProgressBar(pct, barWidth);
       const reset = formatResetClock(limit.nextResetTime as number | undefined);
       const resetSuffix = reset ? ` (resets ${reset})` : "";
-      const line = `${label}:`.padEnd(30) + `${bar} ${remaining}% left${resetSuffix}`;
+      const line =
+        `${label}:`.padEnd(30) + `${bar} ${remaining}% left${resetSuffix}`;
       parts.push(line.slice(0, tw));
     }
     parts.push("");
