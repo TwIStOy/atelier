@@ -2,6 +2,8 @@ import type { Component, TUI } from "@earendil-works/pi-tui";
 import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import { ContextUsageComponent } from "./components/context-usage.ts";
 import { ModelInfoComponent } from "./components/model-info.ts";
+import { PathComponent } from "./components/path.ts";
+import { GitComponent } from "./components/git.ts";
 import type { StatusLineComponent } from "./components/base.ts";
 
 export function makeAboveWidget(
@@ -11,6 +13,8 @@ export function makeAboveWidget(
     const components: StatusLineComponent[] = [
         new ModelInfoComponent(ctx, pi),
         new ContextUsageComponent(ctx),
+        new PathComponent(ctx),
+        new GitComponent(ctx),
     ];
 
     return (_tui, theme) => ({
