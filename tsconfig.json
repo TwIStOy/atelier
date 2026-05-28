@@ -3,6 +3,7 @@
   "references": [
     { "path": "extensions/zai-coding-plan" },
     { "path": "extensions/inference-self-host" },
-    { "path": "extensions/protect-secrets" }
+    { "path": "extensions/protect-secrets" },
+    { "path": "extensions/statusline" }
   ]
 }

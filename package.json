@@ -6,7 +6,8 @@
     "extensions": [
       "extensions/zai-coding-plan",
       "extensions/inference-self-host",
-      "extensions/protect-secrets"
+      "extensions/protect-secrets",
+      "extensions/statusline"
     ],
     "skills": [],
     "themes": []
