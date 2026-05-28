@@ -1,5 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { queryUsage } from "./quota.ts";
+import { resetForegroundBeforeText } from "../utils/terminal.ts";
 
 export default function (pi: ExtensionAPI) {
   pi.registerProvider("zai-coding-plan", {
@@ -57,7 +58,7 @@ export default function (pi: ExtensionAPI) {
     ],
   });
 
-  pi.registerCommand("zai-quota", {
+  pi.registerCommand("zai-usage", {
     description: "Query Z.AI Coding Plan quota and usage",
     async handler(_args, ctx) {
       const apiKey = process.env.ZAI_API_KEY;
@@ -67,9 +68,16 @@ export default function (pi: ExtensionAPI) {
       }
 
       try {
-        ctx.ui.notify(await queryUsage(apiKey), "info");
+        const usageInfo = await queryUsage(apiKey);
+        ctx.ui.notify(
+          ctx.hasUI ? resetForegroundBeforeText(usageInfo) : usageInfo,
+          "info",
+        );
       } catch (e) {
-        ctx.ui.notify(`Failed to query quota: ${e instanceof Error ? e.message : String(e)}`, "error");
+        ctx.ui.notify(
+          `Failed to query quota: ${e instanceof Error ? e.message : String(e)}`,
+          "error",
+        );
       }
     },
   });
