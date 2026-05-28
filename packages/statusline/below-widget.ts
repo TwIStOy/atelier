@@ -1,26 +1,50 @@
 import type { Component, TUI } from "@earendil-works/pi-tui";
-import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
-import type { ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
-import { formatTokens, getSessionStats } from "./utils.ts";
+import type {
+  ExtensionAPI,
+  ExtensionContext,
+  Theme,
+} from "@earendil-works/pi-coding-agent";
+import { CodingPlanUsageComponent } from "./components/coding-plan-usage.ts";
+import { ModelInfoComponent } from "./components/model-info.ts";
+import { GitComponent } from "./components/git.ts";
+import type { StatusLineComponent } from "./components/base.ts";
 
 export function makeBelowWidget(
   ctx: ExtensionContext,
+  pi: ExtensionAPI,
 ): (tui: TUI, theme: Theme) => Component & { dispose?(): void } {
-  return (_tui, theme) => ({
-    render(width: number): string[] {
-      const stats = getSessionStats(ctx);
-      if (stats.turns === 0) return [];
+  const git = new GitComponent(ctx);
+  const codingPlan = new CodingPlanUsageComponent(ctx, pi);
 
-      const left = theme.fg(
-        "dim",
-        `turns ${stats.turns} · ↑${formatTokens(stats.input)} ↓${formatTokens(stats.output)}`,
-      );
-      const right = theme.fg("dim", `$${stats.cost.toFixed(4)}`);
-      const pad = " ".repeat(
-        Math.max(1, width - visibleWidth(left) - visibleWidth(right)),
-      );
-      return [truncateToWidth(left + pad + right, width)];
-    },
-    invalidate() {},
-  });
+  const components: StatusLineComponent[] = [
+    new ModelInfoComponent(ctx, pi),
+    git,
+    codingPlan,
+  ];
+
+  return (_tui, theme) => {
+    git.bindRender(() => _tui.requestRender());
+    codingPlan.bindRender(() => _tui.requestRender());
+
+    return {
+      dispose() {
+        git.dispose();
+        codingPlan.dispose();
+      },
+      render(width: number): string[] {
+        const parts: string[] = [];
+
+        for (const comp of components) {
+          const lines = comp.render(width, theme);
+          if (lines.length > 0) {
+            parts.push(lines[0]);
+          }
+        }
+
+        if (parts.length === 0) return [];
+        return [parts.join(theme.fg("dim", " | "))];
+      },
+      invalidate() {},
+    };
+  };
 }

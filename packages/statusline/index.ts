@@ -10,7 +10,7 @@ export default function (pi: ExtensionAPI) {
     ctx.ui.setWidget("statusline-above", makeAboveWidget(ctx, pi), {
       placement: "aboveEditor",
     });
-    ctx.ui.setWidget("statusline-below", makeBelowWidget(ctx), {
+    ctx.ui.setWidget("statusline-below", makeBelowWidget(ctx, pi), {
       placement: "belowEditor",
     });
     ctx.ui.setFooter(makeFooter(ctx));

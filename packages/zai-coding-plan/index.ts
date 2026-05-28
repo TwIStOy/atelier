@@ -1,12 +1,23 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type {
+  ExtensionAPI,
+  ExtensionContext,
+} from "@earendil-works/pi-coding-agent";
 import { queryUsage } from "./quota.ts";
 import {
   ZAI_CODING_PLAN_EVENTS,
   resetForegroundBeforeText,
 } from "@htwang-contrib/common";
 
+const PROVIDER_ID = "zai-coding-plan";
+
+function maybeRefreshUsage(pi: ExtensionAPI, ctx: ExtensionContext) {
+  const model = ctx.model;
+  if (!model || model.provider !== PROVIDER_ID) return;
+  pi.events.emit(ZAI_CODING_PLAN_EVENTS.REQUEST_USAGE, {});
+}
+
 export default function (pi: ExtensionAPI) {
-  pi.registerProvider("zai-coding-plan", {
+  pi.registerProvider(PROVIDER_ID, {
     name: "Z.AI Coding Plan",
     baseUrl: "https://api.z.ai/api/coding/paas/v4",
     apiKey: "ZAI_API_KEY",
@@ -65,6 +76,14 @@ export default function (pi: ExtensionAPI) {
     const apiKey = process.env.ZAI_API_KEY;
     if (!apiKey) return;
     await queryUsage(pi, apiKey).catch(() => {});
+  });
+
+  pi.on("session_start", (_event, ctx) => maybeRefreshUsage(pi, ctx));
+  pi.on("turn_end", (_event, ctx) => maybeRefreshUsage(pi, ctx));
+  pi.on("model_select", (event, ctx) => {
+    if (event.model.provider === PROVIDER_ID) {
+      maybeRefreshUsage(pi, ctx);
+    }
   });
 
   pi.registerCommand("zai-usage", {
