@@ -1,36 +1,32 @@
 import type { Component, TUI } from "@earendil-works/pi-tui";
-import type { ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import { ContextUsageComponent } from "./components/context-usage.ts";
+import { ModelInfoComponent } from "./components/model-info.ts";
 import type { StatusLineComponent } from "./components/base.ts";
 
-const contextUsage = (ctx: ExtensionContext): StatusLineComponent =>
-  new ContextUsageComponent(ctx);
-
 export function makeAboveWidget(
-  ctx: ExtensionContext,
+    ctx: ExtensionContext,
+    pi: ExtensionAPI,
 ): (tui: TUI, theme: Theme) => Component & { dispose?(): void } {
-  const components = [contextUsage(ctx)];
+    const components: StatusLineComponent[] = [
+        new ModelInfoComponent(ctx, pi),
+        new ContextUsageComponent(ctx),
+    ];
 
-  return (_tui, theme) => ({
-    render(width: number): string[] {
-      const model = ctx.model;
+    return (_tui, theme) => ({
+        render(width: number): string[] {
+            const parts: string[] = [];
 
-      const parts: string[] = [];
+            for (const comp of components) {
+                const lines = comp.render(width, theme);
+                if (lines.length > 0) {
+                    parts.push(lines[0]);
+                }
+            }
 
-      if (model) {
-        parts.push(theme.fg("muted", model.id));
-      }
-
-      for (const comp of components) {
-        const compLines = comp.render(width, theme);
-        if (compLines.length > 0) {
-          parts.push(compLines[0]);
-        }
-      }
-
-      if (parts.length === 0) return [];
-      return [parts.join(theme.fg("dim", " | "))];
-    },
-    invalidate() {},
-  });
+            if (parts.length === 0) return [];
+            return [parts.join(theme.fg("dim", " | "))];
+        },
+        invalidate() {},
+    });
 }

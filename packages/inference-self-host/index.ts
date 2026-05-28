@@ -129,7 +129,7 @@ export default function (pi: ExtensionAPI) {
       },
       {
         id: "deepseek-v4-pro",
-        name: "DeepSeek-V4-Pro",
+        name: "DeepSeek V4 Pro",
         reasoning: true,
         input: ["text"],
         cost: { input: 0.435, output: 0.87, cacheRead: 0.003625, cacheWrite: 0 },
@@ -204,7 +204,7 @@ export default function (pi: ExtensionAPI) {
       },
       {
         id: "deepseek-v4-flash",
-        name: "DeepSeek-V4-Flash",
+        name: "DeepSeek V4 Flash",
         reasoning: true,
         input: ["text"],
         cost: { input: 0.14, output: 0.28, cacheRead: 0.0028, cacheWrite: 0 },
