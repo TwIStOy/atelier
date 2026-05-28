@@ -1,29 +1,36 @@
-import { truncateToWidth } from "@earendil-works/pi-tui";
 import type { Component, TUI } from "@earendil-works/pi-tui";
 import type { ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
+import { ContextUsageComponent } from "./components/context-usage.ts";
+import type { StatusLineComponent } from "./components/base.ts";
 
-export function makeAboveWidget(ctx: ExtensionContext): (tui: TUI, theme: Theme) => Component & { dispose?(): void } {
-    return (_tui, theme) => ({
-        render(width: number): string[] {
-            const usage = ctx.getContextUsage();
-            const model = ctx.model;
+const contextUsage = (ctx: ExtensionContext): StatusLineComponent =>
+  new ContextUsageComponent(ctx);
 
-            const parts: string[] = [];
+export function makeAboveWidget(
+  ctx: ExtensionContext,
+): (tui: TUI, theme: Theme) => Component & { dispose?(): void } {
+  const components = [contextUsage(ctx)];
 
-            if (model) {
-                parts.push(theme.fg("muted", model.id));
-            }
+  return (_tui, theme) => ({
+    render(width: number): string[] {
+      const model = ctx.model;
 
-            if (usage && usage.percent !== null) {
-                const pct = Math.round(usage.percent);
-                const ctxWin = usage.contextWindow ? `/${(usage.contextWindow / 1000).toFixed(0)}k` : "";
-                const color = pct > 80 ? "warning" : pct > 50 ? "muted" : "dim";
-                parts.push(theme.fg(color, `ctx ${pct}%${ctxWin}`));
-            }
+      const parts: string[] = [];
 
-            if (parts.length === 0) return [];
-            return [truncateToWidth(parts.join(theme.fg("dim", " · ")), width)];
-        },
-        invalidate() {},
-    });
+      if (model) {
+        parts.push(theme.fg("muted", model.id));
+      }
+
+      for (const comp of components) {
+        const compLines = comp.render(width, theme);
+        if (compLines.length > 0) {
+          parts.push(compLines[0]);
+        }
+      }
+
+      if (parts.length === 0) return [];
+      return [parts.join(theme.fg("dim", " | "))];
+    },
+    invalidate() {},
+  });
 }
