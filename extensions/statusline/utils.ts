@@ -1,17 +1,7 @@
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 
-export function formatTokens(n: number): string {
-    if (n < 1000) return `${n}`;
-    if (n < 1_000_000) return `${(n / 1000).toFixed(1)}k`;
-    return `${(n / 1_000_000).toFixed(1)}M`;
-}
-
-export function formatCwd(cwd: string): string {
-    const home = process.env.HOME;
-    if (home && cwd.startsWith(home)) return `~${cwd.slice(home.length)}`;
-    return cwd;
-}
+export { formatTokens, formatCwd } from "../utils/format.ts";
 
 export function getSessionStats(ctx: ExtensionContext) {
     let input = 0;

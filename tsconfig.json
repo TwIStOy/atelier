@@ -1,6 +1,7 @@
 {
   "files": [],
   "references": [
+    { "path": "extensions/utils" },
     { "path": "extensions/zai-coding-plan" },
     { "path": "extensions/inference-self-host" },
     { "path": "extensions/protect-secrets" },

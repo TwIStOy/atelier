@@ -1,4 +1,5 @@
-import Table from "cli-table3";
+import { formatProgressBar, formatNumber } from "../utils/format.ts";
+import { terminalWidth, fitColWidths, makeTable } from "../utils/terminal.ts";
 
 const MONITOR_ENDPOINTS = {
   quotaLimit: "https://api.z.ai/api/monitor/usage/quota/limit",
@@ -49,85 +50,37 @@ async function fetchEndpoint(
   return json.data ?? json;
 }
 
-function formatPercentage(value: unknown): string {
-  if (typeof value === "number") return `${value.toFixed(1)}%`;
-  return "N/A";
-}
-
-function formatResetTime(resetTime?: number): string {
-  if (!resetTime) return "—";
-  const diff = resetTime - Date.now();
-  if (diff <= 0) return "—";
-  const totalMinutes = Math.floor(diff / 60000);
-  if (totalMinutes >= 1440) {
-    const hours = Math.floor(totalMinutes / 60);
-    return `${Math.floor(hours / 24)}d ${hours % 24}h`;
-  }
-  return `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`;
-}
-
-function formatNumber(n: number): string {
-  return n.toLocaleString("en-US");
+function formatResetClock(resetTime?: number): string {
+  if (!resetTime) return "";
+  const d = new Date(resetTime);
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  return `${hh}:${mm}`;
 }
 
 const TOKENS_LIMIT_LABELS: Record<string, string> = {
-  "3_5": "Token usage (5 Hour)",
-  "6_1": "Token usage (Weekly)",
+  "3_5": "5h limit",
+  "6_1": "Weekly limit",
 };
 
-function getTokensLimitLabel(limit: Record<string, unknown>): string {
-  const key = `${limit.unit}_${limit.number}`;
-  return (
-    TOKENS_LIMIT_LABELS[key] ??
-    `Token usage (unit=${limit.unit}, number=${limit.number})`
-  );
-}
-
-const TABLE_OPTS = {
-  chars: {
-    top: "─",
-    "top-mid": "┬",
-    "top-left": "┌",
-    "top-right": "┐",
-    bottom: "─",
-    "bottom-mid": "┴",
-    "bottom-left": "└",
-    "bottom-right": "┘",
-    left: "│",
-    "left-mid": "├",
-    mid: "─",
-    "mid-mid": "┼",
-    right: "│",
-    "right-mid": "┤",
-    middle: "│",
-  },
-  style: {
-    "padding-left": 1,
-    "padding-right": 1,
-    compact: true,
-    head: ["hex(#FFA500)"],
-    border: [],
-  },
-  wordWrap: true,
+const LIMIT_ORDER: Record<string, number> = {
+  "3_5": 0,
+  "6_1": 1,
+  TIME_LIMIT: 2,
 };
 
-function makeTable(head: string[], colWidths?: number[]): Table.Table {
-  return new Table({ ...TABLE_OPTS, head, colWidths });
+function getLimitOrder(limit: Record<string, unknown>): number {
+  const key = limit.type === "TIME_LIMIT" ? "TIME_LIMIT" : `${limit.unit}_${limit.number}`;
+  return LIMIT_ORDER[key as string] ?? 99;
 }
 
-function terminalWidth(): number {
-  return process.stdout.columns && process.stdout.columns > 0
-    ? process.stdout.columns
-    : 80;
-}
-
-function fitColWidths(colCount: number, ...minWidths: number[]): number[] {
-  const totalMin = minWidths.reduce((a, b) => a + b, 0);
-  const borderOverhead = colCount + 1 + 2 * colCount;
-  const available = terminalWidth() - borderOverhead;
-  if (available >= totalMin) return minWidths;
-  const scale = available / totalMin;
-  return minWidths.map((w) => Math.max(Math.floor(w * scale), 5));
+function getLimitLabel(limit: Record<string, unknown>): string {
+  if (limit.type === "TOKENS_LIMIT") {
+    const key = `${limit.unit}_${limit.number}`;
+    return TOKENS_LIMIT_LABELS[key] ?? `Limit (unit=${limit.unit}, number=${limit.number})`;
+  }
+  if (limit.type === "TIME_LIMIT") return "Monthly limit";
+  return typeof limit.type === "string" ? limit.type : "Unknown";
 }
 
 function formatQuotaOutput(
@@ -144,24 +97,22 @@ function formatQuotaOutput(
   parts.push(`Z.AI Coding Plan Usage${level}`, "");
 
   if (quota?.limits && Array.isArray(quota.limits)) {
-    const widths = fitColWidths(3, 24, 8, 10);
-    const t = makeTable(["Window", "Usage", "Resets In"], widths);
-    for (const limit of quota.limits as Array<Record<string, unknown>>) {
-      let label: string;
-      if (limit.type === "TOKENS_LIMIT") {
-        label = getTokensLimitLabel(limit);
-      } else if (limit.type === "TIME_LIMIT") {
-        label = "MCP usage (1 Month)";
-      } else {
-        label = typeof limit.type === "string" ? limit.type : "Unknown";
-      }
-      t.push([
-        label,
-        formatPercentage(limit.percentage),
-        formatResetTime(limit.nextResetTime as number | undefined),
-      ]);
+    const barWidth = 20;
+    const tw = terminalWidth();
+    const limits = (quota.limits as Array<Record<string, unknown>>)
+      .slice()
+      .sort((a, b) => getLimitOrder(a) - getLimitOrder(b));
+    for (const limit of limits) {
+      const label = getLimitLabel(limit);
+      const pct = typeof limit.percentage === "number" ? limit.percentage : 0;
+      const remaining = Math.max(0, Math.round(100 - pct));
+      const bar = formatProgressBar(pct, barWidth);
+      const reset = formatResetClock(limit.nextResetTime as number | undefined);
+      const resetSuffix = reset ? ` (resets ${reset})` : "";
+      const line = `${label}:`.padEnd(30) + `${bar} ${remaining}% left${resetSuffix}`;
+      parts.push(line.slice(0, tw));
     }
-    parts.push(t.toString(), "");
+    parts.push("");
   }
 
   if (model?.totalUsage) {
