@@ -68,7 +68,7 @@ export default function (pi: ExtensionAPI) {
       }
 
       try {
-        const usageInfo = await queryUsage(apiKey);
+        const usageInfo = await queryUsage(pi, apiKey);
         ctx.ui.notify(
           ctx.hasUI ? resetForegroundBeforeText(usageInfo) : usageInfo,
           "info",
