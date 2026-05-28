@@ -13,24 +13,77 @@ import type {
 const PROTECTED = "/run/agenix";
 
 const FILE_READ_CMDS = new Set([
-  "cat", "head", "tail", "tac", "rev", "nl", "less", "more", "bat", "pager",
-  "sort", "uniq", "base64", "base32", "xxd", "hexdump", "od", "strings",
-  "cut", "paste", "diff", "comm", "tee",
-  "grep", "egrep", "fgrep", "rg",
-  "sed", "awk", "gawk",
-  "sh", "bash", "zsh", "dash", "source", ".",
+  "cat",
+  "head",
+  "tail",
+  "tac",
+  "rev",
+  "nl",
+  "less",
+  "more",
+  "bat",
+  "pager",
+  "sort",
+  "uniq",
+  "base64",
+  "base32",
+  "xxd",
+  "hexdump",
+  "od",
+  "strings",
+  "cut",
+  "paste",
+  "diff",
+  "comm",
+  "tee",
+  "grep",
+  "egrep",
+  "fgrep",
+  "rg",
+  "sed",
+  "awk",
+  "gawk",
+  "sh",
+  "bash",
+  "zsh",
+  "dash",
+  "source",
+  ".",
 ]);
 
 const OUTPUT_CMDS = new Set(["echo", "printf", "yes"]);
 
 const SAFE_CMDS = new Set([
-  "ls", "stat", "file", "test", "[", "[[",
-  "md5sum", "sha1sum", "sha256sum", "sha512sum", "cksum", "b3sum",
-  "chmod", "chown", "chgrp",
-  "rm", "cp", "mv", "ln", "install",
-  "mkdir", "rmdir", "touch",
-  "find", "which", "type", "command", "env",
-  "wc", "tr",
+  "ls",
+  "stat",
+  "file",
+  "test",
+  "[",
+  "[[",
+  "md5sum",
+  "sha1sum",
+  "sha256sum",
+  "sha512sum",
+  "cksum",
+  "b3sum",
+  "chmod",
+  "chown",
+  "chgrp",
+  "rm",
+  "cp",
+  "mv",
+  "ln",
+  "install",
+  "mkdir",
+  "rmdir",
+  "touch",
+  "find",
+  "which",
+  "type",
+  "command",
+  "env",
+  "wc",
+  "tr",
 ]);
 
 function has(text: string): boolean {
@@ -87,12 +140,20 @@ function nodeReadsProtected(node: Node): boolean {
     case "Pipeline":
       return (node as Pipeline).commands.some((c) => nodeReadsProtected(c));
     case "AndOr":
-      return ((node as unknown as { commands: Node[] }).commands ?? []).some((c) => nodeReadsProtected(c));
+      return ((node as unknown as { commands: Node[] }).commands ?? []).some(
+        (c) => nodeReadsProtected(c),
+      );
     case "Statement":
       return nodeReadsProtected((node as Statement).command);
     case "If": {
-      const n = node as unknown as { clause: unknown; then: unknown; else: unknown };
-      return [n.clause, n.then, n.else].some((l) => l != null && listReadsProtected(l));
+      const n = node as unknown as {
+        clause: unknown;
+        then: unknown;
+        else: unknown;
+      };
+      return [n.clause, n.then, n.else].some(
+        (l) => l != null && listReadsProtected(l),
+      );
     }
     case "For":
     case "Select":
@@ -160,7 +221,8 @@ function analyzeScript(script: Script, exposed: boolean): string | null {
 }
 
 function analyzeStmt(stmt: Statement, exposed: boolean): string | null {
-  const redirected = stmt.redirects?.some((r) => isStdoutRedirect(r.operator)) ?? false;
+  const redirected =
+    stmt.redirects?.some((r) => isStdoutRedirect(r.operator)) ?? false;
   return analyzeNode(stmt.command, redirected ? false : exposed);
 }
 
@@ -181,7 +243,11 @@ function analyzeNode(node: Node, exposed: boolean): string | null {
     case "Statement":
       return analyzeStmt(node, exposed);
     case "If": {
-      const n = node as unknown as { clause: unknown; then: unknown; else: unknown };
+      const n = node as unknown as {
+        clause: unknown;
+        then: unknown;
+        else: unknown;
+      };
       for (const l of [n.clause, n.then, n.else]) {
         if (l) {
           const r = analyzeList(l, exposed);
@@ -234,9 +300,15 @@ function analyzePipe(pipe: Pipeline, exposed: boolean): string | null {
     const last = pipe.commands[pipe.commands.length - 1];
     let lastRedirected = false;
     if (last.type === "Command") {
-      lastRedirected = (last as Command).redirects?.some((r) => isStdoutRedirect(r.operator)) ?? false;
+      lastRedirected =
+        (last as Command).redirects?.some((r) =>
+          isStdoutRedirect(r.operator),
+        ) ?? false;
     } else if (last.type === "Statement") {
-      lastRedirected = (last as Statement).redirects?.some((r) => isStdoutRedirect(r.operator)) ?? false;
+      lastRedirected =
+        (last as Statement).redirects?.some((r) =>
+          isStdoutRedirect(r.operator),
+        ) ?? false;
     }
     if (!lastRedirected) {
       return "Pipeline reads from protected path and output reaches stdout";
@@ -254,7 +326,8 @@ function analyzePipe(pipe: Pipeline, exposed: boolean): string | null {
 function analyzeCmd(cmd: Command, exposed: boolean): string | null {
   const name = getCmdName(cmd);
 
-  const redirected = cmd.redirects?.some((r) => isStdoutRedirect(r.operator)) ?? false;
+  const redirected =
+    cmd.redirects?.some((r) => isStdoutRedirect(r.operator)) ?? false;
   const eff = redirected ? false : exposed;
 
   for (const prefix of cmd.prefix ?? []) {

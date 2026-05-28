@@ -21,7 +21,8 @@ export class ContextUsageComponent implements StatusLineComponent {
 
     const pctColor = pct > 80 ? "error" : pct > 50 ? "warning" : "dim";
     return [
-      theme.fg(pctColor, pctStr) + theme.fg("text", ` ${currentStr}${bar}${maxStr}`),
+      theme.fg(pctColor, pctStr) +
+        theme.fg("text", ` ${currentStr}${bar}${maxStr}`),
     ];
   }
 }

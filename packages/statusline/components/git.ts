@@ -1,42 +1,66 @@
-import { execSync } from "node:child_process";
+import { exec } from "node:child_process";
 import type { ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import type { StatusLineComponent } from "./base.ts";
 
 export class GitComponent implements StatusLineComponent {
-    constructor(private ctx: ExtensionContext) {}
+  private branch: string | null = null;
+  private dirty = false;
+  private refreshing = false;
+  private requestRender: (() => void) | null = null;
+  private refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
-    private cached: { branch: string | null; dirty: boolean } | null = null;
-    private lastRefresh = 0;
+  constructor(private ctx: ExtensionContext) {}
 
-    private refresh() {
-        const now = Date.now();
-        if (this.cached && now - this.lastRefresh < 5000) return;
-        this.lastRefresh = now;
+  bindRender(fn: () => void) {
+    this.requestRender = fn;
+    this.scheduleRefresh(0);
+  }
 
-        try {
-            const branch = execSync("git rev-parse --abbrev-ref HEAD", {
-                cwd: this.ctx.cwd,
-                encoding: "utf-8",
-                stdio: ["pipe", "pipe", "pipe"],
-            }).trim();
-            const status = execSync("git status --porcelain", {
-                cwd: this.ctx.cwd,
-                encoding: "utf-8",
-                stdio: ["pipe", "pipe", "pipe"],
-            }).trim();
-            this.cached = { branch, dirty: status.length > 0 };
-        } catch {
-            this.cached = { branch: null, dirty: false };
-        }
+  dispose() {
+    if (this.refreshTimer) clearTimeout(this.refreshTimer);
+  }
+
+  private scheduleRefresh(delayMs: number) {
+    if (this.refreshTimer) clearTimeout(this.refreshTimer);
+    this.refreshTimer = setTimeout(() => this.refresh(), delayMs);
+  }
+
+  private async refresh() {
+    if (this.refreshing) return;
+    this.refreshing = true;
+
+    const cwd = this.ctx.cwd;
+    try {
+      const [branchOut, statusOut] = await Promise.all([
+        this.exec("git rev-parse --abbrev-ref HEAD", cwd),
+        this.exec("git status --porcelain", cwd),
+      ]);
+      this.branch = branchOut?.trim() || null;
+      this.dirty = (statusOut?.trim().length ?? 0) > 0;
+    } catch {
+      this.branch = null;
+      this.dirty = false;
     }
 
-    render(_width: number, theme: Theme): string[] {
-        this.refresh();
-        if (!this.cached?.branch) return [];
+    this.refreshing = false;
+    this.requestRender?.();
+    this.scheduleRefresh(5000);
+  }
 
-        const marker = this.cached.dirty
-            ? theme.fg("error", "✗")
-            : theme.fg("success", "✓");
-        return [theme.fg("muted", this.cached.branch) + " " + marker];
-    }
+  private exec(cmd: string, cwd: string): Promise<string | null> {
+    return new Promise((resolve) => {
+      exec(cmd, { cwd, encoding: "utf-8" }, (_err, stdout) => {
+        resolve(_err ? null : stdout);
+      });
+    });
+  }
+
+  render(_width: number, theme: Theme): string[] {
+    if (!this.branch) return [];
+
+    const marker = this.dirty
+      ? theme.fg("error", "✗")
+      : theme.fg("success", "✓");
+    return [theme.fg("muted", this.branch) + " " + marker];
+  }
 }

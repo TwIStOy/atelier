@@ -8,13 +8,13 @@ Set the `ZAI_API_KEY` environment variable with your Z.AI API key (create one at
 
 ## Supported Models
 
-| Model | Context | Max Output | Reasoning | Notes |
-|---|---|---|---|---|
-| `glm-5.1` | 200K | 128K | yes | Flagship, all plans |
-| `glm-5` | 200K | 128K | yes | Pro/Max plans only |
-| `glm-5-turbo` | 200K | 16K | yes | All plans |
-| `glm-4.7` | 128K | 16K | no | All plans |
-| `glm-4.5-air` | 128K | 16K | no | Lightweight, all plans |
+| Model         | Context | Max Output | Reasoning | Notes                  |
+| ------------- | ------- | ---------- | --------- | ---------------------- |
+| `glm-5.1`     | 200K    | 128K       | yes       | Flagship, all plans    |
+| `glm-5`       | 200K    | 128K       | yes       | Pro/Max plans only     |
+| `glm-5-turbo` | 200K    | 16K        | yes       | All plans              |
+| `glm-4.7`     | 128K    | 16K        | no        | All plans              |
+| `glm-4.5-air` | 128K    | 16K        | no        | Lightweight, all plans |
 
 ## API Endpoint
 
@@ -39,11 +39,11 @@ The `zai_quota` tool is registered for the LLM to call. Ask the agent "check my 
 
 Queries three Z.AI monitoring endpoints in parallel:
 
-| Endpoint | URL | Info |
-|---|---|---|
-| Quota Limit | `https://api.z.ai/api/monitor/usage/quota/limit` | 5h/weekly quota percentages, reset times |
-| Model Usage | `https://api.z.ai/api/monitor/usage/model-usage` | Token count, model call count (24h window) |
-| Tool Usage | `https://api.z.ai/api/monitor/usage/tool-usage` | Web search, web read, ZRead counts (24h window) |
+| Endpoint    | URL                                              | Info                                            |
+| ----------- | ------------------------------------------------ | ----------------------------------------------- |
+| Quota Limit | `https://api.z.ai/api/monitor/usage/quota/limit` | 5h/weekly quota percentages, reset times        |
+| Model Usage | `https://api.z.ai/api/monitor/usage/model-usage` | Token count, model call count (24h window)      |
+| Tool Usage  | `https://api.z.ai/api/monitor/usage/tool-usage`  | Web search, web read, ZRead counts (24h window) |
 
 Auth uses the same `ZAI_API_KEY` env var, passed as the `Authorization` header (no Bearer prefix).
 
