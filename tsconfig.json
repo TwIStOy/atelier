@@ -1,0 +1,10 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/common" },
+    { "path": "packages/zai-coding-plan" },
+    { "path": "packages/inference-self-host" },
+    { "path": "packages/protect-secrets" },
+    { "path": "packages/statusline" }
+  ]
+}

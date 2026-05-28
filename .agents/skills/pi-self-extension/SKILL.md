@@ -90,7 +90,7 @@ Location: `~/.pi/agent/extensions/web-search.ts`
 
 ```typescript
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { Type } from "@sinclair/typebox";
+import { Type } from "typebox";
 
 export default function (pi: ExtensionAPI) {
   // Register tools
@@ -143,7 +143,7 @@ export default function (pi: ExtensionAPI) {
 - ✅ Return proper result shapes with `content` and `details`
 - ✅ Support cancellation via `signal`
 - ✅ Truncate output (50KB/2000 lines max)
-- ✅ Use `StringEnum` from `@earendil-works/pi-ai` for enums
+- ✅ Use `Type.Union`/`Type.Literal` from `"typebox"` for enums (StringEnum not available in @earendil-works)
 
 ### Output Truncation (Mandatory)
 
@@ -354,7 +354,7 @@ Standard migration:
 ```typescript
 // ~/.pi/agent/extensions/web-search.ts
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { Type } from "@sinclair/typebox";
+import { Type } from "typebox";
 
 export default function (pi: ExtensionAPI) {
   pi.registerTool({
@@ -474,6 +474,7 @@ Before considering an extension complete:
 
 **Dependencies:**
 - [ ] All imported `@earendil-works/*` packages listed as explicit `devDependencies` in `package.json` (transitive deps like `pi-tui` are resolved at runtime by jiti but the LSP cannot find type declarations without them)
+- [ ] Root `pi-tui`/`pi-ai` versions aligned with what `pi-coding-agent` bundles internally — check `node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-tui/package.json` for the bundled version
 
 ## References
 

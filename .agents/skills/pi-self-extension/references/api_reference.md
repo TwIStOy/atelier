@@ -3,9 +3,8 @@
 ## Core Imports
 
 ```typescript
-import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
-import { Type } from "@sinclair/typebox";
-import { StringEnum } from "@mariozechner/pi-ai";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { Type } from "typebox";
 ```
 
 ## ExtensionAPI Methods
@@ -38,7 +37,7 @@ pi.registerTool({
   label: "My Tool", // Display name
   description: "What it does", // LLM sees this
   parameters: Type.Object({ // JSON Schema
-    action: StringEnum(["list", "add"] as const),
+    action: Type.Union([Type.Literal("list"), Type.Literal("add")]),
     text: Type.Optional(Type.String()),
   }),
   async execute(toolCallId, params, signal, onUpdate, ctx) {
@@ -114,7 +113,7 @@ pi.on("turn_end", async (event, ctx) => {
 ### Tool Events
 
 ```typescript
-import { isToolCallEventType } from "@mariozechner/pi-coding-agent";
+import { isToolCallEventType } from "@earendil-works/pi-coding-agent";
 
 pi.on("tool_call", async (event, ctx) => {
   // Before tool executes
@@ -309,7 +308,7 @@ import {
   formatSize,   // "50KB", "1.5MB"
   DEFAULT_MAX_BYTES,  // 50KB
   DEFAULT_MAX_LINES,  // 2000
-} from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-coding-agent";
 
 const output = "...";
 const truncation = truncateHead(output, {
@@ -326,15 +325,16 @@ if (truncation.truncated) {
 
 ## Type Schemas
 
-### StringEnum (Google-compatible)
+### StringEnum replacement
+
+`StringEnum` is NOT available in `@earendil-works/pi-ai`. Use `Type.Union`/`Type.Literal` from `"typebox"` instead:
 
 ```typescript
-import { StringEnum } from "@mariozechner/pi-ai";
+import { Type } from "typebox";
 
-// Use StringEnum instead of Type.Union/Type.Literal
 parameters: Type.Object({
-  action: StringEnum(["list", "add", "delete"] as const),
-  format: StringEnum(["json", "yaml"] as const, { default: "json" }),
+  action: Type.Union([Type.Literal("list"), Type.Literal("add"), Type.Literal("delete")]),
+  format: Type.Union([Type.Literal("json"), Type.Literal("yaml")]),
 })
 ```
 
@@ -373,14 +373,13 @@ config: Type.Object({
 ## Example: Complete Extension
 
 ```typescript
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { Type } from "@sinclair/typebox";
-import { StringEnum } from "@mariozechner/pi-ai";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { Type } from "typebox";
 import {
   truncateHead,
   DEFAULT_MAX_BYTES,
   DEFAULT_MAX_LINES,
-} from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-coding-agent";
 
 export default function (pi: ExtensionAPI) {
   // State
@@ -405,7 +404,7 @@ export default function (pi: ExtensionAPI) {
     parameters: Type.Object({
       query: Type.String({ description: "Search query" }),
       limit: Type.Optional(Type.Number({ default: 5, minimum: 1, maximum: 20 })),
-      format: StringEnum(["text", "json"] as const, { default: "text" }),
+      format: Type.Union([Type.Literal("text"), Type.Literal("json")]),
     }),
     async execute(toolCallId, params, signal, onUpdate, ctx) {
       if (signal?.aborted) {
