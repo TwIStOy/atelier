@@ -40,3 +40,4 @@ npm test
 
 - No comments in code unless explicitly requested.
 - The `pi-self-extension` skill should be loaded when creating or modifying extensions.
+- **Always run `npm run format` after every file change** to keep code style consistent.

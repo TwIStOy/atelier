@@ -1,6 +1,9 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { queryUsage } from "./quota.ts";
-import { resetForegroundBeforeText } from "@htwang-contrib/common";
+import {
+  ZAI_CODING_PLAN_EVENTS,
+  resetForegroundBeforeText,
+} from "@htwang-contrib/common";
 
 export default function (pi: ExtensionAPI) {
   pi.registerProvider("zai-coding-plan", {
@@ -56,6 +59,12 @@ export default function (pi: ExtensionAPI) {
         maxTokens: 16384,
       },
     ],
+  });
+
+  pi.events.on(ZAI_CODING_PLAN_EVENTS.REQUEST_USAGE, async () => {
+    const apiKey = process.env.ZAI_API_KEY;
+    if (!apiKey) return;
+    await queryUsage(pi, apiKey).catch(() => {});
   });
 
   pi.registerCommand("zai-usage", {

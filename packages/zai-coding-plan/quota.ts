@@ -1,5 +1,6 @@
 import { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import {
+  ZAI_CODING_PLAN_EVENTS,
   formatProgressBar,
   formatNumber,
   terminalWidth,
@@ -17,8 +18,6 @@ const MONITOR_ENDPOINTS = {
   modelUsage: "https://api.z.ai/api/monitor/usage/model-usage",
   toolUsage: "https://api.z.ai/api/monitor/usage/tool-usage",
 } as const;
-
-const ZAI_CODING_PLAN_USAGE_EVENT = "pi-extensions:zai-coding-plan:usage";
 
 const RAW_WINDOW_MAP: Record<string, CodingPlanUsageWindow> = {
   "3_5": "5_hours",
@@ -229,7 +228,7 @@ export async function queryUsage(
 
   const usage = buildUsage(quota);
   if (usage) {
-    pi.events.emit(ZAI_CODING_PLAN_USAGE_EVENT, {
+    pi.events.emit(ZAI_CODING_PLAN_EVENTS.USAGE_UPDATE, {
       usage,
     });
   }
