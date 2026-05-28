@@ -185,10 +185,12 @@ import type { AssistantMessage } from "@earendil-works/pi-ai";
 ```typescript
 // Current model
 ctx.model?.id           // "glm-5.1"
+ctx.model?.name         // "GLM 5.1" (display name)
 ctx.model?.provider     // "zai-coding-plan"
+ctx.model?.reasoning    // true/false
 
 // Thinking level
-pi.getThinkingLevel()   // "high" | "medium" | "low" | "off"
+pi.getThinkingLevel()   // "minimal" | "low" | "medium" | "high" | "xhigh"
 
 // Context usage
 ctx.getContextUsage()   // { tokens, contextWindow, percent }
@@ -200,9 +202,12 @@ ctx.cwd                 // "/path/to/project"
 for (const e of ctx.sessionManager.getBranch()) {
     if (e.type === "message" && e.message.role === "assistant") {
         const m = e.message as AssistantMessage;
-        m.usage.input;    // input tokens
-        m.usage.output;   // output tokens
-        m.usage.cost.total; // cost in dollars
+        m.usage.input;        // input tokens
+        m.usage.output;       // output tokens
+        m.usage.cacheRead;    // cache read tokens
+        m.usage.cacheWrite;   // cache write tokens
+        m.usage.totalTokens;  // total tokens
+        m.usage.cost.total;   // cost in dollars
     }
 }
 ```
