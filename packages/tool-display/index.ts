@@ -17,6 +17,10 @@ import { ToolExecutionComponent } from "@earendil-works/pi-coding-agent";
 import { globalToolDisplayRegistry } from "./registry.ts";
 import { renderToolCall } from "./tool-call-display.ts";
 
+const FALLBACK_THEME: Theme = {
+  fg: (_color: string, text: string) => text,
+} as Theme;
+
 function patchToolExecutionRender(getTheme: () => Theme) {
   const proto: any = ToolExecutionComponent.prototype;
   proto.__tdGetTheme = getTheme;
@@ -43,7 +47,7 @@ function patchToolExecutionRender(getTheme: () => Theme) {
       registry: globalToolDisplayRegistry,
     };
 
-    const theme = proto.__tdGetTheme?.();
+    const theme = proto.__tdGetTheme?.() ?? FALLBACK_THEME;
     const rendered = renderToolCall(opts, theme);
     return rendered.render(width);
   };
@@ -51,14 +55,13 @@ function patchToolExecutionRender(getTheme: () => Theme) {
 }
 
 export default function (pi: ExtensionAPI) {
-  let activeTheme: Theme = {
-    fg: (_color: string, text: string) => text,
-  } as Theme;
+  let activeTheme: Theme = FALLBACK_THEME;
 
   patchToolExecutionRender(() => activeTheme);
 
   pi.on("session_start", (_event, ctx) => {
-    if (!ctx.hasUI) return;
-    activeTheme = ctx.ui.theme;
+    if (ctx.ui?.theme) {
+      activeTheme = ctx.ui.theme;
+    }
   });
 }

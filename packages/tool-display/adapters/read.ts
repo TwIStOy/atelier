@@ -51,14 +51,14 @@ export const readAdapter: ToolDisplayAdapter<ReadArgs> = {
       ? theme.fg("accent", path)
       : theme.fg("toolOutput", "...");
     return (
-      theme.fg("toolTitle", theme.bold("read")) +
+      theme.fg("toolTitle", theme.bold("Read")) +
       " " +
       pathDisplay +
       formatLineRange(args, theme)
     );
   },
 
-  formatCollapsedContent(args, output, theme, _width) {
+  formatCollapsedContent(_args, output, theme, _width) {
     if (!output) return [];
     const rawLines = trimTrailingEmpty(output.split("\n"));
     const count = rawLines.length;
