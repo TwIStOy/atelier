@@ -5,6 +5,7 @@
     { "path": "packages/zai-coding-plan" },
     { "path": "packages/inference-self-host" },
     { "path": "packages/protect-secrets" },
-    { "path": "packages/statusline" }
+    { "path": "packages/statusline" },
+    { "path": "packages/user-message" }
   ]
 }

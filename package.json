@@ -11,7 +11,8 @@
       "packages/zai-coding-plan",
       "packages/inference-self-host",
       "packages/protect-secrets",
-      "packages/statusline"
+      "packages/statusline",
+      "packages/user-message"
     ],
     "skills": [],
     "themes": [
