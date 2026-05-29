@@ -25,3 +25,9 @@ export function formatProgressBar(usagePct: number, width: number): string {
   const empty = width - filled;
   return `[${"█".repeat(filled)}${"░".repeat(empty)}]`;
 }
+
+export function trimTrailingEmpty(lines: string[]): string[] {
+  let end = lines.length;
+  while (end > 0 && lines[end - 1] === "") end--;
+  return lines.slice(0, end);
+}

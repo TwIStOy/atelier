@@ -4,17 +4,11 @@ import {
   type Theme,
 } from "@earendil-works/pi-coding-agent";
 import { wrapTextWithAnsi } from "@earendil-works/pi-tui";
-import { shortenPath } from "@htwang-contrib/common";
+import { shortenPath, trimTrailingEmpty } from "@htwang-contrib/common";
 import type { ToolDisplayAdapter } from "../types.ts";
 
 function replaceTabs(text: string): string {
   return text.replace(/\t/g, "   ");
-}
-
-function trimTrailingEmpty(lines: string[]): string[] {
-  let end = lines.length;
-  while (end > 0 && lines[end - 1] === "") end--;
-  return lines.slice(0, end);
 }
 
 function formatLineRange(args: ReadArgs, theme: Theme): string {

@@ -1,5 +1,6 @@
 export {
   shortenPath,
+  trimTrailingEmpty,
   formatTokens,
   formatNumber,
   formatCwd,
