@@ -1,3 +1,10 @@
+export function shortenPath(path: string): string {
+  if (typeof path !== "string") return "";
+  const home = process.env.HOME;
+  if (home && path.startsWith(home)) return `~${path.slice(home.length)}`;
+  return path;
+}
+
 export function formatTokens(n: number): string {
   if (n < 1000) return `${n}`;
   if (n < 1_000_000) return `${(n / 1000).toFixed(1)}k`;
@@ -9,9 +16,7 @@ export function formatNumber(n: number): string {
 }
 
 export function formatCwd(cwd: string): string {
-  const home = process.env.HOME;
-  if (home && cwd.startsWith(home)) return `~${cwd.slice(home.length)}`;
-  return cwd;
+  return shortenPath(cwd);
 }
 
 export function formatProgressBar(usagePct: number, width: number): string {

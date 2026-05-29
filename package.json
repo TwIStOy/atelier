@@ -12,7 +12,8 @@
       "packages/inference-self-host",
       "packages/protect-secrets",
       "packages/statusline",
-      "packages/user-message"
+      "packages/user-message",
+      "packages/tool-display"
     ],
     "skills": [],
     "themes": [

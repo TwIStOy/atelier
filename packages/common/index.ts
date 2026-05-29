@@ -1,4 +1,5 @@
 export {
+  shortenPath,
   formatTokens,
   formatNumber,
   formatCwd,
