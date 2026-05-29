@@ -6,9 +6,6 @@ import type {
   Theme,
 } from "@earendil-works/pi-coding-agent";
 import { CodingPlanUsageComponent } from "./components/coding-plan-usage.ts";
-import { ContextUsageComponent } from "./components/context-usage.ts";
-import { ModelInfoComponent } from "./components/model-info.ts";
-import { PathComponent } from "./components/path.ts";
 import { GitComponent } from "./components/git.ts";
 import { TokensComponent } from "./components/tokens.ts";
 import type { StatusLineComponent } from "./components/base.ts";
@@ -25,11 +22,8 @@ export function makeFooter(
   const codingPlan = new CodingPlanUsageComponent(ctx, pi);
 
   const components: StatusLineComponent[] = [
-    new ModelInfoComponent(ctx, pi),
-    new PathComponent(ctx),
     git,
     codingPlan,
-    new ContextUsageComponent(ctx),
     new TokensComponent(ctx),
   ];
 

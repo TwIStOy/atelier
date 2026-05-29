@@ -1,5 +1,6 @@
 import {
   CustomEditor,
+  type ExtensionAPI,
   type ExtensionContext,
   type ThemeColor,
 } from "@earendil-works/pi-coding-agent";
@@ -57,19 +58,15 @@ function getSessionCost(ctx: ExtensionContext): number {
   return total;
 }
 
-export class AmpEditor extends CustomEditor {
-  private editorTheme: EditorTheme;
-  private getCtx: () => ExtensionContext;
-
+export class MyEditor extends CustomEditor {
   constructor(
     tui: TUI,
     theme: EditorTheme,
     keybindings: KeybindingsManager,
-    getCtx: () => ExtensionContext,
+    private readonly getCtx: () => ExtensionContext,
+    private readonly pi: ExtensionAPI,
   ) {
     super(tui, theme, keybindings, { paddingX: 1 });
-    this.editorTheme = theme;
-    this.getCtx = getCtx;
     this.borderColor = (s: string) => this.fg("border", s);
   }
 
@@ -126,9 +123,12 @@ export class AmpEditor extends CustomEditor {
   }
 
   private getModelLabel(maxWidth: number): string {
-    const name = this.ctx.model?.name ?? "model unknown";
-    const model = this.fg("text", truncateToWidth(name, maxWidth, "…"));
-    return ` ${model} `;
+    const model = this.ctx.model;
+    const name = model?.name ?? "model unknown";
+    const reasoning = model?.reasoning && this.pi.getThinkingLevel() !== "off";
+    const label = reasoning ? `${name} 🧠` : name;
+    const text = this.fg("text", truncateToWidth(label, maxWidth, "…"));
+    return ` ${text} `;
   }
 
   private getCwdLabel(): string {

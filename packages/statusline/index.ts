@@ -3,7 +3,7 @@ import type {
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 import { makeFooter } from "./footer.ts";
-import { AmpEditor } from "./editor.ts";
+import { MyEditor } from "./editor.ts";
 
 export default function (pi: ExtensionAPI) {
   let activeCtx: ExtensionContext | undefined;
@@ -14,7 +14,7 @@ export default function (pi: ExtensionAPI) {
 
     ctx.ui.setEditorComponent(
       (tui, theme, keybindings) =>
-        new AmpEditor(tui, theme, keybindings, () => activeCtx ?? ctx),
+        new MyEditor(tui, theme, keybindings, () => activeCtx ?? ctx, pi),
     );
 
     ctx.ui.setFooter(makeFooter(ctx, pi));
