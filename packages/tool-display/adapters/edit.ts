@@ -66,13 +66,12 @@ function buildDeltaArgs(
   q("--hunk-header-style", "omit");
   q("--hunk-header-decoration-style", "omit");
 
-  if (isSplit) {
-    q("--line-numbers-left-style", styles.overlay0);
-    q("--line-numbers-minus-style", `bold ${styles.red}`);
-    q("--line-numbers-plus-style", `bold ${styles.green}`);
-    q("--line-numbers-right-style", styles.overlay0);
-    q("--line-numbers-zero-style", styles.overlay0);
-  }
+  args.push("--line-numbers");
+  q("--line-numbers-left-style", styles.overlay0);
+  q("--line-numbers-minus-style", `bold ${styles.red}`);
+  q("--line-numbers-plus-style", `bold ${styles.green}`);
+  q("--line-numbers-right-style", styles.overlay0);
+  q("--line-numbers-zero-style", styles.overlay0);
 
   q("--minus-style", `syntax ${mixHex(styles.red, 20, styles.base, 80)}`);
   q(
