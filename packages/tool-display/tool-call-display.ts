@@ -3,11 +3,7 @@ import {
   Theme,
   truncateToVisualLines,
 } from "@earendil-works/pi-coding-agent";
-import {
-  Container,
-  truncateToWidth,
-  visibleWidth,
-} from "@earendil-works/pi-tui";
+import { Container, truncateToWidth } from "@earendil-works/pi-tui";
 import type { ContentRenderer, ToolDisplayAdapter } from "./types.ts";
 
 export type { ContentRenderer, ToolDisplayAdapter };
