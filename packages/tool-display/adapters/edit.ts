@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { diffLines } from "diff";
+import { diffLines, type Change } from "diff";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { shortenPath } from "@htwang-contrib/common";
@@ -9,6 +9,8 @@ import { INDENT, replaceTabs } from "./shared.ts";
 
 const SPLIT_MIN_WIDTH = 100;
 const BAR_WIDTH = 6;
+const MERGE_CONTEXT = 10;
+const CONTEXT_LINES = 3;
 
 interface EditArgs {
   path?: string;
@@ -16,6 +18,12 @@ interface EditArgs {
   edits?: Array<{ oldText: string; newText: string }>;
   oldText?: string;
   newText?: string;
+}
+
+interface ChangeBlock {
+  changes: Change[];
+  preContext: string[];
+  postContext: string[];
 }
 
 function getEdits(args: EditArgs): Array<{ oldText: string; newText: string }> {
@@ -42,6 +50,101 @@ function countChanges(edits: Array<{ oldText: string; newText: string }>): {
     }
   }
   return { added, removed };
+}
+
+function groupChangesIntoChunks(changes: Change[]): ChangeBlock[] {
+  const changeIndices: number[] = [];
+  for (let i = 0; i < changes.length; i++) {
+    if (changes[i].added || changes[i].removed) {
+      changeIndices.push(i);
+    }
+  }
+  if (changeIndices.length === 0) return [];
+
+  const groups: number[][] = [[changeIndices[0]]];
+  for (let i = 1; i < changeIndices.length; i++) {
+    const prev = changeIndices[i - 1];
+    const curr = changeIndices[i];
+    let gapLines = 0;
+    for (let j = prev + 1; j < curr; j++) {
+      if (!changes[j].added && !changes[j].removed) {
+        gapLines += changes[j].count ?? 0;
+      }
+    }
+    if (gapLines <= MERGE_CONTEXT) {
+      groups[groups.length - 1].push(changeIndices[i]);
+    } else {
+      groups.push([changeIndices[i]]);
+    }
+  }
+
+  return groups.map((group) => {
+    const firstChangeIdx = group[0];
+    const lastChangeIdx = group[group.length - 1];
+    let changeStart = firstChangeIdx;
+    let changeEnd = lastChangeIdx;
+    while (changeEnd < changes.length - 1) {
+      const next = changes[changeEnd + 1];
+      if (!next.added && !next.removed) break;
+      changeEnd++;
+    }
+
+    const blockChanges: Change[] = [];
+    for (let i = changeStart; i <= changeEnd; i++) {
+      blockChanges.push(changes[i]);
+    }
+
+    const preEq = firstChangeIdx > 0 ? changes[firstChangeIdx - 1] : null;
+    const preLines =
+      preEq && !preEq.added && !preEq.removed
+        ? preEq.value.replace(/\n$/, "").split("\n")
+        : [];
+    const postEq =
+      changeEnd < changes.length - 1 ? changes[changeEnd + 1] : null;
+    const postLines =
+      postEq && !postEq.added && !postEq.removed
+        ? postEq.value.replace(/\n$/, "").split("\n")
+        : [];
+
+    return {
+      changes: blockChanges,
+      preContext: preLines.slice(-CONTEXT_LINES),
+      postContext: postLines.slice(0, CONTEXT_LINES),
+    };
+  });
+}
+
+function buildFullFileDiff(
+  filePath: string,
+  edits: Array<{ oldText: string; newText: string }>,
+): { oldFull: string; newFull: string } | null {
+  try {
+    const newContent = readFileSync(resolve(filePath), "utf-8");
+    let oldContent = newContent;
+
+    const positions: Array<{
+      oldText: string;
+      newText: string;
+      pos: number;
+    }> = [];
+    for (const edit of edits) {
+      const pos = newContent.indexOf(edit.newText);
+      if (pos === -1) continue;
+      positions.push({ ...edit, pos });
+    }
+
+    positions.sort((a, b) => b.pos - a.pos);
+    for (const p of positions) {
+      oldContent =
+        oldContent.slice(0, p.pos) +
+        p.oldText +
+        oldContent.slice(p.pos + p.newText.length);
+    }
+
+    return { oldFull: oldContent, newFull: newContent };
+  } catch {
+    return null;
+  }
 }
 
 function findStartLine(
@@ -103,6 +206,70 @@ function padRight(text: string, width: number): string {
   return text + " ".repeat(width - vw);
 }
 
+function computeMaxDisplayedLineNum(
+  changes: Change[],
+  chunks: ChangeBlock[],
+  startLine: number,
+): number {
+  let oldLine = startLine;
+  let newLine = startLine;
+  let maxNum = 0;
+
+  for (const chunk of chunks) {
+    const firstIdx = changes.indexOf(chunk.changes[0]);
+    if (firstIdx > 0) {
+      const preEq = changes[firstIdx - 1];
+      if (!preEq.added && !preEq.removed) {
+        const allPre = preEq.value.replace(/\n$/, "").split("\n");
+        oldLine += allPre.length - chunk.preContext.length;
+        newLine += allPre.length - chunk.preContext.length;
+      }
+    }
+
+    for (const ctxLine of chunk.preContext) {
+      maxNum = Math.max(maxNum, oldLine, newLine);
+      oldLine++;
+      newLine++;
+    }
+
+    for (const change of chunk.changes) {
+      const textLines = change.value.replace(/\n$/, "").split("\n");
+      for (let i = 0; i < textLines.length; i++) {
+        if (change.added) {
+          maxNum = Math.max(maxNum, newLine);
+          newLine++;
+        } else if (change.removed) {
+          maxNum = Math.max(maxNum, oldLine);
+          oldLine++;
+        } else {
+          maxNum = Math.max(maxNum, oldLine, newLine);
+          oldLine++;
+          newLine++;
+        }
+      }
+    }
+
+    const lastChange = chunk.changes[chunk.changes.length - 1];
+    const postEqIdx = changes.indexOf(lastChange) + 1;
+    if (postEqIdx < changes.length) {
+      const postEq = changes[postEqIdx];
+      if (!postEq.added && !postEq.removed) {
+        const allPost = postEq.value.replace(/\n$/, "").split("\n");
+        const showCount = Math.min(chunk.postContext.length, allPost.length);
+        for (let j = 0; j < showCount; j++) {
+          maxNum = Math.max(maxNum, oldLine, newLine);
+          oldLine++;
+          newLine++;
+        }
+        oldLine += allPost.length - showCount;
+        newLine += allPost.length - showCount;
+      }
+    }
+  }
+
+  return maxNum;
+}
+
 function renderUnifiedDiff(
   oldText: string,
   newText: string,
@@ -111,43 +278,89 @@ function renderUnifiedDiff(
   startLine: number,
 ): string[] {
   const changes = diffLines(oldText, newText, { newlineIsToken: true });
-  const maxOld = startLine + oldText.split("\n").length - 1;
-  const maxNew = startLine + newText.split("\n").length - 1;
-  const maxNum = Math.max(maxOld, maxNew);
+  const chunks = groupChangesIntoChunks(changes);
+  if (chunks.length === 0) return [];
+
+  const maxNum = computeMaxDisplayedLineNum(changes, chunks, startLine);
   const gw = gutterWidth(maxNum);
-  const contentWidth = Math.max(1, width - INDENT.length - gw - 2);
+  const contentWidth = Math.max(1, width - INDENT.length - gw - 1);
   const lines: string[] = [];
+  const sep = theme.fg("dim", "─".repeat(Math.max(1, width - INDENT.length)));
 
   let oldLine = startLine;
   let newLine = startLine;
 
-  for (const change of changes) {
-    const textLines = change.value.replace(/\n$/, "").split("\n");
-    for (const line of textLines) {
-      const content = truncateToWidth(replaceTabs(line), contentWidth, "");
-      if (change.added) {
-        const full = padRight(
-          rawGutter(newLine, maxNum) + "+ " + content,
-          width - INDENT.length,
-        );
-        lines.push(INDENT + theme.bg("toolSuccessBg", full));
-        newLine++;
-      } else if (change.removed) {
-        const full = padRight(
-          rawGutter(oldLine, maxNum) + "- " + content,
-          width - INDENT.length,
-        );
-        lines.push(INDENT + theme.bg("toolErrorBg", full));
-        oldLine++;
-      } else {
-        lines.push(
-          INDENT +
-            formatDiffGutter(oldLine, maxNum, theme) +
-            theme.fg("dim", "  " + content),
-        );
-        oldLine++;
-        newLine++;
+  function skipEqualLines(count: number) {
+    oldLine += count;
+    newLine += count;
+  }
+
+  function renderContext(line: string) {
+    const content = truncateToWidth(replaceTabs(line), contentWidth, "");
+    lines.push(
+      INDENT +
+        formatDiffGutter(oldLine, maxNum, theme) +
+        theme.fg("dim", " " + content),
+    );
+    oldLine++;
+    newLine++;
+  }
+
+  function renderSep() {
+    lines.push(INDENT + sep);
+  }
+
+  for (let ci = 0; ci < chunks.length; ci++) {
+    const chunk = chunks[ci];
+
+    if (ci > 0) renderSep();
+
+    const preEqIdx = changes.indexOf(chunk.changes[0]) - 1;
+    if (preEqIdx >= 0) {
+      const preEq = changes[preEqIdx];
+      const allPreLines = preEq.value.replace(/\n$/, "").split("\n");
+      const skipCount = allPreLines.length - chunk.preContext.length;
+      skipEqualLines(skipCount);
+    }
+
+    for (const ctxLine of chunk.preContext) {
+      renderContext(ctxLine);
+    }
+
+    for (const change of chunk.changes) {
+      const textLines = change.value.replace(/\n$/, "").split("\n");
+      for (const line of textLines) {
+        const content = truncateToWidth(replaceTabs(line), contentWidth, "");
+        if (change.added) {
+          const full = padRight(
+            rawGutter(newLine, maxNum) + " " + content,
+            width - INDENT.length,
+          );
+          lines.push(INDENT + theme.bg("toolSuccessBg", full));
+          newLine++;
+        } else if (change.removed) {
+          const full = padRight(
+            rawGutter(oldLine, maxNum) + " " + content,
+            width - INDENT.length,
+          );
+          lines.push(INDENT + theme.bg("toolErrorBg", full));
+          oldLine++;
+        } else {
+          renderContext(line);
+        }
       }
+    }
+
+    const lastChange = chunk.changes[chunk.changes.length - 1];
+    const postEqIdx = changes.indexOf(lastChange) + 1;
+    if (postEqIdx < changes.length) {
+      const postEq = changes[postEqIdx];
+      const allPostLines = postEq.value.replace(/\n$/, "").split("\n");
+      const showCount = Math.min(chunk.postContext.length, allPostLines.length);
+      for (let j = 0; j < showCount; j++) {
+        renderContext(allPostLines[j]);
+      }
+      skipEqualLines(allPostLines.length - showCount);
     }
   }
 
@@ -160,8 +373,139 @@ interface DiffRow {
   kind: "equal" | "changed" | "removed" | "added";
 }
 
-function buildDiffRows(oldText: string, newText: string): DiffRow[] {
+function renderSplitDiff(
+  oldText: string,
+  newText: string,
+  theme: Theme,
+  width: number,
+  startLine: number,
+): string[] {
   const changes = diffLines(oldText, newText, { newlineIsToken: true });
+  const chunks = groupChangesIntoChunks(changes);
+  if (chunks.length === 0) return [];
+
+  const maxNum = computeMaxDisplayedLineNum(changes, chunks, startLine);
+  const sep = theme.fg("dim", "│");
+  const sepWidth = 1;
+  const gw = gutterWidth(maxNum);
+  const half = Math.floor((width - INDENT.length - sepWidth - gw * 2) / 2);
+  const lw = Math.max(half, 1);
+  const rw = Math.max(width - INDENT.length - sepWidth - gw * 2 - lw, 1);
+  const lcw = Math.max(lw - gw, 1);
+  const rcw = Math.max(rw - gw, 1);
+  const hsep = theme.fg("dim", "─".repeat(Math.max(1, width - INDENT.length)));
+
+  let oldLine = startLine;
+  let newLine = startLine;
+  const lines: string[] = [];
+
+  function skipEqualLines(count: number) {
+    oldLine += count;
+    newLine += count;
+  }
+
+  function renderSplitRow(
+    left: string,
+    right: string,
+    kind: "equal" | "changed" | "removed" | "added",
+  ) {
+    const leftNum = kind !== "added" ? oldLine : null;
+    const rightNum = kind !== "removed" ? newLine : null;
+
+    let leftStyled: string;
+    let rightStyled: string;
+
+    if (kind === "equal") {
+      const content = truncateToWidth(replaceTabs(left), lcw, "");
+      leftStyled = padRight(
+        formatDiffGutter(leftNum, maxNum, theme) + " " + content,
+        gw + lw,
+      );
+      rightStyled = padRight(
+        formatDiffGutter(rightNum, maxNum, theme) +
+          " " +
+          truncateToWidth(replaceTabs(right), rcw, ""),
+        gw + rw,
+      );
+    } else {
+      if (kind !== "added") {
+        const raw =
+          rawGutter(leftNum, maxNum) +
+          " " +
+          truncateToWidth(replaceTabs(left), lcw - 1, "");
+        leftStyled = theme.bg("toolErrorBg", padRight(raw, gw + lw));
+      } else {
+        leftStyled = theme.bg("toolErrorBg", " ".repeat(gw + lw));
+      }
+      if (kind !== "removed") {
+        const raw =
+          rawGutter(rightNum, maxNum) +
+          " " +
+          truncateToWidth(replaceTabs(right), rcw - 1, "");
+        rightStyled = theme.bg("toolSuccessBg", padRight(raw, gw + rw));
+      } else {
+        rightStyled = theme.bg("toolSuccessBg", " ".repeat(gw + rw));
+      }
+    }
+
+    lines.push(INDENT + leftStyled + sep + rightStyled);
+    if (kind !== "added") oldLine++;
+    if (kind !== "removed") newLine++;
+  }
+
+  function renderSep() {
+    lines.push(INDENT + hsep);
+  }
+
+  for (let ci = 0; ci < chunks.length; ci++) {
+    const chunk = chunks[ci];
+
+    if (ci > 0) renderSep();
+
+    const preEqIdx = changes.indexOf(chunk.changes[0]) - 1;
+    if (preEqIdx >= 0) {
+      const preEq = changes[preEqIdx];
+      const allPreLines = preEq.value.replace(/\n$/, "").split("\n");
+      const skipCount = allPreLines.length - chunk.preContext.length;
+      skipEqualLines(skipCount);
+    }
+
+    for (const ctxLine of chunk.preContext) {
+      renderSplitRow(ctxLine, ctxLine, "equal");
+    }
+
+    const blockChanges: Change[] = [];
+    for (const change of chunk.changes) {
+      if (!change.added && !change.removed) {
+        for (const line of change.value.replace(/\n$/, "").split("\n")) {
+          renderSplitRow(line, line, "equal");
+        }
+      } else {
+        blockChanges.push(change);
+      }
+    }
+    const rows = buildDiffRowsFromChanges(blockChanges);
+    for (const row of rows) {
+      renderSplitRow(row.left, row.right, row.kind);
+    }
+
+    const lastChange = chunk.changes[chunk.changes.length - 1];
+    const postEqIdx = changes.indexOf(lastChange) + 1;
+    if (postEqIdx < changes.length) {
+      const postEq = changes[postEqIdx];
+      const allPostLines = postEq.value.replace(/\n$/, "").split("\n");
+      const showCount = Math.min(chunk.postContext.length, allPostLines.length);
+      for (let j = 0; j < showCount; j++) {
+        renderSplitRow(allPostLines[j], allPostLines[j], "equal");
+      }
+      skipEqualLines(allPostLines.length - showCount);
+    }
+  }
+
+  return lines;
+}
+
+function buildDiffRowsFromChanges(changes: Change[]): DiffRow[] {
   const rows: DiffRow[] = [];
   let i = 0;
 
@@ -200,79 +544,6 @@ function buildDiffRows(oldText: string, newText: string): DiffRow[] {
   return rows;
 }
 
-function renderSplitDiff(
-  oldText: string,
-  newText: string,
-  theme: Theme,
-  width: number,
-  startLine: number,
-): string[] {
-  const rows = buildDiffRows(oldText, newText);
-  const oldLineCount = oldText.split("\n").length;
-  const newLineCount = newText.split("\n").length;
-  const maxOld = startLine + oldLineCount - 1;
-  const maxNew = startLine + newLineCount - 1;
-  const sep = theme.fg("dim", "│");
-  const sepWidth = 1;
-  const lgw = gutterWidth(maxOld);
-  const rgw = gutterWidth(maxNew);
-  const half = Math.floor((width - INDENT.length - sepWidth - lgw - rgw) / 2);
-  const lw = Math.max(half, 1);
-  const rw = Math.max(width - INDENT.length - sepWidth - lgw - rgw - lw, 1);
-  const lcw = Math.max(lw - lgw, 1);
-  const rcw = Math.max(rw - rgw, 1);
-
-  let oldLine = startLine;
-  let newLine = startLine;
-  const lines: string[] = [];
-
-  for (const row of rows) {
-    const leftNum = row.left ? oldLine : null;
-    const rightNum = row.right ? newLine : null;
-
-    let leftStyled: string;
-    let rightStyled: string;
-
-    if (row.kind === "equal") {
-      const content = truncateToWidth(replaceTabs(row.left), lcw, "");
-      leftStyled = padRight(
-        formatDiffGutter(leftNum, maxOld, theme) + " " + content,
-        lgw + lw,
-      );
-      rightStyled =
-        formatDiffGutter(rightNum, maxNew, theme) +
-        " " +
-        truncateToWidth(replaceTabs(row.right), rcw, "");
-    } else {
-      if (row.left) {
-        const raw =
-          rawGutter(leftNum, maxOld) +
-          "- " +
-          truncateToWidth(replaceTabs(row.left), lcw - 2, "");
-        leftStyled = theme.bg("toolErrorBg", padRight(raw, lgw + lw));
-      } else {
-        leftStyled = theme.bg("toolErrorBg", " ".repeat(lgw + lw));
-      }
-      if (row.right) {
-        const raw =
-          rawGutter(rightNum, maxNew) +
-          "+ " +
-          truncateToWidth(replaceTabs(row.right), rcw - 2, "");
-        rightStyled = theme.bg("toolSuccessBg", padRight(raw, rgw + rw));
-      } else {
-        rightStyled = theme.bg("toolSuccessBg", " ".repeat(rgw + rw));
-      }
-    }
-
-    lines.push(INDENT + leftStyled + sep + rightStyled);
-
-    if (row.left) oldLine++;
-    if (row.right) newLine++;
-  }
-
-  return lines;
-}
-
 function renderEditDiff(
   oldText: string,
   newText: string,
@@ -305,7 +576,9 @@ export const editAdapter: ToolDisplayAdapter<EditArgs> = {
     parts.push(theme.fg("muted", "diff"));
     if (added > 0) parts.push(theme.fg("success", `+${added}`));
     if (removed > 0) parts.push(theme.fg("error", `-${removed}`));
-    parts.push(theme.fg("muted", width >= SPLIT_MIN_WIDTH ? "split" : "unified"));
+    parts.push(
+      theme.fg("muted", width >= SPLIT_MIN_WIDTH ? "split" : "unified"),
+    );
     if (added > 0 || removed > 0) {
       parts.push(renderChangeBar(added, removed, theme));
     }
@@ -317,8 +590,21 @@ export const editAdapter: ToolDisplayAdapter<EditArgs> = {
     if (edits.length === 0) return [];
 
     const rawPath = args?.file_path ?? args?.path ?? "";
-    const lines: string[] = [];
 
+    if (edits.length > 1) {
+      const fullDiff = buildFullFileDiff(rawPath, edits);
+      if (fullDiff) {
+        return renderEditDiff(
+          fullDiff.oldFull,
+          fullDiff.newFull,
+          theme,
+          width,
+          1,
+        );
+      }
+    }
+
+    const lines: string[] = [];
     for (let i = 0; i < edits.length; i++) {
       if (edits.length > 1 && i > 0) {
         lines.push(
