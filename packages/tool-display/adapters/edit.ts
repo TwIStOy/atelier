@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { diffLines } from "diff";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
@@ -42,6 +44,22 @@ function countChanges(edits: Array<{ oldText: string; newText: string }>): {
   return { added, removed };
 }
 
+function findStartLine(
+  filePath: string,
+  newText: string,
+  oldText: string,
+): number {
+  try {
+    const content = readFileSync(resolve(filePath), "utf-8");
+    let idx = content.indexOf(newText);
+    if (idx === -1) idx = content.indexOf(oldText);
+    if (idx === -1) return 1;
+    return content.slice(0, idx).split("\n").length;
+  } catch {
+    return 1;
+  }
+}
+
 function renderChangeBar(added: number, removed: number, theme: Theme): string {
   const total = added + removed;
   if (total === 0) return "";
@@ -67,6 +85,14 @@ function formatDiffGutter(
   return theme.fg("dim", String(lineNum).padStart(width) + " │ ");
 }
 
+function rawGutter(lineNum: number | null, maxNum: number): string {
+  const width = String(maxNum).length;
+  if (lineNum === null) {
+    return " ".repeat(width) + " │ ";
+  }
+  return String(lineNum).padStart(width) + " │ ";
+}
+
 function gutterWidth(maxNum: number): number {
   return String(maxNum).length + 3;
 }
@@ -82,35 +108,36 @@ function renderUnifiedDiff(
   newText: string,
   theme: Theme,
   width: number,
+  startLine: number,
 ): string[] {
   const changes = diffLines(oldText, newText, { newlineIsToken: true });
-  const maxOld = oldText.split("\n").length;
-  const maxNew = newText.split("\n").length;
+  const maxOld = startLine + oldText.split("\n").length - 1;
+  const maxNew = startLine + newText.split("\n").length - 1;
   const maxNum = Math.max(maxOld, maxNew);
   const gw = gutterWidth(maxNum);
   const contentWidth = Math.max(1, width - INDENT.length - gw - 2);
   const lines: string[] = [];
 
-  let oldLine = 1;
-  let newLine = 1;
+  let oldLine = startLine;
+  let newLine = startLine;
 
   for (const change of changes) {
     const textLines = change.value.replace(/\n$/, "").split("\n");
     for (const line of textLines) {
       const content = truncateToWidth(replaceTabs(line), contentWidth, "");
       if (change.added) {
-        lines.push(
-          INDENT +
-            formatDiffGutter(newLine, maxNum, theme) +
-            theme.bg("toolSuccessBg", "+ " + content),
+        const full = padRight(
+          rawGutter(newLine, maxNum) + "+ " + content,
+          width - INDENT.length,
         );
+        lines.push(INDENT + theme.bg("toolSuccessBg", full));
         newLine++;
       } else if (change.removed) {
-        lines.push(
-          INDENT +
-            formatDiffGutter(oldLine, maxNum, theme) +
-            theme.bg("toolErrorBg", "- " + content),
+        const full = padRight(
+          rawGutter(oldLine, maxNum) + "- " + content,
+          width - INDENT.length,
         );
+        lines.push(INDENT + theme.bg("toolErrorBg", full));
         oldLine++;
       } else {
         lines.push(
@@ -178,10 +205,13 @@ function renderSplitDiff(
   newText: string,
   theme: Theme,
   width: number,
+  startLine: number,
 ): string[] {
   const rows = buildDiffRows(oldText, newText);
-  const maxOld = oldText.split("\n").length;
-  const maxNew = newText.split("\n").length;
+  const oldLineCount = oldText.split("\n").length;
+  const newLineCount = newText.split("\n").length;
+  const maxOld = startLine + oldLineCount - 1;
+  const maxNew = startLine + newLineCount - 1;
   const sep = theme.fg("dim", "│");
   const sepWidth = 1;
   const lgw = gutterWidth(maxOld);
@@ -192,8 +222,8 @@ function renderSplitDiff(
   const lcw = Math.max(lw - lgw, 1);
   const rcw = Math.max(rw - rgw, 1);
 
-  let oldLine = 1;
-  let newLine = 1;
+  let oldLine = startLine;
+  let newLine = startLine;
   const lines: string[] = [];
 
   for (const row of rows) {
@@ -205,42 +235,36 @@ function renderSplitDiff(
 
     if (row.kind === "equal") {
       const content = truncateToWidth(replaceTabs(row.left), lcw, "");
-      leftStyled = theme.fg("dim", " " + content);
-      rightStyled = theme.fg(
-        "dim",
-        " " + truncateToWidth(replaceTabs(row.right), rcw, ""),
+      leftStyled = padRight(
+        formatDiffGutter(leftNum, maxOld, theme) + " " + content,
+        lgw + lw,
       );
+      rightStyled =
+        formatDiffGutter(rightNum, maxNew, theme) +
+        " " +
+        truncateToWidth(replaceTabs(row.right), rcw, "");
     } else {
       if (row.left) {
-        leftStyled = theme.bg(
-          "toolErrorBg",
-          "- " + truncateToWidth(replaceTabs(row.left), lcw - 2, ""),
-        );
+        const raw =
+          rawGutter(leftNum, maxOld) +
+          "- " +
+          truncateToWidth(replaceTabs(row.left), lcw - 2, "");
+        leftStyled = theme.bg("toolErrorBg", padRight(raw, lgw + lw));
       } else {
-        leftStyled = " ".repeat(lcw);
+        leftStyled = theme.bg("toolErrorBg", " ".repeat(lgw + lw));
       }
       if (row.right) {
-        rightStyled = theme.bg(
-          "toolSuccessBg",
-          "+ " + truncateToWidth(replaceTabs(row.right), rcw - 2, ""),
-        );
+        const raw =
+          rawGutter(rightNum, maxNew) +
+          "+ " +
+          truncateToWidth(replaceTabs(row.right), rcw - 2, "");
+        rightStyled = theme.bg("toolSuccessBg", padRight(raw, rgw + rw));
       } else {
-        rightStyled = " ".repeat(rcw);
+        rightStyled = theme.bg("toolSuccessBg", " ".repeat(rgw + rw));
       }
     }
 
-    const leftFull = padRight(
-      formatDiffGutter(leftNum, maxOld, theme) + leftStyled,
-      lgw + lw,
-    );
-
-    lines.push(
-      INDENT +
-        leftFull +
-        sep +
-        formatDiffGutter(rightNum, maxNew, theme) +
-        rightStyled,
-    );
+    lines.push(INDENT + leftStyled + sep + rightStyled);
 
     if (row.left) oldLine++;
     if (row.right) newLine++;
@@ -254,11 +278,12 @@ function renderEditDiff(
   newText: string,
   theme: Theme,
   width: number,
+  startLine: number,
 ): string[] {
   if (width >= SPLIT_MIN_WIDTH) {
-    return renderSplitDiff(oldText, newText, theme, width);
+    return renderSplitDiff(oldText, newText, theme, width, startLine);
   }
-  return renderUnifiedDiff(oldText, newText, theme, width);
+  return renderUnifiedDiff(oldText, newText, theme, width, startLine);
 }
 
 export const editAdapter: ToolDisplayAdapter<EditArgs> = {
@@ -271,18 +296,14 @@ export const editAdapter: ToolDisplayAdapter<EditArgs> = {
     return theme.fg("toolTitle", theme.bold("Edit")) + " " + pathDisplay;
   },
 
-  formatCollapsedContent(args, _output, theme, width) {
+  formatCollapsedContent(args, _output, theme, _width) {
     const edits = getEdits(args);
     if (edits.length === 0) return [theme.fg("muted", "└ no changes")];
 
     const { added, removed } = countChanges(edits);
     const parts: string[] = ["└"];
-    parts.push(theme.fg("muted", "diff"));
     if (added > 0) parts.push(theme.fg("success", `+${added}`));
     if (removed > 0) parts.push(theme.fg("error", `-${removed}`));
-    parts.push(
-      theme.fg("muted", width >= SPLIT_MIN_WIDTH ? "split" : "unified"),
-    );
     if (added > 0 || removed > 0) {
       parts.push(renderChangeBar(added, removed, theme));
     }
@@ -293,6 +314,7 @@ export const editAdapter: ToolDisplayAdapter<EditArgs> = {
     const edits = getEdits(args);
     if (edits.length === 0) return [];
 
+    const rawPath = args?.file_path ?? args?.path ?? "";
     const lines: string[] = [];
 
     for (let i = 0; i < edits.length; i++) {
@@ -303,8 +325,19 @@ export const editAdapter: ToolDisplayAdapter<EditArgs> = {
         );
       }
 
+      const startLine = findStartLine(
+        rawPath,
+        edits[i].newText,
+        edits[i].oldText,
+      );
       lines.push(
-        ...renderEditDiff(edits[i].oldText, edits[i].newText, theme, width),
+        ...renderEditDiff(
+          edits[i].oldText,
+          edits[i].newText,
+          theme,
+          width,
+          startLine,
+        ),
       );
     }
 
