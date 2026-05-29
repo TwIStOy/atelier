@@ -9,6 +9,7 @@ export {
 } from "./tool-call-display.ts";
 export type { ContentRenderer, ToolDisplayAdapter } from "./types.ts";
 export { prefixLine, wrapTextWithAnsi } from "./format.ts";
+export { editAdapter } from "./adapters/edit.ts";
 export { readAdapter } from "./adapters/read.ts";
 export { writeAdapter } from "./adapters/write.ts";
 export { globalToolDisplayRegistry } from "./registry.ts";
@@ -20,12 +21,17 @@ import { renderToolCall } from "./tool-call-display.ts";
 
 const FALLBACK_THEME: Theme = {
   fg: (_color: string, text: string) => text,
+  bg: (_color: string, text: string) => text,
   bold: (text: string) => text,
 } as Theme;
 
-function patchToolExecutionRender(getTheme: () => Theme) {
+function patchToolExecutionRender(
+  getTheme: () => Theme,
+  registry: typeof globalToolDisplayRegistry,
+) {
   const proto: any = ToolExecutionComponent.prototype;
   proto.__tdGetTheme = getTheme;
+  proto.__tdRegistry = registry;
 
   if (proto.__tdPatched) return;
 
@@ -33,7 +39,8 @@ function patchToolExecutionRender(getTheme: () => Theme) {
   proto.render = function (width: number): string[] {
     if (this.hideComponent) return [];
 
-    const adapter = globalToolDisplayRegistry.get(this.toolName);
+    const reg = proto.__tdRegistry;
+    const adapter = reg.get(this.toolName);
     if (!adapter) return originalRender.call(this, width);
 
     const getTextOutput = this.getTextOutput?.bind(this);
@@ -46,7 +53,7 @@ function patchToolExecutionRender(getTheme: () => Theme) {
       expanded: this.expanded,
       isPartial: this.isPartial,
       isError: this.result?.isError ?? false,
-      registry: globalToolDisplayRegistry,
+      registry: reg,
     };
 
     const theme = proto.__tdGetTheme?.() ?? FALLBACK_THEME;
@@ -59,11 +66,16 @@ function patchToolExecutionRender(getTheme: () => Theme) {
 export default function (pi: ExtensionAPI) {
   let activeTheme: Theme = FALLBACK_THEME;
 
-  patchToolExecutionRender(() => activeTheme);
+  patchToolExecutionRender(() => activeTheme, globalToolDisplayRegistry);
 
   pi.on("session_start", (_event, ctx) => {
     if (ctx.ui?.theme) {
       activeTheme = ctx.ui.theme;
     }
+    patchToolExecutionRender(() => activeTheme, globalToolDisplayRegistry);
+  });
+
+  pi.on("before_agent_start", () => {
+    patchToolExecutionRender(() => activeTheme, globalToolDisplayRegistry);
   });
 }

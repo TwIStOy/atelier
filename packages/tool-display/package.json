@@ -11,6 +11,7 @@
     "@earendil-works/pi-coding-agent": "latest",
     "@earendil-works/pi-tui": "latest",
     "@types/node": "^25.9.1",
+    "diff": "^8.0.4",
     "typescript": "^6.0.0"
   }
 }
