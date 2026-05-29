@@ -11,6 +11,8 @@ export {
   fitColWidths,
   makeTable,
   resetForegroundBeforeText,
+  extractAnsiRgb,
+  mixAnsiRgb,
 } from "./terminal.ts";
 export type {
   CodingPlanUsage,

@@ -1,16 +1,92 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { diffLines, type Change } from "diff";
+import { execSync } from "node:child_process";
+import { diffLines } from "diff";
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
-import { shortenPath } from "@htwang-contrib/common";
+import { truncateToWidth } from "@earendil-works/pi-tui";
+import { shortenPath, extractAnsiRgb } from "@htwang-contrib/common";
 import type { ToolDisplayAdapter } from "../types.ts";
 import { INDENT, replaceTabs } from "./shared.ts";
 
 const SPLIT_MIN_WIDTH = 100;
 const BAR_WIDTH = 6;
-const MERGE_CONTEXT = 10;
-const CONTEXT_LINES = 3;
+
+interface DeltaStyles {
+  base: string;
+  red: string;
+  green: string;
+  text: string;
+  overlay0: string;
+  subtext0: string;
+}
+
+function probeDeltaStyles(theme: Theme): DeltaStyles | null {
+  const base = extractAnsiRgb(theme.bg("toolPendingBg", "x"));
+  const red = extractAnsiRgb(theme.fg("toolDiffRemoved", "x"));
+  const green = extractAnsiRgb(theme.fg("toolDiffAdded", "x"));
+  const text = extractAnsiRgb(theme.fg("syntaxVariable", "x"));
+  const overlay0 = extractAnsiRgb(theme.fg("dim", "x"));
+  const subtext0 = extractAnsiRgb(theme.fg("toolOutput", "x"));
+
+  if (!base || !red || !green || !text || !overlay0 || !subtext0) return null;
+  return { base, red, green, text, overlay0, subtext0 };
+}
+
+function mixHex(a: string, ratioA: number, b: string, ratioB: number): string {
+  const pa = [1, 3, 5].map((i) => parseInt(a.slice(i, i + 2), 16));
+  const pb = [1, 3, 5].map((i) => parseInt(b.slice(i, i + 2), 16));
+  const total = ratioA + ratioB;
+  return (
+    "#" +
+    pa
+      .map((v, i) =>
+        Math.round((v * ratioA + pb[i] * ratioB) / total)
+          .toString(16)
+          .padStart(2, "0"),
+      )
+      .join("")
+  );
+}
+
+function buildDeltaArgs(
+  styles: DeltaStyles,
+  isSplit: boolean,
+  width: number,
+): string[] {
+  const args = [
+    "delta",
+    isSplit ? "--side-by-side" : "--color-only",
+    `--width=${width}`,
+  ];
+
+  const q = (flag: string, value: string) => args.push(`${flag}="${value}"`);
+
+  q("--file-style", "omit");
+  q("--file-decoration-style", "omit");
+  q("--hunk-header-style", "omit");
+  q("--hunk-header-decoration-style", "omit");
+
+  if (isSplit) {
+    q("--line-numbers-left-style", styles.overlay0);
+    q("--line-numbers-minus-style", `bold ${styles.red}`);
+    q("--line-numbers-plus-style", `bold ${styles.green}`);
+    q("--line-numbers-right-style", styles.overlay0);
+    q("--line-numbers-zero-style", styles.overlay0);
+  }
+
+  q("--minus-style", `syntax ${mixHex(styles.red, 20, styles.base, 80)}`);
+  q(
+    "--minus-emph-style",
+    `bold syntax ${mixHex(styles.red, 35, styles.base, 65)}`,
+  );
+  q("--plus-style", `syntax ${mixHex(styles.green, 20, styles.base, 80)}`);
+  q(
+    "--plus-emph-style",
+    `bold syntax ${mixHex(styles.green, 35, styles.base, 65)}`,
+  );
+
+  return args;
+}
 
 interface EditArgs {
   path?: string;
@@ -18,12 +94,6 @@ interface EditArgs {
   edits?: Array<{ oldText: string; newText: string }>;
   oldText?: string;
   newText?: string;
-}
-
-interface ChangeBlock {
-  changes: Change[];
-  preContext: string[];
-  postContext: string[];
 }
 
 function getEdits(args: EditArgs): Array<{ oldText: string; newText: string }> {
@@ -50,68 +120,6 @@ function countChanges(edits: Array<{ oldText: string; newText: string }>): {
     }
   }
   return { added, removed };
-}
-
-function groupChangesIntoChunks(changes: Change[]): ChangeBlock[] {
-  const changeIndices: number[] = [];
-  for (let i = 0; i < changes.length; i++) {
-    if (changes[i].added || changes[i].removed) {
-      changeIndices.push(i);
-    }
-  }
-  if (changeIndices.length === 0) return [];
-
-  const groups: number[][] = [[changeIndices[0]]];
-  for (let i = 1; i < changeIndices.length; i++) {
-    const prev = changeIndices[i - 1];
-    const curr = changeIndices[i];
-    let gapLines = 0;
-    for (let j = prev + 1; j < curr; j++) {
-      if (!changes[j].added && !changes[j].removed) {
-        gapLines += changes[j].count ?? 0;
-      }
-    }
-    if (gapLines <= MERGE_CONTEXT) {
-      groups[groups.length - 1].push(changeIndices[i]);
-    } else {
-      groups.push([changeIndices[i]]);
-    }
-  }
-
-  return groups.map((group) => {
-    const firstChangeIdx = group[0];
-    const lastChangeIdx = group[group.length - 1];
-    let changeStart = firstChangeIdx;
-    let changeEnd = lastChangeIdx;
-    while (changeEnd < changes.length - 1) {
-      const next = changes[changeEnd + 1];
-      if (!next.added && !next.removed) break;
-      changeEnd++;
-    }
-
-    const blockChanges: Change[] = [];
-    for (let i = changeStart; i <= changeEnd; i++) {
-      blockChanges.push(changes[i]);
-    }
-
-    const preEq = firstChangeIdx > 0 ? changes[firstChangeIdx - 1] : null;
-    const preLines =
-      preEq && !preEq.added && !preEq.removed
-        ? preEq.value.replace(/\n$/, "").split("\n")
-        : [];
-    const postEq =
-      changeEnd < changes.length - 1 ? changes[changeEnd + 1] : null;
-    const postLines =
-      postEq && !postEq.added && !postEq.removed
-        ? postEq.value.replace(/\n$/, "").split("\n")
-        : [];
-
-    return {
-      changes: blockChanges,
-      preContext: preLines.slice(-CONTEXT_LINES),
-      postContext: postLines.slice(0, CONTEXT_LINES),
-    };
-  });
 }
 
 function buildFullFileDiff(
@@ -147,19 +155,142 @@ function buildFullFileDiff(
   }
 }
 
-function findStartLine(
+function generateUnifiedDiff(
   filePath: string,
-  newText: string,
   oldText: string,
-): number {
+  newText: string,
+): string {
+  const changes = diffLines(oldText, newText, { newlineIsToken: true });
+
+  let oldLine = 1;
+  let newLine = 1;
+  const hunks: string[] = [];
+
+  let hunkOldStart = 0;
+  let hunkOldCount = 0;
+  let hunkNewStart = 0;
+  let hunkNewCount = 0;
+  let hunkBody: string[] = [];
+  let inHunk = false;
+
+  const CONTEXT = 3;
+
+  function startHunk(changeIdx: number) {
+    let preContextCount = 0;
+    if (changeIdx > 0) {
+      const prev = changes[changeIdx - 1];
+      if (!prev.added && !prev.removed) {
+        const lines = prev.value.replace(/\n$/, "").split("\n");
+        preContextCount = Math.min(CONTEXT, lines.length);
+        const start = lines.length - preContextCount;
+        for (let j = start; j < lines.length; j++) {
+          hunkBody.push(" " + lines[j]);
+        }
+      }
+    }
+
+    hunkOldStart = oldLine - preContextCount;
+    hunkNewStart = newLine - preContextCount;
+    hunkOldCount = preContextCount;
+    hunkNewCount = preContextCount;
+    inHunk = true;
+  }
+
+  function flushHunk() {
+    if (!inHunk || hunkBody.length === 0) return;
+    hunks.push(
+      `@@ -${hunkOldStart},${hunkOldCount} +${hunkNewStart},${hunkNewCount} @@`,
+    );
+    hunks.push(...hunkBody);
+    hunkBody = [];
+    inHunk = false;
+  }
+
+  for (let i = 0; i < changes.length; i++) {
+    const change = changes[i];
+    const textLines = change.value.replace(/\n$/, "").split("\n");
+
+    if (!change.added && !change.removed) {
+      if (inHunk) {
+        const postCtx = textLines.slice(0, CONTEXT);
+        for (const line of postCtx) {
+          hunkBody.push(" " + line);
+          hunkOldCount++;
+          hunkNewCount++;
+        }
+
+        const remaining = textLines.length - postCtx.length;
+        oldLine += textLines.length;
+        newLine += textLines.length;
+
+        if (remaining > 0) {
+          flushHunk();
+        }
+      } else {
+        oldLine += textLines.length;
+        newLine += textLines.length;
+      }
+    } else {
+      if (!inHunk) {
+        startHunk(i);
+      }
+
+      for (const line of textLines) {
+        if (change.removed) {
+          hunkBody.push("-" + line);
+          hunkOldCount++;
+          oldLine++;
+        } else {
+          hunkBody.push("+" + line);
+          hunkNewCount++;
+          newLine++;
+        }
+      }
+    }
+  }
+
+  flushHunk();
+
+  if (hunks.length === 0) return "";
+
+  const header = `diff --git a/${filePath} b/${filePath}\n--- a/${filePath}\n+++ b/${filePath}`;
+  return header + "\n" + hunks.join("\n") + "\n";
+}
+
+function renderWithDelta(
+  unifiedDiff: string,
+  width: number,
+  theme: Theme,
+): string[] {
+  const innerWidth = Math.max(1, width - INDENT.length);
+  const isSplit = innerWidth >= SPLIT_MIN_WIDTH;
+  const styles = probeDeltaStyles(theme);
+
+  const deltaArgs = styles
+    ? buildDeltaArgs(styles, isSplit, innerWidth)
+    : [
+        "delta",
+        isSplit ? "--side-by-side" : "--color-only",
+        `--width=${innerWidth}`,
+      ];
+
+  const diffHeaderRe = /^(diff --git|---|\+\+\+)/;
   try {
-    const content = readFileSync(resolve(filePath), "utf-8");
-    let idx = content.indexOf(newText);
-    if (idx === -1) idx = content.indexOf(oldText);
-    if (idx === -1) return 1;
-    return content.slice(0, idx).split("\n").length;
+    const result = execSync(deltaArgs.join(" "), {
+      input: unifiedDiff,
+      encoding: "utf-8",
+      timeout: 5000,
+      maxBuffer: 1024 * 1024,
+    });
+    return result
+      .split("\n")
+      .filter((line) => line.length > 0 && !diffHeaderRe.test(line))
+      .map((line) => INDENT + truncateToWidth(replaceTabs(line), width, ""));
   } catch {
-    return 1;
+    return unifiedDiff
+      .split("\n")
+      .filter((line) => line.length > 0)
+      .map((line) => INDENT + line);
   }
 }
 
@@ -174,387 +305,6 @@ function renderChangeBar(added: number, removed: number, theme: Theme): string {
     theme.fg("success", "-".repeat(addedW)) +
     "]"
   );
-}
-
-function formatDiffGutter(
-  lineNum: number | null,
-  maxNum: number,
-  theme: Theme,
-): string {
-  const width = String(maxNum).length;
-  if (lineNum === null) {
-    return theme.fg("dim", " ".repeat(width) + " │ ");
-  }
-  return theme.fg("dim", String(lineNum).padStart(width) + " │ ");
-}
-
-function rawGutter(lineNum: number | null, maxNum: number): string {
-  const width = String(maxNum).length;
-  if (lineNum === null) {
-    return " ".repeat(width) + " │ ";
-  }
-  return String(lineNum).padStart(width) + " │ ";
-}
-
-function gutterWidth(maxNum: number): number {
-  return String(maxNum).length + 3;
-}
-
-function padRight(text: string, width: number): string {
-  const vw = visibleWidth(text);
-  if (vw >= width) return text;
-  return text + " ".repeat(width - vw);
-}
-
-function computeMaxDisplayedLineNum(
-  changes: Change[],
-  chunks: ChangeBlock[],
-  startLine: number,
-): number {
-  let oldLine = startLine;
-  let newLine = startLine;
-  let maxNum = 0;
-
-  for (const chunk of chunks) {
-    const firstIdx = changes.indexOf(chunk.changes[0]);
-    if (firstIdx > 0) {
-      const preEq = changes[firstIdx - 1];
-      if (!preEq.added && !preEq.removed) {
-        const allPre = preEq.value.replace(/\n$/, "").split("\n");
-        oldLine += allPre.length - chunk.preContext.length;
-        newLine += allPre.length - chunk.preContext.length;
-      }
-    }
-
-    for (const ctxLine of chunk.preContext) {
-      maxNum = Math.max(maxNum, oldLine, newLine);
-      oldLine++;
-      newLine++;
-    }
-
-    for (const change of chunk.changes) {
-      const textLines = change.value.replace(/\n$/, "").split("\n");
-      for (let i = 0; i < textLines.length; i++) {
-        if (change.added) {
-          maxNum = Math.max(maxNum, newLine);
-          newLine++;
-        } else if (change.removed) {
-          maxNum = Math.max(maxNum, oldLine);
-          oldLine++;
-        } else {
-          maxNum = Math.max(maxNum, oldLine, newLine);
-          oldLine++;
-          newLine++;
-        }
-      }
-    }
-
-    const lastChange = chunk.changes[chunk.changes.length - 1];
-    const postEqIdx = changes.indexOf(lastChange) + 1;
-    if (postEqIdx < changes.length) {
-      const postEq = changes[postEqIdx];
-      if (!postEq.added && !postEq.removed) {
-        const allPost = postEq.value.replace(/\n$/, "").split("\n");
-        const showCount = Math.min(chunk.postContext.length, allPost.length);
-        for (let j = 0; j < showCount; j++) {
-          maxNum = Math.max(maxNum, oldLine, newLine);
-          oldLine++;
-          newLine++;
-        }
-        oldLine += allPost.length - showCount;
-        newLine += allPost.length - showCount;
-      }
-    }
-  }
-
-  return maxNum;
-}
-
-function renderUnifiedDiff(
-  oldText: string,
-  newText: string,
-  theme: Theme,
-  width: number,
-  startLine: number,
-): string[] {
-  const changes = diffLines(oldText, newText, { newlineIsToken: true });
-  const chunks = groupChangesIntoChunks(changes);
-  if (chunks.length === 0) return [];
-
-  const maxNum = computeMaxDisplayedLineNum(changes, chunks, startLine);
-  const gw = gutterWidth(maxNum);
-  const contentWidth = Math.max(1, width - INDENT.length - gw - 1);
-  const lines: string[] = [];
-  const sep = theme.fg("dim", "─".repeat(Math.max(1, width - INDENT.length)));
-
-  let oldLine = startLine;
-  let newLine = startLine;
-
-  function skipEqualLines(count: number) {
-    oldLine += count;
-    newLine += count;
-  }
-
-  function renderContext(line: string) {
-    const content = truncateToWidth(replaceTabs(line), contentWidth, "");
-    lines.push(
-      INDENT +
-        formatDiffGutter(oldLine, maxNum, theme) +
-        theme.fg("dim", " " + content),
-    );
-    oldLine++;
-    newLine++;
-  }
-
-  function renderSep() {
-    lines.push(INDENT + sep);
-  }
-
-  for (let ci = 0; ci < chunks.length; ci++) {
-    const chunk = chunks[ci];
-
-    if (ci > 0) renderSep();
-
-    const preEqIdx = changes.indexOf(chunk.changes[0]) - 1;
-    if (preEqIdx >= 0) {
-      const preEq = changes[preEqIdx];
-      const allPreLines = preEq.value.replace(/\n$/, "").split("\n");
-      const skipCount = allPreLines.length - chunk.preContext.length;
-      skipEqualLines(skipCount);
-    }
-
-    for (const ctxLine of chunk.preContext) {
-      renderContext(ctxLine);
-    }
-
-    for (const change of chunk.changes) {
-      const textLines = change.value.replace(/\n$/, "").split("\n");
-      for (const line of textLines) {
-        const content = truncateToWidth(replaceTabs(line), contentWidth, "");
-        if (change.added) {
-          const full = padRight(
-            rawGutter(newLine, maxNum) + " " + content,
-            width - INDENT.length,
-          );
-          lines.push(INDENT + theme.bg("toolSuccessBg", full));
-          newLine++;
-        } else if (change.removed) {
-          const full = padRight(
-            rawGutter(oldLine, maxNum) + " " + content,
-            width - INDENT.length,
-          );
-          lines.push(INDENT + theme.bg("toolErrorBg", full));
-          oldLine++;
-        } else {
-          renderContext(line);
-        }
-      }
-    }
-
-    const lastChange = chunk.changes[chunk.changes.length - 1];
-    const postEqIdx = changes.indexOf(lastChange) + 1;
-    if (postEqIdx < changes.length) {
-      const postEq = changes[postEqIdx];
-      const allPostLines = postEq.value.replace(/\n$/, "").split("\n");
-      const showCount = Math.min(chunk.postContext.length, allPostLines.length);
-      for (let j = 0; j < showCount; j++) {
-        renderContext(allPostLines[j]);
-      }
-      skipEqualLines(allPostLines.length - showCount);
-    }
-  }
-
-  return lines;
-}
-
-interface DiffRow {
-  left: string;
-  right: string;
-  kind: "equal" | "changed" | "removed" | "added";
-}
-
-function renderSplitDiff(
-  oldText: string,
-  newText: string,
-  theme: Theme,
-  width: number,
-  startLine: number,
-): string[] {
-  const changes = diffLines(oldText, newText, { newlineIsToken: true });
-  const chunks = groupChangesIntoChunks(changes);
-  if (chunks.length === 0) return [];
-
-  const maxNum = computeMaxDisplayedLineNum(changes, chunks, startLine);
-  const sep = theme.fg("dim", "│");
-  const sepWidth = 1;
-  const gw = gutterWidth(maxNum);
-  const half = Math.floor((width - INDENT.length - sepWidth - gw * 2) / 2);
-  const lw = Math.max(half, 1);
-  const rw = Math.max(width - INDENT.length - sepWidth - gw * 2 - lw, 1);
-  const lcw = Math.max(lw - gw, 1);
-  const rcw = Math.max(rw - gw, 1);
-  const hsep = theme.fg("dim", "─".repeat(Math.max(1, width - INDENT.length)));
-
-  let oldLine = startLine;
-  let newLine = startLine;
-  const lines: string[] = [];
-
-  function skipEqualLines(count: number) {
-    oldLine += count;
-    newLine += count;
-  }
-
-  function renderSplitRow(
-    left: string,
-    right: string,
-    kind: "equal" | "changed" | "removed" | "added",
-  ) {
-    const leftNum = kind !== "added" ? oldLine : null;
-    const rightNum = kind !== "removed" ? newLine : null;
-
-    let leftStyled: string;
-    let rightStyled: string;
-
-    if (kind === "equal") {
-      const content = truncateToWidth(replaceTabs(left), lcw, "");
-      leftStyled = padRight(
-        formatDiffGutter(leftNum, maxNum, theme) + " " + content,
-        gw + lw,
-      );
-      rightStyled = padRight(
-        formatDiffGutter(rightNum, maxNum, theme) +
-          " " +
-          truncateToWidth(replaceTabs(right), rcw, ""),
-        gw + rw,
-      );
-    } else {
-      if (kind !== "added") {
-        const raw =
-          rawGutter(leftNum, maxNum) +
-          " " +
-          truncateToWidth(replaceTabs(left), lcw - 1, "");
-        leftStyled = theme.bg("toolErrorBg", padRight(raw, gw + lw));
-      } else {
-        leftStyled = theme.bg("toolErrorBg", " ".repeat(gw + lw));
-      }
-      if (kind !== "removed") {
-        const raw =
-          rawGutter(rightNum, maxNum) +
-          " " +
-          truncateToWidth(replaceTabs(right), rcw - 1, "");
-        rightStyled = theme.bg("toolSuccessBg", padRight(raw, gw + rw));
-      } else {
-        rightStyled = theme.bg("toolSuccessBg", " ".repeat(gw + rw));
-      }
-    }
-
-    lines.push(INDENT + leftStyled + sep + rightStyled);
-    if (kind !== "added") oldLine++;
-    if (kind !== "removed") newLine++;
-  }
-
-  function renderSep() {
-    lines.push(INDENT + hsep);
-  }
-
-  for (let ci = 0; ci < chunks.length; ci++) {
-    const chunk = chunks[ci];
-
-    if (ci > 0) renderSep();
-
-    const preEqIdx = changes.indexOf(chunk.changes[0]) - 1;
-    if (preEqIdx >= 0) {
-      const preEq = changes[preEqIdx];
-      const allPreLines = preEq.value.replace(/\n$/, "").split("\n");
-      const skipCount = allPreLines.length - chunk.preContext.length;
-      skipEqualLines(skipCount);
-    }
-
-    for (const ctxLine of chunk.preContext) {
-      renderSplitRow(ctxLine, ctxLine, "equal");
-    }
-
-    const blockChanges: Change[] = [];
-    for (const change of chunk.changes) {
-      if (!change.added && !change.removed) {
-        for (const line of change.value.replace(/\n$/, "").split("\n")) {
-          renderSplitRow(line, line, "equal");
-        }
-      } else {
-        blockChanges.push(change);
-      }
-    }
-    const rows = buildDiffRowsFromChanges(blockChanges);
-    for (const row of rows) {
-      renderSplitRow(row.left, row.right, row.kind);
-    }
-
-    const lastChange = chunk.changes[chunk.changes.length - 1];
-    const postEqIdx = changes.indexOf(lastChange) + 1;
-    if (postEqIdx < changes.length) {
-      const postEq = changes[postEqIdx];
-      const allPostLines = postEq.value.replace(/\n$/, "").split("\n");
-      const showCount = Math.min(chunk.postContext.length, allPostLines.length);
-      for (let j = 0; j < showCount; j++) {
-        renderSplitRow(allPostLines[j], allPostLines[j], "equal");
-      }
-      skipEqualLines(allPostLines.length - showCount);
-    }
-  }
-
-  return lines;
-}
-
-function buildDiffRowsFromChanges(changes: Change[]): DiffRow[] {
-  const rows: DiffRow[] = [];
-  let i = 0;
-
-  while (i < changes.length) {
-    const change = changes[i];
-    if (!change.added && !change.removed) {
-      for (const line of change.value.replace(/\n$/, "").split("\n")) {
-        rows.push({ left: line, right: line, kind: "equal" });
-      }
-      i++;
-    } else if (change.removed) {
-      const oldLines = change.value.replace(/\n$/, "").split("\n");
-      let newLines: string[] = [];
-      if (i + 1 < changes.length && changes[i + 1].added) {
-        newLines = changes[i + 1].value.replace(/\n$/, "").split("\n");
-        i += 2;
-      } else {
-        i++;
-      }
-      const maxLen = Math.max(oldLines.length, newLines.length);
-      for (let j = 0; j < maxLen; j++) {
-        const o = j < oldLines.length ? oldLines[j] : "";
-        const n = j < newLines.length ? newLines[j] : "";
-        if (o && !n) rows.push({ left: o, right: "", kind: "removed" });
-        else if (!o && n) rows.push({ left: "", right: n, kind: "added" });
-        else rows.push({ left: o, right: n, kind: "changed" });
-      }
-    } else {
-      for (const line of change.value.replace(/\n$/, "").split("\n")) {
-        rows.push({ left: "", right: line, kind: "added" });
-      }
-      i++;
-    }
-  }
-
-  return rows;
-}
-
-function renderEditDiff(
-  oldText: string,
-  newText: string,
-  theme: Theme,
-  width: number,
-  startLine: number,
-): string[] {
-  if (width >= SPLIT_MIN_WIDTH) {
-    return renderSplitDiff(oldText, newText, theme, width, startLine);
-  }
-  return renderUnifiedDiff(oldText, newText, theme, width, startLine);
 }
 
 export const editAdapter: ToolDisplayAdapter<EditArgs> = {
@@ -577,7 +327,7 @@ export const editAdapter: ToolDisplayAdapter<EditArgs> = {
     if (added > 0) parts.push(theme.fg("success", `+${added}`));
     if (removed > 0) parts.push(theme.fg("error", `-${removed}`));
     parts.push(
-      theme.fg("muted", width >= SPLIT_MIN_WIDTH ? "split" : "unified"),
+      theme.fg("muted", width >= SPLIT_MIN_WIDTH ? "side-by-side" : "unified"),
     );
     if (added > 0 || removed > 0) {
       parts.push(renderChangeBar(added, removed, theme));
@@ -585,7 +335,7 @@ export const editAdapter: ToolDisplayAdapter<EditArgs> = {
     return [theme.fg("muted", parts.join(" "))];
   },
 
-  formatExpandedContent(args, _output, theme, width) {
+  formatExpandedContent(args, _output, _theme, width) {
     const edits = getEdits(args);
     if (edits.length === 0) return [];
 
@@ -594,41 +344,26 @@ export const editAdapter: ToolDisplayAdapter<EditArgs> = {
     if (edits.length > 1) {
       const fullDiff = buildFullFileDiff(rawPath, edits);
       if (fullDiff) {
-        return renderEditDiff(
+        const unified = generateUnifiedDiff(
+          rawPath,
           fullDiff.oldFull,
           fullDiff.newFull,
-          theme,
-          width,
-          1,
         );
+        if (unified) return renderWithDelta(unified, width, _theme);
       }
     }
 
-    const lines: string[] = [];
+    const allDiff: string[] = [];
     for (let i = 0; i < edits.length; i++) {
-      if (edits.length > 1 && i > 0) {
-        lines.push(
-          INDENT +
-            theme.fg("dim", "─".repeat(Math.max(1, width - INDENT.length))),
-        );
-      }
-
-      const startLine = findStartLine(
+      const unified = generateUnifiedDiff(
         rawPath,
-        edits[i].newText,
         edits[i].oldText,
+        edits[i].newText,
       );
-      lines.push(
-        ...renderEditDiff(
-          edits[i].oldText,
-          edits[i].newText,
-          theme,
-          width,
-          startLine,
-        ),
-      );
+      if (unified) allDiff.push(unified);
     }
 
-    return lines;
+    if (allDiff.length === 0) return [];
+    return renderWithDelta(allDiff.join("\n"), width, _theme);
   },
 };
