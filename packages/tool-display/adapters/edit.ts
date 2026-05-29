@@ -296,14 +296,16 @@ export const editAdapter: ToolDisplayAdapter<EditArgs> = {
     return theme.fg("toolTitle", theme.bold("Edit")) + " " + pathDisplay;
   },
 
-  formatCollapsedContent(args, _output, theme, _width) {
+  formatCollapsedContent(args, _output, theme, width) {
     const edits = getEdits(args);
     if (edits.length === 0) return [theme.fg("muted", "└ no changes")];
 
     const { added, removed } = countChanges(edits);
     const parts: string[] = ["└"];
+    parts.push(theme.fg("muted", "diff"));
     if (added > 0) parts.push(theme.fg("success", `+${added}`));
     if (removed > 0) parts.push(theme.fg("error", `-${removed}`));
+    parts.push(theme.fg("muted", width >= SPLIT_MIN_WIDTH ? "split" : "unified"));
     if (added > 0 || removed > 0) {
       parts.push(renderChangeBar(added, removed, theme));
     }
