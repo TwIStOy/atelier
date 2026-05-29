@@ -10,6 +10,7 @@ export {
 export type { ContentRenderer, ToolDisplayAdapter } from "./types.ts";
 export { prefixLine, wrapTextWithAnsi } from "./format.ts";
 export { readAdapter } from "./adapters/read.ts";
+export { writeAdapter } from "./adapters/write.ts";
 export { globalToolDisplayRegistry } from "./registry.ts";
 
 import type { ExtensionAPI, Theme } from "@earendil-works/pi-coding-agent";
@@ -19,6 +20,7 @@ import { renderToolCall } from "./tool-call-display.ts";
 
 const FALLBACK_THEME: Theme = {
   fg: (_color: string, text: string) => text,
+  bold: (text: string) => text,
 } as Theme;
 
 function patchToolExecutionRender(getTheme: () => Theme) {
