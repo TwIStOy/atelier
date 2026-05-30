@@ -41,3 +41,8 @@ npm test
 - No comments in code unless explicitly requested.
 - The `pi-self-extension` skill should be loaded when creating or modifying extensions.
 - **Always run `npm run format` after every file change** to keep code style consistent.
+
+## Tool Naming
+
+- Use `snake_case` for tool names (the identifier used in code and API calls).
+- Use `CamelCase` for display names (shown in terminal UI, logs, and user-facing output).
