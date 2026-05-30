@@ -9,6 +9,7 @@ export {
 } from "./tool-call-display.ts";
 export type { ContentRenderer, ToolDisplayAdapter } from "./types.ts";
 export { prefixLine, wrapTextWithAnsi } from "./format.ts";
+export { bashAdapter } from "./adapters/bash.ts";
 export { editAdapter } from "./adapters/edit.ts";
 export { readAdapter } from "./adapters/read.ts";
 export { writeAdapter } from "./adapters/write.ts";
