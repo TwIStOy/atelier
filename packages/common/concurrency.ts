@@ -12,7 +12,7 @@ export async function mapConcurrent<T, R>(
     for (;;) {
       const i = next++;
       if (i >= n) return;
-      results[i] = await fn(items[i], i);
+      results[i] = await fn(items[i]!, i);
     }
   };
   await Promise.all(Array.from({ length: cap }, () => worker()));

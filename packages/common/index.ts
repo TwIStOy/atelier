@@ -24,3 +24,4 @@ export { ZAI_CODING_PLAN_EVENTS } from "./events.ts";
 export { resolveModel } from "./model-resolve.ts";
 export type { ResolvableModel } from "./model-resolve.ts";
 export { getAvailableSkillNames } from "./skills.ts";
+export { mapConcurrent } from "./concurrency.ts";
