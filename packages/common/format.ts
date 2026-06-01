@@ -23,6 +23,30 @@ export function formatTokens(n: number): string {
   return `${(n / 1_000_000).toFixed(1)}M`;
 }
 
+export function formatTokenUsageArrows(input: number, output: number): string {
+  return `↑${formatTokens(input)} ↓${formatTokens(output)}`;
+}
+
+export type UsageStressLevel = "high" | "medium" | "low";
+
+export function usagePercentStressLevel(percent: number): UsageStressLevel {
+  if (percent > 80) return "high";
+  if (percent > 50) return "medium";
+  return "low";
+}
+
+export function formatTokenUsageSummaryLine(
+  input: number,
+  output: number,
+  contextPercent?: number | null,
+): string {
+  let line = `Tokens: ${formatTokenUsageArrows(input, output)}`;
+  if (contextPercent != null) {
+    line += ` · context ${Math.round(contextPercent)}%`;
+  }
+  return line;
+}
+
 export function formatNumber(n: number): string {
   return n.toLocaleString("en-US");
 }

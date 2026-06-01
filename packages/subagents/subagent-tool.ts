@@ -8,7 +8,7 @@ import { Type } from "typebox";
 import {
   mapConcurrent,
   truncateDisplay,
-  formatTokens,
+  formatTokenUsageSummaryLine,
 } from "@htwang-contrib/common";
 import {
   createBackgroundJob,
@@ -93,11 +93,7 @@ function formatBatchToolText(items: SubagentBatchItemDetail[]): string {
     ) {
       const up = typeof it.usage_input === "number" ? it.usage_input : 0;
       const down = typeof it.usage_output === "number" ? it.usage_output : 0;
-      let line = `Tokens: ↑${formatTokens(up)} ↓${formatTokens(down)}`;
-      if (it.context_percent != null) {
-        line += ` · context ${Math.round(it.context_percent)}%`;
-      }
-      out.push(line);
+      out.push(formatTokenUsageSummaryLine(up, down, it.context_percent));
     }
     out.push("");
   }
@@ -536,10 +532,14 @@ function finalizeBackgroundSuccess(
   const ok = r.details.ok !== false;
   const batchCounts =
     mode === "batch" && r.details.batch
-      ? {
-          ok: r.details.batch.filter((b) => b.ok).length,
-          err: r.details.batch.filter((b) => !b.ok).length,
-        }
+      ? r.details.batch.reduce(
+          (acc, b) => {
+            if (b.ok) acc.ok += 1;
+            else acc.err += 1;
+            return acc;
+          },
+          { ok: 0, err: 0 },
+        )
       : undefined;
   updateBackgroundJob(jobId, {
     status: "done",

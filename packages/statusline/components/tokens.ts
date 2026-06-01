@@ -1,6 +1,6 @@
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
-import { formatTokens } from "@htwang-contrib/common";
+import { formatTokens, formatTokenUsageArrows } from "@htwang-contrib/common";
 import type { StatusLineComponent } from "./base.ts";
 
 export class TokensComponent implements StatusLineComponent {
@@ -23,8 +23,7 @@ export class TokensComponent implements StatusLineComponent {
     }
 
     const parts = [
-      `↑${formatTokens(input)}`,
-      `↓${formatTokens(output)}`,
+      formatTokenUsageArrows(input, output),
       `R${formatTokens(cacheRead)}`,
       `W${formatTokens(cacheWrite)}`,
     ];

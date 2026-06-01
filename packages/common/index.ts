@@ -3,10 +3,14 @@ export {
   truncateDisplay,
   trimTrailingEmpty,
   formatTokens,
+  formatTokenUsageArrows,
+  formatTokenUsageSummaryLine,
   formatNumber,
   formatCwd,
   formatProgressBar,
+  usagePercentStressLevel,
 } from "./format.ts";
+export type { UsageStressLevel } from "./format.ts";
 export {
   terminalWidth,
   fitColWidths,

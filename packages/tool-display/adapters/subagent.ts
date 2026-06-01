@@ -1,4 +1,8 @@
-import { truncateDisplay, formatTokens } from "@htwang-contrib/common";
+import {
+  truncateDisplay,
+  formatTokenUsageArrows,
+  usagePercentStressLevel,
+} from "@htwang-contrib/common";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import type { ToolDisplayAdapter } from "../types.ts";
 import { spinnerGlyph } from "../format.ts";
@@ -113,13 +117,11 @@ function formatUsageSuffix(
   if (!hasTok && (pct === undefined || pct === null)) return "";
   const parts: string[] = [];
   if (hasTok) {
-    parts.push(
-      theme.fg("muted", `↑${formatTokens(inp ?? 0)}`) +
-        theme.fg("muted", ` ↓${formatTokens(out ?? 0)}`),
-    );
+    parts.push(theme.fg("muted", formatTokenUsageArrows(inp ?? 0, out ?? 0)));
   }
   if (pct != null) {
-    const c = pct > 80 ? "error" : pct > 50 ? "warning" : "muted";
+    const s = usagePercentStressLevel(pct);
+    const c = s === "high" ? "error" : s === "medium" ? "warning" : "muted";
     parts.push(theme.fg(c, `${Math.round(pct)}%`));
   }
   return theme.fg("muted", " · ") + parts.join(theme.fg("muted", " · "));
@@ -219,10 +221,16 @@ function formatSingleSubagentInlineStats(
 ): string {
   let rawType: string | undefined;
   let tc = 0;
+  let usageIn: number | undefined;
+  let usageOut: number | undefined;
+  let ctxPct: number | null | undefined;
   if (d?.mode === "batch" && d.batch?.length === 1) {
     const row = d.batch[0]!;
     rawType = row.agent_type ?? args.tasks?.[0]?.agent_type ?? args.agent_type;
     tc = typeof row.tool_calls === "number" ? row.tool_calls : 0;
+    usageIn = row.usage_input;
+    usageOut = row.usage_output;
+    ctxPct = row.context_percent;
   } else {
     rawType =
       args.tasks?.length === 1
@@ -238,22 +246,14 @@ function formatSingleSubagentInlineStats(
       const v = d.per_task_tool_calls[0];
       tc = typeof v === "number" ? v : 0;
     }
+    if (!args.tasks || args.tasks.length <= 1) {
+      usageIn = d?.usage_input;
+      usageOut = d?.usage_output;
+      ctxPct = d?.context_percent;
+    }
   }
   const ct = capitalizeType(normalizeAgentType(rawType));
   const w = tc === 1 ? "tool" : "tools";
-  let usageIn: number | undefined;
-  let usageOut: number | undefined;
-  let ctxPct: number | null | undefined;
-  if (d?.mode === "batch" && d.batch?.length === 1) {
-    const row = d.batch[0]!;
-    usageIn = row.usage_input;
-    usageOut = row.usage_output;
-    ctxPct = row.context_percent;
-  } else if (!args.tasks || args.tasks.length <= 1) {
-    usageIn = d?.usage_input;
-    usageOut = d?.usage_output;
-    ctxPct = d?.context_percent;
-  }
   return (
     theme.fg("muted", " · ") +
     theme.fg("syntaxType", ct) +

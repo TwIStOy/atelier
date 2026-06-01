@@ -6,6 +6,7 @@ import type {
 import {
   ZAI_CODING_PLAN_EVENTS,
   formatProgressBar,
+  usagePercentStressLevel,
 } from "@htwang-contrib/common";
 import type { CodingPlanUsage } from "@htwang-contrib/common";
 import type { StatusLineComponent } from "./base.ts";
@@ -49,7 +50,9 @@ export class CodingPlanUsageComponent implements StatusLineComponent {
     const used = Math.round(limit.percentage);
     const bar = formatProgressBar(limit.percentage, 8);
 
-    const pctColor = used > 80 ? "error" : used > 50 ? "warning" : "dim";
+    const stress = usagePercentStressLevel(used);
+    const pctColor =
+      stress === "high" ? "error" : stress === "medium" ? "warning" : "dim";
 
     return [
       theme.fg(pctColor, `${used}%`) +

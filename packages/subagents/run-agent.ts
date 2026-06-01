@@ -292,9 +292,8 @@ export async function runSubAgent(
       settingsManager,
     });
     session = created;
-    const child = created;
 
-    await child.bindExtensions({});
+    await created.bindExtensions({});
 
     const maxTurns = input.max_turns;
     const grace = 3;
@@ -302,10 +301,10 @@ export async function runSubAgent(
     let soft = false;
 
     const emitProgress = () => {
-      const u = snapshotUsage(child);
+      const u = snapshotUsage(created);
       onChildProgress?.({
         tool_calls: toolCallCount,
-        sub_session_file: child.sessionManager.getSessionFile(),
+        sub_session_file: created.sessionManager.getSessionFile(),
         ...(input.stream
           ? {
               task_index: input.stream.task_index,
@@ -316,7 +315,7 @@ export async function runSubAgent(
       });
     };
 
-    const unsub = child.subscribe((event: AgentSessionEvent) => {
+    const unsub = created.subscribe((event: AgentSessionEvent) => {
       if (event.type === "tool_execution_end") {
         toolCallCount += 1;
         emitProgress();
@@ -328,26 +327,26 @@ export async function runSubAgent(
       turnCount += 1;
       if (!soft && turnCount >= maxTurns) {
         soft = true;
-        void child.steer(
+        void created.steer(
           "You have reached the turn limit. Finish now with a short final answer; do not start new tool work.",
         );
       } else if (soft && turnCount >= maxTurns + grace) {
-        void child.abort();
+        void created.abort();
       }
     });
 
-    const cleanupAbort = forwardAbort(child, signal);
+    const cleanupAbort = forwardAbort(created, signal);
 
     emitProgress();
 
     try {
-      await child.prompt(effectiveTask);
+      await created.prompt(effectiveTask);
     } finally {
       unsub();
       cleanupAbort();
     }
 
-    const raw = extractAssistantText(child.messages);
+    const raw = extractAssistantText(created.messages);
     const trunc = truncateHead(raw, {
       maxLines: DEFAULT_MAX_LINES,
       maxBytes: DEFAULT_MAX_BYTES,
