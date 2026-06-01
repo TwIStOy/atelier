@@ -79,6 +79,22 @@ function makeHeader(
     else if (isPartial) statusIcon = spinnerGlyph(theme, spinAt);
     else if (isError) statusIcon = theme.fg("error", "✗");
     else statusIcon = theme.fg("success", "✓");
+  } else if (toolName === "subagent_status") {
+    const d =
+      details && typeof details === "object"
+        ? (details as Record<string, unknown>)
+        : undefined;
+    const st = typeof d?.status === "string" ? d.status : "";
+    if (st === "running") statusIcon = spinnerGlyph(theme, spinAt);
+    else if (st === "unknown" || st === "error") {
+      statusIcon = theme.fg("error", "✗");
+    } else if (st === "done" && d?.ok === false) {
+      statusIcon = theme.fg("error", "✗");
+    } else if (isError) {
+      statusIcon = theme.fg("error", "✗");
+    } else {
+      statusIcon = theme.fg("success", "✓");
+    }
   } else {
     statusIcon = isPartial
       ? spinnerGlyph(theme, spinAt)

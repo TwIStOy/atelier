@@ -1,13 +1,27 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type {
+  AgentToolResult,
+  AgentToolUpdateCallback,
+  ExtensionAPI,
+  ExtensionContext,
+} from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { mapConcurrent } from "./concurrency.ts";
+import { mapConcurrent, truncateDisplay } from "@htwang-contrib/common";
+import {
+  createBackgroundJob,
+  updateBackgroundJob,
+  backgroundJobStatusPayload,
+  subagentStatusToolDetails,
+} from "./background-jobs.ts";
 import { resolveSubagentAgentType } from "./agent-types.ts";
+import { SUBAGENT_EVENTS } from "./events.ts";
 import {
   runSubAgent,
   type SubagentBatchItemDetail,
   type SubagentRunDetails,
 } from "./run-agent.ts";
 import { readSubagentConcurrencyLimits } from "./settings.ts";
+
+const SUBAGENT_TOOL_UI_TICK_MS = 100;
 
 function subagentDetails(partial: SubagentRunDetails): SubagentRunDetails {
   return {
@@ -27,7 +41,22 @@ function subagentDetails(partial: SubagentRunDetails): SubagentRunDetails {
     description: partial.description,
     ok: partial.ok,
     error: partial.error,
+    background: partial.background,
+    background_id: partial.background_id,
   };
+}
+
+function tryParentToolUpdate(
+  onUpdate: AgentToolUpdateCallback<SubagentRunDetails> | undefined,
+  payload: AgentToolResult<SubagentRunDetails>,
+) {
+  if (!onUpdate) return;
+  try {
+    const r = onUpdate(payload);
+    if (r != null && typeof (r as Promise<void>).then === "function") {
+      void (r as Promise<void>).catch(() => {});
+    }
+  } catch {}
 }
 
 function formatBatchToolText(items: SubagentBatchItemDetail[]): string {
@@ -98,6 +127,417 @@ function validateTaskShape(params: {
     };
   }
   return { ok: true, mode: "single" };
+}
+
+type ParallelTaskRow = {
+  task: string;
+  description: string;
+  model?: string;
+  thinking?: string;
+  inherit_context?: boolean;
+  isolated?: boolean;
+  max_turns?: number;
+  agent_type?: "default" | "research" | "review" | "plan";
+};
+
+async function runParallelBatchSubagent(
+  ctx: ExtensionContext,
+  args: {
+    tasks: ParallelTaskRow[];
+    parentBase: {
+      parent_session_id: string;
+      parent_session_file: string;
+    };
+    merged: AbortSignal | undefined;
+    onUpdate: AgentToolUpdateCallback<SubagentRunDetails> | undefined;
+    globalModel?: string;
+    globalThinking?: string;
+    globalInherit: boolean;
+    globalIsolated: boolean;
+    globalMaxTurns?: number;
+    globalAgentType?: "default" | "research" | "review" | "plan";
+    limits: { maxConcurrent: number; maxTotal: number };
+  },
+): Promise<{
+  content: Array<{ type: "text"; text: string }>;
+  details: SubagentRunDetails;
+}> {
+  const {
+    tasks,
+    parentBase,
+    merged,
+    onUpdate,
+    globalModel,
+    globalThinking,
+    globalInherit,
+    globalIsolated,
+    globalMaxTurns,
+    globalAgentType,
+    limits,
+  } = args;
+  const n = tasks.length;
+  const perTaskTools = Array.from({ length: n }, () => 0);
+  const perTaskStarted = Array.from({ length: n }, () => false);
+  const perTaskDone = Array.from({ length: n }, () => false);
+  const perTaskOk = Array.from({ length: n }, () => true);
+
+  const flushBatch = () => {
+    if (!onUpdate) return;
+    tryParentToolUpdate(onUpdate, {
+      content: [{ type: "text" as const, text: "" }],
+      details: subagentDetails({
+        ...parentBase,
+        tool_calls: perTaskTools.reduce((s, x) => s + x, 0),
+        task_total: n,
+        per_task_tool_calls: [...perTaskTools],
+        per_task_started: [...perTaskStarted],
+        per_task_done: [...perTaskDone],
+        per_task_ok: [...perTaskOk],
+      }),
+    });
+  };
+
+  let flushTimer: ReturnType<typeof setInterval> | undefined;
+  if (onUpdate) {
+    flushTimer = setInterval(flushBatch, SUBAGENT_TOOL_UI_TICK_MS);
+    (flushTimer as NodeJS.Timeout & { unref?: () => void }).unref?.();
+    flushBatch();
+  }
+
+  let results: Awaited<ReturnType<typeof runSubAgent>>[];
+  try {
+    results = await mapConcurrent(
+      tasks,
+      limits.maxConcurrent,
+      async (item, i) => {
+        perTaskStarted[i] = true;
+        const r = await runSubAgent(
+          ctx,
+          {
+            task: item.task,
+            model: item.model ?? globalModel,
+            thinking: item.thinking ?? globalThinking,
+            inherit_context: item.inherit_context ?? globalInherit,
+            isolated: item.isolated ?? globalIsolated,
+            max_turns: item.max_turns ?? globalMaxTurns,
+            agent_type: item.agent_type ?? globalAgentType,
+            stream: { task_index: i, task_total: n },
+          },
+          merged,
+          (p) => {
+            const ti = p.task_index;
+            if (typeof ti === "number" && ti >= 0 && ti < n) {
+              perTaskStarted[ti] = true;
+              perTaskTools[ti] = p.tool_calls;
+            }
+          },
+        );
+        perTaskTools[i] = r.tool_calls;
+        perTaskDone[i] = true;
+        perTaskOk[i] = !r.isError;
+        if (onUpdate) {
+          tryParentToolUpdate(onUpdate, {
+            content: [{ type: "text" as const, text: "" }],
+            details: subagentDetails({
+              ...parentBase,
+              tool_calls: perTaskTools.reduce((s, x) => s + x, 0),
+              task_index: i,
+              task_total: n,
+              per_task_tool_calls: [...perTaskTools],
+              per_task_started: [...perTaskStarted],
+              per_task_done: [...perTaskDone],
+              per_task_ok: [...perTaskOk],
+            }),
+          });
+        }
+        return r;
+      },
+    );
+  } finally {
+    if (flushTimer !== undefined) {
+      clearInterval(flushTimer);
+    }
+    if (onUpdate) flushBatch();
+  }
+
+  const batchItems: SubagentBatchItemDetail[] = results.map((r, i) => {
+    const at = resolveSubagentAgentType(
+      tasks[i]?.agent_type ?? globalAgentType,
+    );
+    const desc = tasks[i]!.description.trim();
+    return r.isError
+      ? {
+          index: i,
+          ok: false,
+          error: r.errorMessage ?? "subagent failed",
+          tool_calls: r.tool_calls,
+          sub_session_file: r.sub_session_file,
+          agent_type: at,
+          description: desc,
+        }
+      : {
+          index: i,
+          ok: true,
+          text: r.text,
+          tool_calls: r.tool_calls,
+          sub_session_file: r.sub_session_file,
+          agent_type: at,
+          description: desc,
+        };
+  });
+  const totalToolCalls = batchItems.reduce((s, b) => s + b.tool_calls, 0);
+
+  return {
+    content: [
+      {
+        type: "text",
+        text: formatBatchToolText(batchItems),
+      },
+    ],
+    details: subagentDetails({
+      ...parentBase,
+      tool_calls: totalToolCalls,
+      mode: "batch",
+      batch: batchItems,
+      agent_type: resolveSubagentAgentType(globalAgentType),
+      ok: batchItems.every((b) => b.ok),
+    }),
+  };
+}
+
+async function runSingleSubagent(
+  ctx: ExtensionContext,
+  args: {
+    task: string;
+    description: string;
+    parentBase: {
+      parent_session_id: string;
+      parent_session_file: string;
+    };
+    merged: AbortSignal | undefined;
+    onUpdate?: AgentToolUpdateCallback<SubagentRunDetails>;
+    globalModel?: string;
+    globalThinking?: string;
+    globalInherit: boolean;
+    globalIsolated: boolean;
+    globalMaxTurns?: number;
+    globalAgentType?: "default" | "research" | "review" | "plan";
+  },
+): Promise<{
+  content: Array<{ type: "text"; text: string }>;
+  details: SubagentRunDetails;
+}> {
+  const {
+    task,
+    description,
+    parentBase,
+    merged,
+    onUpdate,
+    globalModel,
+    globalThinking,
+    globalInherit,
+    globalIsolated,
+    globalMaxTurns,
+    globalAgentType,
+  } = args;
+  const singleAgentType = resolveSubagentAgentType(globalAgentType);
+  let prog = {
+    tool_calls: 0,
+    sub_session_file: undefined as string | undefined,
+  };
+  const flushSingle = () => {
+    if (!onUpdate) return;
+    tryParentToolUpdate(onUpdate, {
+      content: [
+        {
+          type: "text" as const,
+          text: `${prog.tool_calls} tool uses…`,
+        },
+      ],
+      details: subagentDetails({
+        ...parentBase,
+        tool_calls: prog.tool_calls,
+        sub_session_file: prog.sub_session_file,
+        mode: "single",
+        agent_type: singleAgentType,
+        description,
+      }),
+    });
+  };
+  let flushTimer: ReturnType<typeof setInterval> | undefined;
+  if (onUpdate) {
+    flushTimer = setInterval(flushSingle, SUBAGENT_TOOL_UI_TICK_MS);
+    (flushTimer as NodeJS.Timeout & { unref?: () => void }).unref?.();
+    flushSingle();
+  }
+  let result: Awaited<ReturnType<typeof runSubAgent>>;
+  try {
+    result = await runSubAgent(
+      ctx,
+      {
+        task,
+        model: globalModel,
+        thinking: globalThinking,
+        inherit_context: globalInherit,
+        isolated: globalIsolated,
+        max_turns: globalMaxTurns,
+        agent_type: globalAgentType,
+      },
+      merged,
+      (p) => {
+        prog = {
+          tool_calls: p.tool_calls,
+          sub_session_file: p.sub_session_file ?? prog.sub_session_file,
+        };
+      },
+    );
+  } finally {
+    if (flushTimer !== undefined) {
+      clearInterval(flushTimer);
+    }
+    if (onUpdate) flushSingle();
+  }
+  if (result.isError) {
+    return {
+      content: [
+        {
+          type: "text",
+          text: result.errorMessage ?? "subagent failed",
+        },
+      ],
+      details: subagentDetails({
+        tool_calls: result.tool_calls,
+        sub_session_file: result.sub_session_file,
+        parent_session_id: result.parent_session_id,
+        parent_session_file: result.parent_session_file,
+        mode: "single",
+        agent_type: singleAgentType,
+        description,
+        ok: false,
+        error: result.errorMessage ?? "subagent failed",
+      }),
+    };
+  }
+  return {
+    content: [
+      {
+        type: "text",
+        text: result.text.length > 0 ? result.text : "(empty subagent reply)",
+      },
+    ],
+    details: subagentDetails({
+      tool_calls: result.tool_calls,
+      sub_session_file: result.sub_session_file,
+      parent_session_id: result.parent_session_id,
+      parent_session_file: result.parent_session_file,
+      mode: "single",
+      agent_type: singleAgentType,
+      description,
+      ok: true,
+    }),
+  };
+}
+
+function finalizeBackgroundSuccess(
+  pi: ExtensionAPI,
+  ctx: ExtensionContext,
+  jobId: string,
+  label: string,
+  mode: "single" | "batch",
+  r: {
+    content: Array<{ type: "text"; text: string }>;
+    details: SubagentRunDetails;
+  },
+) {
+  const text =
+    r.content[0]?.type === "text" && typeof r.content[0].text === "string"
+      ? r.content[0].text
+      : "";
+  const summary = text.length > 12_000 ? `${text.slice(0, 12_000)}\n…` : text;
+  const ok = r.details.ok !== false;
+  const batchCounts =
+    mode === "batch" && r.details.batch
+      ? {
+          ok: r.details.batch.filter((b) => b.ok).length,
+          err: r.details.batch.filter((b) => !b.ok).length,
+        }
+      : undefined;
+  updateBackgroundJob(jobId, {
+    status: "done",
+    ok,
+    error: r.details.error,
+    summary,
+    tool_calls: r.details.tool_calls,
+    batch_counts: batchCounts,
+  });
+  pi.events.emit(SUBAGENT_EVENTS.COMPLETE, {
+    id: jobId,
+    ok,
+    mode,
+    label,
+    error: r.details.error,
+    tool_calls: r.details.tool_calls,
+    batch_counts: batchCounts,
+  });
+  const short = truncateDisplay(label, 64);
+  const msg = ok
+    ? `Subagent done: ${short}`
+    : mode === "batch"
+      ? `Subagent batch finished with errors: ${short}`
+      : `Subagent failed: ${short}`;
+  ctx.ui.notify(msg, ok ? "info" : "error");
+}
+
+function finalizeBackgroundThrown(
+  pi: ExtensionAPI,
+  ctx: ExtensionContext,
+  jobId: string,
+  label: string,
+  mode: "single" | "batch",
+  err: unknown,
+) {
+  const msg = err instanceof Error ? err.message : String(err);
+  updateBackgroundJob(jobId, {
+    status: "error",
+    ok: false,
+    error: msg,
+    summary: msg,
+  });
+  pi.events.emit(SUBAGENT_EVENTS.COMPLETE, {
+    id: jobId,
+    ok: false,
+    mode,
+    label,
+    error: msg,
+  });
+  ctx.ui.notify(
+    `Subagent crashed (${truncateDisplay(label, 48)}): ${truncateDisplay(msg, 160)}`,
+    "error",
+  );
+}
+
+function backgroundStartedReply(
+  parentBase: {
+    parent_session_id: string;
+    parent_session_file: string;
+  },
+  shape: { mode: "single" | "batch" },
+  id: string,
+): {
+  content: Array<{ type: "text"; text: string }>;
+  details: SubagentRunDetails;
+} {
+  const msg = `Background subagent started. id=${id}\nPoll with tool subagent_status and { "id": "${id}" }.`;
+  return {
+    content: [{ type: "text", text: msg }],
+    details: subagentDetails({
+      ...parentBase,
+      tool_calls: 0,
+      mode: shape.mode,
+      background: true,
+      background_id: id,
+    }),
+  };
 }
 
 const subagentAgentTypeSchema = Type.Union(
@@ -181,6 +621,13 @@ const subagentParams = Type.Object({
         "Parallel batch: multiple assignments run with a concurrency limit (mutually exclusive with non-empty `task`). Partial failures are all reported in the tool result text and `details.batch`.",
     }),
   ),
+  background: Type.Optional(
+    Type.Boolean({
+      default: false,
+      description:
+        "When true, starts the run asynchronously and returns immediately with { id } in the reply; use `subagent_status` to read results. Cancellation follows the parent session signal only.",
+    }),
+  ),
   model: Type.Optional(
     Type.String({
       description:
@@ -231,12 +678,39 @@ const subagentParams = Type.Object({
   agent_type: Type.Optional(subagentAgentTypeSchema),
 });
 
+export function registerSubagentStatusTool(pi: ExtensionAPI) {
+  pi.registerTool({
+    name: "subagent_status",
+    label: "Subagent status",
+    description:
+      "Returns JSON status for a background subagent job: pass `id` from a `subagent` call with `background: true`. States: running, done (includes partial batch failures via ok and batch_counts), error (unhandled exception), unknown (expired id).",
+    parameters: Type.Object({
+      id: Type.String({
+        description: "Job id printed in the background `subagent` tool result.",
+      }),
+    }),
+    async execute(_toolCallId, params) {
+      const id = params.id.trim();
+      const payload = backgroundJobStatusPayload(id);
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(payload, null, 2),
+          },
+        ],
+        details: subagentStatusToolDetails(id, payload),
+      };
+    },
+  });
+}
+
 export function registerSubagentTool(pi: ExtensionAPI) {
   pi.registerTool({
     name: "subagent",
     label: "Subagent",
     description:
-      "Runs one or more in-process Pi AgentSession values (no extra pi OS process). Single mode: non-empty `task` plus required `description` (short tree label). Parallel mode: `tasks` array, each item with required `description`; runs up to `max_concurrent` at a time (defaults from ~/.agent/subagents/settings.json, typically 4 concurrent / 8 total). Optional `agent_type` selects the injected system prompt (default, research, review, plan). When some tasks fail, the tool still returns 200-style success with a per-task summary: failed tasks appear under `### Task N — error` and `details.batch[].ok === false`. Sessions persist under ~/.agent/subagents/session; linkage lines append under ~/.agent/subagents/by-parent/<parent_id>.jsonl. Default tools are read-only unless `isolated=false`.",
+      "Runs one or more in-process Pi AgentSession values (no extra pi OS process). Single mode: non-empty `task` plus required `description` (short tree label). Parallel mode: `tasks` array, each item with required `description`; runs up to `max_concurrent` at a time (defaults from ~/.agent/subagents/settings.json, typically 4 concurrent / 8 total). Optional `background: true` returns immediately with an `id`; poll with `subagent_status`. On completion, emits `subagent:complete` on `pi.events` and shows `ctx.ui.notify`. Optional `agent_type` selects the injected system prompt (default, research, review, plan). When some tasks fail, the tool still returns 200-style success with a per-task summary: failed tasks appear under `### Task N — error` and `details.batch[].ok === false`. Sessions persist under ~/.agent/subagents/session; linkage lines append under ~/.agent/subagents/by-parent/<parent_id>.jsonl. Default tools are read-only unless `isolated=false`.",
     parameters: subagentParams,
     async execute(_toolCallId, params, signal, onUpdate, ctx) {
       const parentSessionId = ctx.sessionManager.getHeader()?.id ?? "unknown";
@@ -278,6 +752,10 @@ export function registerSubagentTool(pi: ExtensionAPI) {
           : signal
         : ctx.signal;
 
+      const bgSignal = ctx.signal;
+      const isBackground = params.background === true;
+      const runSignal = isBackground ? bgSignal : merged;
+
       const globalModel = params.model;
       const globalThinking = params.thinking;
       const globalInherit = params.inherit_context === true;
@@ -290,7 +768,7 @@ export function registerSubagentTool(pi: ExtensionAPI) {
           max_concurrent: params.max_concurrent,
           max_total: params.max_total,
         });
-        const tasks = params.tasks;
+        const tasks = params.tasks as ParallelTaskRow[];
         if (tasks.length > limits.maxTotal) {
           return {
             content: [
@@ -310,199 +788,100 @@ export function registerSubagentTool(pi: ExtensionAPI) {
           };
         }
 
-        const n = tasks.length;
-        const perTaskTools = Array.from({ length: n }, () => 0);
-        const perTaskStarted = Array.from({ length: n }, () => false);
-        const perTaskDone = Array.from({ length: n }, () => false);
-        const perTaskOk = Array.from({ length: n }, () => true);
-        const parallelOnUpdate = onUpdate
-          ? (update: Parameters<NonNullable<typeof onUpdate>>[0]) => {
-              const det = update.details as SubagentRunDetails | undefined;
-              if (
-                det &&
-                typeof det.task_index === "number" &&
-                det.task_index >= 0 &&
-                det.task_index < n
-              ) {
-                perTaskStarted[det.task_index] = true;
-                if (typeof det.tool_calls === "number") {
-                  perTaskTools[det.task_index] = det.tool_calls;
-                }
-              }
-              const total = perTaskTools.reduce((s, x) => s + x, 0);
-              onUpdate({
-                ...update,
-                details: subagentDetails({
-                  ...parentBase,
-                  tool_calls: total,
-                  task_index: det?.task_index,
-                  task_total: n,
-                  per_task_tool_calls: [...perTaskTools],
-                  per_task_started: [...perTaskStarted],
-                  per_task_done: [...perTaskDone],
-                  per_task_ok: [...perTaskOk],
-                }),
-              });
-            }
-          : undefined;
-        const results = await mapConcurrent(
-          tasks,
-          limits.maxConcurrent,
-          async (item, i) => {
-            const r = await runSubAgent(
-              ctx,
-              {
-                task: item.task,
-                model: item.model ?? globalModel,
-                thinking: item.thinking ?? globalThinking,
-                inherit_context: item.inherit_context ?? globalInherit,
-                isolated: item.isolated ?? globalIsolated,
-                max_turns: item.max_turns ?? globalMaxTurns,
-                agent_type: item.agent_type ?? globalAgentType,
-                stream: { task_index: i, task_total: n },
-              },
-              merged,
-              parallelOnUpdate,
+        if (isBackground) {
+          const label = `batch (${tasks.length} tasks)`;
+          const jobId = createBackgroundJob({ mode: "batch", label });
+          void runParallelBatchSubagent(ctx, {
+            tasks,
+            parentBase,
+            merged: runSignal,
+            onUpdate,
+            globalModel,
+            globalThinking,
+            globalInherit,
+            globalIsolated,
+            globalMaxTurns,
+            globalAgentType,
+            limits,
+          })
+            .then((r) =>
+              finalizeBackgroundSuccess(pi, ctx, jobId, label, "batch", r),
+            )
+            .catch((e) =>
+              finalizeBackgroundThrown(pi, ctx, jobId, label, "batch", e),
             );
-            perTaskDone[i] = true;
-            perTaskOk[i] = !r.isError;
-            if (onUpdate) {
-              onUpdate({
-                content: [{ type: "text", text: "" }],
-                details: subagentDetails({
-                  ...parentBase,
-                  tool_calls: perTaskTools.reduce((s, x) => s + x, 0),
-                  task_index: i,
-                  task_total: n,
-                  per_task_tool_calls: [...perTaskTools],
-                  per_task_started: [...perTaskStarted],
-                  per_task_done: [...perTaskDone],
-                  per_task_ok: [...perTaskOk],
-                }),
-              });
-            }
-            return r;
-          },
-        );
+          return backgroundStartedReply(parentBase, shape, jobId);
+        }
 
-        const batchItems: SubagentBatchItemDetail[] = results.map((r, i) => {
-          const at = resolveSubagentAgentType(
-            tasks[i]?.agent_type ?? globalAgentType,
-          );
-          const desc = tasks[i]!.description.trim();
-          return r.isError
-            ? {
-                index: i,
-                ok: false,
-                error: r.errorMessage ?? "subagent failed",
-                tool_calls: r.tool_calls,
-                sub_session_file: r.sub_session_file,
-                agent_type: at,
-                description: desc,
-              }
-            : {
-                index: i,
-                ok: true,
-                text: r.text,
-                tool_calls: r.tool_calls,
-                sub_session_file: r.sub_session_file,
-                agent_type: at,
-                description: desc,
-              };
+        return runParallelBatchSubagent(ctx, {
+          tasks,
+          parentBase,
+          merged: runSignal,
+          onUpdate,
+          globalModel,
+          globalThinking,
+          globalInherit,
+          globalIsolated,
+          globalMaxTurns,
+          globalAgentType,
+          limits,
         });
-        const totalToolCalls = batchItems.reduce((s, b) => s + b.tool_calls, 0);
-
-        return {
-          content: [
-            {
-              type: "text",
-              text: formatBatchToolText(batchItems),
-            },
-          ],
-          details: subagentDetails({
-            ...parentBase,
-            tool_calls: totalToolCalls,
-            mode: "batch",
-            batch: batchItems,
-            agent_type: resolveSubagentAgentType(globalAgentType),
-            ok: batchItems.every((b) => b.ok),
-          }),
-        };
       }
 
-      const isolated = globalIsolated;
-      const singleAgentType = resolveSubagentAgentType(globalAgentType);
       const singleDescription = params.description!.trim();
-      const singleOnUpdate = onUpdate
-        ? (update: Parameters<NonNullable<typeof onUpdate>>[0]) => {
-            const det = update.details as SubagentRunDetails | undefined;
-            if (!det) {
-              onUpdate(update);
-              return;
-            }
-            onUpdate({
-              ...update,
-              details: subagentDetails({
-                ...det,
-                description: singleDescription,
-              }),
-            });
-          }
-        : undefined;
-      const result = await runSubAgent(
-        ctx,
-        {
-          task: params.task!.trim(),
-          model: globalModel,
-          thinking: globalThinking,
-          inherit_context: globalInherit,
-          isolated,
-          max_turns: globalMaxTurns,
-          agent_type: globalAgentType,
-        },
-        merged,
-        singleOnUpdate,
-      );
-      if (result.isError) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: result.errorMessage ?? "subagent failed",
-            },
-          ],
-          details: subagentDetails({
-            tool_calls: result.tool_calls,
-            sub_session_file: result.sub_session_file,
-            parent_session_id: result.parent_session_id,
-            parent_session_file: result.parent_session_file,
-            mode: "single",
-            agent_type: singleAgentType,
-            description: singleDescription,
-            ok: false,
-            error: result.errorMessage ?? "subagent failed",
-          }),
-        };
-      }
-      return {
-        content: [
-          {
-            type: "text",
-            text:
-              result.text.length > 0 ? result.text : "(empty subagent reply)",
-          },
-        ],
-        details: subagentDetails({
-          tool_calls: result.tool_calls,
-          sub_session_file: result.sub_session_file,
-          parent_session_id: result.parent_session_id,
-          parent_session_file: result.parent_session_file,
+      if (isBackground) {
+        const jobId = createBackgroundJob({
           mode: "single",
-          agent_type: singleAgentType,
+          label: singleDescription,
+        });
+        void runSingleSubagent(ctx, {
+          task: params.task!.trim(),
           description: singleDescription,
-          ok: true,
-        }),
-      };
+          parentBase,
+          merged: runSignal,
+          globalModel,
+          globalThinking,
+          globalInherit,
+          globalIsolated,
+          globalMaxTurns,
+          globalAgentType,
+        })
+          .then((r) =>
+            finalizeBackgroundSuccess(
+              pi,
+              ctx,
+              jobId,
+              singleDescription,
+              "single",
+              r,
+            ),
+          )
+          .catch((e) =>
+            finalizeBackgroundThrown(
+              pi,
+              ctx,
+              jobId,
+              singleDescription,
+              "single",
+              e,
+            ),
+          );
+        return backgroundStartedReply(parentBase, shape, jobId);
+      }
+
+      return runSingleSubagent(ctx, {
+        task: params.task!.trim(),
+        description: singleDescription,
+        parentBase,
+        merged: runSignal,
+        onUpdate,
+        globalModel,
+        globalThinking,
+        globalInherit,
+        globalIsolated,
+        globalMaxTurns,
+        globalAgentType,
+      });
     },
   });
 }

@@ -14,11 +14,11 @@
 | 1     | 仓库骨架：`packages/subagents`、`tsconfig` reference、空扩展可加载、`tsc --build`       | [x]  |
 | 2     | 单任务前台：`runSubAgent` + `registerTool`、`pi -e` 手测                          | [x]  |
 | 3     | 并行：`tasks[]`、并发槽、失败策略                                                       | [x]  |
-| 4     | 后台：`background`、`subagent_status`、`pi.events`                                      | [ ]  |
+| 4     | 后台：`background`、`subagent_status`、`pi.events`                                      | [x]  |
 | 5     | 策略与运维：settings、子 session 禁止委派工具、README、AGENTS 链接                      | [ ]  |
 | 6     | 可选：statusline、`protect-secrets` 说明、RPC                                           | [ ]  |
 
-**当前停在哪一 phase：** Phase 3 已完成（`tasks[]` + `settings.json` 并发上限 + 部分失败汇总）— **请 review**；确认后再进行 Phase 4（后台）。
+**当前停在哪一 phase：** Phase 4 已完成（`background`、`subagent_status`、`subagent:complete` + `ctx.ui.notify`）；确认后再进行 Phase 5（策略与运维细化）。
 
 ---
 

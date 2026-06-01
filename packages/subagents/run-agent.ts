@@ -2,7 +2,6 @@ import { randomUUID } from "node:crypto";
 import * as fs from "node:fs";
 import type {
   AgentMessage,
-  AgentToolUpdateCallback,
   ThinkingLevel,
 } from "@earendil-works/pi-agent-core";
 import type { TextContent } from "@earendil-works/pi-ai";
@@ -75,6 +74,8 @@ export type SubagentRunDetails = {
   description?: string;
   ok?: boolean;
   error?: string;
+  background?: boolean;
+  background_id?: string;
 };
 
 export type RunSubAgentInput = {
@@ -96,6 +97,13 @@ export type RunSubAgentResult = {
   sub_session_file?: string;
   parent_session_id: string;
   parent_session_file: string;
+};
+
+export type SubagentChildProgress = {
+  tool_calls: number;
+  sub_session_file?: string;
+  task_index?: number;
+  task_total?: number;
 };
 
 function parseThinking(raw: string | undefined): ThinkingLevel | undefined {
@@ -142,23 +150,11 @@ function forwardAbort(session: AgentSession, signal: AbortSignal | undefined) {
   return () => signal.removeEventListener("abort", onAbort);
 }
 
-function pushUpdate(
-  onUpdate: AgentToolUpdateCallback<SubagentRunDetails> | undefined,
-  text: string,
-  details: SubagentRunDetails,
-) {
-  const body = text.length > 8000 ? `${text.slice(0, 8000)}…` : text;
-  onUpdate?.({
-    content: [{ type: "text", text: body }],
-    details: { ...details },
-  });
-}
-
 export async function runSubAgent(
   ctx: ExtensionContext,
   input: RunSubAgentInput,
   signal: AbortSignal | undefined,
-  onUpdate: AgentToolUpdateCallback<SubagentRunDetails> | undefined,
+  onChildProgress?: (p: SubagentChildProgress) => void,
 ): Promise<RunSubAgentResult> {
   const parentHeader = ctx.sessionManager.getHeader();
   const parentSessionId = parentHeader?.id ?? "unknown";
@@ -271,30 +267,19 @@ export async function runSubAgent(
     let turnCount = 0;
     let soft = false;
 
-    let streamed = "";
-    const detailsWithCounts = (): SubagentRunDetails => ({
-      ...baseDetails,
-      tool_calls: toolCallCount,
-      sub_session_file: child.sessionManager.getSessionFile(),
-      ...(input.stream
-        ? {
-            task_index: input.stream.task_index,
-            task_total: input.stream.task_total,
-          }
-        : {}),
-    });
-
     const unsub = child.subscribe((event: AgentSessionEvent) => {
       if (event.type === "tool_execution_end") {
         toolCallCount += 1;
-        pushUpdate(onUpdate, streamed, detailsWithCounts());
-        return;
-      }
-      if (event.type === "message_update") {
-        if (event.assistantMessageEvent.type === "text_delta") {
-          streamed += event.assistantMessageEvent.delta;
-          pushUpdate(onUpdate, streamed, detailsWithCounts());
-        }
+        onChildProgress?.({
+          tool_calls: toolCallCount,
+          sub_session_file: child.sessionManager.getSessionFile(),
+          ...(input.stream
+            ? {
+                task_index: input.stream.task_index,
+                task_total: input.stream.task_total,
+              }
+            : {}),
+        });
         return;
       }
       if (event.type !== "turn_end") return;
@@ -311,6 +296,17 @@ export async function runSubAgent(
     });
 
     const cleanupAbort = forwardAbort(child, signal);
+
+    onChildProgress?.({
+      tool_calls: 0,
+      sub_session_file: child.sessionManager.getSessionFile(),
+      ...(input.stream
+        ? {
+            task_index: input.stream.task_index,
+            task_total: input.stream.task_total,
+          }
+        : {}),
+    });
 
     try {
       await child.prompt(effectiveTask);
