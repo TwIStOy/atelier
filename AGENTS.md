@@ -13,6 +13,10 @@ Monorepo with packages under `packages/`:
 - `packages/statusline/` -- Custom status bar widgets for the pi TUI.
 - `.agents/skills/pi-self-extension/` -- skill with authoritative guidance for building pi extensions (API reference, compat gotchas, validation checklist).
 
+## Subagents (planned)
+
+Design and implementation steps for an in-process subagent extension (parent-only spawn, parallel and background runs, no extra `pi` subprocess): [docs/subagents/DESIGN.md](docs/subagents/DESIGN.md), [docs/subagents/STEPS.md](docs/subagents/STEPS.md).
+
 ## Architecture
 
 - Each extension is a TypeScript file exporting a default function receiving `ExtensionAPI`.
