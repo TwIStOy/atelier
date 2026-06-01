@@ -11,14 +11,14 @@
 | Phase | 目标                                                                                    | 状态 |
 | ----- | --------------------------------------------------------------------------------------- | ---- |
 | 0     | API 与版本锁定：`npm install`、`dist/index.d.ts` 导出核查、本文件「API 验证结果」已填写 | [x]  |
-| 1     | 仓库骨架：`packages/subagents`、`tsconfig` reference、空扩展可加载、`tsc --build`       | [ ]  |
+| 1     | 仓库骨架：`packages/subagents`、`tsconfig` reference、空扩展可加载、`tsc --build`       | [x]  |
 | 2     | 单任务前台：`runInProcessAgent` + `registerTool`、`pi -e` 手测                          | [ ]  |
 | 3     | 并行：`tasks[]`、并发槽、失败策略                                                       | [ ]  |
 | 4     | 后台：`background`、`subagent_status`、`pi.events`                                      | [ ]  |
 | 5     | 策略与运维：settings、子 session 禁止委派工具、README、AGENTS 链接                      | [ ]  |
 | 6     | 可选：statusline、`protect-secrets` 说明、RPC                                           | [ ]  |
 
-**当前停在哪一 phase：** Phase 0 已完成 — **请 review**（含 `packages/common` 的 `workspace:*` → `latest` 修复）；确认后再进行 Phase 1。
+**当前停在哪一 phase：** Phase 1 已完成 — **请 review**；确认后再进行 Phase 2。
 
 ---
 

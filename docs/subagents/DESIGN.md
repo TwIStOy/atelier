@@ -168,3 +168,4 @@ Pi 刻意不把 subagents 做进核心：默认仅少量工具，通过 **Extens
 | 2026-06-01 | 初版：调研、约束、单进程双路线、与仓库集成                                                   |
 | 2026-06-01 | **源码审计**：五款扩展仓库克隆阅读；修正 @tintinweb 进程模型；推荐 `createAgentSession` 路线 |
 | 2026-06-01 | `STEPS.md` 增加总进度 TODO；阶段 0 对 `node_modules` 做导出核对（0.76.0）                    |
+| 2026-06-01 | Phase 1：`packages/subagents` 空扩展骨架、根 `tsconfig` / `pi.extensions` / AGENTS 列表 |

@@ -7,6 +7,7 @@
     { "path": "packages/protect-secrets" },
     { "path": "packages/statusline" },
     { "path": "packages/user-message" },
-    { "path": "packages/tool-display" }
+    { "path": "packages/tool-display" },
+    { "path": "packages/subagents" }
   ]
 }

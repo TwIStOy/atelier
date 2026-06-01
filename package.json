@@ -13,7 +13,8 @@
       "packages/protect-secrets",
       "packages/statusline",
       "packages/user-message",
-      "packages/tool-display"
+      "packages/tool-display",
+      "packages/subagents"
     ],
     "skills": [],
     "themes": [
