@@ -1,6 +1,17 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { runInProcessAgent } from "./run-agent.ts";
+import { runInProcessAgent, type SubagentRunDetails } from "./run-agent.ts";
+
+function subagentDetails(
+  partial: Partial<SubagentRunDetails> & Pick<SubagentRunDetails, "tool_calls">,
+): SubagentRunDetails {
+  return {
+    tool_calls: partial.tool_calls,
+    sub_session_file: partial.sub_session_file,
+    parent_session_id: partial.parent_session_id ?? "unknown",
+    parent_session_file: partial.parent_session_file ?? "",
+  };
+}
 
 const subagentParams = Type.Object({
   task: Type.String({
@@ -9,7 +20,7 @@ const subagentParams = Type.Object({
   model: Type.Optional(
     Type.String({
       description:
-        "Optional model override as provider/modelId (e.g. anthropic/claude-sonnet-4). Defaults to the parent session model.",
+        "Optional model hint: exact provider/modelId, model id, fuzzy name, etc. Resolved via @htwang-contrib/common resolveModel against getAvailable(); falls back to parent model.",
     }),
   ),
   thinking: Type.Optional(
@@ -46,10 +57,12 @@ export default function (pi: ExtensionAPI) {
     name: "subagent",
     label: "Subagent",
     description:
-      "Runs a separate in-process Pi AgentSession (no extra pi OS process). Default is isolated read-only tools. Use isolated=false only when the sub-agent must mutate files or run shell commands.",
+      "Runs a separate in-process Pi AgentSession (no extra pi OS process). Subagent sessions persist under ~/.agent/subagents/session and are linked to the parent session in ~/.agent/subagents/by-parent/<parent_id>.jsonl. Default is isolated read-only tools. Use isolated=false only when the sub-agent must mutate files or run shell commands. Optional model uses the same resolveModel matching as other @htwang-contrib packages.",
     parameters: subagentParams,
     async execute(_toolCallId, params, signal, onUpdate, ctx) {
       if (!ctx.model) {
+        const parentSessionId = ctx.sessionManager.getHeader()?.id ?? "unknown";
+        const parentSessionFile = ctx.sessionManager.getSessionFile() ?? "";
         return {
           content: [
             {
@@ -57,7 +70,11 @@ export default function (pi: ExtensionAPI) {
               text: "subagent: parent session has no active model; select a model first.",
             },
           ],
-          details: {},
+          details: subagentDetails({
+            tool_calls: 0,
+            parent_session_id: parentSessionId,
+            parent_session_file: parentSessionFile,
+          }),
         };
       }
       const merged = signal
@@ -87,7 +104,12 @@ export default function (pi: ExtensionAPI) {
               text: result.errorMessage ?? "subagent failed",
             },
           ],
-          details: {},
+          details: subagentDetails({
+            tool_calls: result.tool_calls,
+            sub_session_file: result.sub_session_file,
+            parent_session_id: result.parent_session_id,
+            parent_session_file: result.parent_session_file,
+          }),
         };
       }
       return {
@@ -98,7 +120,12 @@ export default function (pi: ExtensionAPI) {
               result.text.length > 0 ? result.text : "(empty subagent reply)",
           },
         ],
-        details: {},
+        details: subagentDetails({
+          tool_calls: result.tool_calls,
+          sub_session_file: result.sub_session_file,
+          parent_session_id: result.parent_session_id,
+          parent_session_file: result.parent_session_file,
+        }),
       };
     },
   });

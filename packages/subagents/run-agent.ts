@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+import * as fs from "node:fs";
 import type {
   AgentMessage,
   AgentToolUpdateCallback,
@@ -18,6 +20,8 @@ import {
   type AgentSession,
   type AgentSessionEvent,
 } from "@earendil-works/pi-coding-agent";
+import { resolveModel } from "@htwang-contrib/common";
+import { appendSubagentLinkRecord, SUBAGENT_SESSION_DIR } from "./paths.ts";
 
 const READ_ONLY_TOOLS = ["read", "grep", "find", "ls"] as const;
 const FULL_BUILTIN_TOOLS = [
@@ -42,6 +46,13 @@ const THINKING_LEVELS = new Set<string>([
 const SUBAGENT_SYSTEM =
   "You are a focused sub-agent running inside the same Pi process. Use your tools to complete the assignment. When done, reply with a concise final summary for the parent agent.";
 
+export type SubagentRunDetails = {
+  tool_calls: number;
+  sub_session_file?: string;
+  parent_session_id: string;
+  parent_session_file: string;
+};
+
 export type RunInProcessAgentInput = {
   task: string;
   model?: string;
@@ -55,6 +66,10 @@ export type RunInProcessAgentResult = {
   text: string;
   isError: boolean;
   errorMessage?: string;
+  tool_calls: number;
+  sub_session_file?: string;
+  parent_session_id: string;
+  parent_session_file: string;
 };
 
 function parseThinking(raw: string | undefined): ThinkingLevel | undefined {
@@ -82,17 +97,14 @@ function extractAssistantText(messages: AgentMessage[]): string {
   return "";
 }
 
-function resolveModelFromString(
+function resolveModelForSubagent(
   raw: string | undefined,
   ctx: ExtensionContext,
 ) {
-  if (!raw?.trim()) return ctx.model;
-  const s = raw.trim();
-  const slash = s.indexOf("/");
-  if (slash <= 0 || slash === s.length - 1) return ctx.model;
-  const provider = s.slice(0, slash);
-  const modelId = s.slice(slash + 1);
-  return ctx.modelRegistry.find(provider, modelId) ?? ctx.model;
+  const pattern = raw?.trim();
+  if (!pattern) return ctx.model;
+  const found = resolveModel(ctx.modelRegistry.getAvailable(), pattern);
+  return found ?? ctx.model;
 }
 
 function forwardAbort(session: AgentSession, signal: AbortSignal | undefined) {
@@ -104,112 +116,204 @@ function forwardAbort(session: AgentSession, signal: AbortSignal | undefined) {
   return () => signal.removeEventListener("abort", onAbort);
 }
 
+function pushUpdate(
+  onUpdate: AgentToolUpdateCallback<SubagentRunDetails> | undefined,
+  text: string,
+  details: SubagentRunDetails,
+) {
+  const body = text.length > 8000 ? `${text.slice(0, 8000)}…` : text;
+  onUpdate?.({
+    content: [{ type: "text", text: body }],
+    details: { ...details },
+  });
+}
+
 export async function runInProcessAgent(
   ctx: ExtensionContext,
   input: RunInProcessAgentInput,
   signal: AbortSignal | undefined,
-  onUpdate: AgentToolUpdateCallback<unknown> | undefined,
+  onUpdate: AgentToolUpdateCallback<SubagentRunDetails> | undefined,
 ): Promise<RunInProcessAgentResult> {
-  const isolated = input.isolated !== false;
-  const toolList = isolated ? [...READ_ONLY_TOOLS] : [...FULL_BUILTIN_TOOLS];
+  const parentHeader = ctx.sessionManager.getHeader();
+  const parentSessionId = parentHeader?.id ?? "unknown";
+  const parentSessionFile = ctx.sessionManager.getSessionFile() ?? "";
 
-  const cwd = ctx.cwd;
-  const agentDir = getAgentDir();
-  const settingsManager = SettingsManager.create(cwd, agentDir);
-  const model = resolveModelFromString(input.model, ctx);
-  const thinkingLevel = parseThinking(input.thinking);
+  const baseDetails: SubagentRunDetails = {
+    tool_calls: 0,
+    parent_session_id: parentSessionId,
+    parent_session_file: parentSessionFile,
+  };
 
-  let effectiveTask = input.task.trim();
-  if (!effectiveTask) {
-    return { text: "", isError: true, errorMessage: "task is empty" };
-  }
-  if (input.inherit_context) {
-    const sys = ctx.getSystemPrompt();
-    const head = sys.length > 12_000 ? `${sys.slice(0, 12_000)}\n…` : sys;
-    effectiveTask = `The parent agent session provided the following system prompt context (truncated):\n\n${head}\n\n---\n\nYour assignment:\n\n${effectiveTask}`;
-  }
+  let session: AgentSession | undefined;
+  let toolCallCount = 0;
 
-  const loader = new DefaultResourceLoader({
-    cwd,
-    agentDir,
-    settingsManager,
-    noExtensions: true,
-    noSkills: true,
-    noPromptTemplates: true,
-    noThemes: true,
-    noContextFiles: true,
-    systemPromptOverride: () => SUBAGENT_SYSTEM,
-    appendSystemPromptOverride: () => [],
+  const finish = (
+    partial: Omit<
+      RunInProcessAgentResult,
+      "parent_session_id" | "parent_session_file"
+    > &
+      Partial<
+        Pick<
+          RunInProcessAgentResult,
+          "parent_session_id" | "parent_session_file"
+        >
+      >,
+  ): RunInProcessAgentResult => ({
+    parent_session_id: partial.parent_session_id ?? parentSessionId,
+    parent_session_file: partial.parent_session_file ?? parentSessionFile,
+    tool_calls: partial.tool_calls ?? toolCallCount,
+    sub_session_file:
+      partial.sub_session_file ?? session?.sessionManager.getSessionFile(),
+    text: partial.text,
+    isError: partial.isError,
+    errorMessage: partial.errorMessage,
   });
-  await loader.reload();
-
-  const { session } = await createAgentSession({
-    cwd,
-    agentDir,
-    modelRegistry: ctx.modelRegistry,
-    model,
-    thinkingLevel,
-    tools: [...toolList],
-    resourceLoader: loader,
-    sessionManager: SessionManager.inMemory(cwd),
-    settingsManager,
-  });
-
-  await session.bindExtensions({});
-
-  const maxTurns = input.max_turns;
-  const grace = 3;
-  let turnCount = 0;
-  let soft = false;
-
-  let streamed = "";
-  const unsub = session.subscribe((event: AgentSessionEvent) => {
-    if (event.type === "message_update") {
-      if (event.assistantMessageEvent.type === "text_delta") {
-        streamed += event.assistantMessageEvent.delta;
-        const snap =
-          streamed.length > 8000 ? `${streamed.slice(0, 8000)}…` : streamed;
-        onUpdate?.({
-          content: [{ type: "text", text: snap }],
-          details: {},
-        });
-      }
-      return;
-    }
-    if (event.type !== "turn_end") return;
-    if (maxTurns === undefined || maxTurns <= 0) return;
-    turnCount += 1;
-    if (!soft && turnCount >= maxTurns) {
-      soft = true;
-      void session.steer(
-        "You have reached the turn limit. Finish now with a short final answer; do not start new tool work.",
-      );
-    } else if (soft && turnCount >= maxTurns + grace) {
-      void session.abort();
-    }
-  });
-
-  const cleanupAbort = forwardAbort(session, signal);
 
   try {
-    await session.prompt(effectiveTask);
+    let effectiveTask = input.task.trim();
+    if (!effectiveTask) {
+      return finish({
+        text: "",
+        isError: true,
+        errorMessage: "task is empty",
+        tool_calls: 0,
+      });
+    }
+    if (input.inherit_context) {
+      const sys = ctx.getSystemPrompt();
+      const head = sys.length > 12_000 ? `${sys.slice(0, 12_000)}\n…` : sys;
+      effectiveTask = `The parent agent session provided the following system prompt context (truncated):\n\n${head}\n\n---\n\nYour assignment:\n\n${effectiveTask}`;
+    }
+
+    const isolated = input.isolated !== false;
+    const toolList = isolated ? [...READ_ONLY_TOOLS] : [...FULL_BUILTIN_TOOLS];
+
+    const cwd = ctx.cwd;
+    const agentDir = getAgentDir();
+    const settingsManager = SettingsManager.create(cwd, agentDir);
+    const model = resolveModelForSubagent(input.model, ctx);
+    const thinkingLevel = parseThinking(input.thinking);
+
+    fs.mkdirSync(SUBAGENT_SESSION_DIR, { recursive: true });
+
+    const newOpts: { id: string; parentSession?: string } = {
+      id: randomUUID(),
+    };
+    if (parentHeader?.id) {
+      newOpts.parentSession = parentHeader.id;
+    }
+
+    const sessionManager = SessionManager.create(
+      cwd,
+      SUBAGENT_SESSION_DIR,
+      newOpts,
+    );
+
+    const loader = new DefaultResourceLoader({
+      cwd,
+      agentDir,
+      settingsManager,
+      noExtensions: true,
+      noSkills: true,
+      noPromptTemplates: true,
+      noThemes: true,
+      noContextFiles: true,
+      systemPromptOverride: () => SUBAGENT_SYSTEM,
+      appendSystemPromptOverride: () => [],
+    });
+    await loader.reload();
+
+    const { session: created } = await createAgentSession({
+      cwd,
+      agentDir,
+      modelRegistry: ctx.modelRegistry,
+      model,
+      thinkingLevel,
+      tools: [...toolList],
+      resourceLoader: loader,
+      sessionManager,
+      settingsManager,
+    });
+    session = created;
+    const child = created;
+
+    await child.bindExtensions({});
+
+    const maxTurns = input.max_turns;
+    const grace = 3;
+    let turnCount = 0;
+    let soft = false;
+
+    let streamed = "";
+    const detailsWithCounts = (): SubagentRunDetails => ({
+      ...baseDetails,
+      tool_calls: toolCallCount,
+      sub_session_file: child.sessionManager.getSessionFile(),
+    });
+
+    const unsub = child.subscribe((event: AgentSessionEvent) => {
+      if (event.type === "tool_execution_end") {
+        toolCallCount += 1;
+        pushUpdate(onUpdate, streamed, detailsWithCounts());
+        return;
+      }
+      if (event.type === "message_update") {
+        if (event.assistantMessageEvent.type === "text_delta") {
+          streamed += event.assistantMessageEvent.delta;
+          pushUpdate(onUpdate, streamed, detailsWithCounts());
+        }
+        return;
+      }
+      if (event.type !== "turn_end") return;
+      if (maxTurns === undefined || maxTurns <= 0) return;
+      turnCount += 1;
+      if (!soft && turnCount >= maxTurns) {
+        soft = true;
+        void child.steer(
+          "You have reached the turn limit. Finish now with a short final answer; do not start new tool work.",
+        );
+      } else if (soft && turnCount >= maxTurns + grace) {
+        void child.abort();
+      }
+    });
+
+    const cleanupAbort = forwardAbort(child, signal);
+
+    try {
+      await child.prompt(effectiveTask);
+    } finally {
+      unsub();
+      cleanupAbort();
+    }
+
+    const raw = extractAssistantText(child.messages);
+    const trunc = truncateHead(raw, {
+      maxLines: DEFAULT_MAX_LINES,
+      maxBytes: DEFAULT_MAX_BYTES,
+    });
+    let text = trunc.content;
+    if (trunc.truncated) {
+      text += `\n\n[Output truncated: ${trunc.outputLines} of ${trunc.totalLines} lines (${formatSize(trunc.outputBytes)} of ${formatSize(trunc.totalBytes)}).]`;
+    }
+
+    return finish({ text, isError: false, tool_calls: toolCallCount });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    return { text: "", isError: true, errorMessage: msg };
+    return finish({
+      text: "",
+      isError: true,
+      errorMessage: msg,
+      tool_calls: toolCallCount,
+    });
   } finally {
-    unsub();
-    cleanupAbort();
+    const subFile = session?.sessionManager.getSessionFile();
+    if (subFile) {
+      appendSubagentLinkRecord(parentSessionId, {
+        parent_session_file: parentSessionFile,
+        sub_session_file: subFile,
+        tool_calls: toolCallCount,
+        ended_at: new Date().toISOString(),
+      });
+    }
   }
-
-  const raw = extractAssistantText(session.messages);
-  const trunc = truncateHead(raw, {
-    maxLines: DEFAULT_MAX_LINES,
-    maxBytes: DEFAULT_MAX_BYTES,
-  });
-  let text = trunc.content;
-  if (trunc.truncated) {
-    text += `\n\n[Output truncated: ${trunc.outputLines} of ${trunc.totalLines} lines (${formatSize(trunc.outputBytes)} of ${formatSize(trunc.totalBytes)}).]`;
-  }
-
-  return { text, isError: false };
 }
