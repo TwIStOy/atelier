@@ -46,6 +46,14 @@ const THINKING_LEVELS = new Set<string>([
   "xhigh",
 ]);
 
+export type SubagentUsageSnapshot = {
+  usage_input: number;
+  usage_output: number;
+  context_percent: number | null;
+  context_tokens: number | null;
+  context_window: number;
+};
+
 export type SubagentBatchItemDetail = {
   index: number;
   ok: boolean;
@@ -55,7 +63,7 @@ export type SubagentBatchItemDetail = {
   sub_session_file?: string;
   agent_type?: string;
   description: string;
-};
+} & Partial<SubagentUsageSnapshot>;
 
 export type SubagentRunDetails = {
   tool_calls: number;
@@ -69,6 +77,9 @@ export type SubagentRunDetails = {
   per_task_started?: boolean[];
   per_task_done?: boolean[];
   per_task_ok?: boolean[];
+  per_task_usage_input?: number[];
+  per_task_usage_output?: number[];
+  per_task_context_percent?: (number | null)[];
   batch?: SubagentBatchItemDetail[];
   agent_type?: string;
   description?: string;
@@ -76,7 +87,7 @@ export type SubagentRunDetails = {
   error?: string;
   background?: boolean;
   background_id?: string;
-};
+} & Partial<SubagentUsageSnapshot>;
 
 export type RunSubAgentInput = {
   task: string;
@@ -97,14 +108,14 @@ export type RunSubAgentResult = {
   sub_session_file?: string;
   parent_session_id: string;
   parent_session_file: string;
-};
+} & SubagentUsageSnapshot;
 
 export type SubagentChildProgress = {
   tool_calls: number;
   sub_session_file?: string;
   task_index?: number;
   task_total?: number;
-};
+} & SubagentUsageSnapshot;
 
 function parseThinking(raw: string | undefined): ThinkingLevel | undefined {
   if (raw === undefined || raw === "") return undefined;
@@ -150,6 +161,27 @@ function forwardAbort(session: AgentSession, signal: AbortSignal | undefined) {
   return () => signal.removeEventListener("abort", onAbort);
 }
 
+const EMPTY_USAGE: SubagentUsageSnapshot = {
+  usage_input: 0,
+  usage_output: 0,
+  context_percent: null,
+  context_tokens: null,
+  context_window: 0,
+};
+
+function snapshotUsage(child: AgentSession): SubagentUsageSnapshot {
+  const st = child.getSessionStats();
+  const cu = child.getContextUsage();
+  const cw = cu?.contextWindow ?? child.model?.contextWindow ?? 0;
+  return {
+    usage_input: st.tokens.input,
+    usage_output: st.tokens.output,
+    context_percent: cu?.percent ?? null,
+    context_tokens: cu?.tokens ?? null,
+    context_window: cw,
+  };
+}
+
 export async function runSubAgent(
   ctx: ExtensionContext,
   input: RunSubAgentInput,
@@ -160,34 +192,36 @@ export async function runSubAgent(
   const parentSessionId = parentHeader?.id ?? "unknown";
   const parentSessionFile = ctx.sessionManager.getSessionFile() ?? "";
 
-  const baseDetails: SubagentRunDetails = {
-    tool_calls: 0,
-    parent_session_id: parentSessionId,
-    parent_session_file: parentSessionFile,
-    agent_type: resolveSubagentAgentType(input.agent_type),
-  };
-
   let session: AgentSession | undefined;
   let toolCallCount = 0;
 
   const finish = (
     partial: Omit<
       RunSubAgentResult,
-      "parent_session_id" | "parent_session_file"
+      "parent_session_id" | "parent_session_file" | keyof SubagentUsageSnapshot
     > &
       Partial<
-        Pick<RunSubAgentResult, "parent_session_id" | "parent_session_file">
+        Pick<RunSubAgentResult, "parent_session_id" | "parent_session_file"> &
+          SubagentUsageSnapshot
       >,
-  ): RunSubAgentResult => ({
-    parent_session_id: partial.parent_session_id ?? parentSessionId,
-    parent_session_file: partial.parent_session_file ?? parentSessionFile,
-    tool_calls: partial.tool_calls ?? toolCallCount,
-    sub_session_file:
-      partial.sub_session_file ?? session?.sessionManager.getSessionFile(),
-    text: partial.text,
-    isError: partial.isError,
-    errorMessage: partial.errorMessage,
-  });
+  ): RunSubAgentResult => {
+    const u = session ? snapshotUsage(session) : EMPTY_USAGE;
+    return {
+      parent_session_id: partial.parent_session_id ?? parentSessionId,
+      parent_session_file: partial.parent_session_file ?? parentSessionFile,
+      tool_calls: partial.tool_calls ?? toolCallCount,
+      sub_session_file:
+        partial.sub_session_file ?? session?.sessionManager.getSessionFile(),
+      text: partial.text,
+      isError: partial.isError,
+      errorMessage: partial.errorMessage,
+      usage_input: partial.usage_input ?? u.usage_input,
+      usage_output: partial.usage_output ?? u.usage_output,
+      context_percent: partial.context_percent ?? u.context_percent,
+      context_tokens: partial.context_tokens ?? u.context_tokens,
+      context_window: partial.context_window ?? u.context_window,
+    };
+  };
 
   try {
     let effectiveTask = input.task.trim();
@@ -267,22 +301,29 @@ export async function runSubAgent(
     let turnCount = 0;
     let soft = false;
 
+    const emitProgress = () => {
+      const u = snapshotUsage(child);
+      onChildProgress?.({
+        tool_calls: toolCallCount,
+        sub_session_file: child.sessionManager.getSessionFile(),
+        ...(input.stream
+          ? {
+              task_index: input.stream.task_index,
+              task_total: input.stream.task_total,
+            }
+          : {}),
+        ...u,
+      });
+    };
+
     const unsub = child.subscribe((event: AgentSessionEvent) => {
       if (event.type === "tool_execution_end") {
         toolCallCount += 1;
-        onChildProgress?.({
-          tool_calls: toolCallCount,
-          sub_session_file: child.sessionManager.getSessionFile(),
-          ...(input.stream
-            ? {
-                task_index: input.stream.task_index,
-                task_total: input.stream.task_total,
-              }
-            : {}),
-        });
+        emitProgress();
         return;
       }
       if (event.type !== "turn_end") return;
+      emitProgress();
       if (maxTurns === undefined || maxTurns <= 0) return;
       turnCount += 1;
       if (!soft && turnCount >= maxTurns) {
@@ -297,16 +338,7 @@ export async function runSubAgent(
 
     const cleanupAbort = forwardAbort(child, signal);
 
-    onChildProgress?.({
-      tool_calls: 0,
-      sub_session_file: child.sessionManager.getSessionFile(),
-      ...(input.stream
-        ? {
-            task_index: input.stream.task_index,
-            task_total: input.stream.task_total,
-          }
-        : {}),
-    });
+    emitProgress();
 
     try {
       await child.prompt(effectiveTask);

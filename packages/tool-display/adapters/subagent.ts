@@ -1,4 +1,4 @@
-import { truncateDisplay } from "@htwang-contrib/common";
+import { truncateDisplay, formatTokens } from "@htwang-contrib/common";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import type { ToolDisplayAdapter } from "../types.ts";
 import { spinnerGlyph } from "../format.ts";
@@ -24,6 +24,9 @@ type SubagentBatchRow = {
   description?: string;
   ok?: boolean;
   error?: string;
+  usage_input?: number;
+  usage_output?: number;
+  context_percent?: number | null;
 };
 
 type SubagentDetails = {
@@ -35,11 +38,17 @@ type SubagentDetails = {
   per_task_started?: boolean[];
   per_task_done?: boolean[];
   per_task_ok?: boolean[];
+  per_task_usage_input?: number[];
+  per_task_usage_output?: number[];
+  per_task_context_percent?: (number | null)[];
   batch?: SubagentBatchRow[];
   agent_type?: string;
   description?: string;
   ok?: boolean;
   error?: string;
+  usage_input?: number;
+  usage_output?: number;
+  context_percent?: number | null;
 };
 
 const KNOWN_AGENT_TYPES = new Set(["default", "research", "review", "plan"]);
@@ -92,6 +101,30 @@ function statusGlyph(
   return theme.fg("muted", "○");
 }
 
+function formatUsageSuffix(
+  theme: Theme,
+  inp?: number,
+  out?: number,
+  pct?: number | null,
+): string {
+  const hasTok =
+    (typeof inp === "number" && inp > 0) ||
+    (typeof out === "number" && out > 0);
+  if (!hasTok && (pct === undefined || pct === null)) return "";
+  const parts: string[] = [];
+  if (hasTok) {
+    parts.push(
+      theme.fg("muted", `↑${formatTokens(inp ?? 0)}`) +
+        theme.fg("muted", ` ↓${formatTokens(out ?? 0)}`),
+    );
+  }
+  if (pct != null) {
+    const c = pct > 80 ? "error" : pct > 50 ? "warning" : "muted";
+    parts.push(theme.fg(c, `${Math.round(pct)}%`));
+  }
+  return theme.fg("muted", " · ") + parts.join(theme.fg("muted", " · "));
+}
+
 function callsLineStyled(
   theme: Theme,
   rawType: string | undefined,
@@ -101,7 +134,8 @@ function callsLineStyled(
   error: string | undefined,
   waiting: boolean,
   spinning: boolean,
-  spinAt?: number,
+  spinAt: number | undefined,
+  usageExtra?: string,
 ): string {
   const ct = capitalizeType(normalizeAgentType(rawType));
   const w = count === 1 ? "tool" : "tools";
@@ -118,6 +152,7 @@ function callsLineStyled(
     theme.fg("muted", "calls ") +
     theme.fg("toolOutput", String(count)) +
     theme.fg("muted", ` ${w}`);
+  if (usageExtra) line += usageExtra;
   if (ok === false && error && error.trim()) {
     line += theme.fg("error", ` — ${truncateDisplay(error.trim(), 200)}`);
   }
@@ -154,10 +189,23 @@ function formatMultiSubagentSubtitle(
       if (startArr[i]) running++;
     }
   }
-  return theme.fg(
+  const base = theme.fg(
     "accent",
     truncateDisplay(`${running} running · ${completed} done`, 72),
   );
+  let sumIn = 0;
+  let sumOut = 0;
+  for (const v of d?.per_task_usage_input ?? []) {
+    if (typeof v === "number") sumIn += v;
+  }
+  for (const v of d?.per_task_usage_output ?? []) {
+    if (typeof v === "number") sumOut += v;
+  }
+  const tok =
+    sumIn > 0 || sumOut > 0
+      ? formatUsageSuffix(theme, sumIn, sumOut, null)
+      : "";
+  return base + tok;
 }
 
 function singleSubagentArgs(args: SubagentArgs): boolean {
@@ -193,12 +241,26 @@ function formatSingleSubagentInlineStats(
   }
   const ct = capitalizeType(normalizeAgentType(rawType));
   const w = tc === 1 ? "tool" : "tools";
+  let usageIn: number | undefined;
+  let usageOut: number | undefined;
+  let ctxPct: number | null | undefined;
+  if (d?.mode === "batch" && d.batch?.length === 1) {
+    const row = d.batch[0]!;
+    usageIn = row.usage_input;
+    usageOut = row.usage_output;
+    ctxPct = row.context_percent;
+  } else if (!args.tasks || args.tasks.length <= 1) {
+    usageIn = d?.usage_input;
+    usageOut = d?.usage_output;
+    ctxPct = d?.context_percent;
+  }
   return (
     theme.fg("muted", " · ") +
     theme.fg("syntaxType", ct) +
     theme.fg("muted", " calls ") +
     theme.fg("toolOutput", String(tc)) +
-    theme.fg("muted", ` ${w}`)
+    theme.fg("muted", ` ${w}`) +
+    formatUsageSuffix(theme, usageIn, usageOut, ctxPct ?? null)
   );
 }
 
@@ -251,6 +313,12 @@ function formatCollapsedSubagentSummary(
       const rowDesc = descriptionForBatchRow(item, args);
       const waiting = false;
       const spinning = isPartial && item.ok === undefined;
+      const uExtra = formatUsageSuffix(
+        theme,
+        item.usage_input,
+        item.usage_output,
+        item.context_percent,
+      );
       lines.push(
         theme.fg("muted", `${branch} `) +
           callsLineStyled(
@@ -263,6 +331,7 @@ function formatCollapsedSubagentSummary(
             waiting,
             spinning,
             spinAt,
+            uExtra,
           ),
       );
     }
@@ -285,6 +354,9 @@ function formatCollapsedSubagentSummary(
       !havePerTask &&
       typeof d!.task_index === "number" &&
       typeof d!.tool_calls === "number";
+    const pin = d?.per_task_usage_input;
+    const pout = d?.per_task_usage_output;
+    const ppct = d?.per_task_context_percent;
     const lines: string[] = [];
     for (let i = 0; i < n; i++) {
       const last = i === n - 1;
@@ -309,6 +381,12 @@ function formatCollapsedSubagentSummary(
         : legacyOk && d!.task_index === i
           ? d!.tool_calls!
           : 0;
+      const uExtra = formatUsageSuffix(
+        theme,
+        Array.isArray(pin) ? pin[i] : undefined,
+        Array.isArray(pout) ? pout[i] : undefined,
+        Array.isArray(ppct) ? ppct[i] : undefined,
+      );
       lines.push(
         theme.fg("muted", `${branch} `) +
           callsLineStyled(
@@ -321,6 +399,7 @@ function formatCollapsedSubagentSummary(
             waiting,
             spinning,
             spinAt,
+            uExtra,
           ),
       );
     }

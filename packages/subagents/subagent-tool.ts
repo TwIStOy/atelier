@@ -5,7 +5,11 @@ import type {
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { mapConcurrent, truncateDisplay } from "@htwang-contrib/common";
+import {
+  mapConcurrent,
+  truncateDisplay,
+  formatTokens,
+} from "@htwang-contrib/common";
 import {
   createBackgroundJob,
   updateBackgroundJob,
@@ -36,6 +40,9 @@ function subagentDetails(partial: SubagentRunDetails): SubagentRunDetails {
     per_task_started: partial.per_task_started,
     per_task_done: partial.per_task_done,
     per_task_ok: partial.per_task_ok,
+    per_task_usage_input: partial.per_task_usage_input,
+    per_task_usage_output: partial.per_task_usage_output,
+    per_task_context_percent: partial.per_task_context_percent,
     batch: partial.batch,
     agent_type: partial.agent_type,
     description: partial.description,
@@ -43,6 +50,11 @@ function subagentDetails(partial: SubagentRunDetails): SubagentRunDetails {
     error: partial.error,
     background: partial.background,
     background_id: partial.background_id,
+    usage_input: partial.usage_input,
+    usage_output: partial.usage_output,
+    context_percent: partial.context_percent,
+    context_tokens: partial.context_tokens,
+    context_window: partial.context_window,
   };
 }
 
@@ -73,6 +85,19 @@ function formatBatchToolText(items: SubagentBatchItemDetail[]): string {
       out.push(t.length > 12_000 ? `${t.slice(0, 12_000)}\n…` : t);
     } else {
       out.push(it.error ?? "unknown error");
+    }
+    if (
+      (typeof it.usage_input === "number" && it.usage_input > 0) ||
+      (typeof it.usage_output === "number" && it.usage_output > 0) ||
+      it.context_percent != null
+    ) {
+      const up = typeof it.usage_input === "number" ? it.usage_input : 0;
+      const down = typeof it.usage_output === "number" ? it.usage_output : 0;
+      let line = `Tokens: ↑${formatTokens(up)} ↓${formatTokens(down)}`;
+      if (it.context_percent != null) {
+        line += ` · context ${Math.round(it.context_percent)}%`;
+      }
+      out.push(line);
     }
     out.push("");
   }
@@ -180,6 +205,9 @@ async function runParallelBatchSubagent(
   const perTaskStarted = Array.from({ length: n }, () => false);
   const perTaskDone = Array.from({ length: n }, () => false);
   const perTaskOk = Array.from({ length: n }, () => true);
+  const perTaskUsageIn = Array.from({ length: n }, () => 0);
+  const perTaskUsageOut = Array.from({ length: n }, () => 0);
+  const perTaskCtxPct = Array.from({ length: n }, () => null as number | null);
 
   const flushBatch = () => {
     if (!onUpdate) return;
@@ -193,6 +221,9 @@ async function runParallelBatchSubagent(
         per_task_started: [...perTaskStarted],
         per_task_done: [...perTaskDone],
         per_task_ok: [...perTaskOk],
+        per_task_usage_input: [...perTaskUsageIn],
+        per_task_usage_output: [...perTaskUsageOut],
+        per_task_context_percent: [...perTaskCtxPct],
       }),
     });
   };
@@ -229,10 +260,16 @@ async function runParallelBatchSubagent(
             if (typeof ti === "number" && ti >= 0 && ti < n) {
               perTaskStarted[ti] = true;
               perTaskTools[ti] = p.tool_calls;
+              perTaskUsageIn[ti] = p.usage_input;
+              perTaskUsageOut[ti] = p.usage_output;
+              perTaskCtxPct[ti] = p.context_percent;
             }
           },
         );
         perTaskTools[i] = r.tool_calls;
+        perTaskUsageIn[i] = r.usage_input;
+        perTaskUsageOut[i] = r.usage_output;
+        perTaskCtxPct[i] = r.context_percent;
         perTaskDone[i] = true;
         perTaskOk[i] = !r.isError;
         if (onUpdate) {
@@ -247,6 +284,9 @@ async function runParallelBatchSubagent(
               per_task_started: [...perTaskStarted],
               per_task_done: [...perTaskDone],
               per_task_ok: [...perTaskOk],
+              per_task_usage_input: [...perTaskUsageIn],
+              per_task_usage_output: [...perTaskUsageOut],
+              per_task_context_percent: [...perTaskCtxPct],
             }),
           });
         }
@@ -274,6 +314,11 @@ async function runParallelBatchSubagent(
           sub_session_file: r.sub_session_file,
           agent_type: at,
           description: desc,
+          usage_input: r.usage_input,
+          usage_output: r.usage_output,
+          context_percent: r.context_percent,
+          context_tokens: r.context_tokens,
+          context_window: r.context_window,
         }
       : {
           index: i,
@@ -283,9 +328,16 @@ async function runParallelBatchSubagent(
           sub_session_file: r.sub_session_file,
           agent_type: at,
           description: desc,
+          usage_input: r.usage_input,
+          usage_output: r.usage_output,
+          context_percent: r.context_percent,
+          context_tokens: r.context_tokens,
+          context_window: r.context_window,
         };
   });
   const totalToolCalls = batchItems.reduce((s, b) => s + b.tool_calls, 0);
+  const usageInSum = batchItems.reduce((s, b) => s + (b.usage_input ?? 0), 0);
+  const usageOutSum = batchItems.reduce((s, b) => s + (b.usage_output ?? 0), 0);
 
   return {
     content: [
@@ -301,6 +353,8 @@ async function runParallelBatchSubagent(
       batch: batchItems,
       agent_type: resolveSubagentAgentType(globalAgentType),
       ok: batchItems.every((b) => b.ok),
+      usage_input: usageInSum,
+      usage_output: usageOutSum,
     }),
   };
 }
@@ -344,6 +398,11 @@ async function runSingleSubagent(
   let prog = {
     tool_calls: 0,
     sub_session_file: undefined as string | undefined,
+    usage_input: 0,
+    usage_output: 0,
+    context_percent: null as number | null,
+    context_tokens: null as number | null,
+    context_window: 0,
   };
   const flushSingle = () => {
     if (!onUpdate) return;
@@ -361,6 +420,11 @@ async function runSingleSubagent(
         mode: "single",
         agent_type: singleAgentType,
         description,
+        usage_input: prog.usage_input,
+        usage_output: prog.usage_output,
+        context_percent: prog.context_percent,
+        context_tokens: prog.context_tokens,
+        context_window: prog.context_window,
       }),
     });
   };
@@ -388,6 +452,11 @@ async function runSingleSubagent(
         prog = {
           tool_calls: p.tool_calls,
           sub_session_file: p.sub_session_file ?? prog.sub_session_file,
+          usage_input: p.usage_input,
+          usage_output: p.usage_output,
+          context_percent: p.context_percent,
+          context_tokens: p.context_tokens,
+          context_window: p.context_window,
         };
       },
     );
@@ -415,6 +484,11 @@ async function runSingleSubagent(
         description,
         ok: false,
         error: result.errorMessage ?? "subagent failed",
+        usage_input: result.usage_input,
+        usage_output: result.usage_output,
+        context_percent: result.context_percent,
+        context_tokens: result.context_tokens,
+        context_window: result.context_window,
       }),
     };
   }
@@ -434,6 +508,11 @@ async function runSingleSubagent(
       agent_type: singleAgentType,
       description,
       ok: true,
+      usage_input: result.usage_input,
+      usage_output: result.usage_output,
+      context_percent: result.context_percent,
+      context_tokens: result.context_tokens,
+      context_window: result.context_window,
     }),
   };
 }
