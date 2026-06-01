@@ -5,7 +5,10 @@ import type {
   ThinkingLevel,
 } from "@earendil-works/pi-agent-core";
 import type { TextContent } from "@earendil-works/pi-ai";
-import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type {
+  ExtensionContext,
+  ExtensionFactory,
+} from "@earendil-works/pi-coding-agent";
 import {
   createAgentSession,
   DefaultResourceLoader,
@@ -20,12 +23,15 @@ import {
   type AgentSessionEvent,
 } from "@earendil-works/pi-coding-agent";
 import { resolveModel } from "@htwang-contrib/common";
+import protectSecrets from "@htwang-contrib/protect-secrets/index.ts";
 import { appendSubagentLinkRecord, SUBAGENT_SESSION_DIR } from "./paths.ts";
 import {
   resolveSubagentAgentType,
   subagentSystemPromptFor,
 } from "./agent-types.ts";
 import { childSessionToolNames } from "./child-tools.ts";
+
+const CHILD_SESSION_EXTENSION_FACTORIES: ExtensionFactory[] = [protectSecrets];
 
 const THINKING_LEVELS = new Set<string>([
   "off",
@@ -261,6 +267,7 @@ export async function runSubAgent(
       agentDir,
       settingsManager,
       noExtensions: true,
+      extensionFactories: CHILD_SESSION_EXTENSION_FACTORIES,
       noSkills: true,
       noPromptTemplates: true,
       noThemes: true,

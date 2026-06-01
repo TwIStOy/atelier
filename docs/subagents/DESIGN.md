@@ -120,7 +120,7 @@ Pi 刻意不把 subagents 做进核心：默认仅少量工具，通过 **Extens
 | 包 / 机制                                 | 衔接方式                                                                                                                               |
 | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | `@htwang-contrib/common`                  | 截断与格式化复用。                                                                                                                     |
-| `protect-secrets`                         | 子 session 经 `bindExtensions` 加载同一扩展集时，**bash 工具事件与主会话同源**；若 `isolated: true` 则评估是否仍加载 protect-secrets。 |
+| `protect-secrets`                         | 子 session 在 `runSubAgent` 内通过 **`extensionFactories`** 固定注入 `@htwang-contrib/protect-secrets`（`noExtensions: true` 仍生效）；**bash / read 类 `tool_call` 与主会话同源**。不加载本 `subagents` 扩展。 |
 | `inference-self-host` / `zai-coding-plan` | `sessionOpts.model` / `ctx.modelRegistry` 与父会话一致或可配置覆盖。                                                                   |
 | `pi.events`                               | 任务生命周期事件；可选实现 tintinweb 式 RPC（低优先级）。                                                                              |
 
@@ -172,3 +172,4 @@ Pi 刻意不把 subagents 做进核心：默认仅少量工具，通过 **Extens
 | 2026-06-01 | Phase 2：`runSubAgent`（`createAgentSession` + in-memory session）与 `subagent` 工具   |
 | 2026-06-01 | Phase 4：`background`、`subagent_status`、内存任务表、`subagent:complete` 与 notify |
 | 2026-06-01 | Phase 5：`settings.json` 的 `timeout_ms` 与 `defaults_by_agent_type`；子会话工具 denylist；`AbortSignal.timeout` 与父/工具 signal 合并 |
+| 2026-06-01 | Phase 6（部分）：子 session `extensionFactories` 注入 `protect-secrets`；未做 statusline / RPC |

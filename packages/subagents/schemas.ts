@@ -117,7 +117,7 @@ export const subagentParams = Type.Object({
   isolated: Type.Optional(
     Type.Boolean({
       description:
-        "When true (default), each sub-agent loads no extensions and only read/search tools (read, grep, find, ls). When false, bash/edit/write are enabled; extensions stay disabled to avoid nested subagent registration. Child sessions never receive `subagent` or `subagent_status` tools.",
+        "When true (default), each sub-agent loads only the bundled `@htwang-contrib/protect-secrets` extension (via `extensionFactories`) plus read/search tools (read, grep, find, ls). When false, bash/edit/write are enabled; other user extensions stay disabled to avoid nested subagent registration. Child sessions never receive `subagent` or `subagent_status` tools.",
       default: true,
     }),
   ),

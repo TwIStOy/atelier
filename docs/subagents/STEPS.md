@@ -16,9 +16,9 @@
 | 3     | 并行：`tasks[]`、并发槽、失败策略                                                       | [x]  |
 | 4     | 后台：`background`、`subagent_status`、`pi.events`                                      | [x]  |
 | 5     | 策略与运维：settings、子 session 禁止委派工具、README、AGENTS 链接                      | [x]  |
-| 6     | 可选：statusline、`protect-secrets` 说明、RPC                                           | [ ]  |
+| 6     | 可选：`protect-secrets` 已与子 session 对齐；statusline、`pi.events` RPC **未实现** | [x]  |
 
-**当前停在哪一 phase：** Phase 5 已完成（`settings.json` 扩展、`timeout_ms`、按 `agent_type` 的默认 `model`/`thinking`、子会话工具列表显式排除 `subagent`/`subagent_status`）；下一可选为 Phase 6。
+**当前停在哪一 phase：** Phase 6 中与 **protect-secrets** 相关的部分已在代码中完成（`extensionFactories`）；未做 statusline 订阅与 tintinweb 式 RPC。
 
 ---
 
@@ -190,7 +190,7 @@ statusline：订阅 `subagent:complete`（及 start），展示进行中数量�
 
 ### Step 6.2
 
-文档说明：子 session `bindExtensions` 时是否加载 `protect-secrets`（推荐与主会话一致，除非 `isolated` 产品定义明确排除）。
+子 session **始终**通过 `DefaultResourceLoader` 的 **`extensionFactories`** 注入 `@htwang-contrib/protect-secrets`（与 `noExtensions: true` 兼容；不扫描用户扩展目录，避免子会话再加载 `subagents`）。`bindExtensions` 时与主会话同源走 `tool_call` / bash 管线。
 
 ### Step 6.3
 

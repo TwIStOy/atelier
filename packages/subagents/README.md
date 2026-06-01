@@ -10,7 +10,7 @@ In-process `AgentSession` runs (no extra `pi` process). **Single mode:** set `ta
 
 **`timeout_ms`:** non-zero values merge an `AbortSignal.timeout` with the parent/tool abort (and, in foreground mode, the tool-call `signal`). `0` means no extra wall-clock timeout beyond parent cancellation.
 
-Subagent state is written under `~/.agent/subagents/session`; each run appends a JSON line to `~/.agent/subagents/by-parent/<parent_session_id>.jsonl` so subagents stay associated with the parent Pi session across reloads. Defaults: `isolated=true` (read/grep/find/ls only, no extensions). Set `isolated=false` to allow bash/edit/write; extensions remain off so this extension is not re-registered in the child. **Child sessions never receive** the tools **`subagent`** or **`subagent_status`** (filtered in `child-tools.ts` before `createAgentSession`).
+Subagent state is written under `~/.agent/subagents/session`; each run appends a JSON line to `~/.agent/subagents/by-parent/<parent_session_id>.jsonl` so subagents stay associated with the parent Pi session across reloads. Defaults: `isolated=true` (read/grep/find/ls only). The child `DefaultResourceLoader` sets `noExtensions: true` (no user extension scan) but **`extensionFactories`** always includes **`@htwang-contrib/protect-secrets`**, so `/run/agenix` and bash read-like rules match the main session. Set `isolated=false` to allow bash/edit/write. **Child sessions never receive** the tools **`subagent`** or **`subagent_status`** (filtered in `child-tools.ts` before `createAgentSession`).
 
 Optional **`defaults_by_agent_type`** in settings (see below) supplies default **`model`** / **`thinking`** per persona when the tool call omits them (single mode uses the resolved `agent_type`; batch merges per task with the same precedence as other fields: task field → batch-level param → settings default → parent model).
 
@@ -51,21 +51,21 @@ Example:
 
 ## Package layout (this extension)
 
-| File                    | Role                                                              |
-| ----------------------- | ----------------------------------------------------------------- |
-| `tool.ts`               | Registers `subagent` / `subagent_status`; `execute` routing only. |
-| `schemas.ts`            | TypeBox parameter schemas.                                        |
-| `validate.ts`           | Single vs batch argument validation.                              |
-| `details.ts`            | Normalizes `SubagentRunDetails` for tool results.                 |
-| `parent-update.ts`      | Safe `onUpdate` + throttled interval flush helper.                |
-| `orchestrate-single.ts` | Single-task run + live `details` updates.                         |
-| `orchestrate-batch.ts`  | Parallel batch + per-task arrays + live updates.                  |
-| `batch-text.ts`         | Markdown/text body for completed batch results.                   |
-| `background-finish.ts`  | Job table updates, `pi.events`, `notify` after async runs.        |
-| `run-agent.ts`          | `createAgentSession` + `runSubAgent` (child session lifecycle).   |
-| `child-tools.ts`        | Built-in tool name list + filter excluding delegation tools.      |
-| `abort-timeout.ts`      | Merges optional `AbortSignal.timeout` into run signals.           |
-| `settings.ts`           | Reads `settings.json`; concurrency, timeout, persona defaults.    |
+| File                    | Role                                                                                                |
+| ----------------------- | --------------------------------------------------------------------------------------------------- |
+| `tool.ts`               | Registers `subagent` / `subagent_status`; `execute` routing only.                                   |
+| `schemas.ts`            | TypeBox parameter schemas.                                                                          |
+| `validate.ts`           | Single vs batch argument validation.                                                                |
+| `details.ts`            | Normalizes `SubagentRunDetails` for tool results.                                                   |
+| `parent-update.ts`      | Safe `onUpdate` + throttled interval flush helper.                                                  |
+| `orchestrate-single.ts` | Single-task run + live `details` updates.                                                           |
+| `orchestrate-batch.ts`  | Parallel batch + per-task arrays + live updates.                                                    |
+| `batch-text.ts`         | Markdown/text body for completed batch results.                                                     |
+| `background-finish.ts`  | Job table updates, `pi.events`, `notify` after async runs.                                          |
+| `run-agent.ts`          | `createAgentSession` + `runSubAgent`; child loader uses `extensionFactories` for `protect-secrets`. |
+| `child-tools.ts`        | Built-in tool name list + filter excluding delegation tools.                                        |
+| `abort-timeout.ts`      | Merges optional `AbortSignal.timeout` into run signals.                                             |
+| `settings.ts`           | Reads `settings.json`; concurrency, timeout, persona defaults.                                      |
 
 ## Tool: `subagent_status`
 
