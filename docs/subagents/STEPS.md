@@ -12,13 +12,13 @@
 | ----- | --------------------------------------------------------------------------------------- | ---- |
 | 0     | API 与版本锁定：`npm install`、`dist/index.d.ts` 导出核查、本文件「API 验证结果」已填写 | [x]  |
 | 1     | 仓库骨架：`packages/subagents`、`tsconfig` reference、空扩展可加载、`tsc --build`       | [x]  |
-| 2     | 单任务前台：`runInProcessAgent` + `registerTool`、`pi -e` 手测                          | [x]  |
-| 3     | 并行：`tasks[]`、并发槽、失败策略                                                       | [ ]  |
+| 2     | 单任务前台：`runSubAgent` + `registerTool`、`pi -e` 手测                          | [x]  |
+| 3     | 并行：`tasks[]`、并发槽、失败策略                                                       | [x]  |
 | 4     | 后台：`background`、`subagent_status`、`pi.events`                                      | [ ]  |
 | 5     | 策略与运维：settings、子 session 禁止委派工具、README、AGENTS 链接                      | [ ]  |
 | 6     | 可选：statusline、`protect-secrets` 说明、RPC                                           | [ ]  |
 
-**当前停在哪一 phase：** Phase 2 已完成 — **请 review**（`subagent` 工具 + `run-agent.ts`）；确认后再进行 Phase 3。
+**当前停在哪一 phase：** Phase 3 已完成（`tasks[]` + `settings.json` 并发上限 + 部分失败汇总）— **请 review**；确认后再进行 Phase 4（后台）。
 
 ---
 
@@ -94,7 +94,7 @@
 
 ### Step 2.1
 
-实现 `runInProcessAgent(ctx, options)`（名称自定），核心步骤对齐 tintinweb：
+实现 `runSubAgent(ctx, options)`（名称自定），核心步骤对齐 tintinweb：
 
 1. `new DefaultResourceLoader({ cwd, agentDir, noExtensions / extensionsOverride, noSkills, systemPromptOverride, … })` → `await loader.reload()`。
 2. 计算 **`allowedTools`**（内置 + 可选扩展工具名，**排除**自研委派工具名）。
@@ -126,7 +126,7 @@
 
 ### Step 3.2
 
-对每个任务调用 `runInProcessAgent`，外层使用 **并发槽**（如 `async` + 队列，或 `mapConcurrent` 自写），默认上限从 settings 读取（建议默认 4，总任务数上限 8）。
+对每个任务调用 `runSubAgent`，外层使用 **并发槽**（如 `async` + 队列，或 `mapConcurrent` 自写），默认上限从 settings 读取（建议默认 4，总任务数上限 8）。
 
 ### Step 3.3
 
@@ -146,7 +146,7 @@
 
 ### Step 4.2
 
-`background: true` 时：生成 `id`，`void runInProcessAgent(...).then(emit complete / notify).catch(...)`，**立即**返回 `{ id, status: "running" }`。
+`background: true` 时：生成 `id`，`void runSubAgent(...).then(emit complete / notify).catch(...)`，**立即**返回 `{ id, status: "running" }`。
 
 ### Step 4.3
 

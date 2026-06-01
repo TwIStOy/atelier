@@ -5,17 +5,26 @@ export interface ContentRenderer {
 }
 
 export interface ToolDisplayAdapter<TArgs = Record<string, unknown>> {
-  formatCallHeader(args: TArgs, theme: Theme): string;
+  formatCallHeader(
+    args: TArgs,
+    theme: Theme,
+    details?: unknown,
+    isPartial?: boolean,
+  ): string;
   formatCollapsedContent(
     args: TArgs,
     output: string,
     theme: Theme,
     width: number,
+    details?: unknown,
+    isPartial?: boolean,
+    spinAt?: number,
   ): string[];
   formatExpandedContent(
     args: TArgs,
     output: string,
     theme: Theme,
     width: number,
+    details?: unknown,
   ): string[];
 }

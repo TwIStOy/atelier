@@ -3,7 +3,9 @@ import {
   Theme,
   truncateToVisualLines,
 } from "@earendil-works/pi-coding-agent";
+import { truncateDisplay } from "@htwang-contrib/common";
 import { Container, truncateToWidth } from "@earendil-works/pi-tui";
+import { spinnerGlyph } from "./format.ts";
 import type { ContentRenderer, ToolDisplayAdapter } from "./types.ts";
 
 export type { ContentRenderer, ToolDisplayAdapter };
@@ -28,10 +30,34 @@ export function formatToolArgs(args: Record<string, unknown>): string {
   return entries
     .map(([k, v]) => {
       const val = typeof v === "string" ? v : JSON.stringify(v);
-      const display = val.length > 80 ? val.slice(0, 77) + "…" : val;
-      return `${k}: ${display}`;
+      return `${k}: ${truncateDisplay(val, 80)}`;
     })
     .join(", ");
+}
+
+function subagentRunFinished(details: unknown): "ok" | "err" | undefined {
+  if (details == null || typeof details !== "object") return undefined;
+  const d = details as Record<string, unknown>;
+  const ptd = d.per_task_done;
+  const pto = d.per_task_ok;
+  if (
+    Array.isArray(ptd) &&
+    ptd.length > 0 &&
+    ptd.every((x) => x === true) &&
+    Array.isArray(pto) &&
+    pto.length === ptd.length
+  ) {
+    return pto.every((x) => x === true) ? "ok" : "err";
+  }
+  if (d.ok === true) return "ok";
+  if (d.ok === false) return "err";
+  if (d.mode === "batch" && Array.isArray(d.batch)) {
+    const b = d.batch as { ok?: boolean }[];
+    if (b.length > 0 && b.every((x) => typeof x.ok === "boolean")) {
+      return b.every((x) => x.ok) ? "ok" : "err";
+    }
+  }
+  return undefined;
 }
 
 function makeHeader(
@@ -42,15 +68,27 @@ function makeHeader(
   isError: boolean,
   theme: Theme,
   width: number,
+  spinAt: number,
+  details?: unknown,
 ): string {
-  const statusIcon = isPartial
-    ? theme.fg("muted", "○")
-    : isError
-      ? theme.fg("error", "✗")
-      : theme.fg("success", "✓");
+  let statusIcon: string;
+  if (toolName === "subagent") {
+    const fin = subagentRunFinished(details);
+    if (fin === "ok") statusIcon = theme.fg("success", "✓");
+    else if (fin === "err") statusIcon = theme.fg("error", "✗");
+    else if (isPartial) statusIcon = spinnerGlyph(theme, spinAt);
+    else if (isError) statusIcon = theme.fg("error", "✗");
+    else statusIcon = theme.fg("success", "✓");
+  } else {
+    statusIcon = isPartial
+      ? spinnerGlyph(theme, spinAt)
+      : isError
+        ? theme.fg("error", "✗")
+        : theme.fg("success", "✓");
+  }
 
   const headerText = adapter
-    ? adapter.formatCallHeader(args, theme)
+    ? adapter.formatCallHeader(args, theme, details, isPartial)
     : `${theme.fg("toolTitle", theme.bold(toolName))} ${theme.fg("dim", `(${formatToolArgs(args)})`)}`;
 
   const header = `${statusIcon} ${headerText}`;
@@ -111,6 +149,7 @@ export interface ToolCallDisplayOpts {
   toolName: string;
   args: Record<string, unknown>;
   output?: string;
+  details?: unknown;
   expanded: boolean;
   isPartial: boolean;
   isError: boolean;
@@ -127,6 +166,7 @@ export function renderToolCall(
 
   return {
     render(width: number): string[] {
+      const spinAt = Date.now();
       const header = makeHeader(
         opts.toolName,
         opts.args,
@@ -135,34 +175,52 @@ export function renderToolCall(
         opts.isError,
         theme,
         width,
+        spinAt,
+        opts.details,
       );
       const lines = [header];
 
-      if (opts.output) {
-        let contentLines: string[];
-        if (adapter) {
-          contentLines = opts.expanded
-            ? adapter.formatExpandedContent(
-                opts.args,
-                opts.output,
-                theme,
-                width,
-              )
-            : adapter.formatCollapsedContent(
-                opts.args,
-                opts.output,
-                theme,
-                width,
-              );
-        } else {
-          const collapsedRenderer =
-            opts.renderCollapsed ?? defaultCollapsedRenderer;
-          const expandedRenderer =
-            opts.renderExpanded ?? defaultExpandedRenderer;
-          contentLines = opts.expanded
-            ? expandedRenderer(opts.output, theme, width)
-            : collapsedRenderer(opts.output, theme, width);
-        }
+      const out = opts.output ?? "";
+      const hasTextOutput = Boolean(out);
+      const detailsOnlyCollapsed =
+        opts.toolName === "subagent" &&
+        !opts.expanded &&
+        !opts.isPartial &&
+        opts.details !== undefined;
+
+      const useAdapter =
+        adapter &&
+        (opts.expanded ||
+          hasTextOutput ||
+          detailsOnlyCollapsed ||
+          (opts.toolName === "subagent" && !opts.expanded));
+
+      if (useAdapter) {
+        const contentLines = opts.expanded
+          ? adapter.formatExpandedContent(
+              opts.args,
+              out,
+              theme,
+              width,
+              opts.details,
+            )
+          : adapter.formatCollapsedContent(
+              opts.args,
+              out,
+              theme,
+              width,
+              opts.details,
+              opts.isPartial,
+              spinAt,
+            );
+        lines.push(...contentLines);
+      } else if (opts.output) {
+        const collapsedRenderer =
+          opts.renderCollapsed ?? defaultCollapsedRenderer;
+        const expandedRenderer = opts.renderExpanded ?? defaultExpandedRenderer;
+        const contentLines = opts.expanded
+          ? expandedRenderer(opts.output, theme, width)
+          : collapsedRenderer(opts.output, theme, width);
         lines.push(...contentLines);
       } else if (!opts.isPartial && !opts.isError) {
         lines.push(INDENT + theme.fg("muted", "done"));

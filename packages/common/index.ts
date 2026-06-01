@@ -1,5 +1,6 @@
 export {
   shortenPath,
+  truncateDisplay,
   trimTrailingEmpty,
   formatTokens,
   formatNumber,

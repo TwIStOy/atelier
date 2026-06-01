@@ -1,3 +1,15 @@
+export function truncateDisplay(
+  text: string,
+  maxLen: number,
+  ellipsis = "…",
+): string {
+  if (typeof text !== "string") return "";
+  if (text.length <= maxLen) return text;
+  const e = ellipsis.length;
+  const take = Math.max(0, maxLen - e);
+  return text.slice(0, take) + ellipsis;
+}
+
 export function shortenPath(path: string): string {
   if (typeof path !== "string") return "";
   const home = process.env.HOME;

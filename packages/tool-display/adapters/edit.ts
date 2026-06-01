@@ -307,7 +307,7 @@ function renderChangeBar(added: number, removed: number, theme: Theme): string {
 }
 
 export const editAdapter: ToolDisplayAdapter<EditArgs> = {
-  formatCallHeader(args, theme) {
+  formatCallHeader(args, theme, _details?: unknown, _isPartial?: boolean) {
     const rawPath = args?.file_path ?? args?.path ?? "";
     const path = shortenPath(rawPath);
     const pathDisplay = path
@@ -316,7 +316,15 @@ export const editAdapter: ToolDisplayAdapter<EditArgs> = {
     return theme.fg("toolTitle", theme.bold("Edit")) + " " + pathDisplay;
   },
 
-  formatCollapsedContent(args, _output, theme, width) {
+  formatCollapsedContent(
+    args,
+    _output,
+    theme,
+    width,
+    _details?: unknown,
+    _isPartial?: boolean,
+    _spinAt?: number,
+  ) {
     const edits = getEdits(args);
     if (edits.length === 0) return [theme.fg("muted", "└ no changes")];
 
@@ -334,7 +342,7 @@ export const editAdapter: ToolDisplayAdapter<EditArgs> = {
     return [theme.fg("muted", parts.join(" "))];
   },
 
-  formatExpandedContent(args, _output, _theme, width) {
+  formatExpandedContent(args, _output, _theme, width, _details?: unknown) {
     const edits = getEdits(args);
     if (edits.length === 0) return [];
 

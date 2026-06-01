@@ -1,4 +1,4 @@
-import { shortenPath } from "@htwang-contrib/common";
+import { shortenPath, truncateDisplay } from "@htwang-contrib/common";
 import type { ToolDisplayAdapter } from "../types.ts";
 import { INDENT, formatLineCount } from "./shared.ts";
 
@@ -9,12 +9,12 @@ interface BashArgs {
 }
 
 export const bashAdapter: ToolDisplayAdapter<BashArgs> = {
-  formatCallHeader(args, theme) {
+  formatCallHeader(args, theme, _details?: unknown, _isPartial?: boolean) {
     const cmd = args?.command ?? "";
     const desc = args?.description;
     const cwd = args?.workdir;
 
-    const cmdDisplay = cmd.length > 60 ? cmd.slice(0, 57) + "…" : cmd;
+    const cmdDisplay = truncateDisplay(cmd, 60);
     const header = desc
       ? theme.fg("toolTitle", theme.bold("Bash")) +
         " " +
@@ -31,12 +31,20 @@ export const bashAdapter: ToolDisplayAdapter<BashArgs> = {
     return header;
   },
 
-  formatCollapsedContent(_args, output, theme, _width) {
+  formatCollapsedContent(
+    _args,
+    output,
+    theme,
+    _width,
+    _details?: unknown,
+    _isPartial?: boolean,
+    _spinAt?: number,
+  ) {
     if (!output) return [];
     return formatLineCount(output, theme);
   },
 
-  formatExpandedContent(_args, output, theme, _width) {
+  formatExpandedContent(_args, output, theme, _width, _details?: unknown) {
     if (!output) return [];
     const lines = output
       .split("\n")

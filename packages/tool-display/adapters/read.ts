@@ -19,7 +19,7 @@ function formatLineRange(args: ReadArgs, theme: Theme): string {
 }
 
 export const readAdapter: ToolDisplayAdapter<ReadArgs> = {
-  formatCallHeader(args, theme) {
+  formatCallHeader(args, theme, _details?: unknown, _isPartial?: boolean) {
     const rawPath = args?.file_path ?? args?.path ?? "";
     const path = shortenPath(rawPath);
     const pathDisplay = path
@@ -33,12 +33,20 @@ export const readAdapter: ToolDisplayAdapter<ReadArgs> = {
     );
   },
 
-  formatCollapsedContent(_args, output, theme, _width) {
+  formatCollapsedContent(
+    _args,
+    output,
+    theme,
+    _width,
+    _details?: unknown,
+    _isPartial?: boolean,
+    _spinAt?: number,
+  ) {
     if (!output) return [];
     return formatLineCount(output, theme);
   },
 
-  formatExpandedContent(args, output, theme, width) {
+  formatExpandedContent(args, output, theme, width, _details?: unknown) {
     const rawPath = args?.file_path ?? args?.path ?? "";
     const startLine = args?.offset ?? 1;
     return renderContentWithLineNumbers(

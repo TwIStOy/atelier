@@ -9,7 +9,7 @@ interface WriteArgs {
 }
 
 export const writeAdapter: ToolDisplayAdapter<WriteArgs> = {
-  formatCallHeader(args, theme) {
+  formatCallHeader(args, theme, _details?: unknown, _isPartial?: boolean) {
     const rawPath = args?.file_path ?? args?.path ?? "";
     const path = shortenPath(rawPath);
     const pathDisplay = path
@@ -18,13 +18,21 @@ export const writeAdapter: ToolDisplayAdapter<WriteArgs> = {
     return theme.fg("toolTitle", theme.bold("Write")) + " " + pathDisplay;
   },
 
-  formatCollapsedContent(args, _output, theme, _width) {
+  formatCollapsedContent(
+    args,
+    _output,
+    theme,
+    _width,
+    _details?: unknown,
+    _isPartial?: boolean,
+    _spinAt?: number,
+  ) {
     const content = args?.content ?? "";
     if (!content) return [theme.fg("muted", "└ empty file")];
     return formatLineCount(content, theme);
   },
 
-  formatExpandedContent(args, _output, theme, width) {
+  formatExpandedContent(args, _output, theme, width, _details?: unknown) {
     const rawPath = args?.file_path ?? args?.path ?? "";
     const content = args?.content ?? "";
     return renderContentWithLineNumbers(content, 1, rawPath, theme, width);

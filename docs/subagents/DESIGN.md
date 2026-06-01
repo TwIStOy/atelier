@@ -102,7 +102,7 @@ Pi 刻意不把 subagents 做进核心：默认仅少量工具，通过 **Extens
 
 ### 4.1 组件划分（建议新包 `packages/subagents/` 或等价）
 
-- **执行器**：封装 `runInProcessAgent(ctx, { prompt, model, thinking, isolated, inheritContext, maxTurns, signal })` → 内部 `createAgentSession` + `session.prompt` + 收集 `responseText` / usage。
+- **执行器**：封装 `runSubAgent(ctx, { prompt, model, thinking, isolated, inheritContext, maxTurns, signal })` → 内部 `createAgentSession` + `session.prompt` + 收集 `responseText` / usage。
 - **调度器**：多任务 **`Promise.all` + 并发槽**；后台任务 **`void` + 内存表 + id**（可参考 tintinweb 的 `AgentManager` / scheduler 形状，但可删减为最小）。
 - **策略**：子 session 的 **`allowedTools` 不包含** 自研委派工具名，保证 **仅主会话** 可发起委派（与 tintinweb `EXCLUDED_TOOL_NAMES` 同思路）。
 - **可观测**：`pi.events.emit`（与 `zai-coding-plan` / statusline 一致）、`ctx.ui.notify`。
@@ -111,7 +111,7 @@ Pi 刻意不把 subagents 做进核心：默认仅少量工具，通过 **Extens
 
 单一主工具（`snake_case`），例如 `delegate_agent` 或 `subagent`：
 
-- **前台**：`await runInProcessAgent(...)`，`onUpdate` 映射自 `session.subscribe` 的文本 delta 或阶段性摘要。
+- **前台**：`await runSubAgent(...)`，`onUpdate` 映射自 `session.subscribe` 的文本 delta 或阶段性摘要。
 - **后台**：立即返回 `{ id, status: "running" }`；提供第二工具 **`subagent_status`** 或等价查询（对齐 tintinweb 的 `get_subagent_result` 思想）。
 - **并行**：`tasks[]` + 并发上限；失败策略写入 description。
 
@@ -169,4 +169,4 @@ Pi 刻意不把 subagents 做进核心：默认仅少量工具，通过 **Extens
 | 2026-06-01 | **源码审计**：五款扩展仓库克隆阅读；修正 @tintinweb 进程模型；推荐 `createAgentSession` 路线 |
 | 2026-06-01 | `STEPS.md` 增加总进度 TODO；阶段 0 对 `node_modules` 做导出核对（0.76.0）                    |
 | 2026-06-01 | Phase 1：`packages/subagents` 空扩展骨架、根 `tsconfig` / `pi.extensions` / AGENTS 列表      |
-| 2026-06-01 | Phase 2：`runInProcessAgent`（`createAgentSession` + in-memory session）与 `subagent` 工具   |
+| 2026-06-01 | Phase 2：`runSubAgent`（`createAgentSession` + in-memory session）与 `subagent` 工具   |

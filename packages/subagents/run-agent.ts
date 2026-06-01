@@ -22,6 +22,10 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { resolveModel } from "@htwang-contrib/common";
 import { appendSubagentLinkRecord, SUBAGENT_SESSION_DIR } from "./paths.ts";
+import {
+  resolveSubagentAgentType,
+  subagentSystemPromptFor,
+} from "./agent-types.ts";
 
 const READ_ONLY_TOOLS = ["read", "grep", "find", "ls"] as const;
 const FULL_BUILTIN_TOOLS = [
@@ -43,26 +47,48 @@ const THINKING_LEVELS = new Set<string>([
   "xhigh",
 ]);
 
-const SUBAGENT_SYSTEM =
-  "You are a focused sub-agent running inside the same Pi process. Use your tools to complete the assignment. When done, reply with a concise final summary for the parent agent.";
+export type SubagentBatchItemDetail = {
+  index: number;
+  ok: boolean;
+  text?: string;
+  error?: string;
+  tool_calls: number;
+  sub_session_file?: string;
+  agent_type?: string;
+  description: string;
+};
 
 export type SubagentRunDetails = {
   tool_calls: number;
   sub_session_file?: string;
   parent_session_id: string;
   parent_session_file: string;
+  mode?: "single" | "batch";
+  task_index?: number;
+  task_total?: number;
+  per_task_tool_calls?: number[];
+  per_task_started?: boolean[];
+  per_task_done?: boolean[];
+  per_task_ok?: boolean[];
+  batch?: SubagentBatchItemDetail[];
+  agent_type?: string;
+  description?: string;
+  ok?: boolean;
+  error?: string;
 };
 
-export type RunInProcessAgentInput = {
+export type RunSubAgentInput = {
   task: string;
   model?: string;
   thinking?: string;
   inherit_context?: boolean;
   isolated?: boolean;
   max_turns?: number;
+  stream?: { task_index: number; task_total: number };
+  agent_type?: string;
 };
 
-export type RunInProcessAgentResult = {
+export type RunSubAgentResult = {
   text: string;
   isError: boolean;
   errorMessage?: string;
@@ -128,12 +154,12 @@ function pushUpdate(
   });
 }
 
-export async function runInProcessAgent(
+export async function runSubAgent(
   ctx: ExtensionContext,
-  input: RunInProcessAgentInput,
+  input: RunSubAgentInput,
   signal: AbortSignal | undefined,
   onUpdate: AgentToolUpdateCallback<SubagentRunDetails> | undefined,
-): Promise<RunInProcessAgentResult> {
+): Promise<RunSubAgentResult> {
   const parentHeader = ctx.sessionManager.getHeader();
   const parentSessionId = parentHeader?.id ?? "unknown";
   const parentSessionFile = ctx.sessionManager.getSessionFile() ?? "";
@@ -142,6 +168,7 @@ export async function runInProcessAgent(
     tool_calls: 0,
     parent_session_id: parentSessionId,
     parent_session_file: parentSessionFile,
+    agent_type: resolveSubagentAgentType(input.agent_type),
   };
 
   let session: AgentSession | undefined;
@@ -149,16 +176,13 @@ export async function runInProcessAgent(
 
   const finish = (
     partial: Omit<
-      RunInProcessAgentResult,
+      RunSubAgentResult,
       "parent_session_id" | "parent_session_file"
     > &
       Partial<
-        Pick<
-          RunInProcessAgentResult,
-          "parent_session_id" | "parent_session_file"
-        >
+        Pick<RunSubAgentResult, "parent_session_id" | "parent_session_file">
       >,
-  ): RunInProcessAgentResult => ({
+  ): RunSubAgentResult => ({
     parent_session_id: partial.parent_session_id ?? parentSessionId,
     parent_session_file: partial.parent_session_file ?? parentSessionFile,
     tool_calls: partial.tool_calls ?? toolCallCount,
@@ -187,6 +211,9 @@ export async function runInProcessAgent(
 
     const isolated = input.isolated !== false;
     const toolList = isolated ? [...READ_ONLY_TOOLS] : [...FULL_BUILTIN_TOOLS];
+
+    const agentType = resolveSubagentAgentType(input.agent_type);
+    const systemPrompt = subagentSystemPromptFor(agentType);
 
     const cwd = ctx.cwd;
     const agentDir = getAgentDir();
@@ -218,7 +245,7 @@ export async function runInProcessAgent(
       noPromptTemplates: true,
       noThemes: true,
       noContextFiles: true,
-      systemPromptOverride: () => SUBAGENT_SYSTEM,
+      systemPromptOverride: () => systemPrompt,
       appendSystemPromptOverride: () => [],
     });
     await loader.reload();
@@ -249,6 +276,12 @@ export async function runInProcessAgent(
       ...baseDetails,
       tool_calls: toolCallCount,
       sub_session_file: child.sessionManager.getSessionFile(),
+      ...(input.stream
+        ? {
+            task_index: input.stream.task_index,
+            task_total: input.stream.task_total,
+          }
+        : {}),
     });
 
     const unsub = child.subscribe((event: AgentSessionEvent) => {
