@@ -111,7 +111,7 @@ Pi 刻意不把 subagents 做进核心：默认仅少量工具，通过 **Extens
 
 单一主工具（`snake_case`），例如 `delegate_agent` 或 `subagent`：
 
-- **前台**：`await runSubAgent(...)`；父工具 `onUpdate` **不**从子 `session.subscribe` 的调用栈直接触发。子会话在 `tool_execution_end` 时只调用可选的 `onChildProgress` 更新本地快照；`subagent-tool` 用 **`setInterval`（约 100ms）** 读快照再 `tryParentToolUpdate`，与 tintinweb（`onTextDelta` / 本地 state + 定时 `streamUpdate`）同构，避免 `Agent listener invoked outside active run`。
+- **前台**：`await runSubAgent(...)`；父工具 `onUpdate` **不**从子 `session.subscribe` 的调用栈直接触发。子会话在 `tool_execution_end` 时只调用可选的 `onChildProgress` 更新本地快照；`packages/subagents` 侧编排（`tool.ts` / `parent-update.ts`）用 **`setInterval`（约 100ms）** 读快照再 `tryParentToolUpdate`，与 tintinweb（`onTextDelta` / 本地 state + 定时 `streamUpdate`）同构，避免 `Agent listener invoked outside active run`。
 - **后台**：立即返回 `{ id, status: "running" }`；提供第二工具 **`subagent_status`** 或等价查询（对齐 tintinweb 的 `get_subagent_result` 思想）。
 - **并行**：`tasks[]` + 并发上限；失败策略写入 description。
 

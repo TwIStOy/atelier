@@ -12,11 +12,26 @@ Batch results list every task with `ok` or `error`; partial failures do not abor
 
 **Background (`background: true`):** the tool returns immediately with `details.background_id` and instructions to call **`subagent_status`** with `{ "id": "<uuid>" }`. The run uses **`ctx.signal`** only (not the foreground tool-call abort). When the job finishes, the extension updates an in-memory table (capped; very old completed jobs may be pruned), emits **`subagent:complete`** on `pi.events`, and calls **`ctx.ui.notify`**. JSON from `subagent_status` uses `status`: `running`, `done` (check `ok` and optional `batch_counts`), `error` (unhandled exception), or `unknown` (id not found).
 
-Streaming live tool rows: the child session **never** calls the parent Pi `onUpdate` from `session.subscribe`. Each `tool_execution_end` updates a **local progress snapshot** via optional `onChildProgress`; **`subagent-tool`** runs a **`setInterval` (~100ms)** that reads that snapshot and calls `tryParentToolUpdate` (same separation as tintinweb/pi-subagents: local state + timer, not child event stack → parent `emit`). Batch mode also flushes once when each task completes so `per_task_done` stays accurate.
+Streaming live tool rows: the child session **never** calls the parent Pi `onUpdate` from `session.subscribe`. Each `tool_execution_end` updates a **local progress snapshot** via optional `onChildProgress`; orchestration in **`tool.ts`** runs a **`setInterval` (~100ms)** that reads that snapshot and calls `tryParentToolUpdate` (same separation as tintinweb/pi-subagents: local state + timer, not child event stack → parent `emit`). Batch mode also flushes once when each task completes so `per_task_done` stays accurate.
 
 Optional **`agent_type`** (`default`, `research`, `review`, `plan`) selects the injected system prompt; omit for `default`. Per-task `tasks[].agent_type` overrides the batch default.
 
 For TUI tool rows, load **`packages/tool-display`** in your Pi config (before or after `subagents`); it registers display adapters for **`subagent`** and **`subagent_status`** so headers and collapsed/expanded output match **Read** / **Bash** styling.
+
+## Package layout (this extension)
+
+| File                    | Role                                                              |
+| ----------------------- | ----------------------------------------------------------------- |
+| `tool.ts`               | Registers `subagent` / `subagent_status`; `execute` routing only. |
+| `schemas.ts`            | TypeBox parameter schemas.                                        |
+| `validate.ts`           | Single vs batch argument validation.                              |
+| `details.ts`            | Normalizes `SubagentRunDetails` for tool results.                 |
+| `parent-update.ts`      | Safe `onUpdate` + throttled interval flush helper.                |
+| `orchestrate-single.ts` | Single-task run + live `details` updates.                         |
+| `orchestrate-batch.ts`  | Parallel batch + per-task arrays + live updates.                  |
+| `batch-text.ts`         | Markdown/text body for completed batch results.                   |
+| `background-finish.ts`  | Job table updates, `pi.events`, `notify` after async runs.        |
+| `run-agent.ts`          | `createAgentSession` + `runSubAgent` (child session lifecycle).   |
 
 ## Tool: `subagent_status`
 
