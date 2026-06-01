@@ -55,6 +55,13 @@ const taskItem = Type.Object({
       minimum: 1,
     }),
   ),
+  timeout_ms: Type.Optional(
+    Type.Number({
+      description:
+        "Per-task wall-clock cap merged with parent/tool abort; falls back to batch `timeout_ms` then ~/.agent/subagents/settings.json `timeout_ms`. 0 disables extra timeout.",
+      minimum: 0,
+    }),
+  ),
   agent_type: Type.Optional(subagentAgentTypeSchema),
 });
 
@@ -85,7 +92,7 @@ export const subagentParams = Type.Object({
     Type.Boolean({
       default: false,
       description:
-        "When true, starts the run asynchronously and returns immediately with { id } in the reply; use `subagent_status` to read results. Cancellation follows the parent session signal only.",
+        "When true, starts the run asynchronously and returns immediately with { id } in the reply; use `subagent_status` to read results. Cancellation follows the parent session signal and optional `timeout_ms`.",
     }),
   ),
   model: Type.Optional(
@@ -110,7 +117,7 @@ export const subagentParams = Type.Object({
   isolated: Type.Optional(
     Type.Boolean({
       description:
-        "When true (default), each sub-agent loads no extensions and only read/search tools (read, grep, find, ls). When false, bash/edit/write are enabled; extensions stay disabled to avoid nested subagent registration.",
+        "When true (default), each sub-agent loads no extensions and only read/search tools (read, grep, find, ls). When false, bash/edit/write are enabled; extensions stay disabled to avoid nested subagent registration. Child sessions never receive `subagent` or `subagent_status` tools.",
       default: true,
     }),
   ),
@@ -133,6 +140,13 @@ export const subagentParams = Type.Object({
       description:
         "Parallel batch only: overrides settings `max_total` (maximum number of tasks accepted in `tasks`) for this call (minimum 1).",
       minimum: 1,
+    }),
+  ),
+  timeout_ms: Type.Optional(
+    Type.Number({
+      description:
+        "Optional wall-clock cap (milliseconds) merged with parent/tool `AbortSignal` via `AbortSignal.timeout`; overrides ~/.agent/subagents/settings.json `timeout_ms` when set. 0 disables extra timeout. In batch mode, applies to tasks without their own `timeout_ms`.",
+      minimum: 0,
     }),
   ),
   agent_type: Type.Optional(subagentAgentTypeSchema),

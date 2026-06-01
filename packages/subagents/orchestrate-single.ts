@@ -8,6 +8,7 @@ import {
   tryParentToolUpdate,
   withThrottledParentFlush,
 } from "./parent-update.ts";
+import { defaultsForAgentType, type SubagentSettings } from "./settings.ts";
 import { runSubAgent, type SubagentRunDetails } from "./run-agent.ts";
 
 export async function runSingleSubagent(
@@ -20,6 +21,7 @@ export async function runSingleSubagent(
       parent_session_file: string;
     };
     merged: AbortSignal | undefined;
+    subagentSettings: SubagentSettings;
     onUpdate?: AgentToolUpdateCallback<SubagentRunDetails>;
     globalModel?: string;
     globalThinking?: string;
@@ -37,6 +39,7 @@ export async function runSingleSubagent(
     description,
     parentBase,
     merged,
+    subagentSettings,
     onUpdate,
     globalModel,
     globalThinking,
@@ -46,6 +49,9 @@ export async function runSingleSubagent(
     globalAgentType,
   } = args;
   const singleAgentType = resolveSubagentAgentType(globalAgentType);
+  const defs = defaultsForAgentType(subagentSettings, singleAgentType);
+  const effectiveModel = globalModel ?? defs.model;
+  const effectiveThinking = globalThinking ?? defs.thinking;
   let prog = {
     tool_calls: 0,
     sub_session_file: undefined as string | undefined,
@@ -89,8 +95,8 @@ export async function runSingleSubagent(
       ctx,
       {
         task,
-        model: globalModel,
-        thinking: globalThinking,
+        model: effectiveModel,
+        thinking: effectiveThinking,
         inherit_context: globalInherit,
         isolated: globalIsolated,
         max_turns: globalMaxTurns,

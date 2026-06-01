@@ -16,9 +16,9 @@ Monorepo with packages under `packages/`:
 - `packages/user-message/` -- User message handling extension.
 - `.agents/skills/pi-self-extension/` -- skill with authoritative guidance for building pi extensions (API reference, compat gotchas, validation checklist).
 
-## Subagents (planned)
+## Subagents
 
-Design and implementation steps for an in-process subagent extension (parent-only spawn, parallel and background runs, no extra `pi` subprocess): [docs/subagents/DESIGN.md](docs/subagents/DESIGN.md), [docs/subagents/STEPS.md](docs/subagents/STEPS.md).
+In-process subagent extension (parallel and background runs, no extra `pi` subprocess). Same design docs as the rest of the repo: [docs/subagents/DESIGN.md](docs/subagents/DESIGN.md), [docs/subagents/STEPS.md](docs/subagents/STEPS.md). Package overview and `~/.agent/subagents/settings.json`: [packages/subagents/README.md](packages/subagents/README.md).
 
 ## Architecture
 

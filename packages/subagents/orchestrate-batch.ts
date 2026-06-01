@@ -3,6 +3,7 @@ import type {
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 import { mapConcurrent } from "@htwang-contrib/common";
+import { mergeAbortWithTimeoutMs } from "./abort-timeout.ts";
 import { resolveSubagentAgentType } from "./agent-types.ts";
 import { formatBatchToolText } from "./batch-text.ts";
 import { subagentDetails } from "./details.ts";
@@ -10,6 +11,11 @@ import {
   tryParentToolUpdate,
   withThrottledParentFlush,
 } from "./parent-update.ts";
+import {
+  defaultsForAgentType,
+  resolveTimeoutMs,
+  type SubagentSettings,
+} from "./settings.ts";
 import {
   runSubAgent,
   type SubagentBatchItemDetail,
@@ -24,6 +30,7 @@ export type ParallelTaskRow = {
   inherit_context?: boolean;
   isolated?: boolean;
   max_turns?: number;
+  timeout_ms?: number;
   agent_type?: "default" | "research" | "review" | "plan";
 };
 
@@ -36,6 +43,7 @@ export async function runParallelBatchSubagent(
       parent_session_file: string;
     };
     merged: AbortSignal | undefined;
+    subagentSettings: SubagentSettings;
     onUpdate: AgentToolUpdateCallback<SubagentRunDetails> | undefined;
     globalModel?: string;
     globalThinking?: string;
@@ -53,6 +61,7 @@ export async function runParallelBatchSubagent(
     tasks,
     parentBase,
     merged,
+    subagentSettings,
     onUpdate,
     globalModel,
     globalThinking,
@@ -100,19 +109,26 @@ export async function runParallelBatchSubagent(
       limits.maxConcurrent,
       async (item, i) => {
         perTaskStarted[i] = true;
+        const at = resolveSubagentAgentType(item.agent_type ?? globalAgentType);
+        const defs = defaultsForAgentType(subagentSettings, at);
+        const taskTimeout = resolveTimeoutMs(
+          item.timeout_ms,
+          subagentSettings.timeoutMs,
+        );
+        const taskSignal = mergeAbortWithTimeoutMs(merged, taskTimeout);
         const r = await runSubAgent(
           ctx,
           {
             task: item.task,
-            model: item.model ?? globalModel,
-            thinking: item.thinking ?? globalThinking,
+            model: item.model ?? globalModel ?? defs.model,
+            thinking: item.thinking ?? globalThinking ?? defs.thinking,
             inherit_context: item.inherit_context ?? globalInherit,
             isolated: item.isolated ?? globalIsolated,
             max_turns: item.max_turns ?? globalMaxTurns,
             agent_type: item.agent_type ?? globalAgentType,
             stream: { task_index: i, task_total: n },
           },
-          merged,
+          taskSignal,
           (p) => {
             const ti = p.task_index;
             if (typeof ti === "number" && ti >= 0 && ti < n) {

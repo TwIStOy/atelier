@@ -25,17 +25,7 @@ import {
   resolveSubagentAgentType,
   subagentSystemPromptFor,
 } from "./agent-types.ts";
-
-const READ_ONLY_TOOLS = ["read", "grep", "find", "ls"] as const;
-const FULL_BUILTIN_TOOLS = [
-  "read",
-  "bash",
-  "edit",
-  "write",
-  "grep",
-  "find",
-  "ls",
-] as const;
+import { childSessionToolNames } from "./child-tools.ts";
 
 const THINKING_LEVELS = new Set<string>([
   "off",
@@ -240,7 +230,7 @@ export async function runSubAgent(
     }
 
     const isolated = input.isolated !== false;
-    const toolList = isolated ? [...READ_ONLY_TOOLS] : [...FULL_BUILTIN_TOOLS];
+    const toolList = childSessionToolNames(isolated);
 
     const agentType = resolveSubagentAgentType(input.agent_type);
     const systemPrompt = subagentSystemPromptFor(agentType);
@@ -286,7 +276,7 @@ export async function runSubAgent(
       modelRegistry: ctx.modelRegistry,
       model,
       thinkingLevel,
-      tools: [...toolList],
+      tools: toolList,
       resourceLoader: loader,
       sessionManager,
       settingsManager,

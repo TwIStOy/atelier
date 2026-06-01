@@ -104,7 +104,7 @@ Pi 刻意不把 subagents 做进核心：默认仅少量工具，通过 **Extens
 
 - **执行器**：封装 `runSubAgent(ctx, { prompt, model, thinking, isolated, inheritContext, maxTurns, signal })` → 内部 `createAgentSession` + `session.prompt` + 收集 `responseText` / usage。
 - **调度器**：多任务 **`Promise.all` + 并发槽**；后台任务 **`void` + 内存表 + id**（可参考 tintinweb 的 `AgentManager` / scheduler 形状，但可删减为最小）。
-- **策略**：子 session 的 **`allowedTools` 不包含** 自研委派工具名，保证 **仅主会话** 可发起委派（与 tintinweb `EXCLUDED_TOOL_NAMES` 同思路）。
+- **策略**：子 session 的 **`allowedTools` 不包含** 自研委派工具名（本仓库实现为 **`subagent`**、**`subagent_status`** 的显式过滤），保证 **仅主会话** 可发起委派（与 tintinweb `EXCLUDED_TOOL_NAMES` 同思路）。
 - **可观测**：`pi.events.emit`（与 `zai-coding-plan` / statusline 一致）、`ctx.ui.notify`。
 
 ### 4.2 工具面（示意）
@@ -130,7 +130,7 @@ Pi 刻意不把 subagents 做进核心：默认仅少量工具，通过 **Extens
 
 ### 5.1 安全
 
-- 并发与超时上限；`session.abort()` 响应父级 `signal`。
+- 并发与超时上限；`session.abort()` 响应父级 `signal`；可选 **`timeout_ms`**（`AbortSignal.timeout` 与父级/工具 `signal` 合并）。
 - 子 session **默认 `isolated` 或等价缩小扩展**；工具白名单明确。
 - 不向子上下文注入「如何再 spawn 其他 subagent」的冗长说明（默认从 allowedTools 层面禁止即可）。
 
@@ -171,3 +171,4 @@ Pi 刻意不把 subagents 做进核心：默认仅少量工具，通过 **Extens
 | 2026-06-01 | Phase 1：`packages/subagents` 空扩展骨架、根 `tsconfig` / `pi.extensions` / AGENTS 列表      |
 | 2026-06-01 | Phase 2：`runSubAgent`（`createAgentSession` + in-memory session）与 `subagent` 工具   |
 | 2026-06-01 | Phase 4：`background`、`subagent_status`、内存任务表、`subagent:complete` 与 notify |
+| 2026-06-01 | Phase 5：`settings.json` 的 `timeout_ms` 与 `defaults_by_agent_type`；子会话工具 denylist；`AbortSignal.timeout` 与父/工具 signal 合并 |

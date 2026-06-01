@@ -1,62 +1,145 @@
 import * as fs from "node:fs";
-import * as os from "node:os";
 import * as path from "node:path";
+import { getAgentDir } from "@earendil-works/pi-coding-agent";
+import {
+  type SubagentAgentType,
+  resolveSubagentAgentType,
+} from "./agent-types.ts";
 
-const DEFAULT_MAX_CONCURRENT = 4;
-const DEFAULT_MAX_TOTAL = 8;
-const ABS_MAX_CONCURRENT = 64;
-const ABS_MAX_TOTAL = 32;
+const DEFAULT_MAX_CONCURRENT = 3;
+const DEFAULT_MAX_TOTAL = 10;
+const DEFAULT_TIMEOUT_MS = 0;
 
-const SETTINGS_PATH = path.join(
-  os.homedir(),
-  ".agent",
-  "subagents",
-  "settings.json",
-);
+const AGENT_PERSONAS: SubagentAgentType[] = [
+  "default",
+  "research",
+  "review",
+  "plan",
+];
 
-type FileShape = {
-  max_concurrent?: number;
-  max_total?: number;
+export type SubagentAgentTypeDefaults = {
+  model?: string;
+  thinking?: string;
 };
 
-function clampInt(v: unknown, lo: number, hi: number, fallback: number) {
+export type SubagentSettings = {
+  maxConcurrent: number;
+  maxTotal: number;
+  timeoutMs: number;
+  defaultsByAgentType: Partial<
+    Record<SubagentAgentType, SubagentAgentTypeDefaults>
+  >;
+};
+
+function parsePositiveInt(v: unknown, fallback: number): number {
   if (typeof v !== "number" || !Number.isFinite(v)) return fallback;
-  const x = Math.floor(v);
-  if (x < lo) return lo;
-  if (x > hi) return hi;
-  return x;
+  const n = Math.floor(v);
+  return n > 0 ? n : fallback;
 }
 
-export function readSubagentConcurrencyLimits(overrides?: {
+function parseNonNegativeInt(v: unknown, fallback: number): number {
+  if (typeof v !== "number" || !Number.isFinite(v)) return fallback;
+  const n = Math.floor(v);
+  return n >= 0 ? n : fallback;
+}
+
+function parseDefaultsByAgentType(
+  raw: unknown,
+): Partial<Record<SubagentAgentType, SubagentAgentTypeDefaults>> {
+  const out: Partial<Record<SubagentAgentType, SubagentAgentTypeDefaults>> = {};
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return out;
+  const obj = raw as Record<string, unknown>;
+  for (const k of AGENT_PERSONAS) {
+    const v = obj[k];
+    if (!v || typeof v !== "object" || Array.isArray(v)) continue;
+    const row = v as Record<string, unknown>;
+    const model =
+      typeof row.model === "string" && row.model.trim()
+        ? row.model.trim()
+        : undefined;
+    const thinking =
+      typeof row.thinking === "string" && row.thinking.trim()
+        ? row.thinking.trim()
+        : undefined;
+    if (model || thinking) {
+      out[k] = {
+        ...(model ? { model } : {}),
+        ...(thinking ? { thinking } : {}),
+      };
+    }
+  }
+  return out;
+}
+
+function readSettingsFile(): unknown {
+  const agentDir = getAgentDir();
+  const file = path.join(agentDir, "subagents", "settings.json");
+  if (!fs.existsSync(file)) return undefined;
+  try {
+    const raw = fs.readFileSync(file, "utf8");
+    return JSON.parse(raw) as unknown;
+  } catch {
+    return undefined;
+  }
+}
+
+export type SubagentSettingsOverrides = {
   max_concurrent?: number;
   max_total?: number;
-}): { maxConcurrent: number; maxTotal: number } {
+  timeout_ms?: number;
+};
+
+export function readSubagentSettings(
+  overrides?: SubagentSettingsOverrides,
+): SubagentSettings {
+  const parsed = readSettingsFile();
   let maxConcurrent = DEFAULT_MAX_CONCURRENT;
   let maxTotal = DEFAULT_MAX_TOTAL;
-  try {
-    const raw = fs.readFileSync(SETTINGS_PATH, "utf-8");
-    const j = JSON.parse(raw) as FileShape;
-    maxConcurrent = clampInt(
-      j.max_concurrent,
-      1,
-      ABS_MAX_CONCURRENT,
-      DEFAULT_MAX_CONCURRENT,
-    );
-    maxTotal = clampInt(j.max_total, 1, ABS_MAX_TOTAL, DEFAULT_MAX_TOTAL);
-  } catch {}
+  let timeoutMs = DEFAULT_TIMEOUT_MS;
+  let defaultsByAgentType: Partial<
+    Record<SubagentAgentType, SubagentAgentTypeDefaults>
+  > = {};
+
+  if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+    const o = parsed as Record<string, unknown>;
+    maxConcurrent = parsePositiveInt(o.max_concurrent, DEFAULT_MAX_CONCURRENT);
+    maxTotal = parsePositiveInt(o.max_total, DEFAULT_MAX_TOTAL);
+    timeoutMs = parseNonNegativeInt(o.timeout_ms, DEFAULT_TIMEOUT_MS);
+    defaultsByAgentType = parseDefaultsByAgentType(o.defaults_by_agent_type);
+  }
+
   if (overrides?.max_concurrent !== undefined) {
-    maxConcurrent = clampInt(
-      overrides.max_concurrent,
-      1,
-      ABS_MAX_CONCURRENT,
-      maxConcurrent,
-    );
+    maxConcurrent = parsePositiveInt(overrides.max_concurrent, maxConcurrent);
   }
   if (overrides?.max_total !== undefined) {
-    maxTotal = clampInt(overrides.max_total, 1, ABS_MAX_TOTAL, maxTotal);
+    maxTotal = parsePositiveInt(overrides.max_total, maxTotal);
   }
-  if (maxTotal < maxConcurrent) {
-    maxTotal = maxConcurrent;
+  if (overrides?.timeout_ms !== undefined) {
+    timeoutMs = parseNonNegativeInt(overrides.timeout_ms, timeoutMs);
   }
-  return { maxConcurrent, maxTotal };
+
+  return { maxConcurrent, maxTotal, timeoutMs, defaultsByAgentType };
+}
+
+export function readSubagentConcurrencyLimits(
+  overrides?: Pick<SubagentSettingsOverrides, "max_concurrent" | "max_total">,
+): { maxConcurrent: number; maxTotal: number } {
+  const s = readSubagentSettings(overrides);
+  return { maxConcurrent: s.maxConcurrent, maxTotal: s.maxTotal };
+}
+
+export function resolveTimeoutMs(
+  taskOverride: number | undefined,
+  fallback: number,
+): number {
+  if (taskOverride === undefined) return fallback;
+  return parseNonNegativeInt(taskOverride, fallback);
+}
+
+export function defaultsForAgentType(
+  settings: SubagentSettings,
+  agentType: string,
+): SubagentAgentTypeDefaults {
+  const key = resolveSubagentAgentType(agentType);
+  return settings.defaultsByAgentType[key] ?? {};
 }
