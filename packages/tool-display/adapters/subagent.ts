@@ -55,11 +55,9 @@ type SubagentDetails = {
   context_percent?: number | null;
 };
 
-const KNOWN_AGENT_TYPES = new Set(["default", "research", "review", "plan"]);
-
 function normalizeAgentType(raw: string | undefined): string {
   const t = raw?.trim().toLowerCase();
-  if (t && KNOWN_AGENT_TYPES.has(t)) return t;
+  if (t && t.length > 0) return t;
   return "default";
 }
 

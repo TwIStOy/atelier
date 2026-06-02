@@ -1,21 +1,11 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
-import {
-  type SubagentAgentType,
-  resolveSubagentAgentType,
-} from "./agent-types.ts";
+import { normalizeSubagentAgentId } from "./agent-catalog.ts";
 
 const DEFAULT_MAX_CONCURRENT = 3;
 const DEFAULT_MAX_TOTAL = 10;
 const DEFAULT_TIMEOUT_MS = 0;
-
-const AGENT_PERSONAS: SubagentAgentType[] = [
-  "default",
-  "research",
-  "review",
-  "plan",
-];
 
 export type SubagentAgentTypeDefaults = {
   model?: string;
@@ -26,9 +16,7 @@ export type SubagentSettings = {
   maxConcurrent: number;
   maxTotal: number;
   timeoutMs: number;
-  defaultsByAgentType: Partial<
-    Record<SubagentAgentType, SubagentAgentTypeDefaults>
-  >;
+  defaultsByAgentType: Partial<Record<string, SubagentAgentTypeDefaults>>;
 };
 
 function parsePositiveInt(v: unknown, fallback: number): number {
@@ -45,11 +33,13 @@ function parseNonNegativeInt(v: unknown, fallback: number): number {
 
 function parseDefaultsByAgentType(
   raw: unknown,
-): Partial<Record<SubagentAgentType, SubagentAgentTypeDefaults>> {
-  const out: Partial<Record<SubagentAgentType, SubagentAgentTypeDefaults>> = {};
+): Partial<Record<string, SubagentAgentTypeDefaults>> {
+  const out: Partial<Record<string, SubagentAgentTypeDefaults>> = {};
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return out;
   const obj = raw as Record<string, unknown>;
-  for (const k of AGENT_PERSONAS) {
+  for (const k of Object.keys(obj)) {
+    const nk = normalizeSubagentAgentId(k);
+    if (!nk) continue;
     const v = obj[k];
     if (!v || typeof v !== "object" || Array.isArray(v)) continue;
     const row = v as Record<string, unknown>;
@@ -62,7 +52,7 @@ function parseDefaultsByAgentType(
         ? row.thinking.trim()
         : undefined;
     if (model || thinking) {
-      out[k] = {
+      out[nk] = {
         ...(model ? { model } : {}),
         ...(thinking ? { thinking } : {}),
       };
@@ -96,9 +86,8 @@ export function readSubagentSettings(
   let maxConcurrent = DEFAULT_MAX_CONCURRENT;
   let maxTotal = DEFAULT_MAX_TOTAL;
   let timeoutMs = DEFAULT_TIMEOUT_MS;
-  let defaultsByAgentType: Partial<
-    Record<SubagentAgentType, SubagentAgentTypeDefaults>
-  > = {};
+  let defaultsByAgentType: Partial<Record<string, SubagentAgentTypeDefaults>> =
+    {};
 
   if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
     const o = parsed as Record<string, unknown>;
@@ -140,6 +129,6 @@ export function defaultsForAgentType(
   settings: SubagentSettings,
   agentType: string,
 ): SubagentAgentTypeDefaults {
-  const key = resolveSubagentAgentType(agentType);
+  const key = normalizeSubagentAgentId(agentType) || "default";
   return settings.defaultsByAgentType[key] ?? {};
 }

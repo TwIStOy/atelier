@@ -4,6 +4,7 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import { mapConcurrent } from "@htwang-contrib/common";
 import { mergeAbortWithTimeoutMs } from "./abort-timeout.ts";
+import { buildSubagentAgentCatalog } from "./agent-catalog.ts";
 import { resolveSubagentAgentType } from "./agent-types.ts";
 import { formatBatchToolText } from "./batch-text.ts";
 import { subagentDetails } from "./details.ts";
@@ -31,7 +32,7 @@ export type ParallelTaskRow = {
   isolated?: boolean;
   max_turns?: number;
   timeout_ms?: number;
-  agent_type?: "default" | "research" | "review" | "plan";
+  agent_type?: string;
 };
 
 export async function runParallelBatchSubagent(
@@ -47,10 +48,10 @@ export async function runParallelBatchSubagent(
     onUpdate: AgentToolUpdateCallback<SubagentRunDetails> | undefined;
     globalModel?: string;
     globalThinking?: string;
-    globalInherit: boolean;
-    globalIsolated: boolean;
+    globalInherit: boolean | undefined;
+    globalIsolated: boolean | undefined;
     globalMaxTurns?: number;
-    globalAgentType?: "default" | "research" | "review" | "plan";
+    globalAgentType?: string;
     limits: { maxConcurrent: number; maxTotal: number };
   },
 ): Promise<{
@@ -71,6 +72,7 @@ export async function runParallelBatchSubagent(
     globalAgentType,
     limits,
   } = args;
+  const catalog = buildSubagentAgentCatalog(ctx.cwd);
   const n = tasks.length;
   const perTaskTools = Array.from({ length: n }, () => 0);
   const perTaskStarted = Array.from({ length: n }, () => false);
@@ -109,7 +111,11 @@ export async function runParallelBatchSubagent(
       limits.maxConcurrent,
       async (item, i) => {
         perTaskStarted[i] = true;
-        const at = resolveSubagentAgentType(item.agent_type ?? globalAgentType);
+        const at = resolveSubagentAgentType(
+          item.agent_type ?? globalAgentType,
+          catalog,
+        );
+        const file = catalog.agents.get(at)?.fileOptions ?? {};
         const defs = defaultsForAgentType(subagentSettings, at);
         const taskTimeout = resolveTimeoutMs(
           item.timeout_ms,
@@ -120,11 +126,16 @@ export async function runParallelBatchSubagent(
           ctx,
           {
             task: item.task,
-            model: item.model ?? globalModel ?? defs.model,
-            thinking: item.thinking ?? globalThinking ?? defs.thinking,
-            inherit_context: item.inherit_context ?? globalInherit,
-            isolated: item.isolated ?? globalIsolated,
-            max_turns: item.max_turns ?? globalMaxTurns,
+            model: item.model ?? globalModel ?? file.model ?? defs.model,
+            thinking:
+              item.thinking ?? globalThinking ?? file.thinking ?? defs.thinking,
+            inherit_context:
+              item.inherit_context ??
+              globalInherit ??
+              file.inherit_context ??
+              false,
+            isolated: item.isolated ?? globalIsolated ?? file.isolated ?? true,
+            max_turns: item.max_turns ?? globalMaxTurns ?? file.max_turns,
             agent_type: item.agent_type ?? globalAgentType,
             stream: { task_index: i, task_total: n },
           },
@@ -139,6 +150,7 @@ export async function runParallelBatchSubagent(
               perTaskCtxPct[ti] = p.context_percent;
             }
           },
+          catalog,
         );
         perTaskTools[i] = r.tool_calls;
         perTaskUsageIn[i] = r.usage_input;
@@ -174,6 +186,7 @@ export async function runParallelBatchSubagent(
   const batchItems: SubagentBatchItemDetail[] = results.map((r, i) => {
     const at = resolveSubagentAgentType(
       tasks[i]?.agent_type ?? globalAgentType,
+      catalog,
     );
     const desc = tasks[i]!.description.trim();
     return r.isError
@@ -222,7 +235,7 @@ export async function runParallelBatchSubagent(
       tool_calls: totalToolCalls,
       mode: "batch",
       batch: batchItems,
-      agent_type: resolveSubagentAgentType(globalAgentType),
+      agent_type: resolveSubagentAgentType(globalAgentType, catalog),
       ok: batchItems.every((b) => b.ok),
       usage_input: usageInSum,
       usage_output: usageOutSum,

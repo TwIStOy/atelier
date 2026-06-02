@@ -26,6 +26,10 @@ import { resolveModel } from "@htwang-contrib/common";
 import protectSecrets from "@htwang-contrib/protect-secrets/index.ts";
 import { appendSubagentLinkRecord, SUBAGENT_SESSION_DIR } from "./paths.ts";
 import {
+  buildSubagentAgentCatalog,
+  type SubagentAgentCatalog,
+} from "./agent-catalog.ts";
+import {
   resolveSubagentAgentType,
   subagentSystemPromptFor,
 } from "./agent-types.ts";
@@ -183,6 +187,7 @@ export async function runSubAgent(
   input: RunSubAgentInput,
   signal: AbortSignal | undefined,
   onChildProgress?: (p: SubagentChildProgress) => void,
+  catalog?: SubagentAgentCatalog,
 ): Promise<RunSubAgentResult> {
   const parentHeader = ctx.sessionManager.getHeader();
   const parentSessionId = parentHeader?.id ?? "unknown";
@@ -238,10 +243,10 @@ export async function runSubAgent(
     const isolated = input.isolated !== false;
     const toolList = childSessionToolNames(isolated);
 
-    const agentType = resolveSubagentAgentType(input.agent_type);
-    const systemPrompt = subagentSystemPromptFor(agentType);
-
     const cwd = ctx.cwd;
+    const agentCatalog = catalog ?? buildSubagentAgentCatalog(cwd);
+    const agentType = resolveSubagentAgentType(input.agent_type, agentCatalog);
+    const systemPrompt = subagentSystemPromptFor(agentType, agentCatalog);
     const agentDir = getAgentDir();
     const settingsManager = SettingsManager.create(cwd, agentDir);
     const model = resolveModelForSubagent(input.model, ctx);

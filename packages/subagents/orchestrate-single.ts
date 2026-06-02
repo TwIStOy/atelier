@@ -2,6 +2,7 @@ import type {
   AgentToolUpdateCallback,
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
+import { buildSubagentAgentCatalog } from "./agent-catalog.ts";
 import { resolveSubagentAgentType } from "./agent-types.ts";
 import { subagentDetails } from "./details.ts";
 import {
@@ -25,10 +26,10 @@ export async function runSingleSubagent(
     onUpdate?: AgentToolUpdateCallback<SubagentRunDetails>;
     globalModel?: string;
     globalThinking?: string;
-    globalInherit: boolean;
-    globalIsolated: boolean;
+    globalInherit: boolean | undefined;
+    globalIsolated: boolean | undefined;
     globalMaxTurns?: number;
-    globalAgentType?: "default" | "research" | "review" | "plan";
+    globalAgentType?: string;
   },
 ): Promise<{
   content: Array<{ type: "text"; text: string }>;
@@ -48,10 +49,15 @@ export async function runSingleSubagent(
     globalMaxTurns,
     globalAgentType,
   } = args;
-  const singleAgentType = resolveSubagentAgentType(globalAgentType);
+  const catalog = buildSubagentAgentCatalog(ctx.cwd);
+  const singleAgentType = resolveSubagentAgentType(globalAgentType, catalog);
+  const file = catalog.agents.get(singleAgentType)?.fileOptions ?? {};
   const defs = defaultsForAgentType(subagentSettings, singleAgentType);
-  const effectiveModel = globalModel ?? defs.model;
-  const effectiveThinking = globalThinking ?? defs.thinking;
+  const effectiveModel = globalModel ?? file.model ?? defs.model;
+  const effectiveThinking = globalThinking ?? file.thinking ?? defs.thinking;
+  const effectiveInherit = globalInherit ?? file.inherit_context ?? false;
+  const effectiveIsolated = globalIsolated ?? file.isolated ?? true;
+  const effectiveMaxTurns = globalMaxTurns ?? file.max_turns;
   let prog = {
     tool_calls: 0,
     sub_session_file: undefined as string | undefined,
@@ -97,9 +103,9 @@ export async function runSingleSubagent(
         task,
         model: effectiveModel,
         thinking: effectiveThinking,
-        inherit_context: globalInherit,
-        isolated: globalIsolated,
-        max_turns: globalMaxTurns,
+        inherit_context: effectiveInherit,
+        isolated: effectiveIsolated,
+        max_turns: effectiveMaxTurns,
         agent_type: globalAgentType,
       },
       merged,
@@ -114,6 +120,7 @@ export async function runSingleSubagent(
           context_window: p.context_window,
         };
       },
+      catalog,
     );
   } finally {
     ui.stopAndFlush();
