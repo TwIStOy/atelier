@@ -1,8 +1,19 @@
-export function validateTaskShape(params: {
-  task?: string;
-  description?: string;
-  tasks?: { task: string; description: string }[];
-}):
+import type { SubagentAgentCatalog } from "./agent-catalog.ts";
+import { resolveSubagentAgentId } from "./agent-catalog.ts";
+
+export function validateTaskShape(
+  params: {
+    task?: string;
+    description?: string;
+    tasks?: Array<{
+      task: string;
+      description?: string;
+      agent_type?: string;
+    }>;
+    agent_type?: string;
+  },
+  catalog: SubagentAgentCatalog,
+):
   | { ok: true; mode: "single" }
   | { ok: true; mode: "batch" }
   | { ok: false; message: string } {
@@ -23,26 +34,34 @@ export function validateTaskShape(params: {
   }
   if (hasTasks && params.tasks) {
     for (let i = 0; i < params.tasks.length; i++) {
-      if (!params.tasks[i].task?.trim()) {
+      const row = params.tasks[i];
+      if (!row.task?.trim()) {
         return {
           ok: false,
           message: `subagent: tasks[${i}].task is empty.`,
         };
       }
-      if (!params.tasks[i].description?.trim()) {
+      const aid = resolveSubagentAgentId(
+        row.agent_type ?? params.agent_type,
+        catalog,
+      );
+      const fileDesc = catalog.agents.get(aid)?.fileOptions.description?.trim();
+      if (!row.description?.trim() && !fileDesc) {
         return {
           ok: false,
-          message: `subagent: tasks[${i}].description is required (short tree label).`,
+          message: `subagent: tasks[${i}].description is required unless the agent persona frontmatter sets description (agent_type → ${aid}).`,
         };
       }
     }
     return { ok: true, mode: "batch" };
   }
-  if (!params.description?.trim()) {
+  const aid = resolveSubagentAgentId(params.agent_type, catalog);
+  const fileDesc = catalog.agents.get(aid)?.fileOptions.description?.trim();
+  if (!params.description?.trim() && !fileDesc) {
     return {
       ok: false,
       message:
-        "subagent: `description` is required in single-task mode (short label for the tool tree).",
+        "subagent: pass `description` (single mode) or set `description` in the persona Markdown frontmatter.",
     };
   }
   return { ok: true, mode: "single" };

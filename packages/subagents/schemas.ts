@@ -1,29 +1,24 @@
 import { Type } from "typebox";
 
-const subagentAgentTypeSchema = Type.Union(
-  [
-    Type.Literal("default"),
-    Type.Literal("research"),
-    Type.Literal("review"),
-    Type.Literal("plan"),
-  ],
-  {
-    description:
-      "Which system prompt persona to inject: default (balanced worker), research (evidence-first), review (critique), plan (steps and tradeoffs, not full implementation).",
-  },
-);
+const subagentAgentTypeSchema = Type.String({
+  maxLength: 64,
+  description:
+    "Persona id (`[a-z][a-z0-9_-]*`); unknown → `default`. Markdown agents: shipped dirs, `$HOME/.config/pi/agents`, `<cwd>/.pi/agents`, `pi.agents` paths. YAML frontmatter (Pi `parseFrontmatter`) may set defaults for this run: `name` (id), `description`, `model`, `thinking`, `inherit_context`, `isolated`, `max_turns`. Tool arguments override frontmatter when both are set.",
+});
 
 const taskItem = Type.Object({
   task: Type.String({
     description:
       "Instructions for this sub-agent; optional fields below override batch-level defaults.",
   }),
-  description: Type.String({
-    minLength: 1,
-    maxLength: 72,
-    description:
-      "Required short label for the collapsed tool tree (after agent type, before tool counts).",
-  }),
+  description: Type.Optional(
+    Type.String({
+      minLength: 1,
+      maxLength: 72,
+      description:
+        "Short tree label; optional if this task’s persona frontmatter sets `description`.",
+    }),
+  ),
   model: Type.Optional(
     Type.String({
       description:
@@ -77,7 +72,7 @@ export const subagentParams = Type.Object({
       minLength: 1,
       maxLength: 72,
       description:
-        "Required with `task` (single mode): short label for the collapsed tool tree (after agent type, before tool counts). Omit when using `tasks`.",
+        "Single mode: short tree label with `task`. Optional if the selected persona frontmatter sets `description`. Omit when using `tasks`.",
     }),
   ),
   tasks: Type.Optional(

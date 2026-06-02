@@ -18,14 +18,37 @@ import { runSingleSubagent } from "./orchestrate-single.ts";
 import { subagentParams, subagentStatusParams } from "./schemas.ts";
 import { validateTaskShape } from "./validate.ts";
 import { mergeAbortWithTimeoutMs } from "./abort-timeout.ts";
+import {
+  buildSubagentAgentCatalog,
+  resolveSubagentAgentId,
+  type SubagentAgentCatalog,
+} from "./agent-catalog.ts";
 import { readSubagentSettings, type SubagentSettings } from "./settings.ts";
+
+function fillBatchTaskDescriptions(
+  tasks: ParallelTaskRow[],
+  catalog: SubagentAgentCatalog,
+  globalAgentType: string | undefined,
+): ParallelTaskRow[] {
+  return tasks.map((t) => {
+    const aid = resolveSubagentAgentId(
+      t.agent_type ?? globalAgentType,
+      catalog,
+    );
+    const description =
+      t.description?.trim() ||
+      catalog.agents.get(aid)?.fileOptions.description?.trim() ||
+      "";
+    return { ...t, description };
+  });
+}
 
 export function registerSubagentStatusTool(pi: ExtensionAPI) {
   pi.registerTool({
     name: "subagent_status",
     label: "Subagent status",
     description:
-      "Returns JSON status for a background subagent job: pass `id` from a `subagent` call with `background: true`. States: running, done (includes partial batch failures via ok and batch_counts), error (unhandled exception), unknown (expired id).",
+      "JSON status for a background `subagent` job: pass `id` from `subagent` with `background: true`.",
     parameters: subagentStatusParams,
     async execute(_toolCallId, params) {
       const id = params.id.trim();
@@ -48,7 +71,7 @@ export function registerSubagentTool(pi: ExtensionAPI) {
     name: "subagent",
     label: "Subagent",
     description:
-      "Runs one or more in-process Pi AgentSession values (no extra pi OS process). Single mode: non-empty `task` plus required `description` (short tree label). Parallel mode: `tasks` array, each item with required `description`; runs up to `max_concurrent` at a time (defaults from ~/.agent/subagents/settings.json, built-in 3 concurrent / 10 total if file absent). Optional `background: true` returns immediately with an `id`; poll with `subagent_status`. Optional `timeout_ms` merges a wall-clock abort with parent cancellation. On completion, emits `subagent:complete` on `pi.events` and shows `ctx.ui.notify`. Optional `agent_type` selects the injected system prompt (default, research, review, plan). When some tasks fail, the tool still returns 200-style success with a per-task summary: failed tasks appear under `### Task N — error` and `details.batch[].ok === false`. Sessions persist under ~/.agent/subagents/session; linkage lines append under ~/.agent/subagents/by-parent/<parent_id>.jsonl. Child sessions load `@htwang-contrib/protect-secrets` (extensionFactories) but not user-configured extensions; default tools are read-only unless `isolated=false`; child sessions never receive `subagent` or `subagent_status`.",
+      "Run child Pi agent work in-process (no extra `pi` process). Single: `task` and optional `description` (or use persona frontmatter `description`). Parallel: `tasks` with optional per-task `description` when the persona file sets it. Tool parameters override persona Markdown frontmatter defaults (`model`, `thinking`, `inherit_context`, `isolated`, `max_turns`, `description`). With `background: true`, returns an `id`—poll `subagent_status`. Optional: `timeout_ms`, `agent_type`, `max_concurrent`, `max_total`.",
     parameters: subagentParams,
     async execute(_toolCallId, params, signal, onUpdate, ctx) {
       const parentSessionId = ctx.sessionManager.getHeader()?.id ?? "unknown";
@@ -58,7 +81,8 @@ export function registerSubagentTool(pi: ExtensionAPI) {
         parent_session_file: parentSessionFile,
       };
 
-      const shape = validateTaskShape(params);
+      const catalog = buildSubagentAgentCatalog(ctx.cwd);
+      const shape = validateTaskShape(params, catalog);
       if (!shape.ok) {
         return {
           content: [{ type: "text", text: shape.message }],
@@ -106,8 +130,8 @@ export function registerSubagentTool(pi: ExtensionAPI) {
 
       const globalModel = params.model;
       const globalThinking = params.thinking;
-      const globalInherit = params.inherit_context === true;
-      const globalIsolated = params.isolated !== false;
+      const globalInherit = params.inherit_context;
+      const globalIsolated = params.isolated;
       const globalMaxTurns = params.max_turns;
       const globalAgentType = params.agent_type;
 
@@ -116,7 +140,11 @@ export function registerSubagentTool(pi: ExtensionAPI) {
           maxConcurrent: subagentSettings.maxConcurrent,
           maxTotal: subagentSettings.maxTotal,
         };
-        const tasks = params.tasks as ParallelTaskRow[];
+        const tasks = fillBatchTaskDescriptions(
+          params.tasks as ParallelTaskRow[],
+          catalog,
+          params.agent_type,
+        );
         if (tasks.length > limits.maxTotal) {
           return {
             content: [
@@ -178,7 +206,11 @@ export function registerSubagentTool(pi: ExtensionAPI) {
         });
       }
 
-      const singleDescription = params.description!.trim();
+      const singleAgentId = resolveSubagentAgentId(params.agent_type, catalog);
+      const singleDescription =
+        params.description?.trim() ||
+        catalog.agents.get(singleAgentId)?.fileOptions.description?.trim() ||
+        "";
       if (isBackground) {
         const jobId = createBackgroundJob({
           mode: "single",

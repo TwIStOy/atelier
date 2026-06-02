@@ -102,7 +102,7 @@ Pi 刻意不把 subagents 做进核心：默认仅少量工具，通过 **Extens
 
 ### 4.1 组件划分（建议新包 `packages/subagents/` 或等价）
 
-- **执行器**：封装 `runSubAgent(ctx, { prompt, model, thinking, isolated, inheritContext, maxTurns, signal })` → 内部 `createAgentSession` + `session.prompt` + 收集 `responseText` / usage。
+- **执行器**：封装 `runSubAgent(ctx, { prompt, model, thinking, isolated, inheritContext, maxTurns, signal })` → 内部 `createAgentSession` + `session.prompt` + 收集 `responseText` / usage。子 agent 的 **system prompt  persona** 由 Markdown 目录合并（`~/.config/pi/agents`、`<cwd>/.pi/agents`、`package.json` 的 `pi.agents`、各扩展的 `pi.agents`），见 `packages/subagents/README.md`。
 - **调度器**：多任务 **`Promise.all` + 并发槽**；后台任务 **`void` + 内存表 + id**（可参考 tintinweb 的 `AgentManager` / scheduler 形状，但可删减为最小）。
 - **策略**：子 session 的 **`allowedTools` 不包含** 自研委派工具名（本仓库实现为 **`subagent`**、**`subagent_status`** 的显式过滤），保证 **仅主会话** 可发起委派（与 tintinweb `EXCLUDED_TOOL_NAMES` 同思路）。
 - **可观测**：`pi.events.emit`（与 `zai-coding-plan` / statusline 一致）、`ctx.ui.notify`。
@@ -173,3 +173,4 @@ Pi 刻意不把 subagents 做进核心：默认仅少量工具，通过 **Extens
 | 2026-06-01 | Phase 4：`background`、`subagent_status`、内存任务表、`subagent:complete` 与 notify |
 | 2026-06-01 | Phase 5：`settings.json` 的 `timeout_ms` 与 `defaults_by_agent_type`；子会话工具 denylist；`AbortSignal.timeout` 与父/工具 signal 合并 |
 | 2026-06-01 | Phase 6（部分）：子 session `extensionFactories` 注入 `protect-secrets`；未做 statusline / RPC |
+| 2026-06-01 | 子 agent persona：`*.md` 目录合并（`~/.config/pi/agents`、`.pi/agents`、`pi.agents` 与扩展 manifest） |
