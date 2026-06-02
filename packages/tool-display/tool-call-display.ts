@@ -210,6 +210,9 @@ export function renderToolCall(
       const globCollapsedPartial =
         opts.toolName === "glob" && !opts.expanded && opts.isPartial;
 
+      const lsCollapsedPartial =
+        opts.toolName === "ls" && !opts.expanded && opts.isPartial;
+
       const useAdapter =
         adapter &&
         (opts.expanded ||
@@ -217,6 +220,7 @@ export function renderToolCall(
           detailsOnlyCollapsed ||
           grepCollapsedPartial ||
           globCollapsedPartial ||
+          lsCollapsedPartial ||
           (opts.toolName === "subagent" && !opts.expanded));
 
       if (useAdapter) {
