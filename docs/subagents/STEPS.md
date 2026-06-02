@@ -190,7 +190,7 @@ statusline：订阅 `subagent:complete`（及 start），展示进行中数量�
 
 ### Step 6.2
 
-子 session **始终**通过 `DefaultResourceLoader` 的 **`extensionFactories`** 注入 `@htwang-contrib/protect-secrets`（与 `noExtensions: true` 兼容；不扫描用户扩展目录，避免子会话再加载 `subagents`）。`bindExtensions` 时与主会话同源走 `tool_call` / bash 管线。
+子 session **始终**通过 `DefaultResourceLoader` 的 **`extensionFactories`** 注入 `@htwang-contrib/protect-secrets` 与 `@htwang-contrib/extra-tools`（与 `noExtensions: true` 兼容；不扫描用户扩展目录，避免子会话再加载 `subagents`）。`bindExtensions` 时与主会话同源走 `tool_call` / bash 管线。
 
 ### Step 6.3
 

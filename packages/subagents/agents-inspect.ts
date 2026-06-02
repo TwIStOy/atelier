@@ -4,7 +4,7 @@ import {
   buildSubagentAgentCatalog,
   type SubagentAgentCatalog,
 } from "./agent-catalog.ts";
-import { childSessionToolNames } from "./child-tools.ts";
+import { resolveChildToolNames } from "./child-tools.ts";
 import {
   defaultsForAgentType,
   readSubagentSettings,
@@ -51,7 +51,12 @@ export function formatSubagentAgentInspect(
   const desc = file.description?.trim() ?? "";
   const whenToUse = file.whenToUse?.trim() ?? "";
 
-  const tools = childSessionToolNames(isolated).join(", ");
+  const fmTools = file.tools;
+  const fmToolsDisplay =
+    fmTools && fmTools.length > 0
+      ? fmTools.join(", ")
+      : "(omit → default list for isolation mode)";
+  const toolsEffective = resolveChildToolNames(isolated, fmTools).join(", ");
 
   const lines: string[] = [
     `id: ${agentId}`,
@@ -72,9 +77,10 @@ export function formatSubagentAgentInspect(
     `  inherit_context: ${inherit}`,
     `  max_turns: ${maxTurns ?? "(omit → unlimited with soft stop + grace)"}`,
     "",
-    `builtin tools (${isolated ? "isolated" : "non-isolated"}): ${tools}`,
+    `frontmatter tools (subset of Pi defaults for this isolation mode; unknown names omitted): ${fmToolsDisplay}`,
+    `effective child tools (${isolated ? "isolated" : "non-isolated"}): ${toolsEffective}`,
     "",
-    "Child session: DefaultResourceLoader uses noExtensions: true, noSkills, noPromptTemplates, noThemes, noContextFiles; extensionFactories includes protect-secrets only.",
+    "Child session: DefaultResourceLoader uses noExtensions: true, noSkills, noPromptTemplates, noThemes, noContextFiles; extensionFactories includes protect-secrets and extra-tools (grep, glob, ls).",
     "",
     "Batch mode: per-task tool fields override the same keys for that row only (task > batch tool args > persona > defaults_by_agent_type).",
   ];

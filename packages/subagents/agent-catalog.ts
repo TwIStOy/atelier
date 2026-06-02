@@ -23,6 +23,7 @@ export type SubagentAgentFileOptions = {
   inherit_context?: boolean;
   isolated?: boolean;
   max_turns?: number;
+  tools?: string[];
 };
 
 export type SubagentAgentEntry = {
@@ -89,6 +90,42 @@ function parseMaxTurnsField(fm: Record<string, unknown>): number | undefined {
   return n >= 1 ? n : undefined;
 }
 
+function dedupePreserveOrder(names: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const n of names) {
+    if (seen.has(n)) continue;
+    seen.add(n);
+    out.push(n);
+  }
+  return out;
+}
+
+function parseToolsField(fm: Record<string, unknown>): string[] | undefined {
+  const v = fm["tools"];
+  if (v === undefined) return undefined;
+  const norm = (s: string) => s.trim().toLowerCase();
+  let names: string[] = [];
+  if (Array.isArray(v)) {
+    for (const x of v) {
+      if (typeof x !== "string") continue;
+      const t = norm(x);
+      if (t) names.push(t);
+    }
+  } else if (typeof v === "string") {
+    names = v
+      .split(/[\s,]+/)
+      .map(norm)
+      .filter(Boolean);
+  } else {
+    return undefined;
+  }
+  names = dedupePreserveOrder(names);
+  if (names.length === 0) return undefined;
+  const max = 50;
+  return names.length > max ? names.slice(0, max) : names;
+}
+
 function parseFileOptionsFromFrontmatter(
   fm: Record<string, unknown>,
 ): SubagentAgentFileOptions {
@@ -108,6 +145,7 @@ function parseFileOptionsFromFrontmatter(
   const inherit_context = parseBooleanField(fm, "inherit_context");
   const isolated = parseBooleanField(fm, "isolated");
   const max_turns = parseMaxTurnsField(fm);
+  const tools = parseToolsField(fm);
   const out: SubagentAgentFileOptions = {};
   if (description) out.description = description;
   if (whenToUse) out.whenToUse = whenToUse;
@@ -116,6 +154,7 @@ function parseFileOptionsFromFrontmatter(
   if (inherit_context !== undefined) out.inherit_context = inherit_context;
   if (isolated !== undefined) out.isolated = isolated;
   if (max_turns !== undefined) out.max_turns = max_turns;
+  if (tools !== undefined) out.tools = tools;
   return out;
 }
 
@@ -314,11 +353,9 @@ export function subagentsPersonasSystemPromptXml(
   for (const id of ids) {
     const entry = catalog.agents.get(id);
     if (!entry) continue;
-    const description = entry.fileOptions.description?.trim() ?? "";
     const whenToUse = entry.fileOptions.whenToUse?.trim() ?? "";
     lines.push("  <agent>");
     lines.push(`    <name>${escapeXmlText(id)}</name>`);
-    lines.push(`    <description>${escapeXmlText(description)}</description>`);
     lines.push(`    <when_to_use>${escapeXmlText(whenToUse)}</when_to_use>`);
     lines.push("  </agent>");
   }

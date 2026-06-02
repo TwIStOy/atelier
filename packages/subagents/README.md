@@ -10,7 +10,7 @@ In-process `AgentSession` runs (no extra `pi` process). **Single mode:** set `ta
 
 **`timeout_ms`:** non-zero values merge an `AbortSignal.timeout` with the parent/tool abort (and, in foreground mode, the tool-call `signal`). `0` means no extra wall-clock timeout beyond parent cancellation.
 
-Subagent state is written under `~/.agent/subagents/session`; each run appends a JSON line to `~/.agent/subagents/by-parent/<parent_session_id>.jsonl` so subagents stay associated with the parent Pi session across reloads. Defaults: `isolated=true` (read/grep/find/ls only). The child `DefaultResourceLoader` sets `noExtensions: true` (no user extension scan) but **`extensionFactories`** always includes **`@htwang-contrib/protect-secrets`**, so `/run/agenix` and bash read-like rules match the main session. Set `isolated=false` to allow bash/edit/write. **Child sessions never receive** the tools **`subagent`** or **`subagent_status`** (filtered in `child-tools.ts` before `createAgentSession`).
+Subagent state is written under `~/.agent/subagents/session`; each run appends a JSON line to `~/.agent/subagents/by-parent/<parent_session_id>.jsonl` so subagents stay associated with the parent Pi session across reloads. Defaults: `isolated=true` (read/grep/glob/find/ls only). The child `DefaultResourceLoader` sets `noExtensions: true` (no user extension scan) but **`extensionFactories`** always includes **`@htwang-contrib/protect-secrets`** and **`@htwang-contrib/extra-tools`** (grep / glob / ls), so `/run/agenix` and bash read-like rules match the main session and child personas get those tools without requiring `extra-tools` on the parent. Set `isolated=false` to allow bash/edit/write. **Child sessions never receive** the tools **`subagent`** or **`subagent_status`** (filtered in `child-tools.ts` before `createAgentSession`).
 
 Optional **`defaults_by_agent_type`** in settings (see below) supplies default **`model`** / **`thinking`** per agent id when the tool call omits them and the persona Markdown does not set them (single mode uses the resolved `agent_type`; batch merges per task with precedence **task field → batch-level param → persona frontmatter → `defaults_by_agent_type` → parent model** for `model`/`thinking`; same idea for `inherit_context`, `isolated`, `max_turns`, `description`).
 
@@ -50,10 +50,11 @@ Markdown **body** is the main child system prompt. If **`whenToUse`** / **`when_
 | `inherit_context` | Boolean; when true, same behavior as tool `inherit_context`.                                                                                                                                                                                                                                                                                                             |
 | `isolated`        | Boolean; when false, enables bash/edit/write in the child (same as tool `isolated`).                                                                                                                                                                                                                                                                                     |
 | `max_turns`       | Positive integer; cap agentic turns when the tool omits `max_turns`.                                                                                                                                                                                                                                                                                                     |
+| `tools`           | Optional allowlist of child tool names (YAML string array, or one comma/whitespace-separated string). Each name must appear in Pi’s default set for this persona’s effective `isolated` mode (read-only vs full); unknown names are dropped. If none remain after filtering, the default full list is used. At most 50 names are read from frontmatter.                  |
 
 **Precedence:** any value set on the **`subagent` tool call** wins over frontmatter; frontmatter wins over **`defaults_by_agent_type`** in `settings.json`; then the parent session model applies for `model` where still unset.
 
-On each parent LLM turn, this extension appends a **`<subagents>`** XML block to the session system prompt (`before_agent_start`): one **`<agent>`** per loaded persona, each with **`<name>`**, **`<description>`**, and **`<when_to_use>`** (from frontmatter `whenToUse` or `when_to_use`, or empty). This is the supported way to surface the catalog to the model; there is no duplicate TUI “agents” strip in chat.
+On each parent LLM turn, this extension appends a **`<subagents>`** XML block to the session system prompt (`before_agent_start`): one **`<agent>`** per loaded persona, each with **`<name>`** and **`<when_to_use>`** (from frontmatter `whenToUse` or `when_to_use`, or empty). This is the supported way to surface the catalog to the model; there is no duplicate TUI “agents” strip in chat.
 
 ```yaml
 ---
@@ -62,6 +63,10 @@ description: My label
 whenToUse: When the user needs a focused pass on this workflow only.
 inherit_context: false
 isolated: true
+tools:
+  - read
+  - grep
+  - glob
 ---
 System prompt text…
 ```
@@ -72,12 +77,12 @@ Unknown `agent_type` arguments resolve to **`general-purpose`**. If you used the
 
 Optional JSON object (missing file → built-in defaults only):
 
-| Field                    | Type   | Default | Role                                                                                                                                                                         |
-| ------------------------ | ------ | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `max_concurrent`         | number | 3       | Parallel batch: max simultaneous `runSubAgent` calls.                                                                                                                        |
-| `max_total`              | number | 10      | Parallel batch: max length of `tasks` array.                                                                                                                                 |
-| `timeout_ms`             | number | 0       | Wall-clock cap merged via `AbortSignal.timeout`; `0` = disabled.                                                                                                             |
-| `defaults_by_agent_type` | object | —       | Keys are agent ids (e.g. `general-purpose`, `research`, or custom ids from your catalog). Each value may include `model` and/or `thinking` when the tool omits those fields. |
+| Field                    | Type   | Default | Role                                                                                                                                                                        |
+| ------------------------ | ------ | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `max_concurrent`         | number | 3       | Parallel batch: max simultaneous `runSubAgent` calls.                                                                                                                       |
+| `max_total`              | number | 10      | Parallel batch: max length of `tasks` array.                                                                                                                                |
+| `timeout_ms`             | number | 0       | Wall-clock cap merged via `AbortSignal.timeout`; `0` = disabled.                                                                                                            |
+| `defaults_by_agent_type` | object | —       | Keys are agent ids (e.g. `general-purpose`, `explore`, or custom ids from your catalog). Each value may include `model` and/or `thinking` when the tool omits those fields. |
 
 Example:
 
@@ -87,8 +92,8 @@ Example:
   "max_total": 8,
   "timeout_ms": 600000,
   "defaults_by_agent_type": {
-    "research": { "thinking": "medium" },
-    "review": { "thinking": "low" }
+    "explore": { "thinking": "medium" },
+    "plan": { "thinking": "low" }
   }
 }
 ```
@@ -106,7 +111,7 @@ Example:
 | `orchestrate-batch.ts`  | Parallel batch + per-task arrays + live updates.                                                                            |
 | `batch-text.ts`         | Markdown/text body for completed batch results.                                                                             |
 | `background-finish.ts`  | Job table updates, `pi.events`, `notify` after async runs.                                                                  |
-| `run-agent.ts`          | `createAgentSession` + `runSubAgent`; child loader uses `extensionFactories` for `protect-secrets`.                         |
+| `run-agent.ts`          | `createAgentSession` + `runSubAgent`; child loader uses `extensionFactories` for `protect-secrets` and `extra-tools`.       |
 | `agent-catalog.ts`      | Agent Markdown catalog, id normalization, system prompt + **`<subagents>`** XML for the parent prompt, `SubagentAgentType`. |
 | `child-tools.ts`        | Built-in tool name list + filter excluding delegation tools.                                                                |
 | `abort-timeout.ts`      | Merges optional `AbortSignal.timeout` into run signals.                                                                     |

@@ -47,8 +47,7 @@ export function registerSubagentStatusTool(pi: ExtensionAPI) {
   pi.registerTool({
     name: "subagent_status",
     label: "Subagent status",
-    description:
-      "JSON status for a background `subagent` job: pass `id` from `subagent` with `background: true`.",
+    description: "Read status for a background subagent job.",
     parameters: subagentStatusParams,
     async execute(_toolCallId, params) {
       const id = params.id.trim();
@@ -71,7 +70,7 @@ export function registerSubagentTool(pi: ExtensionAPI) {
     name: "subagent",
     label: "Subagent",
     description:
-      "Delegates a task to an in-process child Pi agent session and returns its final reply (single task or parallel batch).",
+      "Run a child agent in-process; returns its reply or starts a background job.",
     parameters: subagentParams,
     async execute(_toolCallId, params, signal, onUpdate, ctx) {
       const parentSessionId = ctx.sessionManager.getHeader()?.id ?? "unknown";

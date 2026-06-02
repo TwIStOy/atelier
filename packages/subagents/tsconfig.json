@@ -14,5 +14,9 @@
   },
   "include": ["./**/*.ts"],
   "exclude": ["node_modules", "dist"],
-  "references": [{ "path": "../common" }, { "path": "../protect-secrets" }]
+  "references": [
+    { "path": "../common" },
+    { "path": "../extra-tools" },
+    { "path": "../protect-secrets" }
+  ]
 }

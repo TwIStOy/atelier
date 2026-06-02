@@ -1,0 +1,5 @@
+- List directory contents in the workspace (read-only)
+- Returns entry names sorted alphabetically; directories are shown with a trailing /
+- Includes dotfiles
+- Use when you need to see what files exist in a folder before using `read` or `grep`
+- Optional `limit` caps how many entries are returned (default 500)

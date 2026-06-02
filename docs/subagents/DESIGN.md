@@ -120,7 +120,7 @@ Pi 刻意不把 subagents 做进核心：默认仅少量工具，通过 **Extens
 | 包 / 机制                                 | 衔接方式                                                                                                                               |
 | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | `@htwang-contrib/common`                  | 截断与格式化复用。                                                                                                                     |
-| `protect-secrets`                         | 子 session 在 `runSubAgent` 内通过 **`extensionFactories`** 固定注入 `@htwang-contrib/protect-secrets`（`noExtensions: true` 仍生效）；**bash / read 类 `tool_call` 与主会话同源**。不加载本 `subagents` 扩展。 |
+| `protect-secrets` + `extra-tools`        | 子 session 在 `runSubAgent` 内通过 **`extensionFactories`** 固定注入 `@htwang-contrib/protect-secrets` 与 `@htwang-contrib/extra-tools`（`noExtensions: true` 仍生效）；**bash / read 类 `tool_call` 与主会话同源**。不加载本 `subagents` 扩展。 |
 | `inference-self-host` / `zai-coding-plan` | `sessionOpts.model` / `ctx.modelRegistry` 与父会话一致或可配置覆盖。                                                                   |
 | `pi.events`                               | 任务生命周期事件；可选实现 tintinweb 式 RPC（低优先级）。                                                                              |
 

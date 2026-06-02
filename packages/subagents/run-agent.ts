@@ -23,6 +23,7 @@ import {
   type AgentSessionEvent,
 } from "@earendil-works/pi-coding-agent";
 import { resolveModel } from "@htwang-contrib/common";
+import extraTools from "@htwang-contrib/extra-tools/index.ts";
 import protectSecrets from "@htwang-contrib/protect-secrets/index.ts";
 import { appendSubagentLinkRecord, SUBAGENT_SESSION_DIR } from "./paths.ts";
 import {
@@ -31,9 +32,12 @@ import {
   subagentSystemPromptFromCatalog,
   type SubagentAgentCatalog,
 } from "./agent-catalog.ts";
-import { childSessionToolNames } from "./child-tools.ts";
+import { resolveChildToolNames } from "./child-tools.ts";
 
-const CHILD_SESSION_EXTENSION_FACTORIES: ExtensionFactory[] = [protectSecrets];
+const CHILD_SESSION_EXTENSION_FACTORIES: ExtensionFactory[] = [
+  protectSecrets,
+  extraTools,
+];
 
 const THINKING_LEVELS = new Set<string>([
   "off",
@@ -239,11 +243,12 @@ export async function runSubAgent(
     }
 
     const isolated = input.isolated !== false;
-    const toolList = childSessionToolNames(isolated);
-
     const cwd = ctx.cwd;
     const agentCatalog = catalog ?? buildSubagentAgentCatalog(cwd);
     const agentType = resolveSubagentAgentId(input.agent_type, agentCatalog);
+    const personaTools = agentCatalog.agents.get(agentType)?.fileOptions.tools;
+    const toolList = resolveChildToolNames(isolated, personaTools);
+
     const systemPrompt = subagentSystemPromptFromCatalog(
       agentType,
       agentCatalog,
