@@ -54,7 +54,7 @@ Markdown **body** is the main child system prompt. If **`whenToUse`** / **`when_
 
 **Precedence:** any value set on the **`subagent` tool call** wins over frontmatter; frontmatter wins over **`defaults_by_agent_type`** in `settings.json`; then the parent session model applies for `model` where still unset.
 
-On each parent LLM turn, this extension appends a **`<subagents>`** XML block to the session system prompt (`before_agent_start`): one **`<agent>`** per loaded persona, each with **`<name>`** and **`<when_to_use>`** (from frontmatter `whenToUse` or `when_to_use`, or empty). This is the supported way to surface the catalog to the model; there is no duplicate TUI “agents” strip in chat.
+On each **main** workspace agent start, `before_agent_start` appends a short **Subagents feature** block and the **`<subagents>`** persona catalog after the base system prompt. When the session file is under `~/.agent/subagents/session` (in-process child sessions), this extension **does not modify** the system prompt—no feature block and no persona XML (child loaders use `noExtensions: true`, so they normally do not load this package). Each **`<agent>`** has **`<name>`** and **`<when_to_use>`** (from frontmatter `whenToUse` or `when_to_use`, or empty). This is the supported way to surface the catalog to the parent model; there is no duplicate TUI “agents” strip in chat.
 
 ```yaml
 ---

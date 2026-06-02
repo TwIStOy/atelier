@@ -6,6 +6,10 @@ import {
   buildSubagentAgentCatalog,
   subagentsPersonasSystemPromptXml,
 } from "./agent-catalog.ts";
+import {
+  shouldInjectSubagentsParentSystemPrompt,
+  subagentsFeatureSystemPrompt,
+} from "./feature-system-prompt.ts";
 import { runSubagentsAgentsCommand } from "./agents-inspect.ts";
 import { registerSubagentStatusTool, registerSubagentTool } from "./tool.ts";
 
@@ -22,8 +26,17 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.on("before_agent_start", (event, ctx) => {
+    if (!shouldInjectSubagentsParentSystemPrompt(ctx)) {
+      return { systemPrompt: event.systemPrompt };
+    }
     const catalog = buildSubagentAgentCatalog(ctx.cwd);
     const block = subagentsPersonasSystemPromptXml(catalog);
-    return { systemPrompt: `${event.systemPrompt}\n\n${block}` };
+    return {
+      systemPrompt: [
+        event.systemPrompt,
+        subagentsFeatureSystemPrompt(),
+        block,
+      ].join("\n\n"),
+    };
   });
 }
