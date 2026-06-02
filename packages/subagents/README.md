@@ -26,6 +26,8 @@ For TUI tool rows, load **`packages/tool-display`** in your Pi config (before or
 
 Loaded personas are listed for the model only inside the **`<subagents_personas>`** block appended to the parent **system prompt** each turn (`before_agent_start`). There is no separate **`[Agents]`** chat row: extensions cannot append to the same pass as Pi’s built-in `showLoadedResources`, and `sendMessage` entries are session messages—on `/reload`, Pi redraws messages first then re-appends resource sections, so a custom block would jump above `[Context]` / `[Skills]` and stack on every reload.
 
+**Command `/subagents-agents`:** TUI only. Opens a **picker** (same family of prompts as other Pi settings-style flows). Choose an agent to open a **read-only editor** with the Markdown **source path**, merged **defaults** (single-call merge: persona then `defaults_by_agent_type`, no tool-call overrides), **resolved model** via the parent registry + `resolveModel`, **thinking / isolated / inherit_context / max_turns**, the **builtin tool** list for that isolation mode, and a short note on child **resource loader** and batch overrides.
+
 ## Agent definitions (Markdown catalog)
 
 At each `subagent` run, prompts are merged from layers in order (**later layers override** the same id):

@@ -1,6 +1,12 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { basename, dirname, extname, join, resolve } from "node:path";
+import {
+  basename,
+  dirname,
+  extname,
+  join,
+  resolve as resolvePath,
+} from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseFrontmatter } from "@earendil-works/pi-coding-agent";
 
@@ -19,6 +25,7 @@ export type SubagentAgentFileOptions = {
 export type SubagentAgentEntry = {
   prompt: string;
   fileOptions: SubagentAgentFileOptions;
+  sourcePath: string;
 };
 
 export type SubagentAgentCatalog = {
@@ -182,7 +189,7 @@ function readPackageJsonPi(packageJsonPath: string): PackageJsonPi | null {
 }
 
 function resolveExtensionRoot(entry: string, cwd: string): string | null {
-  const p = resolve(cwd, entry);
+  const p = resolvePath(cwd, entry);
   try {
     const st = statSync(p);
     return st.isDirectory() ? p : dirname(p);
@@ -198,7 +205,7 @@ function readPiAgentsDirsFromPackageRoot(extRoot: string): string[] {
   const out: string[] = [];
   for (const e of entries) {
     if (typeof e !== "string" || !e.trim()) continue;
-    const d = resolve(extRoot, e.trim());
+    const d = resolvePath(extRoot, e.trim());
     if (existsSync(d)) out.push(d);
   }
   return out;
@@ -245,12 +252,17 @@ export function buildSubagentAgentCatalog(cwd: string): SubagentAgentCatalog {
         agents.set(row.id, {
           prompt: row.prompt,
           fileOptions: row.fileOptions,
+          sourcePath: resolvePath(file),
         });
       }
     }
   }
   if (!agents.has("default")) {
-    agents.set("default", { prompt: ULTIMATE_DEFAULT_PROMPT, fileOptions: {} });
+    agents.set("default", {
+      prompt: ULTIMATE_DEFAULT_PROMPT,
+      fileOptions: {},
+      sourcePath: "<built-in default>",
+    });
   }
   return { agents };
 }
