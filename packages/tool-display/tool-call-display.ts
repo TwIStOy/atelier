@@ -3,7 +3,7 @@ import {
   Theme,
   truncateToVisualLines,
 } from "@earendil-works/pi-coding-agent";
-import { truncateDisplay } from "@htwang-contrib/common";
+import { truncateDisplay, trimTrailingEmpty } from "@htwang-contrib/common";
 import { Container, truncateToWidth } from "@earendil-works/pi-tui";
 import { spinnerGlyph } from "./format.ts";
 import type { ContentRenderer, ToolDisplayAdapter } from "./types.ts";
@@ -11,6 +11,8 @@ import type { ContentRenderer, ToolDisplayAdapter } from "./types.ts";
 export type { ContentRenderer, ToolDisplayAdapter };
 
 const PREVIEW_LINES = 3;
+
+const INDENT = "    ";
 
 export class ToolDisplayRegistry {
   private adapters = new Map<string, ToolDisplayAdapter>();
@@ -33,6 +35,50 @@ export function formatToolArgs(args: Record<string, unknown>): string {
       return `${k}: ${truncateDisplay(val, 80)}`;
     })
     .join(", ");
+}
+
+const GENERIC_DESC_MAX = 120;
+
+export function formatGenericToolHeader(
+  toolName: string,
+  toolLabel: string | undefined,
+  toolDescription: string | undefined,
+  args: Record<string, unknown>,
+  theme: Theme,
+  width: number,
+): string {
+  let text = theme.fg("toolTitle", theme.bold(toolName));
+  const label = toolLabel?.trim();
+  if (label && label.toLowerCase() !== toolName.toLowerCase()) {
+    text += ` ${theme.fg("accent", label)}`;
+  }
+  const desc = toolDescription?.trim();
+  if (desc) {
+    const short =
+      desc.length > GENERIC_DESC_MAX
+        ? `${desc.slice(0, GENERIC_DESC_MAX - 1)}…`
+        : desc;
+    text += ` ${theme.fg("dim", short)}`;
+  }
+  const argStr = formatToolArgs(args);
+  if (argStr) text += ` ${theme.fg("dim", `(${argStr})`)}`;
+  return truncateToWidth(text, width, "…");
+}
+
+export function defaultGenericCollapsedRenderer(
+  output: string,
+  theme: Theme,
+  width: number,
+): string[] {
+  if (!output.trim()) return [];
+  const n = trimTrailingEmpty(output.split("\n")).length;
+  const line =
+    INDENT +
+    theme.fg(
+      "muted",
+      `${n} line${n !== 1 ? "s" : ""} — ${keyText("app.tools.expand")} to expand`,
+    );
+  return [truncateToWidth(line, width, "…")];
 }
 
 function subagentRunFinished(details: unknown): "ok" | "err" | undefined {
@@ -63,6 +109,8 @@ function subagentRunFinished(details: unknown): "ok" | "err" | undefined {
 function makeHeader(
   toolName: string,
   args: Record<string, unknown>,
+  toolLabel: string | undefined,
+  toolDescription: string | undefined,
   adapter: ToolDisplayAdapter | undefined,
   isPartial: boolean,
   isError: boolean,
@@ -105,13 +153,18 @@ function makeHeader(
 
   const headerText = adapter
     ? adapter.formatCallHeader(args, theme, details, isPartial)
-    : `${theme.fg("toolTitle", theme.bold(toolName))} ${theme.fg("dim", `(${formatToolArgs(args)})`)}`;
+    : formatGenericToolHeader(
+        toolName,
+        toolLabel,
+        toolDescription,
+        args,
+        theme,
+        width,
+      );
 
   const header = `${statusIcon} ${headerText}`;
   return truncateToWidth(header, width, "…");
 }
-
-const INDENT = "    ";
 
 export function defaultCollapsedRenderer(
   content: string,
@@ -161,8 +214,18 @@ export function defaultExpandedRenderer(
   return lines;
 }
 
+export function defaultGenericExpandedRenderer(
+  output: string,
+  theme: Theme,
+  width: number,
+): string[] {
+  return defaultExpandedRenderer(output, theme, width);
+}
+
 export interface ToolCallDisplayOpts {
   toolName: string;
+  toolLabel?: string;
+  toolDescription?: string;
   args: Record<string, unknown>;
   output?: string;
   details?: unknown;
@@ -186,6 +249,8 @@ export function renderToolCall(
       const header = makeHeader(
         opts.toolName,
         opts.args,
+        opts.toolLabel,
+        opts.toolDescription,
         adapter,
         opts.isPartial,
         opts.isError,
@@ -244,8 +309,13 @@ export function renderToolCall(
         lines.push(...contentLines);
       } else if (opts.output) {
         const collapsedRenderer =
-          opts.renderCollapsed ?? defaultCollapsedRenderer;
-        const expandedRenderer = opts.renderExpanded ?? defaultExpandedRenderer;
+          opts.renderCollapsed ??
+          (adapter
+            ? defaultCollapsedRenderer
+            : defaultGenericCollapsedRenderer);
+        const expandedRenderer =
+          opts.renderExpanded ??
+          (adapter ? defaultExpandedRenderer : defaultGenericExpandedRenderer);
         const contentLines = opts.expanded
           ? expandedRenderer(opts.output, theme, width)
           : collapsedRenderer(opts.output, theme, width);

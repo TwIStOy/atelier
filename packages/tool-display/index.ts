@@ -3,9 +3,12 @@ export {
   ToolDisplayRegistry,
   type ToolCallDisplayOpts,
   formatToolArgs,
+  formatGenericToolHeader,
   renderToolCall,
   defaultCollapsedRenderer,
   defaultExpandedRenderer,
+  defaultGenericCollapsedRenderer,
+  defaultGenericExpandedRenderer,
 } from "./tool-call-display.ts";
 export type { ContentRenderer, ToolDisplayAdapter } from "./types.ts";
 export { prefixLine, wrapTextWithAnsi, spinnerGlyph } from "./format.ts";
@@ -22,6 +25,30 @@ import type { ExtensionAPI, Theme } from "@earendil-works/pi-coding-agent";
 import { ToolExecutionComponent } from "@earendil-works/pi-coding-agent";
 import { globalToolDisplayRegistry } from "./registry.ts";
 import { renderToolCall } from "./tool-call-display.ts";
+
+type ToolExecutionPatchThis = {
+  hideComponent?: boolean;
+  toolName: string;
+  args: Record<string, unknown>;
+  expanded: boolean;
+  isPartial: boolean;
+  result?: { details?: unknown; isError?: boolean; content?: unknown[] };
+  toolDefinition?: {
+    label?: string;
+    description?: string;
+    renderCall?: unknown;
+    renderResult?: unknown;
+  };
+  builtInToolDefinition?: {
+    label?: string;
+    description?: string;
+    renderCall?: unknown;
+    renderResult?: unknown;
+  };
+  getTextOutput?: () => string | undefined;
+  getCallRenderer?: () => unknown;
+  getResultRenderer?: () => unknown;
+};
 
 const FALLBACK_THEME: Theme = {
   fg: (_color: string, text: string) => text,
@@ -40,18 +67,28 @@ function patchToolExecutionRender(
   if (proto.__tdPatched) return;
 
   const originalRender = proto.render;
-  proto.render = function (width: number): string[] {
+  proto.render = function (
+    this: ToolExecutionPatchThis,
+    width: number,
+  ): string[] {
     if (this.hideComponent) return [];
 
     const reg = proto.__tdRegistry;
     const adapter = reg.get(this.toolName);
-    if (!adapter) return originalRender.call(this, width);
+    const callR = this.getCallRenderer?.();
+    const resultR = this.result ? this.getResultRenderer?.() : undefined;
+    if (!adapter && (callR != null || resultR != null)) {
+      return originalRender.call(this, width);
+    }
 
+    const def = this.toolDefinition ?? this.builtInToolDefinition;
     const getTextOutput = this.getTextOutput?.bind(this);
     const output = this.result ? getTextOutput?.() : undefined;
 
     const opts = {
       toolName: this.toolName,
+      toolLabel: def?.label,
+      toolDescription: def?.description,
       args: this.args,
       output,
       details: this.result?.details,
