@@ -1,6 +1,9 @@
 import type { ExtensionAPI, Theme } from "@earendil-works/pi-coding-agent";
 import { Container, Spacer, Text } from "@earendil-works/pi-tui";
-import { buildSubagentAgentCatalog } from "./agent-catalog.ts";
+import {
+  buildSubagentAgentCatalog,
+  subagentsPersonasSystemPromptXml,
+} from "./agent-catalog.ts";
 import { registerSubagentStatusTool, registerSubagentTool } from "./tool.ts";
 
 const SUBAGENTS_AGENTS_MESSAGE_TYPE = "subagents_agents";
@@ -39,6 +42,12 @@ export default function (pi: ExtensionAPI) {
   registerSubagentsAgentsStartupRenderer(pi);
   registerSubagentTool(pi);
   registerSubagentStatusTool(pi);
+
+  pi.on("before_agent_start", (event, ctx) => {
+    const catalog = buildSubagentAgentCatalog(ctx.cwd);
+    const block = subagentsPersonasSystemPromptXml(catalog);
+    return { systemPrompt: `${event.systemPrompt}\n\n${block}` };
+  });
 
   pi.on("session_start", (event, ctx) => {
     if (!ctx.hasUI || event.reason === "resume") return;
