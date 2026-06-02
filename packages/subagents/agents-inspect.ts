@@ -49,6 +49,7 @@ export function formatSubagentAgentInspect(
   const inherit = file.inherit_context ?? false;
   const maxTurns = file.max_turns;
   const desc = file.description?.trim() ?? "";
+  const whenToUse = file.whenToUse?.trim() ?? "";
 
   const tools = childSessionToolNames(isolated).join(", ");
 
@@ -58,6 +59,9 @@ export function formatSubagentAgentInspect(
     "",
     `frontmatter description (truncated in catalog to 72 chars): ${
       desc || "(none)"
+    }`,
+    `frontmatter whenToUse (truncated in catalog to 2000 chars): ${
+      whenToUse || "(none)"
     }`,
     "",
     "Effective defaults when the subagent tool omits model, thinking, inherit_context, isolated, and max_turns (persona frontmatter, then defaults_by_agent_type in ~/.agent/subagents/settings.json, then fallbacks):",

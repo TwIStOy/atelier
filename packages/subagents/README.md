@@ -20,11 +20,11 @@ Batch results list every task with `ok` or `error`; partial failures do not abor
 
 Streaming live tool rows: the child session **never** calls the parent Pi `onUpdate` from `session.subscribe`. Each `tool_execution_end` updates a **local progress snapshot** via optional `onChildProgress`; orchestration in **`tool.ts`** runs a **`setInterval` (~100ms)** that reads that snapshot and calls `tryParentToolUpdate` (same separation as tintinweb/pi-subagents: local state + timer, not child event stack → parent `emit`). Batch mode also flushes once when each task completes so `per_task_done` stays accurate.
 
-Optional **`agent_type`** selects the injected system prompt from the [agent catalog](#agent-definitions-markdown-catalog); omit or use an unknown id for `default`. Per-task `tasks[].agent_type` overrides the batch default.
+Optional **`agent_type`** selects the injected system prompt from the [agent catalog](#agent-definitions-markdown-catalog). Omit **`agent_type`** or pass an unknown id to use **`general-purpose`**. Per-task `tasks[].agent_type` overrides the batch default.
 
 For TUI tool rows, load **`packages/tool-display`** in your Pi config (before or after `subagents`); it registers display adapters for **`subagent`** and **`subagent_status`** so headers and collapsed/expanded output match **Read** / **Bash** styling.
 
-Loaded personas are listed for the model only inside the **`<subagents_personas>`** block appended to the parent **system prompt** each turn (`before_agent_start`). There is no separate **`[Agents]`** chat row: extensions cannot append to the same pass as Pi’s built-in `showLoadedResources`, and `sendMessage` entries are session messages—on `/reload`, Pi redraws messages first then re-appends resource sections, so a custom block would jump above `[Context]` / `[Skills]` and stack on every reload.
+Loaded personas are listed for the model only inside the **`<subagents>`** block appended to the parent **system prompt** each turn (`before_agent_start`). There is no separate **`[Agents]`** chat row: extensions cannot append to the same pass as Pi’s built-in `showLoadedResources`, and `sendMessage` entries are session messages—on `/reload`, Pi redraws messages first then re-appends resource sections, so a custom block would jump above `[Context]` / `[Skills]` and stack on every reload.
 
 **Command `/subagents-agents`:** TUI only. Opens a **picker** (same family of prompts as other Pi settings-style flows). Choose an agent to open a **read-only editor** with the Markdown **source path**, merged **defaults** (single-call merge: persona then `defaults_by_agent_type`, no tool-call overrides), **resolved model** via the parent registry + `resolveModel`, **thinking / isolated / inherit_context / max_turns**, the **builtin tool** list for that isolation mode, and a short note on child **resource loader** and batch overrides.
 
@@ -38,44 +38,46 @@ At each `subagent` run, prompts are merged from layers in order (**later layers 
 4. **`pi.agents`** on the **project** `package.json` (paths relative to the repo root), same array shape as **`pi.skills`**.
 5. For each path in **`pi.extensions`** on the project `package.json`, that extension’s **`package.json`** → **`pi.agents`** entries (directories relative to the extension root); each directory contributes `*.md` files.
 
-Markdown **body** becomes the child system prompt. YAML **frontmatter** is parsed with Pi’s **`parseFrontmatter`**. Supported keys (all optional except having a non-empty body):
+Markdown **body** is the main child system prompt. If **`whenToUse`** / **`when_to_use`** is set in frontmatter, the child prompt is prefixed with **`<when_to_use>…</when_to_use>`** (XML-escaped) before the body—the same text shape the parent sees in the catalog XML. YAML **frontmatter** is parsed with Pi’s **`parseFrontmatter`**. Supported keys (all optional except having a non-empty body):
 
-| Field             | Role                                                                                                                                                  |
-| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `name`            | Overrides the agent id from the filename; must normalize to `^[a-z][a-z0-9_-]*$`.                                                                     |
-| `description`     | Default short label for the collapsed tool tree when the tool omits `description` (single or per batch row). Max 72 characters (truncated if longer). |
-| `model`           | Default model hint when the tool omits `model` / per-task `model`.                                                                                    |
-| `thinking`        | Default thinking level when the tool omits `thinking`.                                                                                                |
-| `inherit_context` | Boolean; when true, same behavior as tool `inherit_context`.                                                                                          |
-| `isolated`        | Boolean; when false, enables bash/edit/write in the child (same as tool `isolated`).                                                                  |
-| `max_turns`       | Positive integer; cap agentic turns when the tool omits `max_turns`.                                                                                  |
+| Field             | Role                                                                                                                                                                                                                                                                                                                                                                     |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `name`            | Overrides the agent id from the filename; must normalize to `^[a-z][a-z0-9_-]*$`.                                                                                                                                                                                                                                                                                        |
+| `description`     | Default short label for the collapsed tool tree when the tool omits `description` (single or per batch row). Max 72 characters (truncated if longer).                                                                                                                                                                                                                    |
+| `whenToUse`       | Also accepted as `when_to_use`. Guidance on when to pick this persona: parent **`<subagents>`** XML includes **`<when_to_use>`**; the **child** system prompt is prefixed with the same **`<when_to_use>…</when_to_use>`** block (XML-escaped) before the Markdown body when the subagent runs. Max 2000 characters (truncated if longer). Not used for tool row labels. |
+| `model`           | Default model hint when the tool omits `model` / per-task `model`.                                                                                                                                                                                                                                                                                                       |
+| `thinking`        | Default thinking level when the tool omits `thinking`.                                                                                                                                                                                                                                                                                                                   |
+| `inherit_context` | Boolean; when true, same behavior as tool `inherit_context`.                                                                                                                                                                                                                                                                                                             |
+| `isolated`        | Boolean; when false, enables bash/edit/write in the child (same as tool `isolated`).                                                                                                                                                                                                                                                                                     |
+| `max_turns`       | Positive integer; cap agentic turns when the tool omits `max_turns`.                                                                                                                                                                                                                                                                                                     |
 
 **Precedence:** any value set on the **`subagent` tool call** wins over frontmatter; frontmatter wins over **`defaults_by_agent_type`** in `settings.json`; then the parent session model applies for `model` where still unset.
 
-On each parent LLM turn, this extension appends a **`<subagents_personas>`** XML block to the session system prompt (`before_agent_start`): one **`<agent>`** per loaded persona, each with **`<name>`** (canonical id) and **`<description>`** (from frontmatter, or empty). This is the supported way to surface the catalog to the model; there is no duplicate TUI “agents” strip in chat.
+On each parent LLM turn, this extension appends a **`<subagents>`** XML block to the session system prompt (`before_agent_start`): one **`<agent>`** per loaded persona, each with **`<name>`**, **`<description>`**, and **`<when_to_use>`** (from frontmatter `whenToUse` or `when_to_use`, or empty). This is the supported way to surface the catalog to the model; there is no duplicate TUI “agents” strip in chat.
 
 ```yaml
 ---
 name: my_agent
 description: My label
+whenToUse: When the user needs a focused pass on this workflow only.
 inherit_context: false
 isolated: true
 ---
 System prompt text…
 ```
 
-Unknown `agent_type` arguments resolve to **`default`**.
+Unknown `agent_type` arguments resolve to **`general-purpose`**. If you used the old built-in id **`default`**, rename your Markdown to **`general-purpose.md`** (or `name: general-purpose` in frontmatter) and rename **`defaults_by_agent_type.default`** to **`general-purpose`** in `settings.json`.
 
 ## Settings: `~/.agent/subagents/settings.json`
 
 Optional JSON object (missing file → built-in defaults only):
 
-| Field                    | Type   | Default | Role                                                                                                                                                                 |
-| ------------------------ | ------ | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `max_concurrent`         | number | 3       | Parallel batch: max simultaneous `runSubAgent` calls.                                                                                                                |
-| `max_total`              | number | 10      | Parallel batch: max length of `tasks` array.                                                                                                                         |
-| `timeout_ms`             | number | 0       | Wall-clock cap merged via `AbortSignal.timeout`; `0` = disabled.                                                                                                     |
-| `defaults_by_agent_type` | object | —       | Keys are agent ids (e.g. `default`, `research`, or custom ids from your catalog). Each value may include `model` and/or `thinking` when the tool omits those fields. |
+| Field                    | Type   | Default | Role                                                                                                                                                                         |
+| ------------------------ | ------ | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `max_concurrent`         | number | 3       | Parallel batch: max simultaneous `runSubAgent` calls.                                                                                                                        |
+| `max_total`              | number | 10      | Parallel batch: max length of `tasks` array.                                                                                                                                 |
+| `timeout_ms`             | number | 0       | Wall-clock cap merged via `AbortSignal.timeout`; `0` = disabled.                                                                                                             |
+| `defaults_by_agent_type` | object | —       | Keys are agent ids (e.g. `general-purpose`, `research`, or custom ids from your catalog). Each value may include `model` and/or `thinking` when the tool omits those fields. |
 
 Example:
 
@@ -93,22 +95,22 @@ Example:
 
 ## Package layout (this extension)
 
-| File                    | Role                                                                                                                             |
-| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `tool.ts`               | Registers `subagent` / `subagent_status`; `execute` routing only.                                                                |
-| `schemas.ts`            | TypeBox parameter schemas.                                                                                                       |
-| `validate.ts`           | Single vs batch argument validation.                                                                                             |
-| `details.ts`            | Normalizes `SubagentRunDetails` for tool results.                                                                                |
-| `parent-update.ts`      | Safe `onUpdate` + throttled interval flush helper.                                                                               |
-| `orchestrate-single.ts` | Single-task run + live `details` updates.                                                                                        |
-| `orchestrate-batch.ts`  | Parallel batch + per-task arrays + live updates.                                                                                 |
-| `batch-text.ts`         | Markdown/text body for completed batch results.                                                                                  |
-| `background-finish.ts`  | Job table updates, `pi.events`, `notify` after async runs.                                                                       |
-| `run-agent.ts`          | `createAgentSession` + `runSubAgent`; child loader uses `extensionFactories` for `protect-secrets`.                              |
-| `agent-catalog.ts`      | Agent Markdown catalog, id normalization, system prompt + `<subagents_personas>` XML for the parent prompt, `SubagentAgentType`. |
-| `child-tools.ts`        | Built-in tool name list + filter excluding delegation tools.                                                                     |
-| `abort-timeout.ts`      | Merges optional `AbortSignal.timeout` into run signals.                                                                          |
-| `settings.ts`           | Reads `settings.json`; concurrency, timeout, persona defaults.                                                                   |
+| File                    | Role                                                                                                                        |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `tool.ts`               | Registers `subagent` / `subagent_status`; `execute` routing only.                                                           |
+| `schemas.ts`            | TypeBox parameter schemas.                                                                                                  |
+| `validate.ts`           | Single vs batch argument validation.                                                                                        |
+| `details.ts`            | Normalizes `SubagentRunDetails` for tool results.                                                                           |
+| `parent-update.ts`      | Safe `onUpdate` + throttled interval flush helper.                                                                          |
+| `orchestrate-single.ts` | Single-task run + live `details` updates.                                                                                   |
+| `orchestrate-batch.ts`  | Parallel batch + per-task arrays + live updates.                                                                            |
+| `batch-text.ts`         | Markdown/text body for completed batch results.                                                                             |
+| `background-finish.ts`  | Job table updates, `pi.events`, `notify` after async runs.                                                                  |
+| `run-agent.ts`          | `createAgentSession` + `runSubAgent`; child loader uses `extensionFactories` for `protect-secrets`.                         |
+| `agent-catalog.ts`      | Agent Markdown catalog, id normalization, system prompt + **`<subagents>`** XML for the parent prompt, `SubagentAgentType`. |
+| `child-tools.ts`        | Built-in tool name list + filter excluding delegation tools.                                                                |
+| `abort-timeout.ts`      | Merges optional `AbortSignal.timeout` into run signals.                                                                     |
+| `settings.ts`           | Reads `settings.json`; concurrency, timeout, persona defaults.                                                              |
 
 ## Tool: `subagent_status`
 

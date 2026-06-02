@@ -1,6 +1,7 @@
 ---
 name: research
 description: Research
+whenToUse: When you need codebase evidence via read-only tools before answering.
 inherit_context: false
 isolated: true
 ---

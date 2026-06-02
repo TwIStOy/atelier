@@ -3,7 +3,7 @@ import { Type } from "typebox";
 const subagentAgentTypeSchema = Type.String({
   maxLength: 64,
   description:
-    "Persona id (`[a-z][a-z0-9_-]*`); unknown → `default`. Markdown agents: shipped dirs, `$HOME/.config/pi/agents`, `<cwd>/.pi/agents`, `pi.agents` paths. YAML frontmatter (Pi `parseFrontmatter`) may set defaults for this run: `name` (id), `description`, `model`, `thinking`, `inherit_context`, `isolated`, `max_turns`. Tool arguments override frontmatter when both are set.",
+    "Persona id (`[a-z][a-z0-9_-]*`); unknown → `general-purpose`. Markdown agents: shipped dirs, `$HOME/.config/pi/agents`, `<cwd>/.pi/agents`, `pi.agents` paths. YAML frontmatter (Pi `parseFrontmatter`) may set defaults for this run: `name` (id), `description`, `whenToUse` / `when_to_use`, `model`, `thinking`, `inherit_context`, `isolated`, `max_turns`. Tool arguments override frontmatter when both are set.",
 });
 
 const taskItem = Type.Object({

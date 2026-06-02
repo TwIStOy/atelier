@@ -58,7 +58,7 @@ type SubagentDetails = {
 function normalizeAgentType(raw: string | undefined): string {
   const t = raw?.trim().toLowerCase();
   if (t && t.length > 0) return t;
-  return "default";
+  return "general-purpose";
 }
 
 function capitalizeType(type: string): string {

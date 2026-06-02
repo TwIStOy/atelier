@@ -1,6 +1,7 @@
 ---
-name: default
+name: general-purpose
 description: Subagent
+whenToUse: Default subagent for any task that does not need a specialized persona.
 inherit_context: false
 isolated: true
 ---

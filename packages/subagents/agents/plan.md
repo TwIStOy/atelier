@@ -1,6 +1,7 @@
 ---
 name: plan
 description: Plan
+whenToUse: When you need a scoped plan, steps, and tradeoffs without implementing unless asked.
 inherit_context: false
 isolated: true
 ---

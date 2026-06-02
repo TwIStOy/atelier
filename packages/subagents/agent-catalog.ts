@@ -10,11 +10,14 @@ import {
 import { fileURLToPath } from "node:url";
 import { parseFrontmatter } from "@earendil-works/pi-coding-agent";
 
+export const SUBAGENT_FALLBACK_AGENT_ID = "general-purpose" as const;
+
 const ULTIMATE_DEFAULT_PROMPT =
   "You are a focused sub-agent running inside the same Pi process. Use your tools to complete the assignment. When done, reply with a concise final summary for the parent agent.";
 
 export type SubagentAgentFileOptions = {
   description?: string;
+  whenToUse?: string;
   model?: string;
   thinking?: string;
   inherit_context?: boolean;
@@ -94,6 +97,12 @@ function parseFileOptionsFromFrontmatter(
     descriptionRaw && descriptionRaw.length > 72
       ? descriptionRaw.slice(0, 72)
       : descriptionRaw;
+  const whenToUseRaw =
+    parseStringField(fm, "whenToUse") ?? parseStringField(fm, "when_to_use");
+  const whenToUse =
+    whenToUseRaw && whenToUseRaw.length > 2000
+      ? whenToUseRaw.slice(0, 2000)
+      : whenToUseRaw;
   const model = parseStringField(fm, "model");
   const thinking = parseStringField(fm, "thinking");
   const inherit_context = parseBooleanField(fm, "inherit_context");
@@ -101,6 +110,7 @@ function parseFileOptionsFromFrontmatter(
   const max_turns = parseMaxTurnsField(fm);
   const out: SubagentAgentFileOptions = {};
   if (description) out.description = description;
+  if (whenToUse) out.whenToUse = whenToUse;
   if (model) out.model = model;
   if (thinking) out.thinking = thinking;
   if (inherit_context !== undefined) out.inherit_context = inherit_context;
@@ -257,11 +267,11 @@ export function buildSubagentAgentCatalog(cwd: string): SubagentAgentCatalog {
       }
     }
   }
-  if (!agents.has("default")) {
-    agents.set("default", {
+  if (!agents.has(SUBAGENT_FALLBACK_AGENT_ID)) {
+    agents.set(SUBAGENT_FALLBACK_AGENT_ID, {
       prompt: ULTIMATE_DEFAULT_PROMPT,
       fileOptions: {},
-      sourcePath: "<built-in default>",
+      sourcePath: `<built-in ${SUBAGENT_FALLBACK_AGENT_ID}>`,
     });
   }
   return { agents };
@@ -273,18 +283,7 @@ export function resolveSubagentAgentId(
 ): string {
   const t = normalizeSubagentAgentId(raw ?? "");
   if (t && catalog.agents.has(t)) return t;
-  return "default";
-}
-
-export function subagentSystemPromptFromCatalog(
-  agentId: string,
-  catalog: SubagentAgentCatalog,
-): string {
-  return (
-    catalog.agents.get(agentId)?.prompt ??
-    catalog.agents.get("default")?.prompt ??
-    ULTIMATE_DEFAULT_PROMPT
-  );
+  return SUBAGENT_FALLBACK_AGENT_ID;
 }
 
 function escapeXmlText(s: string): string {
@@ -292,6 +291,19 @@ function escapeXmlText(s: string): string {
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;");
+}
+
+export function subagentSystemPromptFromCatalog(
+  agentId: string,
+  catalog: SubagentAgentCatalog,
+): string {
+  const row = catalog.agents.get(agentId);
+  const fallbackRow = catalog.agents.get(SUBAGENT_FALLBACK_AGENT_ID);
+  const entry = row ?? fallbackRow;
+  const body = entry?.prompt ?? ULTIMATE_DEFAULT_PROMPT;
+  const whenToUse = entry?.fileOptions.whenToUse?.trim() ?? "";
+  if (!whenToUse) return body;
+  return `<when_to_use>\n${escapeXmlText(whenToUse)}\n</when_to_use>\n\n${body}`;
 }
 
 export function subagentsPersonasSystemPromptXml(
@@ -303,9 +315,11 @@ export function subagentsPersonasSystemPromptXml(
     const entry = catalog.agents.get(id);
     if (!entry) continue;
     const description = entry.fileOptions.description?.trim() ?? "";
+    const whenToUse = entry.fileOptions.whenToUse?.trim() ?? "";
     lines.push("  <agent>");
     lines.push(`    <name>${escapeXmlText(id)}</name>`);
     lines.push(`    <description>${escapeXmlText(description)}</description>`);
+    lines.push(`    <when_to_use>${escapeXmlText(whenToUse)}</when_to_use>`);
     lines.push("  </agent>");
   }
   lines.push("</subagents>");

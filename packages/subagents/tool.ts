@@ -71,7 +71,7 @@ export function registerSubagentTool(pi: ExtensionAPI) {
     name: "subagent",
     label: "Subagent",
     description:
-      "Run child Pi agent work in-process (no extra `pi` process). Single: `task` and optional `description` (or use persona frontmatter `description`). Parallel: `tasks` with optional per-task `description` when the persona file sets it. Tool parameters override persona Markdown frontmatter defaults (`model`, `thinking`, `inherit_context`, `isolated`, `max_turns`, `description`). With `background: true`, returns an `id`—poll `subagent_status`. Optional: `timeout_ms`, `agent_type`, `max_concurrent`, `max_total`.",
+      "Delegates a task to an in-process child Pi agent session and returns its final reply (single task or parallel batch).",
     parameters: subagentParams,
     async execute(_toolCallId, params, signal, onUpdate, ctx) {
       const parentSessionId = ctx.sessionManager.getHeader()?.id ?? "unknown";
