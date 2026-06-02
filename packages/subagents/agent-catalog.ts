@@ -272,3 +272,28 @@ export function subagentSystemPromptFromCatalog(
     ULTIMATE_DEFAULT_PROMPT
   );
 }
+
+function escapeXmlText(s: string): string {
+  return s
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+export function subagentsPersonasSystemPromptXml(
+  catalog: SubagentAgentCatalog,
+): string {
+  const ids = [...catalog.agents.keys()].sort((a, b) => a.localeCompare(b));
+  const lines = ["<subagents>"];
+  for (const id of ids) {
+    const entry = catalog.agents.get(id);
+    if (!entry) continue;
+    const description = entry.fileOptions.description?.trim() ?? "";
+    lines.push("  <agent>");
+    lines.push(`    <name>${escapeXmlText(id)}</name>`);
+    lines.push(`    <description>${escapeXmlText(description)}</description>`);
+    lines.push("  </agent>");
+  }
+  lines.push("</subagents>");
+  return lines.join("\n");
+}

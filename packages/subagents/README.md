@@ -48,6 +48,8 @@ Markdown **body** becomes the child system prompt. YAML **frontmatter** is parse
 
 **Precedence:** any value set on the **`subagent` tool call** wins over frontmatter; frontmatter wins over **`defaults_by_agent_type`** in `settings.json`; then the parent session model applies for `model` where still unset.
 
+On each parent LLM turn, this extension appends a **`<subagents_personas>`** XML block to the session system prompt (`before_agent_start`): one **`<agent>`** per loaded persona, each with **`<name>`** (canonical id) and **`<description>`** (from frontmatter, or empty).
+
 ```yaml
 ---
 name: my_agent
