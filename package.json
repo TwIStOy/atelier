@@ -14,7 +14,8 @@
       "packages/statusline",
       "packages/user-message",
       "packages/tool-display",
-      "packages/subagents"
+      "packages/subagents",
+      "packages/extra-tools"
     ],
     "skills": [],
     "themes": [

@@ -14,6 +14,7 @@ Monorepo with packages under `packages/`:
 - `packages/statusline/` -- Custom status bar widgets for the pi TUI.
 - `packages/tool-display/` -- Tool call rendering adapters for the pi TUI.
 - `packages/user-message/` -- User message handling extension.
+- `packages/extra-tools/` -- Extra LLM tools: `grep` and `glob` (ripgrep-backed; opencode-style descriptions in co-located `.txt` files). `grep` overrides the built-in tool name when this extension loads.
 - `.agents/skills/pi-self-extension/` -- skill with authoritative guidance for building pi extensions (API reference, compat gotchas, validation checklist).
 
 ## Subagents

@@ -204,11 +204,19 @@ export function renderToolCall(
         !opts.isPartial &&
         opts.details !== undefined;
 
+      const grepCollapsedPartial =
+        opts.toolName === "grep" && !opts.expanded && opts.isPartial;
+
+      const globCollapsedPartial =
+        opts.toolName === "glob" && !opts.expanded && opts.isPartial;
+
       const useAdapter =
         adapter &&
         (opts.expanded ||
           hasTextOutput ||
           detailsOnlyCollapsed ||
+          grepCollapsedPartial ||
+          globCollapsedPartial ||
           (opts.toolName === "subagent" && !opts.expanded));
 
       if (useAdapter) {
