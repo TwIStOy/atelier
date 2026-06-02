@@ -25,6 +25,8 @@ export type SubagentAgentCatalog = {
   agents: Map<string, SubagentAgentEntry>;
 };
 
+export type SubagentAgentType = string;
+
 function shippedAgentsDir(): string {
   return fileURLToPath(new URL("./agents/", import.meta.url));
 }

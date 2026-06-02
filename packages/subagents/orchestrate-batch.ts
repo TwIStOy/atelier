@@ -4,8 +4,10 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import { mapConcurrent } from "@htwang-contrib/common";
 import { mergeAbortWithTimeoutMs } from "./abort-timeout.ts";
-import { buildSubagentAgentCatalog } from "./agent-catalog.ts";
-import { resolveSubagentAgentType } from "./agent-types.ts";
+import {
+  buildSubagentAgentCatalog,
+  resolveSubagentAgentId,
+} from "./agent-catalog.ts";
 import { formatBatchToolText } from "./batch-text.ts";
 import { subagentDetails } from "./details.ts";
 import {
@@ -111,7 +113,7 @@ export async function runParallelBatchSubagent(
       limits.maxConcurrent,
       async (item, i) => {
         perTaskStarted[i] = true;
-        const at = resolveSubagentAgentType(
+        const at = resolveSubagentAgentId(
           item.agent_type ?? globalAgentType,
           catalog,
         );
@@ -184,7 +186,7 @@ export async function runParallelBatchSubagent(
   }
 
   const batchItems: SubagentBatchItemDetail[] = results.map((r, i) => {
-    const at = resolveSubagentAgentType(
+    const at = resolveSubagentAgentId(
       tasks[i]?.agent_type ?? globalAgentType,
       catalog,
     );
@@ -235,7 +237,7 @@ export async function runParallelBatchSubagent(
       tool_calls: totalToolCalls,
       mode: "batch",
       batch: batchItems,
-      agent_type: resolveSubagentAgentType(globalAgentType, catalog),
+      agent_type: resolveSubagentAgentId(globalAgentType, catalog),
       ok: batchItems.every((b) => b.ok),
       usage_input: usageInSum,
       usage_output: usageOutSum,

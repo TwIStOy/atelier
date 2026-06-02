@@ -2,8 +2,10 @@ import type {
   AgentToolUpdateCallback,
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
-import { buildSubagentAgentCatalog } from "./agent-catalog.ts";
-import { resolveSubagentAgentType } from "./agent-types.ts";
+import {
+  buildSubagentAgentCatalog,
+  resolveSubagentAgentId,
+} from "./agent-catalog.ts";
 import { subagentDetails } from "./details.ts";
 import {
   tryParentToolUpdate,
@@ -50,7 +52,7 @@ export async function runSingleSubagent(
     globalAgentType,
   } = args;
   const catalog = buildSubagentAgentCatalog(ctx.cwd);
-  const singleAgentType = resolveSubagentAgentType(globalAgentType, catalog);
+  const singleAgentType = resolveSubagentAgentId(globalAgentType, catalog);
   const file = catalog.agents.get(singleAgentType)?.fileOptions ?? {};
   const defs = defaultsForAgentType(subagentSettings, singleAgentType);
   const effectiveModel = globalModel ?? file.model ?? defs.model;
