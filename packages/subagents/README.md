@@ -24,6 +24,8 @@ Optional **`agent_type`** selects the injected system prompt from the [agent cat
 
 For TUI tool rows, load **`packages/tool-display`** in your Pi config (before or after `subagents`); it registers display adapters for **`subagent`** and **`subagent_status`** so headers and collapsed/expanded output match **Read** / **Bash** styling.
 
+Loaded personas are listed for the model only inside the **`<subagents_personas>`** block appended to the parent **system prompt** each turn (`before_agent_start`). There is no separate **`[Agents]`** chat row: extensions cannot append to the same pass as Pi’s built-in `showLoadedResources`, and `sendMessage` entries are session messages—on `/reload`, Pi redraws messages first then re-appends resource sections, so a custom block would jump above `[Context]` / `[Skills]` and stack on every reload.
+
 ## Agent definitions (Markdown catalog)
 
 At each `subagent` run, prompts are merged from layers in order (**later layers override** the same id):
@@ -48,7 +50,7 @@ Markdown **body** becomes the child system prompt. YAML **frontmatter** is parse
 
 **Precedence:** any value set on the **`subagent` tool call** wins over frontmatter; frontmatter wins over **`defaults_by_agent_type`** in `settings.json`; then the parent session model applies for `model` where still unset.
 
-On each parent LLM turn, this extension appends a **`<subagents_personas>`** XML block to the session system prompt (`before_agent_start`): one **`<agent>`** per loaded persona, each with **`<name>`** (canonical id) and **`<description>`** (from frontmatter, or empty).
+On each parent LLM turn, this extension appends a **`<subagents_personas>`** XML block to the session system prompt (`before_agent_start`): one **`<agent>`** per loaded persona, each with **`<name>`** (canonical id) and **`<description>`** (from frontmatter, or empty). This is the supported way to surface the catalog to the model; there is no duplicate TUI “agents” strip in chat.
 
 ```yaml
 ---
@@ -89,23 +91,22 @@ Example:
 
 ## Package layout (this extension)
 
-| File                    | Role                                                                                                |
-| ----------------------- | --------------------------------------------------------------------------------------------------- |
-| `tool.ts`               | Registers `subagent` / `subagent_status`; `execute` routing only.                                   |
-| `schemas.ts`            | TypeBox parameter schemas.                                                                          |
-| `validate.ts`           | Single vs batch argument validation.                                                                |
-| `details.ts`            | Normalizes `SubagentRunDetails` for tool results.                                                   |
-| `parent-update.ts`      | Safe `onUpdate` + throttled interval flush helper.                                                  |
-| `orchestrate-single.ts` | Single-task run + live `details` updates.                                                           |
-| `orchestrate-batch.ts`  | Parallel batch + per-task arrays + live updates.                                                    |
-| `batch-text.ts`         | Markdown/text body for completed batch results.                                                     |
-| `background-finish.ts`  | Job table updates, `pi.events`, `notify` after async runs.                                          |
-| `run-agent.ts`          | `createAgentSession` + `runSubAgent`; child loader uses `extensionFactories` for `protect-secrets`. |
-| `agent-catalog.ts`      | Discovers `*.md` agent definitions from config paths and `pi.agents` manifests.                     |
-| `agent-types.ts`        | Thin helpers mapping `agent_type` + catalog → system prompt.                                        |
-| `child-tools.ts`        | Built-in tool name list + filter excluding delegation tools.                                        |
-| `abort-timeout.ts`      | Merges optional `AbortSignal.timeout` into run signals.                                             |
-| `settings.ts`           | Reads `settings.json`; concurrency, timeout, persona defaults.                                      |
+| File                    | Role                                                                                                                             |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `tool.ts`               | Registers `subagent` / `subagent_status`; `execute` routing only.                                                                |
+| `schemas.ts`            | TypeBox parameter schemas.                                                                                                       |
+| `validate.ts`           | Single vs batch argument validation.                                                                                             |
+| `details.ts`            | Normalizes `SubagentRunDetails` for tool results.                                                                                |
+| `parent-update.ts`      | Safe `onUpdate` + throttled interval flush helper.                                                                               |
+| `orchestrate-single.ts` | Single-task run + live `details` updates.                                                                                        |
+| `orchestrate-batch.ts`  | Parallel batch + per-task arrays + live updates.                                                                                 |
+| `batch-text.ts`         | Markdown/text body for completed batch results.                                                                                  |
+| `background-finish.ts`  | Job table updates, `pi.events`, `notify` after async runs.                                                                       |
+| `run-agent.ts`          | `createAgentSession` + `runSubAgent`; child loader uses `extensionFactories` for `protect-secrets`.                              |
+| `agent-catalog.ts`      | Agent Markdown catalog, id normalization, system prompt + `<subagents_personas>` XML for the parent prompt, `SubagentAgentType`. |
+| `child-tools.ts`        | Built-in tool name list + filter excluding delegation tools.                                                                     |
+| `abort-timeout.ts`      | Merges optional `AbortSignal.timeout` into run signals.                                                                          |
+| `settings.ts`           | Reads `settings.json`; concurrency, timeout, persona defaults.                                                                   |
 
 ## Tool: `subagent_status`
 

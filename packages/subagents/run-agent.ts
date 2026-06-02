@@ -27,12 +27,10 @@ import protectSecrets from "@htwang-contrib/protect-secrets/index.ts";
 import { appendSubagentLinkRecord, SUBAGENT_SESSION_DIR } from "./paths.ts";
 import {
   buildSubagentAgentCatalog,
+  resolveSubagentAgentId,
+  subagentSystemPromptFromCatalog,
   type SubagentAgentCatalog,
 } from "./agent-catalog.ts";
-import {
-  resolveSubagentAgentType,
-  subagentSystemPromptFor,
-} from "./agent-types.ts";
 import { childSessionToolNames } from "./child-tools.ts";
 
 const CHILD_SESSION_EXTENSION_FACTORIES: ExtensionFactory[] = [protectSecrets];
@@ -245,8 +243,11 @@ export async function runSubAgent(
 
     const cwd = ctx.cwd;
     const agentCatalog = catalog ?? buildSubagentAgentCatalog(cwd);
-    const agentType = resolveSubagentAgentType(input.agent_type, agentCatalog);
-    const systemPrompt = subagentSystemPromptFor(agentType, agentCatalog);
+    const agentType = resolveSubagentAgentId(input.agent_type, agentCatalog);
+    const systemPrompt = subagentSystemPromptFromCatalog(
+      agentType,
+      agentCatalog,
+    );
     const agentDir = getAgentDir();
     const settingsManager = SettingsManager.create(cwd, agentDir);
     const model = resolveModelForSubagent(input.model, ctx);
