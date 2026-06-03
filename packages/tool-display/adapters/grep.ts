@@ -1,7 +1,7 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { shortenPath } from "@htwang-contrib/common";
 import type { ToolDisplayAdapter } from "../types.ts";
-import { INDENT, formatLineCount } from "./shared.ts";
+import { formatExpandedToolOutputLines, formatLineCount } from "./shared.ts";
 
 interface GrepArgs {
   pattern?: string;
@@ -62,10 +62,7 @@ export const grepAdapter: ToolDisplayAdapter<GrepArgs> = {
     return formatLineCount(output, theme);
   },
 
-  formatExpandedContent(_args, output, theme, _width, _details?: unknown) {
-    if (!output) return [];
-    return output
-      .split("\n")
-      .map((line) => INDENT + theme.fg("toolOutput", line));
+  formatExpandedContent(_args, output, theme, width, _details?: unknown) {
+    return formatExpandedToolOutputLines(output ?? "", theme, width);
   },
 };

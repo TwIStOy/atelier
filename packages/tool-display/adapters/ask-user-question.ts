@@ -1,8 +1,6 @@
-import type { Theme } from "@earendil-works/pi-coding-agent";
 import { truncateDisplay } from "@htwang-contrib/common";
-import { truncateToWidth } from "@earendil-works/pi-tui";
 import type { ToolDisplayAdapter } from "../types.ts";
-import { INDENT } from "./shared.ts";
+import { formatExpandedToolOutputLines, INDENT } from "./shared.ts";
 
 interface AuqQuestionArg {
   header?: string;
@@ -88,13 +86,6 @@ export const askUserQuestionAdapter: ToolDisplayAdapter<AskUserQuestionArgs> = {
   },
 
   formatExpandedContent(_args, output, theme, width, _details) {
-    if (!output) return [];
-    const inner = Math.max(1, width - INDENT.length);
-    return output
-      .split("\n")
-      .map(
-        (line) =>
-          INDENT + truncateToWidth(theme.fg("toolOutput", line), inner, "…"),
-      );
+    return formatExpandedToolOutputLines(output ?? "", theme, width);
   },
 };

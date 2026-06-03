@@ -1,7 +1,11 @@
 import { truncateDisplay } from "@htwang-contrib/common";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import type { ToolDisplayAdapter } from "../types.ts";
-import { formatLineCount, INDENT } from "./shared.ts";
+import {
+  formatExpandedToolOutputLines,
+  formatLineCount,
+  INDENT,
+} from "./shared.ts";
 
 interface SubagentStatusArgs {
   id?: string;
@@ -152,10 +156,7 @@ export const subagentStatusAdapter: ToolDisplayAdapter<SubagentStatusArgs> = {
     return formatLineCount(output, theme);
   },
 
-  formatExpandedContent(_args, output, theme, _width, _details) {
-    if (!output) return [];
-    return output
-      .split("\n")
-      .map((line) => INDENT + theme.fg("toolOutput", line));
+  formatExpandedContent(_args, output, theme, width, _details) {
+    return formatExpandedToolOutputLines(output ?? "", theme, width);
   },
 };

@@ -1,6 +1,6 @@
 import { shortenPath, truncateDisplay } from "@htwang-contrib/common";
 import type { ToolDisplayAdapter } from "../types.ts";
-import { INDENT, formatLineCount } from "./shared.ts";
+import { formatExpandedToolOutputLines, formatLineCount } from "./shared.ts";
 
 interface BashArgs {
   command?: string;
@@ -50,11 +50,7 @@ export const bashAdapter: ToolDisplayAdapter<BashArgs> = {
     return formatLineCount(output, theme);
   },
 
-  formatExpandedContent(_args, output, theme, _width, _details?: unknown) {
-    if (!output) return [];
-    const lines = output
-      .split("\n")
-      .map((line) => INDENT + theme.fg("toolOutput", line));
-    return lines;
+  formatExpandedContent(_args, output, theme, width, _details?: unknown) {
+    return formatExpandedToolOutputLines(output ?? "", theme, width);
   },
 };

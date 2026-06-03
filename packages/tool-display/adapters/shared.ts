@@ -3,10 +3,29 @@ import {
   highlightCode,
   type Theme,
 } from "@earendil-works/pi-coding-agent";
-import { wrapTextWithAnsi } from "@earendil-works/pi-tui";
+import {
+  truncateToWidth,
+  visibleWidth,
+  wrapTextWithAnsi,
+} from "@earendil-works/pi-tui";
 import { trimTrailingEmpty } from "@htwang-contrib/common";
 
 export const INDENT = "    ";
+
+export function formatExpandedToolOutputLines(
+  output: string,
+  theme: Theme,
+  width: number,
+): string[] {
+  if (!output) return [];
+  const inner = Math.max(1, width - visibleWidth(INDENT));
+  return output
+    .split("\n")
+    .map(
+      (line) =>
+        INDENT + truncateToWidth(theme.fg("toolOutput", line), inner, "…"),
+    );
+}
 
 export function replaceTabs(text: string): string {
   return text.replace(/\t/g, "   ");

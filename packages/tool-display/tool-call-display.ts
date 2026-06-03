@@ -5,6 +5,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { truncateDisplay, trimTrailingEmpty } from "@htwang-contrib/common";
 import { Container, truncateToWidth } from "@earendil-works/pi-tui";
+import { formatExpandedToolOutputLines } from "./adapters/shared.ts";
 import { spinnerGlyph } from "./format.ts";
 import type { ContentRenderer, ToolDisplayAdapter } from "./types.ts";
 
@@ -204,9 +205,7 @@ export function defaultExpandedRenderer(
   width: number,
 ): string[] {
   if (!content) return [];
-  const lines = content
-    .split("\n")
-    .map((line) => INDENT + theme.fg("toolOutput", line));
+  const lines = formatExpandedToolOutputLines(content, theme, width);
   const hint = theme.fg(
     "muted",
     `${INDENT}${keyText("app.tools.expand")} to collapse`,
