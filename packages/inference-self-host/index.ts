@@ -27,7 +27,7 @@ export default function (pi: ExtensionAPI) {
   pi.registerProvider("inference-self-host", {
     name: "Inference(Self Host)",
     baseUrl: "https://inference.twistoy.cn/v1",
-    apiKey: "INFERENCE_TWISTOY_API_KEY",
+    apiKey: "$INFERENCE_TWISTOY_API_KEY",
     api: "openai-completions",
     authHeader: true,
     models: [

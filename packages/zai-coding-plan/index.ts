@@ -20,7 +20,7 @@ export default function (pi: ExtensionAPI) {
   pi.registerProvider(PROVIDER_ID, {
     name: "Z.AI Coding Plan",
     baseUrl: "https://api.z.ai/api/coding/paas/v4",
-    apiKey: "ZAI_API_KEY",
+    apiKey: "$ZAI_API_KEY",
     api: "openai-completions",
     authHeader: true,
     models: [
