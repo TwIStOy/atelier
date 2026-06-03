@@ -17,20 +17,20 @@
 
 **Design ref:** [D3.1](./DESIGN.md#d31-global-statets)
 
-- [ ] Create `packages/common/global-state.ts` with `getGlobalState<T>(key, init)` and `clearGlobalState(key)`
-- [ ] Export from `packages/common/index.ts`
-- [ ] Run `npm run format`
-- [ ] Verify: `npx tsc --build packages/common` passes
+- [x] Create `packages/common/global-state.ts` with `getGlobalState<T>(key, init)` and `clearGlobalState(key)`
+- [x] Export from `packages/common/index.ts`
+- [x] Run `npm run format`
+- [x] Verify: `npx tsc --build packages/common` passes
 
 ### Step 1.2 — Create `global-state.test.ts`
 
 **Design ref:** [D6.1](./DESIGN.md#d61-packagescommonglobal-statetestts)
 
-- [ ] Create `packages/common/global-state.test.ts`
-- [ ] Test: returns init value on first access
-- [ ] Test: returns same reference on subsequent calls
-- [ ] Test: `clearGlobalState` removes the slot
-- [ ] Verify: `npx vitest run packages/common/global-state.test.ts` passes
+- [x] Create `packages/common/global-state.test.ts`
+- [x] Test: returns init value on first access
+- [x] Test: returns same reference on subsequent calls
+- [x] Test: `clearGlobalState` removes the slot
+- [x] Verify: `npx vitest run packages/common/global-state.test.ts` passes
 
 ### Step 1.3 — Create `message-text.ts`
 
