@@ -12,6 +12,7 @@
       "packages/inference-self-host",
       "packages/protect-secrets",
       "packages/statusline",
+      "packages/user-input-history",
       "packages/user-message",
       "packages/tool-display",
       "packages/subagents",
