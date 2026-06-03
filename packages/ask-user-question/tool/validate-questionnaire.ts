@@ -14,6 +14,8 @@ export const ERROR_TOO_FEW_OPTIONS = `Error: Each question requires at least ${M
 export const ERROR_RESERVED_LABEL = `Error: Option label is reserved (${RESERVED_LABELS.join(", ")})`;
 export const ERROR_DUPLICATE_OPTION_LABEL =
   "Error: Option labels must be unique within a question";
+export const ERROR_MULTI_SELECT_PREVIEW =
+  "Error: multiSelect questions cannot include option previews; remove preview fields or set multiSelect to false";
 
 const RESERVED_LABEL_SET: ReadonlySet<string> = new Set(RESERVED_LABELS);
 
@@ -70,6 +72,17 @@ export function validateQuestionnaire(typed: QuestionParams): ValidationResult {
         };
       }
       seenLabels.add(o.label);
+    }
+    if (q.multiSelect === true) {
+      for (const o of q.options) {
+        if (typeof o.preview === "string" && o.preview.trim().length > 0) {
+          return {
+            ok: false,
+            error: "multi_select_preview",
+            message: ERROR_MULTI_SELECT_PREVIEW,
+          };
+        }
+      }
     }
   }
 

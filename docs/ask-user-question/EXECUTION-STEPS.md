@@ -17,10 +17,10 @@
 | Phase 0  | 3 / 3         |
 | 脚手架   | 7 / 7         |
 | Phase 1  | 5 / 5         |
-| Phase 2  | 0 / 13        |
+| Phase 2  | 3 / 13        |
 | Phase 3  | 0 / 2         |
 | 收尾     | 0 / 2         |
-| **合计** | **15 / 32**   |
+| **合计** | **18 / 32**   |
 
 ---
 
@@ -56,6 +56,20 @@
 
 ## Phase 2 — UI / 状态机 parity（大块，建议按模块合入）
 
+**增量说明（当前仓库）**：已合入 **`events.ts`** + **`questionnaire-ui.ts`**（多选 Submit、单选 Chat、单选 preview 纯文本 stub）、校验 **`multi_select_preview`**；手测命令 **`/auq-phase2`**。完整 **`state/`** / **`view/`** / Markdown 预览 parity 仍按下列项推进。
+
+**P2-9 之前的项（P2-1～P2-8）当前状态**：**均未按 rpiv 目录结构迁移**，仍是 `- [ ]`。当前 `questionnaire-ui.ts` 只是编辑器槽里的**薄壳交互**，与上游 parity 的对应关系如下，**不能**当作这些项已验收：
+
+| 项 | 说明 |
+| --- | --- |
+| **P2-1** | 无 `packages/ask-user-question/state/`；无 `reduce` / `Effect` / `key-router` 穷尽联合。 |
+| **P2-2** | 无 `view/`、`build-questionnaire`、`DialogView`、binding 策略。 |
+| **P2-3～P2-5** | 无 `PreviewPane`、`injectGlobalLeftWidth`、`decideLayout`、`getMarkdownTheme` 预览链。 |
+| **P2-6～P2-7** | 多选仅有**列表内勾选 + Submit 行**；**无**上游 `MultiSelectView` / `bodyHeights` / `selectMultiSelectProps` 等实现与测试契约。 |
+| **P2-8** | 无 `Input` cursor、无 `Ctrl+]` 折叠、无 notes / `inlineInput` 低延迟路径等。 |
+
+**Phase 2 之前的阶段**（Phase 0、脚手架、Phase 1）：见上文各节，均为 **`[x]`**，无未勾选缺口。
+
 - [ ] **P2-1** 迁移 **`state/`**：`reduce` + `Effect`、`QuestionnaireSession`、`key-router`、`selectors`；`QuestionnaireAction` 穷尽、Effect 闭集与上游一致。
 - [ ] **P2-2** 迁移 **`view/`** 与 **`build-questionnaire.ts`**：`QuestionnaireBuilder`、`QuestionnairePropsAdapter`、bindings、`DialogView` / tab 策略。
 - [ ] **P2-3** 确认 **`injectGlobalLeftWidth` 在首帧 `PreviewPane.render` 之前**已注入（否则会按设计抛错）。
@@ -64,9 +78,9 @@
 - [ ] **P2-6** 预览回归：**多选题**下 `PreviewPane` 退化为仅选项列；**`bodyHeights`** 使用 **`MultiSelectView.naturalHeight`**。
 - [ ] **P2-7** 多选回归：**`selectMultiSelectProps`** 无 predicate、每 tab 每 tick；最后一题 Next 行为 **Submit** 文案；**`naturalHeight(w) === render(w).length`**；与 **`multi_confirm` / `next` sentinel** 一致（§2.9）。
 - [ ] **P2-8** 手测高风险：**Input `cursor` 反射**、**`Ctrl+]`** 折叠、notes / **`inlineInput`** 低延迟路径、Submit 页**部分作答仍可提交**。
-- [ ] **P2-9** 恢复 **`events.ts`**：`ASK_USER_PROMPT_EVENT` payload **不含 preview 正文**，与上游一致。
-- [ ] **P2-10** **`npx tsc --build`** 通过。
-- [ ] **P2-11** **`npm run format`**（或项目约定格式化命令）已跑。
+- [x] **P2-9** 恢复 **`events.ts`**：`ASK_USER_PROMPT_EVENT` payload **不含 preview 正文**，与上游一致。
+- [x] **P2-10** **`npx tsc --build`** 通过。
+- [x] **P2-11** **`npm run format`**（或项目约定格式化命令）已跑。
 - [ ] **P2-12** 人工问卷回归：**窄终端 / 宽终端 / code fence 长行 / 多 Tab**。
 - [ ] **P2-13（可选）** **`tool-display`**：为 `ask_user_question` 增加专用 adapter（非阻塞）。
 

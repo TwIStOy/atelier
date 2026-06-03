@@ -95,7 +95,8 @@ export type QuestionnaireError =
   | "too_many_questions"
   | "duplicate_question"
   | "duplicate_option_label"
-  | "reserved_label";
+  | "reserved_label"
+  | "multi_select_preview";
 
 export interface QuestionnaireResult {
   answers: QuestionAnswer[];

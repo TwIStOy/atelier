@@ -1,5 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { createMvpQuestionnaireComponent } from "./mvp-questionnaire-ui.ts";
+import { emitAskUserPrompt } from "./events.ts";
+import { createQuestionnaireComponent } from "./questionnaire-ui.ts";
 import {
   buildQuestionnaireResponse,
   buildToolResult,
@@ -24,9 +25,6 @@ const DEFAULT_PROMPT_GUIDELINES: string[] = [
 ];
 
 const ERROR_NO_UI = "Error: UI not available (running in non-interactive mode)";
-
-const ERROR_MULTISELECT_MVP =
-  "Error: multiSelect questions are not supported in this MVP build; set multiSelect to false or omit it.";
 
 const TOOL_DESCRIPTION = `Ask the user one or more structured questions during execution. Use when you need to:
 1. Gather user preferences or requirements
@@ -66,13 +64,6 @@ export function registerAskUserQuestionTool(pi: ExtensionAPI): void {
         });
       }
 
-      if (typed.questions.some((q) => q.multiSelect === true)) {
-        return buildToolResult(ERROR_MULTISELECT_MVP, {
-          answers: [],
-          cancelled: true,
-        });
-      }
-
       const validation = validateQuestionnaire(typed);
       if (!validation.ok) {
         return buildToolResult(validation.message, {
@@ -82,9 +73,11 @@ export function registerAskUserQuestionTool(pi: ExtensionAPI): void {
         });
       }
 
+      emitAskUserPrompt(pi, typed);
+
       const result = await ctx.ui.custom<QuestionnaireResult>(
         (tui, theme, _keybindings, done) =>
-          createMvpQuestionnaireComponent(typed, theme, tui, done),
+          createQuestionnaireComponent(typed, theme, tui, done),
       );
 
       return buildQuestionnaireResponse(result, typed);

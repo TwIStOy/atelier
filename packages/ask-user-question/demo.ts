@@ -4,8 +4,10 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import { Box, Text } from "@earendil-works/pi-tui";
 import type { Component } from "@earendil-works/pi-tui";
+import { emitAskUserPrompt } from "./events.ts";
+import { EXAMPLE_PHASE2_QUESTIONNAIRE } from "./example-phase2-questionnaire.ts";
 import { EXAMPLE_QUESTIONNAIRE } from "./example-questionnaire.ts";
-import { createMvpQuestionnaireComponent } from "./mvp-questionnaire-ui.ts";
+import { createQuestionnaireComponent } from "./questionnaire-ui.ts";
 import { buildQuestionnaireResponse } from "./tool/response-envelope.ts";
 import type { QuestionnaireResult } from "./tool/types.ts";
 import { validateQuestionnaire } from "./tool/validate-questionnaire.ts";
@@ -13,6 +15,45 @@ import { validateQuestionnaire } from "./tool/validate-questionnaire.ts";
 type Phase0ProbeResult = { probe: "auq_phase0"; dismissedBy: "enter" };
 
 export function registerAskUserQuestionDemos(pi: ExtensionAPI): void {
+  pi.registerCommand("auq-phase2", {
+    description:
+      "ask_user_question Phase 2 hand-test: multi-select + Submit, then single-select + Chat row (listen for ask_user_question:prompt)",
+    async handler(_args, ctx: ExtensionCommandContext) {
+      if (!ctx.hasUI) {
+        ctx.ui.notify(
+          "hasUI is false — Phase 2 demo skipped (expected in print/RPC)",
+          "warning",
+        );
+        return;
+      }
+      const check = validateQuestionnaire(EXAMPLE_PHASE2_QUESTIONNAIRE);
+      if (!check.ok) {
+        ctx.ui.notify(check.message, "error");
+        return;
+      }
+      emitAskUserPrompt(pi, EXAMPLE_PHASE2_QUESTIONNAIRE);
+      const result = await ctx.ui.custom<QuestionnaireResult>(
+        (tui, theme, _keybindings, done) =>
+          createQuestionnaireComponent(
+            EXAMPLE_PHASE2_QUESTIONNAIRE,
+            theme,
+            tui,
+            done,
+          ),
+      );
+      const toolView = buildQuestionnaireResponse(
+        result,
+        EXAMPLE_PHASE2_QUESTIONNAIRE,
+      );
+      const text =
+        toolView.content[0]?.type === "text" ? toolView.content[0].text : "";
+      ctx.ui.notify(
+        `Phase 2 demo done (cancelled=${result?.cancelled ?? true}). Envelope:\n${text}`,
+        "info",
+      );
+    },
+  });
+
   pi.registerCommand("auq-phase1", {
     description:
       "ask_user_question Phase 1: open MVP questionnaire UI (sample 2 questions) in the editor slot",
@@ -31,12 +72,7 @@ export function registerAskUserQuestionDemos(pi: ExtensionAPI): void {
       }
       const result = await ctx.ui.custom<QuestionnaireResult>(
         (tui, theme, _keybindings, done) =>
-          createMvpQuestionnaireComponent(
-            EXAMPLE_QUESTIONNAIRE,
-            theme,
-            tui,
-            done,
-          ),
+          createQuestionnaireComponent(EXAMPLE_QUESTIONNAIRE, theme, tui, done),
       );
       const toolView = buildQuestionnaireResponse(
         result,

@@ -10,9 +10,13 @@ With this repo on your `pi.extensions` list, start interactive Pi and run:
 
 The probe calls **`ctx.ui.custom(factory)`** with no options object, so the UI appears in the **prompt editor region** (same as [ghoseb/pi-askuserquestion](https://github.com/ghoseb/pi-askuserquestion)). Press Enter to call `done`; Pi restores the normal editor and shows an info notification with the JSON result.
 
-### Phase 1 MVP UI demo
+### Phase 1 UI demo
 
-`/auq-phase1` opens the same **MVP questionnaire** used by `ask_user_question` (two sample questions from [`example-questionnaire.ts`](./example-questionnaire.ts)): **↑↓** move, **Enter** confirms each question, **Esc** cancels. After close, an info notification shows the **LLM-facing envelope** text from `buildQuestionnaireResponse`.
+`/auq-phase1` uses the same questionnaire component as the tool (two sample questions from [`example-questionnaire.ts`](./example-questionnaire.ts)): **↑↓** move, **Enter** confirms each question, **Esc** cancels. After close, an info notification shows the **LLM-facing envelope** text from `buildQuestionnaireResponse`.
+
+### Phase 2 hand-test demo
+
+`/auq-phase2` runs [`example-phase2-questionnaire.ts`](./example-phase2-questionnaire.ts): first question is **multi-select** (**Space** toggles, **Enter** on **Submit** confirms); second is single-select with a **Chat about this** row (**Enter** on that row ends with a `chat` answer). The demo calls **`emitAskUserPrompt`** before opening the UI so you can subscribe to **`ask_user_question:prompt`** (same event as the real tool after validation). Use this to verify keyboard flow and envelope text in the editor slot.
 
 See [docs/ask-user-question/PHASE0.md](../../docs/ask-user-question/PHASE0.md) for locked dependency versions and porting notes.
 
@@ -24,18 +28,18 @@ Package root **`tool.ts`** (next to **`tool/`**) registers `ask_user_question` a
 
 ## Phase 1 — `ask_user_question` tool (MVP)
 
-The extension registers **`ask_user_question`** in **`tool.ts`**. **`index.ts`** wires **`registerAskUserQuestionDemos`** from **`demo.ts`** (`/auq-phase0` editor-slot smoke test, `/auq-phase1` MVP questionnaire demo). When the port is finished, remove **`demo.ts`** and drop the `registerAskUserQuestionDemos` call from **`index.ts`** (and **`example-questionnaire.ts`** if nothing else imports it).
+The extension registers **`ask_user_question`** in **`tool.ts`**. **`index.ts`** wires **`registerAskUserQuestionDemos`** from **`demo.ts`** (`/auq-phase0`, `/auq-phase1`, `/auq-phase2`). When the port is finished, remove **`demo.ts`** and drop the `registerAskUserQuestionDemos` call from **`index.ts`** (and demo-only example modules if nothing else imports them).
 
 ### Prompt snippet / guidelines (P1-2)
 
 Edit **`tool.ts`** (`DEFAULT_PROMPT_SNIPPET`, `DEFAULT_PROMPT_GUIDELINES`) when you want to change what Pi injects into the system prompt for this tool.
 
-### MVP behaviour vs rpiv (P1-4 / P1-5)
+### Current UI vs rpiv (Phase 2 增量中)
 
 - **Editor slot only**: `execute` uses **`ctx.ui.custom(factory)`** with no overlay options (see [PHASE0.md](../../docs/ask-user-question/PHASE0.md)).
-- **No `pi.events.emit`**: rpiv’s `ASK_USER_PROMPT_EVENT` is **not** emitted in Phase 1; Phase 2 will restore it if still desired.
-- **Single-select only in UI**: if any question has **`multiSelect: true`**, the tool returns an error message and `cancelled: true` (MVP does not render checkboxes yet).
-- **Interaction**: multi-question flows are supported sequentially (↑↓, Enter per question, Esc cancels entire run). There is **no** “Type something.” / “Chat about this” row yet; free-text and chat answers are Phase 2+.
-- **Preview**: option `preview` is passed through to **`details` / envelope** when present; there is **no** Markdown preview pane in the MVP UI.
+- **`pi.events.emit`**: after successful validation, **`emitAskUserPrompt`** emits **`ask_user_question:prompt`** with per-question **`header` / `question` / `multiSelect` / `hasPreview`** only (no preview body). See [`events.ts`](./events.ts).
+- **Multi-select**: supported in **[`questionnaire-ui.ts`](./questionnaire-ui.ts)**; **`multiSelect` + non-empty `preview` on any option** is rejected at validation (`multi_select_preview`).
+- **Single-select**: **Chat about this** row is shown; **“Type something.”** custom row is not implemented yet (full parity is later Phase 2).
+- **Preview**: for single-select questions that have any option `preview`, the UI shows a **plain-text stub** (first lines only); **not** the rpiv Markdown `PreviewPane` / `getMarkdownTheme` pipeline yet. Selected option `preview` is still passed through to **`details` / envelope** when the user confirms an option.
 
 `content[0].text` and `details` for success / validation / `no_ui` follow the same **`buildToolResult` / `buildQuestionnaireResponse`** shapes as the rpiv tool layer.
