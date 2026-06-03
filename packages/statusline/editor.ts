@@ -10,10 +10,20 @@ import type { KeybindingsManager } from "@earendil-works/pi-coding-agent";
 
 const MIN_BODY_LINES = 1;
 
+function formatAbbreviatedCount(
+  value: number,
+  divisor: number,
+  suffix: string,
+): string {
+  const scaled = (value / divisor).toFixed(1);
+  const num = scaled.endsWith(".0") ? scaled.slice(0, -2) : scaled;
+  return `${num}${suffix}`;
+}
+
 function formatCount(value: number | null | undefined): string {
   if (value == null) return "?";
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}m`;
-  if (value >= 1_000) return `${Math.round(value / 1_000)}k`;
+  if (value >= 1_000_000) return formatAbbreviatedCount(value, 1_000_000, "M");
+  if (value >= 1_000) return formatAbbreviatedCount(value, 1_000, "K");
   return String(value);
 }
 
