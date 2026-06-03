@@ -54,3 +54,14 @@ npm test
 
 - Use `snake_case` for tool names (the identifier used in code and API calls).
 - Use `CamelCase` for display names (shown in terminal UI, logs, and user-facing output).
+
+## Porting upstream code — reuse this repo first (重要)
+
+When migrating or adapting an extension from another project (for example `rpiv-ask-user-question` under `docs/ask-user-question/`):
+
+- **Do not** paste large slabs of upstream code by default. Implement against **this** monorepo: package layout, `peerDependencies`, ESM + `.ts` imports, existing extension patterns, and how Pi is wired here.
+- **Reuse before copy**: prefer `@htwang-contrib/common`, patterns from sibling packages (`subagents`, `tool-display`, `user-message`, etc.), and shared types/helpers already in the tree.
+- **Promote to `packages/common/`**: if you introduce logic that **two or more** extensions could reasonably share, add it to `packages/common` and export it from that package’s public surface instead of duplicating it inside a single extension.
+- Upstream remains a **behavior and API reference**, not a vendor drop. The step-by-step checklist lives in [docs/ask-user-question/EXECUTION-STEPS.md](docs/ask-user-question/EXECUTION-STEPS.md); architecture notes in [docs/ask-user-question/PORT-DESIGN.md](docs/ask-user-question/PORT-DESIGN.md).
+
+**Agents: treat the bullets above as mandatory for any port or large adaptation, not optional guidance.**
