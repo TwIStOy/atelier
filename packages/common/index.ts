@@ -30,3 +30,8 @@ export type { ResolvableModel } from "./model-resolve.ts";
 export { getAvailableSkillNames } from "./skills.ts";
 export { mapConcurrent } from "./concurrency.ts";
 export { getGlobalState, clearGlobalState } from "./global-state.ts";
+export {
+  extractMessageText,
+  userMessageText,
+  assistantMessageText,
+} from "./message-text.ts";
