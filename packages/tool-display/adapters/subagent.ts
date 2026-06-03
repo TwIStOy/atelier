@@ -410,7 +410,13 @@ function formatCollapsedSubagentSummary(
 }
 
 export const subagentAdapter: ToolDisplayAdapter<SubagentArgs> = {
-  formatCallHeader(args, theme, details, _isPartial?: boolean) {
+  formatCallHeader(
+    args,
+    theme,
+    details,
+    _isPartial?: boolean,
+    _expanded?: boolean,
+  ) {
     const base = theme.fg("toolTitle", theme.bold("Subagent")) + " ";
     const d =
       details && typeof details === "object"

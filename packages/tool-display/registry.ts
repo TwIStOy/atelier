@@ -1,4 +1,5 @@
 import { ToolDisplayRegistry } from "./tool-call-display.ts";
+import { askUserQuestionAdapter } from "./adapters/ask-user-question.ts";
 import { bashAdapter } from "./adapters/bash.ts";
 import { editAdapter } from "./adapters/edit.ts";
 import { globAdapter } from "./adapters/glob.ts";
@@ -10,6 +11,7 @@ import { subagentStatusAdapter } from "./adapters/subagent-status.ts";
 import { writeAdapter } from "./adapters/write.ts";
 
 export const globalToolDisplayRegistry = new ToolDisplayRegistry();
+globalToolDisplayRegistry.register("ask_user_question", askUserQuestionAdapter);
 globalToolDisplayRegistry.register("read", readAdapter);
 globalToolDisplayRegistry.register("grep", grepAdapter);
 globalToolDisplayRegistry.register("glob", globAdapter);

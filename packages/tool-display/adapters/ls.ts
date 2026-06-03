@@ -15,7 +15,13 @@ function entryCountFromDetails(details: unknown): number | undefined {
 }
 
 export const lsAdapter: ToolDisplayAdapter<LsArgs> = {
-  formatCallHeader(args, theme, _details?: unknown, _isPartial?: boolean) {
+  formatCallHeader(
+    args,
+    theme,
+    _details?: unknown,
+    _isPartial?: boolean,
+    _expanded?: boolean,
+  ) {
     const rawPath = typeof args.path === "string" ? args.path.trim() : "";
     const displayPath = rawPath ? shortenPath(rawPath) : ".";
     const lim = args.limit;

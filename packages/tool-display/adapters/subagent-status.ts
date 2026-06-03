@@ -80,7 +80,7 @@ function statusWord(d: SubagentStatusDetails): {
 }
 
 export const subagentStatusAdapter: ToolDisplayAdapter<SubagentStatusArgs> = {
-  formatCallHeader(args, theme, details, _isPartial) {
+  formatCallHeader(args, theme, details, _isPartial, _expanded?: boolean) {
     const d = parseDetails(details);
     const rawId = typeof args.id === "string" ? args.id.trim() : "";
     const idShow = d ? shortJobId(d.job_id) : truncateDisplay(rawId, 36);

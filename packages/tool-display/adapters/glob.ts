@@ -15,7 +15,13 @@ function fileCountFromDetails(details: unknown): number | undefined {
 }
 
 export const globAdapter: ToolDisplayAdapter<GlobArgs> = {
-  formatCallHeader(args, theme, _details?: unknown, _isPartial?: boolean) {
+  formatCallHeader(
+    args,
+    theme,
+    _details?: unknown,
+    _isPartial?: boolean,
+    _expanded?: boolean,
+  ) {
     const pattern = typeof args.pattern === "string" ? args.pattern : "";
     const pathRaw = typeof args.path === "string" ? args.path.trim() : "";
 

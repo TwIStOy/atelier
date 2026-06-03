@@ -117,6 +117,7 @@ function makeHeader(
   theme: Theme,
   width: number,
   spinAt: number,
+  expanded: boolean,
   details?: unknown,
 ): string {
   let statusIcon: string;
@@ -152,7 +153,7 @@ function makeHeader(
   }
 
   const headerText = adapter
-    ? adapter.formatCallHeader(args, theme, details, isPartial)
+    ? adapter.formatCallHeader(args, theme, details, isPartial, expanded)
     : formatGenericToolHeader(
         toolName,
         toolLabel,
@@ -257,6 +258,7 @@ export function renderToolCall(
         theme,
         width,
         spinAt,
+        opts.expanded,
         opts.details,
       );
       const lines = [header];
@@ -278,10 +280,14 @@ export function renderToolCall(
       const lsCollapsedPartial =
         opts.toolName === "ls" && !opts.expanded && opts.isPartial;
 
+      const askUserQuestionCollapsed =
+        opts.toolName === "ask_user_question" && !opts.expanded && adapter;
+
       const useAdapter =
         adapter &&
         (opts.expanded ||
           hasTextOutput ||
+          askUserQuestionCollapsed ||
           detailsOnlyCollapsed ||
           grepCollapsedPartial ||
           globCollapsedPartial ||

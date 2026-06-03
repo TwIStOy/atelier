@@ -9,7 +9,13 @@ interface BashArgs {
 }
 
 export const bashAdapter: ToolDisplayAdapter<BashArgs> = {
-  formatCallHeader(args, theme, _details?: unknown, _isPartial?: boolean) {
+  formatCallHeader(
+    args,
+    theme,
+    _details?: unknown,
+    _isPartial?: boolean,
+    _expanded?: boolean,
+  ) {
     const cmd = args?.command ?? "";
     const desc = args?.description;
     const cwd = args?.workdir;

@@ -9,7 +9,13 @@ interface WriteArgs {
 }
 
 export const writeAdapter: ToolDisplayAdapter<WriteArgs> = {
-  formatCallHeader(args, theme, _details?: unknown, _isPartial?: boolean) {
+  formatCallHeader(
+    args,
+    theme,
+    _details?: unknown,
+    _isPartial?: boolean,
+    _expanded?: boolean,
+  ) {
     const rawPath = args?.file_path ?? args?.path ?? "";
     const path = shortenPath(rawPath);
     const pathDisplay = path
