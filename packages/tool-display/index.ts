@@ -49,6 +49,7 @@ type ToolExecutionPatchThis = {
   getTextOutput?: () => string | undefined;
   getCallRenderer?: () => unknown;
   getResultRenderer?: () => unknown;
+  invalidate(): void;
 };
 
 const FALLBACK_THEME: Theme = {
@@ -66,6 +67,18 @@ function patchToolExecutionRender(
   proto.__tdRegistry = registry;
 
   if (proto.__tdPatched) return;
+
+  const originalSetExpanded = proto.setExpanded as (
+    this: ToolExecutionPatchThis,
+    expanded: boolean,
+  ) => void;
+  proto.setExpanded = function (
+    this: ToolExecutionPatchThis,
+    expanded: boolean,
+  ) {
+    originalSetExpanded.call(this, expanded);
+    this.invalidate();
+  };
 
   const originalRender = proto.render;
   proto.render = function (
