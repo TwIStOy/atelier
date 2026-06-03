@@ -55,7 +55,8 @@ function renameKeysToBindingValue(keys: string[]): KeyId | KeyId[] {
  * Free `ctrl+r` for this process only: strip it from `app.session.rename` in the
  * in-memory user layer. Pi merges user bindings over defaults; setting `[]` removes
  * the built-in shortcut when the user had no override (undefined → defaults).
- * Does not write `keybindings.json`.
+ * Does not write `keybindings.json`. Call from `session_start` so `getKeybindings()`
+ * is the interactive agent KeybindingsManager (see extension `session_start` hook).
  */
 function detachBuiltinSessionRenameCtrlR(): void {
   const kb = getKeybindings();
@@ -154,8 +155,6 @@ async function openReverseSearch(
 }
 
 export default function userInputHistoryExtension(pi: ExtensionAPI): void {
-  detachBuiltinSessionRenameCtrlR();
-
   // Every user text that enters `session.prompt()` (after slash-command precheck),
   // including CLI `-m` / `initialMessage` which never touch the editor `addToHistory`.
   // Merging `[text]` with disk keeps prior entries and bumps duplicates by time.
@@ -166,6 +165,9 @@ export default function userInputHistoryExtension(pi: ExtensionAPI): void {
   });
 
   pi.on("session_start", (_event, ctx) => {
+    // After InteractiveMode has called setKeybindings(); clearing ctrl+r here avoids
+    // built-in vs extension shortcut diagnostics (load-time detach can hit a stale KB).
+    detachBuiltinSessionRenameCtrlR();
     if (!ctx.hasUI) return;
     const prior = unwrapBaseFactory(ctx.ui.getEditorComponent());
     const wrapped: PriorMarked = Object.assign(
