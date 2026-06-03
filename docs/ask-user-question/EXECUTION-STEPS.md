@@ -14,33 +14,33 @@
 
 | 区块     | 已完成 / 总数 |
 | -------- | ------------- |
-| Phase 0  | 0 / 3         |
-| 脚手架   | 0 / 7         |
+| Phase 0  | 3 / 3         |
+| 脚手架   | 7 / 7         |
 | Phase 1  | 0 / 5         |
 | Phase 2  | 0 / 13        |
 | Phase 3  | 0 / 2         |
 | 收尾     | 0 / 2         |
-| **合计** | **0 / 32**    |
+| **合计** | **10 / 32**   |
 
 ---
 
 ## Phase 0 — 锁 API、做最小验证（阻塞后续一切）
 
-- [ ] **P0-1** 锁定本机 Pi / `@earendil-works/pi-coding-agent` 版本；打开 `ExtensionContext` 中与 **`ctx.ui.custom`**、`ctx.hasUI`、overlay 选项相关的类型定义。
-- [ ] **P0-2** 写最小临时 extension（或脚本化入口）：`hasUI === true` 时 `ctx.ui.custom` 只返回简单 `Text`/`Box`，调 `done(...)`；验证 **overlay、焦点、键盘、`done` 生命周期** 与上游 `ask-user-question.ts` 假设一致。
-- [ ] **P0-3** 输出差异清单：签名、overlay 选项名、泛型返回值等与上游不一致处记入「适配层」todo（薄封装优先，不 fork 全量 view）。
+- [x] **P0-1** 锁定本机 Pi / `@earendil-works/pi-coding-agent` 版本；打开 `ExtensionContext` 中与 **`ctx.ui.custom`**、`ctx.hasUI` 相关的类型定义。
+- [x] **P0-2** 写最小临时 extension（或脚本化入口）：`hasUI === true` 时 **`ctx.ui.custom(factory)`**（不传第二参数，**编辑器槽**，对齐 [ghoseb/pi-askuserquestion](https://github.com/ghoseb/pi-askuserquestion)）只返回简单 `Text`/`Box`，调 `done(...)`；验证 **焦点、键盘、`done` 与编辑器恢复**。
+- [x] **P0-3** 输出差异清单：签名、泛型返回值、`done` 与 rpiv 挂载差异等记入「适配层」todo（薄封装优先，不 fork 全量 view）。
 
 ---
 
 ## 脚手架 — 新包进 monorepo（可与 Phase 0 后半并行）
 
-- [ ] **S-1** 新建目录 **`packages/ask-user-question/`**（独立包，不并入 `user-message`）。
-- [ ] **S-2** **`package.json`**：`name`（如 `@htwang-contrib/ask-user-question`）、`pi.extensions` → `./index.ts`，**peerDependencies** 与仓库其它包对齐（`pi-coding-agent`、`pi-tui`、`typebox`）。
-- [ ] **S-3** **`tsconfig.json`**：`composite`、references（按需连 `common`），**import 使用 `.ts` 后缀**。
-- [ ] **S-4** 根 **`package.json`** `workspaces` 纳入新包。
-- [ ] **S-5** 根 **`tsconfig.json`** `references` 纳入新包。
-- [ ] **S-6** 根 **`AGENTS.md`** 扩展包列表更新。
-- [ ] **S-7** 验证 **ESM**：若入口有 **顶层 `await` / 动态 `import`**，在本仓库 Pi 加载路径下空跑一轮，确认不报错。
+- [x] **S-1** 新建目录 **`packages/ask-user-question/`**（独立包，不并入 `user-message`）。
+- [x] **S-2** **`package.json`**：`name`（如 `@htwang-contrib/ask-user-question`）、`pi.extensions` → `./index.ts`，**peerDependencies** 与仓库其它包对齐（`pi-coding-agent`、`pi-tui`、`typebox`）。
+- [x] **S-3** **`tsconfig.json`**：`composite`、references（按需连 `common`），**import 使用 `.ts` 后缀**。
+- [x] **S-4** 根 **`package.json`** `workspaces` 纳入新包。
+- [x] **S-5** 根 **`tsconfig.json`** `references` 纳入新包。
+- [x] **S-6** 根 **`AGENTS.md`** 扩展包列表更新。
+- [x] **S-7** 验证 **ESM**：若入口有 **顶层 `await` / 动态 `import`**，在本仓库 Pi 加载路径下空跑一轮，确认不报错。
 
 ---
 
@@ -97,5 +97,6 @@
 
 ## 另见
 
+- Phase 0 结论与适配表：[PHASE0.md](./PHASE0.md)
 - 架构、阶段划分原文：[PORT-DESIGN.md](./PORT-DESIGN.md)
 - 上游 README：<https://github.com/juicesharp/rpiv-mono/blob/main/packages/rpiv-ask-user-question/README.md>

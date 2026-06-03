@@ -12,7 +12,8 @@
 
 - 向 Pi 注册工具 **`ask_user_question`**：在需要澄清时，由模型发起**结构化问卷**（多题、多 Tab、单选/多选、选项说明、可选 Markdown `preview` 侧栏、提交前 Review、`Other`/聊天逃逸等）。
 - **强依赖交互式 TUI**：`execute` 里检查 `ctx.hasUI`，否则返回 `details.error: "no_ui"`。
-- **核心 UI 挂载方式**：`ctx.ui.custom((tui, theme, _kb, done) => { ... return session.component; }, { overlay: true, overlayOptions: { ... } })`，在 overlay 里跑一套自建的 `pi-tui` 组件树（问卷会话状态机 + 视图层）。
+- **上游 rpiv 的 UI 挂载**：`ctx.ui.custom(..., { overlay: true, overlayOptions: { … } })`，在全屏浮层里跑自建的 `pi-tui` 组件树（问卷会话状态机 + 视图层）。
+- **本仓库实现**：只使用 **`ctx.ui.custom(factory)`**（不传第二参数），组件落在 **编辑器槽**（`editorContainer`），与 [ghoseb/pi-askuserquestion](https://github.com/ghoseb/pi-askuserquestion) 一致；从 rpiv 迁视图时需按**单槽高度**重做布局，不维护浮层代码路径。
 
 能力细节以 [上游 README](https://github.com/juicesharp/rpiv-mono/blob/main/packages/rpiv-ask-user-question/README.md) 为准（多 Tab、预览、备注、本地化、`pi.events` 通知等）。
 
@@ -30,7 +31,7 @@
 2. `validateQuestionnaire`（纯函数，不含 schema 解析）→ 失败则 `cancelled: true` + 具体 `error` 枚举。
 3. **`pi.events.emit(ASK_USER_PROMPT_EVENT, payload)`**：payload 只含题面摘要（`hasPreview` 布尔，不含 preview 正文），见 `events.ts` 稳定性注释。
 4. **`itemsByTab`**：`typed.questions.map((q) => buildItemsForQuestion(q))`；`buildItemsForQuestion` 先把作者 `options` 映射为 `WrappingSelectItem` 的 `kind:"option"`，再按 `sentinelsToAppend(question, hasAnyPreview)` 追加 **`other` / `next`**（`chat` 因 `livesInMainList:false` 不会进主列表）。
-5. **`await ctx.ui.custom<QuestionnaireResult>(factory, { overlay: true, overlayOptions: { anchor: "bottom-center", width: "100%", maxHeight: "100%", margin: … } })`**：factory 内 `new QuestionnaireSession({ tui, theme, params, itemsByTab, done })`，返回 **`session.component`**（实现 `render` / `invalidate` / `handleInput`）。
+5. （上游 rpiv）**`await ctx.ui.custom<QuestionnaireResult>(factory, { overlay: true, overlayOptions: { anchor: "bottom-center", width: "100%", maxHeight: "100%", margin: … } })`**：factory 内 `new QuestionnaireSession({ tui, theme, params, itemsByTab, done })`，返回 **`session.component`**（实现 `render` / `invalidate` / `handleInput`）。**本仓库**改为 **`await ctx.ui.custom<QuestionnaireResult>(factory)`**（仅编辑器槽），会话组件与 `done` 语义不变。
 6. **`buildQuestionnaireResponse(result, typed)`**：把 `QuestionnaireResult` 转成 LLM 可见 `content[0].text`（`ENVELOPE_PREFIX` + 各题 `buildAnswerSegment` + `ENVELOPE_SUFFIX`）；取消或空段统一 **`DECLINE_MESSAGE`** 文案策略在 `response-envelope.ts` 注释中写明。
 
 ### 2.3 行协议与类型（`state/row-intent.ts` + `tool/types.ts` + `view/components/wrapping-select.ts`）
@@ -43,7 +44,7 @@
 
 - 产出 **`QuestionnaireAction`** 判别联合（`nav`、`tab_switch`、`confirm`、`toggle`、`multi_confirm`、`cancel`、`notes_enter`/`exit`、`submit`、`submit_nav`、`focus_chat`、`focus_options`、`notes_forward`、`toggle_collapsed`、`ignore`）。
 - **最外层拦截**：`Ctrl+]` → `toggle_collapsed`（设计理由写在注释：避免与系统快捷键、Pi 其它快捷键冲突）。
-- **`collapsed`**：`routeKey` 在折叠态几乎吞掉所有键，仅 **`KEYBIND_CANCEL` → `cancel`**；与 `QuestionnaireSession` 里折叠时只渲染单行 hint、**不 `OverlayHandle.setHidden`** 的设计一致（保持 overlay 焦点不落到下层）。
+- **`collapsed`**：`routeKey` 在折叠态几乎吞掉所有键，仅 **`KEYBIND_CANCEL` → `cancel`**；与 `QuestionnaireSession` 里折叠时只渲染单行 hint、**不把焦点交回会话主界面** 的设计一致（rpiv 曾用 `OverlayHandle.setHidden` 达成类似效果；编辑器槽端口需等价处理焦点与键盘吞噬）。
 - **焦点优先级**与 **`selectActiveView`（`state/selectors/focus.ts`）** 一致：`notes` > `submit` tab > `chat` > `options`\*\*。
 - **单选列表**：`UP/DOWN` 在顶/底与 **`focus_chat` 闭环**（注释描述 `[chat, option0, …, optionLast]` 循环）；`Enter` 在 `chatFocused` / 普通列表都会走 `buildSingleSelectAnswer` → `confirm`（可带 `autoAdvanceTab`）。
 - **多选**：`Space` / `Enter` 在选项行上 **toggle**；在 **`ROW_INTENT_META.autoSubmitsInMulti`** 的行（即 `next`）上 `Enter` → `multi_confirm` 并带 `autoAdvanceTab`；`Space` 在 `blocksMultiToggle` 行被吞掉。
@@ -52,7 +53,7 @@
 ### 2.5 纯 reducer + 副作用（`state/state-reducer.ts` + `state/questionnaire-session.ts`）
 
 - **`reduce(state, action, ctx)`**：表驱动 **`HANDLERS`**，保证 **`QuestionnaireAction` 穷尽**；返回 `{ state, effects }`，**无副作用**。
-- **`Effect` 闭集**：`set_input_buffer` / `clear_input_buffer` / `set_notes_value` / `set_notes_focused` / `forward_notes_keystroke` / **`done`**。`QuestionnaireSession.runEffect` 里 **`done` 调 `this.done(result)`** 结束 overlay。
+- **`Effect` 闭集**：`set_input_buffer` / `clear_input_buffer` / `set_notes_value` / `set_notes_focused` / `forward_notes_keystroke` / **`done`**。`QuestionnaireSession.runEffect` 里 **`done` 调 `this.done(result)`** 结束 `ctx.ui.custom` 会话并恢复主编辑器。
 - **笔记与答案分离**：`notesByTab` 在 reducer 里维护；在 `confirm` / `multi_confirm` 时把 pending notes 合并进 `QuestionAnswer.notes`（避免「只加笔记就算答完」）。
 - **`handleIgnoreInline`**：`action.kind === "ignore"` 且 **`inputMode`** 时，把按键交给 headless **`inlineInput.handleInput`**（支持 bracketed paste、CSI-u 等），然后 **`viewAdapter.apply` 不走 reducer**——注释称为低延迟路径。
 
@@ -94,7 +95,7 @@
 
 | 耦合点                                          | 说明                                                                                                                            |
 | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| **`ctx.ui.custom` + overlay 选项**              | 行为与 Pi 版本绑定；port 的 Phase 0 必须用同版本 `pi-coding-agent` 实测。                                                       |
+| **`ctx.ui.custom`（编辑器槽）**                 | 行为与 Pi 版本绑定；Phase 0 用同版本 `pi-coding-agent` 实测 `custom` + `done`。                                                 |
 | **`getMarkdownTheme`（`build-questionnaire`）** | 预览 Markdown 依赖 Pi 暴露的主题 API。                                                                                          |
 | **`Input` 私有 `cursor` 反射**                  | `props-adapter.ts` 已标注希望将来换公共 API；port 后 Pi 升级需回归。                                                            |
 | **`@juicesharp/rpiv-config` / `rpiv-i18n`**     | 可替换/可选，但 **`index.ts` / `i18n-bridge.ts` 的顶层 await 与动态 import 模式**要在本仓库 tsconfig / Pi loader 下验证仍合法。 |
@@ -130,24 +131,25 @@
   - **轻量 UI 条件**：`statusline`、`user-message` 使用 `ctx.hasUI` 守卫。
   - **深度改 TUI**：`tool-display` 通过 patch `ToolExecutionComponent.prototype.render` 定制工具行渲染。
 
-**对照结论：**`ask_user_question` 属于 **「注册工具 + 重度 `ctx.ui.custom` overlay」**；与本仓库多数包相比，**代码量与 TUI 状态机更接近一个独立子项目**，适合单独 `packages/ask-user-question/`（或 `packages/user-question/`），而不是塞进现有 `user-message`（除非刻意做大而全的「用户交互」聚合包）。
+**对照结论：**`ask_user_question` 属于 **「注册工具 + 重度 `ctx.ui.custom`（编辑器槽）」**；与本仓库多数包相比，**代码量与 TUI 状态机更接近一个独立子项目**，适合单独 `packages/ask-user-question/`（或 `packages/user-question/`），而不是塞进现有 `user-message`（除非刻意做大而全的「用户交互」聚合包）。
 
 ## 5. Port 目标与原则
 
-| 目标         | 说明                                                                                                                                                                       |
-| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **功能**     | 至少支持 README 中的 schema 子集：多题、单选/多选、选项 label/description、可选 preview、提交前确认、无 UI 时明确错误。                                                    |
-| **API 对齐** | 以本机锁定的 `@earendil-works/pi-coding-agent` 为准，验证 `ctx.ui.custom` 签名、overlay 选项、`done` 回调与上游一致；若有不兼容，在实现阶段做薄适配层而非 fork 全量 view。 |
-| **依赖**     | 优先去掉 `@juicesharp/rpiv-config` / `@juicesharp/rpiv-i18n`，改为可选：本地 `guidance.json` 或 extension 内常量；i18n 第二阶段再引入或对接自有方案。                      |
-| **仓库规范** | 新包 `package.json` 加入 workspace；根 `tsconfig.json` references；`AGENTS.md` 列表更新；工具 `promptSnippet` / `promptGuidelines` 与上游语义对齐。                        |
-| **合规**     | 上游 MIT；port 时保留版权与来源说明（README / 文件头按团队规范）。                                                                                                         |
+| 目标         | 说明                                                                                                                                                              |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **功能**     | 至少支持 README 中的 schema 子集：多题、单选/多选、选项 label/description、可选 preview、提交前确认、无 UI 时明确错误。                                           |
+| **API 对齐** | 以本机锁定的 `@earendil-works/pi-coding-agent` 为准，验证 **`ctx.ui.custom` 工厂签名、`done`、编辑器恢复**；若有不兼容，在实现阶段做薄适配层而非 fork 全量 view。 |
+| **依赖**     | 优先去掉 `@juicesharp/rpiv-config` / `@juicesharp/rpiv-i18n`，改为可选：本地 `guidance.json` 或 extension 内常量；i18n 第二阶段再引入或对接自有方案。             |
+| **仓库规范** | 新包 `package.json` 加入 workspace；根 `tsconfig.json` references；`AGENTS.md` 列表更新；工具 `promptSnippet` / `promptGuidelines` 与上游语义对齐。               |
+| **合规**     | 上游 MIT；port 时保留版权与来源说明（README / 文件头按团队规范）。                                                                                                |
 
 ## 6. 分阶段设计方案
 
 ### Phase 0 — API 与行为探测（1–2 天）
 
-- 在当前 Pi 版本上写最小脚本或临时 extension：仅调用 `ctx.ui.custom` 返回一个 `Text`/`Box`，确认 **overlay、键盘、done 生命周期** 与上游假设一致。
-- 对照 `ExtensionContext` 类型定义，列出与 `ask-user-question.ts` 中用法差异清单（若有）。
+- 在当前 Pi 版本上写最小 extension：`ctx.ui.custom` 返回 `Text`/`Box`，**键盘与 `done` 生命周期**与工具假设一致。
+- **挂载位置**：只使用 **`ctx.ui.custom(factory)`**（**编辑器槽**），与 [ghoseb/pi-askuserquestion](https://github.com/ghoseb/pi-askuserquestion/blob/main/README.md) 一致；见 [PHASE0.md](./PHASE0.md)。
+- 对照 `ExtensionContext` 类型定义，列出与 rpiv `ask-user-question.ts` 的差异清单（若有）。
 
 ### Phase 1 — MVP 包落地（核心路径）
 
@@ -180,11 +182,11 @@
 
 | 风险                                                | 缓解                                                                            |
 | --------------------------------------------------- | ------------------------------------------------------------------------------- |
-| **`ctx.ui.custom` 行为差异**（不同 Pi 版本 / fork） | Phase 0 用最小 overlay 验证；差异集中在适配层。                                 |
+| **`ctx.ui.custom` 行为差异**（不同 Pi 版本 / fork） | Phase 0 用最小 **编辑器槽** `custom` 探测；差异集中在适配层。                   |
 | **TUI 体量与维护成本**                              | 保持 `state` / `view` 边界清晰；单测优先覆盖 reducer 与校验。                   |
 | **与 `user-message` 职责重叠**                      | 本包专注「模型发起的结构化选择题」；自由文本用户输入仍属会话主流程，不必合并。  |
 | **子 agent / 无 UI 会话**                           | 子会话若 `hasUI` 为 false，行为应与上游一致：工具返回错误信息，不阻塞整条链路。 |
 
 ## 9. 小结
 
-上游 **`rpiv-ask-user-question`** 是一个 **以 `registerTool` + `ctx.ui.custom` overlay 为核心的重型 TUI 扩展**；逻辑上可拆为 **类型/校验/响应封装（薄）** + **问卷状态机与视图（厚）**。Port 到 **hawtian-pi-extensions** 时，推荐 **新建独立 package**，先替换 **配置与 i18n 依赖**，再分阶段迁移 **工具层 → 全量 UI**，并在 Phase 0 **锁定 Pi 的 UI API** 与本仓库扩展约定一致。
+上游 **`rpiv-ask-user-question`** 是一个 **以 `registerTool` + `ctx.ui.custom`（历史上为全屏浮层）为核心的重型 TUI 扩展**；逻辑上可拆为 **类型/校验/响应封装（薄）** + **问卷状态机与视图（厚）**。Port 到 **hawtian-pi-extensions** 时固定为 **编辑器槽 `custom`**，推荐 **新建独立 package**，先替换 **配置与 i18n 依赖**，再分阶段迁移 **工具层 → 全量 UI**，并在 Phase 0 **锁定 Pi 的 UI API** 与本仓库约定一致。

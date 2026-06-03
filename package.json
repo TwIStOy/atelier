@@ -15,7 +15,8 @@
       "packages/user-message",
       "packages/tool-display",
       "packages/subagents",
-      "packages/extra-tools"
+      "packages/extra-tools",
+      "packages/ask-user-question"
     ],
     "skills": [],
     "themes": [

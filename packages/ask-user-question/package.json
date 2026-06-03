@@ -1,0 +1,19 @@
+{
+  "name": "@htwang-contrib/ask-user-question",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "index.ts",
+  "types": "index.ts",
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "latest",
+    "@earendil-works/pi-tui": "latest",
+    "@types/node": "^25.9.1",
+    "typescript": "^6.0.0"
+  }
+}

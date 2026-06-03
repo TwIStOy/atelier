@@ -9,6 +9,7 @@
     { "path": "packages/user-message" },
     { "path": "packages/tool-display" },
     { "path": "packages/subagents" },
-    { "path": "packages/extra-tools" }
+    { "path": "packages/extra-tools" },
+    { "path": "packages/ask-user-question" }
   ]
 }
