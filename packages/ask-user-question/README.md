@@ -11,3 +11,7 @@ With this repo on your `pi.extensions` list, start interactive Pi and run:
 The probe calls **`ctx.ui.custom(factory)`** with no options object, so the UI appears in the **prompt editor region** (same as [ghoseb/pi-askuserquestion](https://github.com/ghoseb/pi-askuserquestion)). Press Enter to call `done`; Pi restores the normal editor and shows an info notification with the JSON result.
 
 See [docs/ask-user-question/PHASE0.md](../../docs/ask-user-question/PHASE0.md) for locked dependency versions and porting notes.
+
+## Tool layer (P1-1)
+
+`packages/ask-user-question/tool/` — TypeBox **`QuestionParamsSchema`**, **`validateQuestionnaire`**, **`buildQuestionnaireResponse`** / **`buildAnswerSegment`**, **`formatAnswerScalar`**. `types.ts` inlines sentinel labels (aligned with rpiv `ROW_INTENT_META`) so this step does not depend on `state/row-intent.ts` yet.

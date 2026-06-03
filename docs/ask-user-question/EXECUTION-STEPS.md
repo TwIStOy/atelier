@@ -16,11 +16,11 @@
 | -------- | ------------- |
 | Phase 0  | 3 / 3         |
 | 脚手架   | 7 / 7         |
-| Phase 1  | 0 / 5         |
+| Phase 1  | 1 / 5         |
 | Phase 2  | 0 / 13        |
 | Phase 3  | 0 / 2         |
 | 收尾     | 0 / 2         |
-| **合计** | **10 / 32**   |
+| **合计** | **11 / 32**   |
 
 ---
 
@@ -46,7 +46,7 @@
 
 ## Phase 1 — MVP：工具层 + 最薄可跑通路径
 
-- [ ] **P1-1** 迁移薄层（改 import 路径）：`tool/types.ts`、`validate-questionnaire.ts`、`response-envelope.ts`、`format-answer.ts` 及 schema 强相关逻辑。
+- [x] **P1-1** 迁移薄层（改 import 路径）：`tool/types.ts`、`validate-questionnaire.ts`、`response-envelope.ts`、`format-answer.ts` 及 schema 强相关逻辑。
 - [ ] **P1-2** 替换 **`rpiv-config`**：包内 `guidance.json` 或默认常量 + `readFileSync` / 静态导出；`promptSnippet` / `promptGuidelines` 合并进 `registerTool`，语义与上游一致。
 - [ ] **P1-3** **`index.ts`**：默认导出注册函数；**不接 `rpiv-i18n`**；UI 字符串英文硬编码或 `strings.ts`。
 - [ ] **P1-4** **`execute` 骨架**：`!ctx.hasUI` → `details.error: "no_ui"`；`validateQuestionnaire` 失败路径与上游枚举对齐；若 Phase 1 不接 `pi.events.emit`，在 README 写明与上游差异。
