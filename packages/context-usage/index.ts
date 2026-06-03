@@ -5,11 +5,12 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import { Key, matchesKey } from "@earendil-works/pi-tui";
 import type { TUI } from "@earendil-works/pi-tui";
-import { CONTEXT_USAGE_WIDGET_KEY } from "./constants.ts";
 import {
   buildContextUsageDetails,
   renderContextUsageMessage,
 } from "./context-usage.ts";
+
+const CONTEXT_USAGE_WIDGET_KEY = "pi-extensions.context-usage";
 
 const INSTALL_GUARD = Symbol.for("pi-extensions.context-usage.installed");
 
