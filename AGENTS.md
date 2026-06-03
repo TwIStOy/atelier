@@ -15,7 +15,7 @@ Monorepo with packages under `packages/`:
 - `packages/tool-display/` -- Tool call rendering adapters for the pi TUI.
 - `packages/user-message/` -- User message handling extension.
 - `packages/extra-tools/` -- Extra LLM tools `grep`, `glob`, and `ls` (prompt bullets in co-located `.txt`; `grep`/`glob` use ripgrep). Same-named tools override pi built-ins when this extension loads.
-- `packages/ask-user-question/` -- Structured `ask_user_question` tool (port in progress). Phase 0: `/auq-phase0` probes `ctx.ui.custom` in the **editor slot** only; see `docs/ask-user-question/`.
+- `packages/ask-user-question/` -- `ask_user_question` MVP; dev commands **`/auq-phase0`** / **`/auq-phase1`** live in **`demo.ts`** (delete with demos when port is done); see `docs/ask-user-question/`.
 - `.agents/skills/pi-self-extension/` -- skill with authoritative guidance for building pi extensions (API reference, compat gotchas, validation checklist).
 
 ## Subagents

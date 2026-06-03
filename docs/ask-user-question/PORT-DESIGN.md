@@ -135,13 +135,13 @@
 
 ## 5. Port 目标与原则
 
-| 目标         | 说明                                                                                                                                                              |
-| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **功能**     | 至少支持 README 中的 schema 子集：多题、单选/多选、选项 label/description、可选 preview、提交前确认、无 UI 时明确错误。                                           |
-| **API 对齐** | 以本机锁定的 `@earendil-works/pi-coding-agent` 为准，验证 **`ctx.ui.custom` 工厂签名、`done`、编辑器恢复**；若有不兼容，在实现阶段做薄适配层而非 fork 全量 view。 |
-| **依赖**     | 优先去掉 `@juicesharp/rpiv-config` / `@juicesharp/rpiv-i18n`，改为可选：本地 `guidance.json` 或 extension 内常量；i18n 第二阶段再引入或对接自有方案。             |
-| **仓库规范** | 新包 `package.json` 加入 workspace；根 `tsconfig.json` references；`AGENTS.md` 列表更新；工具 `promptSnippet` / `promptGuidelines` 与上游语义对齐。               |
-| **合规**     | 上游 MIT；port 时保留版权与来源说明（README / 文件头按团队规范）。                                                                                                |
+| 目标         | 说明                                                                                                                                                                                          |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **功能**     | 至少支持 README 中的 schema 子集：多题、单选/多选、选项 label/description、可选 preview、提交前确认、无 UI 时明确错误。                                                                       |
+| **API 对齐** | 以本机锁定的 `@earendil-works/pi-coding-agent` 为准，验证 **`ctx.ui.custom` 工厂签名、`done`、编辑器恢复**；若有不兼容，在实现阶段做薄适配层而非 fork 全量 view。                             |
+| **依赖**     | 优先去掉 `@juicesharp/rpiv-config` / `@juicesharp/rpiv-i18n`；`promptSnippet` / `promptGuidelines` 写在 **`tool.ts`**（包根，与 `tool/` 目录区分）常量中；i18n 第二阶段再引入或对接自有方案。 |
+| **仓库规范** | 新包 `package.json` 加入 workspace；根 `tsconfig.json` references；`AGENTS.md` 列表更新；工具 `promptSnippet` / `promptGuidelines` 与上游语义对齐。                                           |
+| **合规**     | 上游 MIT；port 时保留版权与来源说明（README / 文件头按团队规范）。                                                                                                                            |
 
 ## 6. 分阶段设计方案
 
@@ -156,7 +156,7 @@
 - 新增 **`packages/ask-user-question/`**（名称可与工具名对应，便于发现）。
 - **直接迁移**（复制后改 import 路径）：`tool/types.ts`、`validate-questionnaire.ts`、`response-envelope.ts`、`format-answer.ts` 及与 schema 强相关的逻辑。
 - **入口**：`index.ts` 只负责 `registerTool`；**暂不接** `rpiv-i18n` 动态 import，UI 字符串硬编码英文或抽 `strings.ts`。
-- **`config`**：用本仓库方式替代 `rpiv-config`（例如 `readFileSync` 读包内 `guidance.json` 或导出默认 `DEFAULT_PROMPT_*`）。
+- **`config`**：用本仓库包根 **`tool.ts`** 中的 `DEFAULT_PROMPT_*` 替代 `rpiv-config` 拉取的 guidance。
 - **验收**：非交互 `hasUI === false` 返回 `no_ui`；交互下一题单选 + 提交成功，`details` 形状与上游 README 一致或文档化差异。
 
 ### Phase 2 — UI 与状态机完整 parity
