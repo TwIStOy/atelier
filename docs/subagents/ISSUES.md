@@ -1,1 +1,3 @@
 - [ ] User message 里的花费统计，要算上 subagents 使用的
+- [ ] Subagents 可以统计一个在运行的时间，放在提示的最后面
+- [ ] 可以有一个面板查看运行过的 subagent 的所有历史记录
