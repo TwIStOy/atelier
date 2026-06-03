@@ -14,6 +14,7 @@ Monorepo with packages under `packages/`:
 - `packages/statusline/` -- Custom status bar widgets for the pi TUI.
 - `packages/tool-display/` -- Tool call rendering adapters for the pi TUI.
 - `packages/user-message/` -- User message handling extension.
+- `packages/user-input-history/` -- Persistent prompt history in `history-store.ts` (`XDG_CACHE_HOME/pi/user-input-history.json`, locked multi-process merge); Ctrl+R panel in `interactive-search.ts` ranks lines with **skim** (`sk --filter`, stdin = history; falls back to built-in fuzzy if `sk` missing); extension entry `index.ts` clears built-in `ctrl+r` on `app.session.rename` via in-memory `getKeybindings().setUserBindings` only (does not edit `keybindings.json`).
 - `packages/extra-tools/` -- Extra LLM tools `grep`, `glob`, and `ls` (prompt bullets in co-located `.txt`; `grep`/`glob` use ripgrep). Same-named tools override pi built-ins when this extension loads.
 - `packages/ask-user-question/` -- `ask_user_question` tool + rpiv-parity **`state/`** / **`view/`** (editor-slot `ctx.ui.custom` only); dev commands **`/auq-phase0`** / **`/auq-phase1`** / **`/auq-phase2`** in **`demo.ts`** (delete with demos when port is done); see `docs/ask-user-question/`.
 - `packages/context-usage/` -- **`/context`** command: estimated context-window usage in the below-editor widget; **Esc** clears it. Adapted from dotpi `context-usage`.

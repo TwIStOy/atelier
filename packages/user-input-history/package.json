@@ -1,0 +1,18 @@
+{
+  "name": "@htwang-contrib/user-input-history",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "index.ts",
+  "types": "index.ts",
+  "dependencies": {
+    "proper-lockfile": "4.1.2"
+  },
+  "devDependencies": {
+    "@types/proper-lockfile": "4.1.4",
+    "@earendil-works/pi-ai": "^0.76.0",
+    "@earendil-works/pi-coding-agent": "latest",
+    "@earendil-works/pi-tui": "^0.76.0",
+    "@types/node": "^25.9.1",
+    "typescript": "^6.0.0"
+  }
+}
