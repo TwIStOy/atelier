@@ -1,6 +1,6 @@
 # ask-user-question
 
-Port of structured questionnaire tooling from [rpiv-ask-user-question](https://github.com/juicesharp/rpiv-mono/tree/main/packages/rpiv-ask-user-question). Work is staged per [docs/ask-user-question/EXECUTION-STEPS.md](../../docs/ask-user-question/EXECUTION-STEPS.md).
+Port of structured questionnaire tooling from [rpiv-ask-user-question](https://github.com/juicesharp/rpiv-mono/tree/main/packages/rpiv-ask-user-question) (MIT). Work is staged per [docs/ask-user-question/EXECUTION-STEPS.md](../../docs/ask-user-question/EXECUTION-STEPS.md).
 
 ## Phase 0 manual check
 
@@ -10,36 +10,33 @@ With this repo on your `pi.extensions` list, start interactive Pi and run:
 
 The probe calls **`ctx.ui.custom(factory)`** with no options object, so the UI appears in the **prompt editor region** (same as [ghoseb/pi-askuserquestion](https://github.com/ghoseb/pi-askuserquestion)). Press Enter to call `done`; Pi restores the normal editor and shows an info notification with the JSON result.
 
-### Phase 1 UI demo
+### Phase 1 / full UI demos
 
-`/auq-phase1` uses the same questionnaire component as the tool (two sample questions from [`example-questionnaire.ts`](./example-questionnaire.ts)): **↑↓** move, **Enter** confirms each question, **Esc** cancels. After close, an info notification shows the **LLM-facing envelope** text from `buildQuestionnaireResponse`.
+`/auq-phase1` opens the same **`QuestionnaireSession`** path as the real tool (sample from [`example-questionnaire.ts`](./example-questionnaire.ts)).
 
-### Phase 2 hand-test demo
-
-`/auq-phase2` runs [`example-phase2-questionnaire.ts`](./example-phase2-questionnaire.ts): first question is **multi-select** (**Space** toggles, **Enter** on **Submit** confirms); second is single-select with a **Chat about this** row (**Enter** on that row ends with a `chat` answer). The demo calls **`emitAskUserPrompt`** before opening the UI so you can subscribe to **`ask_user_question:prompt`** (same event as the real tool after validation). Use this to verify keyboard flow and envelope text in the editor slot.
+`/auq-phase2` runs [`example-phase2-questionnaire.ts`](./example-phase2-questionnaire.ts) and **`emitAskUserPrompt`** before the UI so you can listen for **`ask_user_question:prompt`**.
 
 See [docs/ask-user-question/PHASE0.md](../../docs/ask-user-question/PHASE0.md) for locked dependency versions and porting notes.
 
-## Tool layer (P1-1)
+## Layout
 
-`packages/ask-user-question/tool/` — TypeBox **`QuestionParamsSchema`**, **`validateQuestionnaire`**, **`buildQuestionnaireResponse`** / **`buildAnswerSegment`**, **`formatAnswerScalar`**. `types.ts` inlines sentinel labels (aligned with rpiv `ROW_INTENT_META`) so this step does not depend on `state/row-intent.ts` yet.
+| Path                 | Role                                                                                                                                                                                                            |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`tool/`**          | TypeBox schema, **`validateQuestionnaire`**, response envelope, **`formatAnswerScalar`**. **`types.ts`** pulls **`SENTINEL_LABELS`** from **`state/row-intent.ts`** (single source with **`ROW_INTENT_META`**). |
+| **`state/`**         | **`QuestionnaireSession`**, **`reduce`**, **`key-router`**, **`selectors/`**, **`build-questionnaire.ts`**.                                                                                                     |
+| **`view/`**          | **`DialogView`**, tab strategies, **`PreviewPane`**, **`MultiSelectView`**, **`QuestionnairePropsAdapter`**.                                                                                                    |
+| **`tool.ts`**        | Registers **`ask_user_question`**, prompt defaults, **`execute`** → **`emitAskUserPrompt`** → **`ctx.ui.custom`** (editor slot **only** — no overlay object).                                                   |
+| **`build-items.ts`** | **`buildItemsForQuestion`** (sentinel rows) shared by **`tool.ts`** and demos.                                                                                                                                  |
+| **`events.ts`**      | **`ask_user_question:prompt`** payload (per-option **`hasPreview`**, no preview body).                                                                                                                          |
 
-Package root **`tool.ts`** (next to **`tool/`**) registers `ask_user_question` and holds prompt defaults; do not confuse with the `tool/` schema folder.
+## Demos and removal
 
-## Phase 1 — `ask_user_question` tool (MVP)
+**`index.ts`** wires **`registerAskUserQuestionDemos`** from **`demo.ts`** (`/auq-phase0`, `/auq-phase1`, `/auq-phase2`). When the port is finished, remove **`demo.ts`** and that call (and demo-only examples if unused).
 
-The extension registers **`ask_user_question`** in **`tool.ts`**. **`index.ts`** wires **`registerAskUserQuestionDemos`** from **`demo.ts`** (`/auq-phase0`, `/auq-phase1`, `/auq-phase2`). When the port is finished, remove **`demo.ts`** and drop the `registerAskUserQuestionDemos` call from **`index.ts`** (and demo-only example modules if nothing else imports them).
+## vs upstream rpiv
 
-### Prompt snippet / guidelines (P1-2)
+- **Mounting**: rpiv used **`ctx.ui.custom(..., { overlay: true, ... })`**; this package uses **editor-slot-only** `custom(factory)` (see [PHASE0.md](../../docs/ask-user-question/PHASE0.md)). Re-validate layout on your Pi build (**EXECUTION-STEPS P2-12**).
+- **Copy / strings**: UI strings are **inline English** in components and **`ROW_INTENT_META`** (no **`rpiv-i18n`**).
+- **Events**: channel name is **`ask_user_question:prompt`** (not **`rpiv:ask-user:prompt`**) so it matches the tool id in this monorepo; payload shape follows the upstream summary (including **`options[]`** with **`hasPreview`**).
 
-Edit **`tool.ts`** (`DEFAULT_PROMPT_SNIPPET`, `DEFAULT_PROMPT_GUIDELINES`) when you want to change what Pi injects into the system prompt for this tool.
-
-### Current UI vs rpiv (Phase 2 增量中)
-
-- **Editor slot only**: `execute` uses **`ctx.ui.custom(factory)`** with no overlay options (see [PHASE0.md](../../docs/ask-user-question/PHASE0.md)).
-- **`pi.events.emit`**: after successful validation, **`emitAskUserPrompt`** emits **`ask_user_question:prompt`** with per-question **`header` / `question` / `multiSelect` / `hasPreview`** only (no preview body). See [`events.ts`](./events.ts).
-- **Multi-select**: supported in **[`questionnaire-ui.ts`](./questionnaire-ui.ts)**; **`multiSelect` + non-empty `preview` on any option** is rejected at validation (`multi_select_preview`).
-- **Single-select**: **Chat about this** row is shown; **“Type something.”** custom row is not implemented yet (full parity is later Phase 2).
-- **Preview**: for single-select questions that have any option `preview`, the UI shows a **plain-text stub** (first lines only); **not** the rpiv Markdown `PreviewPane` / `getMarkdownTheme` pipeline yet. Selected option `preview` is still passed through to **`details` / envelope** when the user confirms an option.
-
-`content[0].text` and `details` for success / validation / `no_ui` follow the same **`buildToolResult` / `buildQuestionnaireResponse`** shapes as the rpiv tool layer.
+`content[0].text` and `details` for success / validation / `no_ui` follow **`buildToolResult` / `buildQuestionnaireResponse`** as in rpiv.

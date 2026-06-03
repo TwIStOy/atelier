@@ -24,6 +24,7 @@
 - **`index.ts`**：`export default` 仅调用 `registerAskUserQuestionTool`；模块顶层 **`await import("@juicesharp/rpiv-i18n/loader")`**，成功则 `registerLocalesFromDir(I18N_NAMESPACE, import.meta.url)` 把包内 `locales/*.json` 挂到 SDK；失败则静默英文。**ESM 顶层 await** 保证任何下游在同步调用 `t()` 前 `scopeImpl` 已就绪。
 - **`config.ts`**：唯一依赖 **`@juicesharp/rpiv-config`** 的 `configPath("rpiv-ask-user-question")` + `loadJsonConfig`，读出可选 `guidance`（`promptSnippet` / `promptGuidelines`），在 `ask-user-question.ts` 里经 `validateGuidanceFields` 合并进 `registerTool`。
 - **`state/i18n-bridge.ts`**：另一条动态 **`await import("@juicesharp/rpiv-i18n")`** 得到 `scope(namespace)`；失败则 `t(key,fallback)=fallback`。`displayLabel(sentinelKind)` 用 `t(\`sentinel.${kind}\`, ROW_INTENT_META[kind].label)`。**校验保留字标签**用的是英文 canonical `ROW_INTENT_META`，不用 `displayLabel`，避免 locale 绕过保留字检测。
+- **hawtian-pi-extensions**：无 **`i18n-bridge.ts`**；sentinel 与 UI 字面量直接使用 **`ROW_INTENT_META`** 或各文件内英文常量。
 
 ### 2.2 工具 `execute` 主路径（`ask-user-question.ts`）
 
@@ -42,9 +43,9 @@
 
 ### 2.4 键盘路由（`state/key-router.ts`）
 
-- 产出 **`QuestionnaireAction`** 判别联合（`nav`、`tab_switch`、`confirm`、`toggle`、`multi_confirm`、`cancel`、`notes_enter`/`exit`、`submit`、`submit_nav`、`focus_chat`、`focus_options`、`notes_forward`、`toggle_collapsed`、`ignore`）。
-- **最外层拦截**：`Ctrl+]` → `toggle_collapsed`（设计理由写在注释：避免与系统快捷键、Pi 其它快捷键冲突）。
-- **`collapsed`**：`routeKey` 在折叠态几乎吞掉所有键，仅 **`KEYBIND_CANCEL` → `cancel`**；与 `QuestionnaireSession` 里折叠时只渲染单行 hint、**不把焦点交回会话主界面** 的设计一致（rpiv 曾用 `OverlayHandle.setHidden` 达成类似效果；编辑器槽端口需等价处理焦点与键盘吞噬）。
+- 产出 **`QuestionnaireAction`** 判别联合（`nav`、`tab_switch`、`confirm`、`toggle`、`multi_confirm`、`cancel`、`notes_enter`/`exit`、`submit`、`submit_nav`、`focus_chat`、`focus_options`、`notes_forward`、`ignore`）。**hawtian-pi-extensions**：无上游的 **`toggle_collapsed`**。
+- **（仅上游 rpiv）** **最外层拦截**：`Ctrl+]` → `toggle_collapsed`；**hawtian-pi-extensions 已删除**。
+- **（仅上游 rpiv）`collapsed`**：`routeKey` 在折叠态几乎吞掉所有键，仅 **`KEYBIND_CANCEL` → `cancel`**；`QuestionnaireSession` 折叠时只渲染单行 hint。**hawtian-pi-extensions 已删除折叠态与 `Ctrl+]`**。
 - **焦点优先级**与 **`selectActiveView`（`state/selectors/focus.ts`）** 一致：`notes` > `submit` tab > `chat` > `options`\*\*。
 - **单选列表**：`UP/DOWN` 在顶/底与 **`focus_chat` 闭环**（注释描述 `[chat, option0, …, optionLast]` 循环）；`Enter` 在 `chatFocused` / 普通列表都会走 `buildSingleSelectAnswer` → `confirm`（可带 `autoAdvanceTab`）。
 - **多选**：`Space` / `Enter` 在选项行上 **toggle**；在 **`ROW_INTENT_META.autoSubmitsInMulti`** 的行（即 `next`）上 `Enter` → `multi_confirm` 并带 `autoAdvanceTab`；`Space` 在 `blocksMultiToggle` 行被吞掉。

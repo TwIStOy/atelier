@@ -1,6 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { buildItemsForQuestion } from "./build-items.ts";
 import { emitAskUserPrompt } from "./events.ts";
-import { createQuestionnaireComponent } from "./questionnaire-ui.ts";
+import { QuestionnaireSession } from "./state/questionnaire-session.ts";
 import {
   buildQuestionnaireResponse,
   buildToolResult,
@@ -75,9 +76,19 @@ export function registerAskUserQuestionTool(pi: ExtensionAPI): void {
 
       emitAskUserPrompt(pi, typed);
 
+      const itemsByTab = typed.questions.map((q) => buildItemsForQuestion(q));
+
       const result = await ctx.ui.custom<QuestionnaireResult>(
-        (tui, theme, _keybindings, done) =>
-          createQuestionnaireComponent(typed, theme, tui, done),
+        (tui, theme, _keybindings, done) => {
+          const session = new QuestionnaireSession({
+            tui,
+            theme,
+            params: typed,
+            itemsByTab,
+            done,
+          });
+          return session.component;
+        },
       );
 
       return buildQuestionnaireResponse(result, typed);

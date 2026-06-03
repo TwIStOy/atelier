@@ -4,10 +4,11 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import { Box, Text } from "@earendil-works/pi-tui";
 import type { Component } from "@earendil-works/pi-tui";
+import { buildItemsForQuestion } from "./build-items.ts";
 import { emitAskUserPrompt } from "./events.ts";
 import { EXAMPLE_PHASE2_QUESTIONNAIRE } from "./example-phase2-questionnaire.ts";
 import { EXAMPLE_QUESTIONNAIRE } from "./example-questionnaire.ts";
-import { createQuestionnaireComponent } from "./questionnaire-ui.ts";
+import { QuestionnaireSession } from "./state/questionnaire-session.ts";
 import { buildQuestionnaireResponse } from "./tool/response-envelope.ts";
 import type { QuestionnaireResult } from "./tool/types.ts";
 import { validateQuestionnaire } from "./tool/validate-questionnaire.ts";
@@ -33,13 +34,18 @@ export function registerAskUserQuestionDemos(pi: ExtensionAPI): void {
       }
       emitAskUserPrompt(pi, EXAMPLE_PHASE2_QUESTIONNAIRE);
       const result = await ctx.ui.custom<QuestionnaireResult>(
-        (tui, theme, _keybindings, done) =>
-          createQuestionnaireComponent(
-            EXAMPLE_PHASE2_QUESTIONNAIRE,
-            theme,
+        (tui, theme, _keybindings, done) => {
+          const itemsByTab = EXAMPLE_PHASE2_QUESTIONNAIRE.questions.map((q) =>
+            buildItemsForQuestion(q),
+          );
+          return new QuestionnaireSession({
             tui,
+            theme,
+            params: EXAMPLE_PHASE2_QUESTIONNAIRE,
+            itemsByTab,
             done,
-          ),
+          }).component;
+        },
       );
       const toolView = buildQuestionnaireResponse(
         result,
@@ -56,7 +62,7 @@ export function registerAskUserQuestionDemos(pi: ExtensionAPI): void {
 
   pi.registerCommand("auq-phase1", {
     description:
-      "ask_user_question Phase 1: open MVP questionnaire UI (sample 2 questions) in the editor slot",
+      "ask_user_question: open full QuestionnaireSession UI (sample 2 questions) in the editor slot",
     async handler(_args, ctx: ExtensionCommandContext) {
       if (!ctx.hasUI) {
         ctx.ui.notify(
@@ -71,8 +77,19 @@ export function registerAskUserQuestionDemos(pi: ExtensionAPI): void {
         return;
       }
       const result = await ctx.ui.custom<QuestionnaireResult>(
-        (tui, theme, _keybindings, done) =>
-          createQuestionnaireComponent(EXAMPLE_QUESTIONNAIRE, theme, tui, done),
+        (tui, theme, _keybindings, done) => {
+          const params = EXAMPLE_QUESTIONNAIRE;
+          const itemsByTab = params.questions.map((q) =>
+            buildItemsForQuestion(q),
+          );
+          return new QuestionnaireSession({
+            tui,
+            theme,
+            params,
+            itemsByTab,
+            done,
+          }).component;
+        },
       );
       const toolView = buildQuestionnaireResponse(
         result,
@@ -81,7 +98,7 @@ export function registerAskUserQuestionDemos(pi: ExtensionAPI): void {
       const text =
         toolView.content[0]?.type === "text" ? toolView.content[0].text : "";
       ctx.ui.notify(
-        `Phase 1 MVP done (cancelled=${result?.cancelled ?? true}). Envelope:\n${text}`,
+        `Phase 1 demo done (cancelled=${result?.cancelled ?? true}). Envelope:\n${text}`,
         "info",
       );
     },

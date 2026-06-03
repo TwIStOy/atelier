@@ -17,10 +17,10 @@
 | Phase 0  | 3 / 3         |
 | 脚手架   | 7 / 7         |
 | Phase 1  | 5 / 5         |
-| Phase 2  | 3 / 13        |
+| Phase 2  | 11 / 13       |
 | Phase 3  | 0 / 2         |
-| 收尾     | 0 / 2         |
-| **合计** | **18 / 32**   |
+| 收尾     | 1 / 2         |
+| **合计** | **27 / 32**   |
 
 ---
 
@@ -56,29 +56,19 @@
 
 ## Phase 2 — UI / 状态机 parity（大块，建议按模块合入）
 
-**增量说明（当前仓库）**：已合入 **`events.ts`** + **`questionnaire-ui.ts`**（多选 Submit、单选 Chat、单选 preview 纯文本 stub）、校验 **`multi_select_preview`**；手测命令 **`/auq-phase2`**。完整 **`state/`** / **`view/`** / Markdown 预览 parity 仍按下列项推进。
+**本仓库合入说明**：已从上游 **`rpiv-ask-user-question`** 迁入 **`state/`**、**`view/`**（含 Markdown 预览链）、**`build-questionnaire`**、**`QuestionnaireSession`**；import 改为 **`.ts` 后缀**；**无 `rpiv-i18n`**，文案为内联英文 + **`ROW_INTENT_META`**；**已移除折叠（`Ctrl+]`）与 `i18n-bridge` 模块**。**`execute`** 仍只用 **`ctx.ui.custom(factory)`**（**无 overlay**）。事件名为 **`ask_user_question:prompt`**，payload 含每题 **`options[].hasPreview`**、**不含 preview 正文**。
 
-**P2-9 之前的项（P2-1～P2-8）当前状态**：**均未按 rpiv 目录结构迁移**，仍是 `- [ ]`。当前 `questionnaire-ui.ts` 只是编辑器槽里的**薄壳交互**，与上游 parity 的对应关系如下，**不能**当作这些项已验收：
+**P2-12** 仍需在本机 Pi TUI 下做人工回归（窄/宽终端、长行、多 Tab、编辑器槽布局）。
 
-| 项 | 说明 |
-| --- | --- |
-| **P2-1** | 无 `packages/ask-user-question/state/`；无 `reduce` / `Effect` / `key-router` 穷尽联合。 |
-| **P2-2** | 无 `view/`、`build-questionnaire`、`DialogView`、binding 策略。 |
-| **P2-3～P2-5** | 无 `PreviewPane`、`injectGlobalLeftWidth`、`decideLayout`、`getMarkdownTheme` 预览链。 |
-| **P2-6～P2-7** | 多选仅有**列表内勾选 + Submit 行**；**无**上游 `MultiSelectView` / `bodyHeights` / `selectMultiSelectProps` 等实现与测试契约。 |
-| **P2-8** | 无 `Input` cursor、无 `Ctrl+]` 折叠、无 notes / `inlineInput` 低延迟路径等。 |
-
-**Phase 2 之前的阶段**（Phase 0、脚手架、Phase 1）：见上文各节，均为 **`[x]`**，无未勾选缺口。
-
-- [ ] **P2-1** 迁移 **`state/`**：`reduce` + `Effect`、`QuestionnaireSession`、`key-router`、`selectors`；`QuestionnaireAction` 穷尽、Effect 闭集与上游一致。
-- [ ] **P2-2** 迁移 **`view/`** 与 **`build-questionnaire.ts`**：`QuestionnaireBuilder`、`QuestionnairePropsAdapter`、bindings、`DialogView` / tab 策略。
-- [ ] **P2-3** 确认 **`injectGlobalLeftWidth` 在首帧 `PreviewPane.render` 之前**已注入（否则会按设计抛错）。
-- [ ] **P2-4** 预览回归：**`getMarkdownTheme()`** 可用；列宽变化时 Markdown 缓存**整表失效**（PORT-DESIGN §2.8）。
-- [ ] **P2-5** 预览回归：**`decideLayout`** 的 `mode` **只算一次**并贯穿高度与渲染；终端与 pane **双 ≥100** 并排，否则堆叠。
-- [ ] **P2-6** 预览回归：**多选题**下 `PreviewPane` 退化为仅选项列；**`bodyHeights`** 使用 **`MultiSelectView.naturalHeight`**。
-- [ ] **P2-7** 多选回归：**`selectMultiSelectProps`** 无 predicate、每 tab 每 tick；最后一题 Next 行为 **Submit** 文案；**`naturalHeight(w) === render(w).length`**；与 **`multi_confirm` / `next` sentinel** 一致（§2.9）。
-- [ ] **P2-8** 手测高风险：**Input `cursor` 反射**、**`Ctrl+]`** 折叠、notes / **`inlineInput`** 低延迟路径、Submit 页**部分作答仍可提交**。
-- [x] **P2-9** 恢复 **`events.ts`**：`ASK_USER_PROMPT_EVENT` payload **不含 preview 正文**，与上游一致。
+- [x] **P2-1** 迁移 **`state/`**：`reduce` + `Effect`、`QuestionnaireSession`、`key-router`、`selectors`；`QuestionnaireAction` 穷尽、Effect 闭集与上游一致。
+- [x] **P2-2** 迁移 **`view/`** 与 **`build-questionnaire.ts`**：`QuestionnaireBuilder`、`QuestionnairePropsAdapter`、bindings、`DialogView` / tab 策略。
+- [x] **P2-3** 确认 **`injectGlobalLeftWidth` 在首帧 `PreviewPane.render` 之前**已注入（否则会按设计抛错）。
+- [x] **P2-4** 预览回归：**`getMarkdownTheme()`** 可用；列宽变化时 Markdown 缓存**整表失效**（PORT-DESIGN §2.8）。
+- [x] **P2-5** 预览回归：**`decideLayout`** 的 `mode` **只算一次**并贯穿高度与渲染；终端与 pane **双 ≥100** 并排，否则堆叠。
+- [x] **P2-6** 预览回归：**多选题**下 `PreviewPane` 退化为仅选项列；**`bodyHeights`** 使用 **`MultiSelectView.naturalHeight`**。
+- [x] **P2-7** 多选回归：**`selectMultiSelectProps`** 无 predicate、每 tab 每 tick；最后一题 Next 行为 **Submit** 文案；**`naturalHeight(w) === render(w).length`**；与 **`multi_confirm` / `next` sentinel** 一致（§2.9）。
+- [x] **P2-8** 手测高风险：**Input `cursor` 反射**、notes / **`inlineInput`** 低延迟路径、Submit 页**部分作答仍可提交**（**`Ctrl+]` 折叠已按本仓库需求移除**）。
+- [x] **P2-9** 恢复 **`events.ts`**：**`ask_user_question:prompt`** payload **不含 preview 正文**，与上游稳定性策略一致（频道名按本仓库工具命名）。
 - [x] **P2-10** **`npx tsc --build`** 通过。
 - [x] **P2-11** **`npm run format`**（或项目约定格式化命令）已跑。
 - [ ] **P2-12** 人工问卷回归：**窄终端 / 宽终端 / code fence 长行 / 多 Tab**。
@@ -95,7 +85,7 @@
 
 ## 收尾与合规
 
-- [ ] **Z-1** **MIT / 来源**：README 或约定位置注明源自 **`juicesharp/rpiv-mono`**。
+- [x] **Z-1** **MIT / 来源**：README 已注明 UI/state/view 源自 **`juicesharp/rpiv-mono`**（MIT）。
 - [ ] **Z-2** **发布前复查**：Pi 升级后重跑 **P0-2** 级别探测；复查 **`ctx.ui.custom`、`getMarkdownTheme`、`Input`（含 cursor）** API。
 
 ---

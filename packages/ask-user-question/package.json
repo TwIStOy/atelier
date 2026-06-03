@@ -9,7 +9,6 @@
       "./index.ts"
     ]
   },
-  "dependencies": {},
   "devDependencies": {
     "@earendil-works/pi-coding-agent": "latest",
     "@earendil-works/pi-tui": "latest",

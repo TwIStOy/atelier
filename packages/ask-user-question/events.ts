@@ -3,15 +3,21 @@ import type { QuestionParams } from "./tool/types.ts";
 
 export const ASK_USER_PROMPT_EVENT = "ask_user_question:prompt" as const;
 
-export type AskUserPromptQuestionSummary = {
-  header: string;
-  question: string;
-  multiSelect: boolean;
+export type AskUserPromptOption = {
+  label: string;
+  description: string;
   hasPreview: boolean;
 };
 
+export type AskUserPromptQuestion = {
+  question: string;
+  header: string;
+  multiSelect: boolean;
+  options: ReadonlyArray<AskUserPromptOption>;
+};
+
 export type AskUserPromptPayload = {
-  questions: AskUserPromptQuestionSummary[];
+  questions: ReadonlyArray<AskUserPromptQuestion>;
 };
 
 export function buildAskUserPromptPayload(
@@ -19,12 +25,14 @@ export function buildAskUserPromptPayload(
 ): AskUserPromptPayload {
   return {
     questions: params.questions.map((q) => ({
-      header: q.header,
       question: q.question,
-      multiSelect: q.multiSelect === true,
-      hasPreview: q.options.some(
-        (o) => typeof o.preview === "string" && o.preview.trim().length > 0,
-      ),
+      header: q.header,
+      multiSelect: q.multiSelect ?? false,
+      options: q.options.map((o) => ({
+        label: o.label,
+        description: o.description,
+        hasPreview: typeof o.preview === "string" && o.preview.length > 0,
+      })),
     })),
   };
 }
