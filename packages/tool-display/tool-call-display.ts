@@ -40,6 +40,13 @@ export function formatToolArgs(args: Record<string, unknown>): string {
 
 const GENERIC_DESC_MAX = 120;
 
+function snakeToCamelCase(s: string): string {
+  return s
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join("");
+}
+
 export function formatGenericToolHeader(
   toolName: string,
   toolLabel: string | undefined,
@@ -48,19 +55,8 @@ export function formatGenericToolHeader(
   theme: Theme,
   width: number,
 ): string {
-  let text = theme.fg("toolTitle", theme.bold(toolName));
-  const label = toolLabel?.trim();
-  if (label && label.toLowerCase() !== toolName.toLowerCase()) {
-    text += ` ${theme.fg("accent", label)}`;
-  }
-  const desc = toolDescription?.trim();
-  if (desc) {
-    const short =
-      desc.length > GENERIC_DESC_MAX
-        ? `${desc.slice(0, GENERIC_DESC_MAX - 1)}…`
-        : desc;
-    text += ` ${theme.fg("dim", short)}`;
-  }
+  const displayName = snakeToCamelCase(toolName);
+  let text = theme.fg("toolTitle", theme.bold(displayName));
   const argStr = formatToolArgs(args);
   if (argStr) text += ` ${theme.fg("dim", `(${argStr})`)}`;
   return truncateToWidth(text, width, "…");
