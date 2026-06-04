@@ -14,13 +14,13 @@
 | 1     | 仓库骨架：`packages/goal` 目录、`package.json`、`tsconfig.json`、空扩展可加载、根 `tsconfig` reference                                                     | § 5.1 目录结构                 | [x]  |
 | 2     | 核心类型与存储：`Goal` 类型、JSON 文件存储 CRUD、校验函数                                                                                                  | § 2.2 存储模型                 | [x]  |
 | 3     | 命令注册：`/goal` 命令解析与处理（set / show / pause / resume / clear）                                                                                    | § 2.1 生命周期事件             | [x]  |
-| 4     | Agent 工具注册：`create_goal`、`update_goal`、`get_goal`                                                                                                   | § 1 功能表 — Agent 工具        | [ ]  |
-| 5     | Token / time 计量：`agent_start` / `agent_end` / `session_shutdown` 事件中的 usage 收集与累加                                                              | § 2.1 生命周期事件 — agent_end | [ ]  |
+| 4     | Agent 工具注册：`create_goal`、`update_goal`、`get_goal`                                                                                                   | § 1 功能表 — Agent 工具        | [x]  |
+| 5     | Token / time 计量：`agent_start` / `agent_end` / `session_shutdown` 事件中的 usage 收集与累加                                                              | § 2.1 生命周期事件 — agent_end | [x]  |
 | 6     | 续行 prompt：`continuation.ts` + `prompt.ts`，`pi.sendMessage({ display: false })` 注入                                                                    | § 2.3 续行 prompt 设计         | [ ]  |
 | 7     | Footer 融合：goal 状态渲染与 `packages/statusline` 的集成                                                                                                  | § 5.3 Footer 融合策略          | [ ]  |
 | 8     | 收尾：README、AGENTS.md 链接、`tsc --build`、`npm run format`、发布检查                                                                                    | § 5.5 移植检查清单             | [ ]  |
 
-**当前停在哪一 phase：** Phase 4（Agent 工具注册已完成，待 Phase 5 事件计量）
+**当前停在哪一 phase：** Phase 6（续行 Prompt）
 
 ### API 验证结果（Phase 0）
 

@@ -5,6 +5,7 @@
   "main": "index.ts",
   "types": "index.ts",
   "devDependencies": {
+    "@earendil-works/pi-ai": "latest",
     "@earendil-works/pi-coding-agent": "latest",
     "@earendil-works/pi-tui": "latest",
     "@sinclair/typebox": "^0.34.0",

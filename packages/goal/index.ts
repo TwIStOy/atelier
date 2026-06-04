@@ -2,18 +2,26 @@ import type {
   ExtensionAPI,
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
+import type { AssistantMessage } from "@earendil-works/pi-ai";
 import { Type } from "@sinclair/typebox";
+import { isStaleCtxError } from "@htwang-contrib/common";
 import { parseGoalCommand } from "./goal/command.ts";
 import {
   createGoal,
   readGoal,
   updateGoal,
   clearGoal,
+  accountGoalUsage,
   type GoalStoreRef,
 } from "./goal/store.ts";
 import { validateObjective, validateTokenBudget } from "./goal/validation.ts";
 import { formatGoalForTool, formatGoalToolResponse } from "./goal/format.ts";
 import { GoalAlreadyExistsError, GoalNotFoundError } from "./goal/errors.ts";
+import {
+  shouldQueueGoalContinuationAfterAgentEnd,
+  shouldQueueBudgetLimitedPrompt,
+} from "./goal/continuation.ts";
+import type { Goal, TokenUsageSnapshot } from "./goal/types.ts";
 
 function getStoreRef(ctx: ExtensionContext): GoalStoreRef {
   const sessionDir = ctx.sessionManager.getSessionDir();
@@ -21,7 +29,168 @@ function getStoreRef(ctx: ExtensionContext): GoalStoreRef {
   return { baseDir: sessionDir, threadId };
 }
 
+type GoalAccounting = {
+  goalId: string;
+  measuredFromMilliseconds: number;
+};
+
+function extractAssistantUsage(messages: unknown[]): TokenUsageSnapshot {
+  let input = 0;
+  let output = 0;
+  let cacheRead = 0;
+  let cacheWrite = 0;
+  for (const msg of messages) {
+    const m = msg as Record<string, unknown>;
+    if (m.role !== "assistant") continue;
+    const usage = (msg as unknown as AssistantMessage).usage;
+    if (!usage) continue;
+    input += usage.input;
+    output += usage.output;
+    cacheRead += usage.cacheRead;
+    cacheWrite += usage.cacheWrite;
+  }
+  return {
+    input,
+    output,
+    cacheRead,
+    cacheWrite,
+    totalTokens: input + output + cacheRead + cacheWrite,
+  };
+}
+
 export default function initGoal(pi: ExtensionAPI): void {
+  let agentTurnInProgress = false;
+  let goalAccounting: GoalAccounting | null = null;
+  let completedThisTurnGoalId: string | null = null;
+
+  function startAccounting(goal: Goal): void {
+    goalAccounting = {
+      goalId: goal.id,
+      measuredFromMilliseconds: Date.now(),
+    };
+  }
+
+  function stopAccounting(): void {
+    goalAccounting = null;
+  }
+
+  function finalizeAccounting(
+    ctx: ExtensionContext,
+    usage: TokenUsageSnapshot,
+  ): void {
+    if (!goalAccounting) return;
+    const ref = getStoreRef(ctx);
+    const elapsedMs = Date.now() - goalAccounting.measuredFromMilliseconds;
+    const elapsedSeconds = elapsedMs / 1000;
+    try {
+      const goal = accountGoalUsage(ref, usage, elapsedSeconds, "shutdown");
+      pi.events.emit("goal:update", goal);
+    } catch {
+      // goal may have been cleared mid-turn
+    }
+    stopAccounting();
+  }
+
+  // --- Events ---
+
+  pi.on("session_start", async (event, ctx) => {
+    try {
+      const ref = getStoreRef(ctx);
+      const goal = readGoal(ref);
+      if (!goal) return;
+
+      if (goal.status === "active") {
+        startAccounting(goal);
+      }
+
+      if (event.reason === "resume" && goal.status === "paused" && ctx.hasUI) {
+        const choice = await ctx.ui.select(
+          `Goal is paused: "${goal.objective}". Resume it?`,
+          ["Resume", "Keep paused"],
+        );
+        if (choice === "Resume") {
+          const updated = updateGoal(ref, { status: "active" });
+          startAccounting(updated);
+          pi.events.emit("goal:update", updated);
+          ctx.ui.notify(`Goal resumed: ${updated.objective}`, "info");
+        }
+      }
+    } catch (e) {
+      if (isStaleCtxError(e)) return;
+      throw e;
+    }
+  });
+
+  pi.on("agent_start", (_event, ctx) => {
+    agentTurnInProgress = true;
+    completedThisTurnGoalId = null;
+
+    try {
+      const ref = getStoreRef(ctx);
+      const goal = readGoal(ref);
+      if (goal && goal.status === "active") {
+        startAccounting(goal);
+      }
+    } catch {
+      // ignore
+    }
+  });
+
+  pi.on("agent_end", (event, ctx) => {
+    const usage = extractAssistantUsage(event.messages);
+
+    if (goalAccounting) {
+      const elapsedMs = Date.now() - goalAccounting.measuredFromMilliseconds;
+      const elapsedSeconds = elapsedMs / 1000;
+
+      try {
+        const ref = getStoreRef(ctx);
+        const goal = accountGoalUsage(ref, usage, elapsedSeconds, "agentEnd");
+
+        // Track if goal was completed by the agent this turn
+        if (goal.status === "complete") {
+          completedThisTurnGoalId = goal.id;
+        }
+
+        pi.events.emit("goal:update", goal);
+
+        // Phase 6 will hook continuation / budget-limited prompts here
+        if (shouldQueueBudgetLimitedPrompt(goal)) {
+          // TODO: Phase 6 — queueBudgetLimitedPrompt(pi, goal);
+        } else if (
+          shouldQueueGoalContinuationAfterAgentEnd(
+            goal,
+            ctx.hasPendingMessages(),
+          )
+        ) {
+          // TODO: Phase 6 — queueContinuationPrompt(pi, goal);
+        }
+      } catch (e) {
+        if (isStaleCtxError(e)) return;
+        // goal may have been cleared during the turn
+      }
+    }
+
+    agentTurnInProgress = false;
+    stopAccounting();
+  });
+
+  pi.on("session_shutdown", (_event, ctx) => {
+    if (goalAccounting) {
+      finalizeAccounting(ctx, {
+        input: 0,
+        output: 0,
+        cacheRead: 0,
+        cacheWrite: 0,
+        totalTokens: 0,
+      });
+    }
+    agentTurnInProgress = false;
+    stopAccounting();
+  });
+
+  // --- Command ---
+
   pi.registerCommand("goal", {
     description: "Set, inspect, pause, resume, or clear the persistent goal",
     handler: async (rawArgs, ctx) => {
@@ -57,6 +226,9 @@ export default function initGoal(pi: ExtensionAPI): void {
             clearGoal(ref);
           }
           const goal = createGoal(ref, objective, null);
+          if (agentTurnInProgress) {
+            startAccounting(goal);
+          }
           ctx.ui.notify(`Goal set: ${goal.objective}`, "info");
           pi.events.emit("goal:update", goal);
           return;
@@ -80,6 +252,11 @@ export default function initGoal(pi: ExtensionAPI): void {
             return;
           }
           const updated = updateGoal(ref, { status: cmd.status });
+          if (cmd.status === "active" && agentTurnInProgress) {
+            startAccounting(updated);
+          } else if (cmd.status === "paused") {
+            stopAccounting();
+          }
           const label = cmd.status === "paused" ? "paused" : "resumed";
           ctx.ui.notify(`Goal ${label}: ${updated.objective}`, "info");
           pi.events.emit("goal:update", updated);
@@ -93,6 +270,7 @@ export default function initGoal(pi: ExtensionAPI): void {
             return;
           }
           clearGoal(ref);
+          stopAccounting();
           ctx.ui.notify("Goal cleared.", "info");
           pi.events.emit("goal:update", null);
           return;
@@ -100,6 +278,8 @@ export default function initGoal(pi: ExtensionAPI): void {
       }
     },
   });
+
+  // --- Tools ---
 
   pi.registerTool({
     name: "create_goal",
@@ -124,6 +304,9 @@ export default function initGoal(pi: ExtensionAPI): void {
 
       try {
         const goal = createGoal(ref, objective, tokenBudget);
+        if (agentTurnInProgress) {
+          startAccounting(goal);
+        }
         pi.events.emit("goal:update", goal);
         return {
           content: [
@@ -165,6 +348,8 @@ export default function initGoal(pi: ExtensionAPI): void {
       const ref = getStoreRef(ctx);
       try {
         const goal = updateGoal(ref, { status: params.status });
+        completedThisTurnGoalId = goal.id;
+        stopAccounting();
         pi.events.emit("goal:update", goal);
         return {
           content: [
