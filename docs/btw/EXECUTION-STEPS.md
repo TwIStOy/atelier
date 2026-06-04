@@ -138,15 +138,15 @@ Depends on: Step 1.3 (`assistantMessageText`)
 
 **Design ref:** [D4.3](./DESIGN.md#d43-btw-uits--overlay-component)
 
-- [ ] Create `packages/btw/btw-ui.ts`
-- [ ] Implement `BtwOverlayController` class (render, handleInput, invalidate)
-  - [ ] render: banner + history + echo + answer + footer layout
-  - [ ] render: scroll clipping (natural → slice with maxRows)
-  - [ ] handleInput: Esc abort, ↑/↓ scroll, x clear history
-  - [ ] setAnswer / setError / constructor
-- [ ] Implement `showBtwOverlay` factory function
-- [ ] Run `npm run format`
-- [ ] Verify: `npx tsc --build packages/btw` passes (may need stub `btw.ts` first)
+- [x] Create `packages/btw/btw-ui.ts`
+- [x] Implement `BtwOverlayController` class (render, handleInput, invalidate)
+  - [x] render: banner + history + echo + answer + footer layout
+  - [x] render: scroll clipping (natural → slice with maxRows)
+  - [x] handleInput: Esc abort, ↑/↓ scroll, x clear history
+  - [x] setAnswer / setError / constructor
+- [x] Implement `showBtwOverlay` factory function
+- [x] Run `npm run format`
+- [x] Verify: `npx tsc --build packages/btw` passes
 
 ### Step 2.4 — Create `btw.ts`
 
