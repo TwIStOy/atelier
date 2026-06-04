@@ -20,7 +20,8 @@
       "packages/ask-user-question",
       "packages/context-usage",
       "packages/goal",
-      "packages/btw"
+      "packages/btw",
+      "packages/memory"
     ],
     "skills": [],
     "themes": [

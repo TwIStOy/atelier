@@ -26,6 +26,23 @@ export {
   getGoalAdapter,
   updateGoalAdapter,
 } from "./adapters/goal.ts";
+export {
+  journalReadAdapter,
+  journalSearchAdapter,
+  journalWriteAdapter,
+} from "./adapters/journal.ts";
+export {
+  memoryAliasAdapter,
+  memoryCreateAdapter,
+  memoryDeleteAdapter,
+  memoryDomainsAdapter,
+  memoryHistoryAdapter,
+  memoryListAdapter,
+  memoryReadAdapter,
+  memorySearchAdapter,
+  memoryTriggersAdapter,
+  memoryUpdateAdapter,
+} from "./adapters/memory.ts";
 
 import type { ExtensionAPI, Theme } from "@earendil-works/pi-coding-agent";
 import { ToolExecutionComponent } from "@earendil-works/pi-coding-agent";
