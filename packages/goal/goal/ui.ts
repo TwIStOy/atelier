@@ -1,5 +1,6 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import type { TUI } from "@earendil-works/pi-tui";
+import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { formatTokens, formatElapsedSeconds } from "@htwang-contrib/common";
 import type { Goal } from "./types.ts";
 
@@ -43,13 +44,11 @@ export function renderGoalWidget(
 
   const label = theme.fg("dim", "goal");
   const sep = theme.fg("dim", " ");
-  const objective = truncateObjective(goal.objective, 80, theme);
+  const prefix = `${label}${sep}${statusText}${sep}`;
+  const prefixWidth = visibleWidth(prefix);
+  const objective = theme.fg("dim", goal.objective);
+  const available = Math.max(0, width - prefixWidth);
+  const truncatedObjective = truncateToWidth(objective, available, "…");
 
-  const left = `${label}${sep}${statusText}${sep}${objective}`;
-  return [left];
-}
-
-function truncateObjective(text: string, maxLen: number, theme: Theme): string {
-  if (text.length <= maxLen) return theme.fg("dim", text);
-  return theme.fg("dim", text.slice(0, maxLen - 1) + "…");
+  return [`${prefix}${truncatedObjective}`];
 }
