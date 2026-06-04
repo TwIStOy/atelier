@@ -194,8 +194,9 @@ export async function accountGoalUsage(
   ref: GoalStoreRef,
   usage: TokenUsageSnapshot,
   elapsedSeconds: number,
-  _mode: "agent_end" | "session_shutdown" | "manual" = "manual",
+  mode: "agent_end" | "session_shutdown" | "manual" = "manual",
 ): Promise<Goal | null> {
+  void mode;
   const goal = await readGoal(ref);
   if (!goal) return null;
   if (goal.status !== "active") return goal;

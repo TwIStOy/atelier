@@ -1,4 +1,7 @@
-import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
+import type {
+  ExtensionAPI,
+  ExtensionCommandContext,
+} from "@earendil-works/pi-coding-agent";
 import { parseGoalCommand, goalCommandUsage } from "./goal/command.ts";
 import { formatGoalForTool } from "./goal/format.ts";
 import {

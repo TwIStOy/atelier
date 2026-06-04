@@ -36,7 +36,9 @@ export function formatGoalForTool(goal: Goal | null): string {
   ].join("\n");
 }
 
-export function formatGoalToolResponse(goal: Goal | null): Record<string, unknown> {
+export function formatGoalToolResponse(
+  goal: Goal | null,
+): Record<string, unknown> {
   if (!goal) {
     return {
       goal: null,
