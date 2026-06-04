@@ -26,21 +26,14 @@ export const createGoalAdapter: ToolDisplayAdapter<GoalArgs> = {
     return obj ? `${label} ${obj}` : label;
   },
 
-  formatCollapsedContent(_args, output, theme, width, details) {
+  formatCollapsedContent(_args, output, theme, _width, details) {
     if (!output) return [];
     const d = details as Record<string, unknown> | undefined;
     const status = typeof d?.status === "string" ? d.status : "";
-    const statusText =
-      status === "active"
-        ? theme.fg("success", "● active")
-        : theme.fg("muted", status);
-    return [
-      truncateToWidth(
-        `${INDENT}└ ${statusText} — ${firstLine(output)}`,
-        width,
-        "…",
-      ),
-    ];
+    if (status === "active") {
+      return [theme.fg("muted", `└ ● active — ${firstLine(output)}`)];
+    }
+    return [theme.fg("muted", `└ ${status}`)];
   },
 
   formatExpandedContent(_args, output, theme, width) {
@@ -63,15 +56,13 @@ export const updateGoalAdapter: ToolDisplayAdapter<GoalArgs> = {
     return `${label} ${statusLabel}`;
   },
 
-  formatCollapsedContent(_args, output, theme, width, details) {
-    if (!output) return [];
+  formatCollapsedContent(_args, _output, theme, _width, details) {
     const d = details as Record<string, unknown> | undefined;
     const status = typeof d?.status === "string" ? d.status : "";
-    const icon =
-      status === "complete"
-        ? theme.fg("success", "✓ complete")
-        : theme.fg("muted", status);
-    return [truncateToWidth(`${INDENT}└ ${icon}`, width, "…")];
+    if (status === "complete") {
+      return [theme.fg("muted", "└ ✓ complete")];
+    }
+    return [theme.fg("muted", `└ ${status}`)];
   },
 
   formatExpandedContent(_args, output, theme, width) {
@@ -91,14 +82,13 @@ export const getGoalAdapter: ToolDisplayAdapter<GoalArgs> = {
     return theme.fg("toolTitle", theme.bold("GetGoal"));
   },
 
-  formatCollapsedContent(_args, output, theme, width, details) {
-    if (!output) return [];
+  formatCollapsedContent(_args, output, theme, _width, details) {
     const d = details as Record<string, unknown> | undefined;
     const goal = d?.goal;
     if (goal === null || goal === undefined) {
-      return [`${INDENT}└ ${theme.fg("muted", "no goal set")}`];
+      return [theme.fg("muted", "└ no goal set")];
     }
-    return [truncateToWidth(`${INDENT}└ ${firstLine(output)}`, width, "…")];
+    return [theme.fg("muted", `└ ${firstLine(output)}`)];
   },
 
   formatExpandedContent(_args, output, theme, width) {
