@@ -19,8 +19,13 @@ import { formatGoalForTool, formatGoalToolResponse } from "./goal/format.ts";
 import { GoalAlreadyExistsError, GoalNotFoundError } from "./goal/errors.ts";
 import {
   shouldQueueGoalContinuationAfterAgentEnd,
+  shouldQueueGoalContinuationWhenIdle,
   shouldQueueBudgetLimitedPrompt,
 } from "./goal/continuation.ts";
+import {
+  buildContinuationPrompt,
+  buildBudgetLimitedPrompt,
+} from "./goal/prompt.ts";
 import type { Goal, TokenUsageSnapshot } from "./goal/types.ts";
 
 function getStoreRef(ctx: ExtensionContext): GoalStoreRef {
@@ -63,6 +68,13 @@ export default function initGoal(pi: ExtensionAPI): void {
   let goalAccounting: GoalAccounting | null = null;
   let completedThisTurnGoalId: string | null = null;
 
+  function queueHiddenGoalPrompt(customType: string, content: string): void {
+    pi.sendMessage(
+      { customType, content, display: false },
+      { triggerTurn: true, deliverAs: "followUp" },
+    );
+  }
+
   function startAccounting(goal: Goal): void {
     goalAccounting = {
       goalId: goal.id,
@@ -101,6 +113,19 @@ export default function initGoal(pi: ExtensionAPI): void {
 
       if (goal.status === "active") {
         startAccounting(goal);
+
+        if (
+          shouldQueueGoalContinuationWhenIdle(
+            goal,
+            ctx.isIdle(),
+            ctx.hasPendingMessages(),
+          )
+        ) {
+          queueHiddenGoalPrompt(
+            "pi-goal-continuation",
+            buildContinuationPrompt(goal),
+          );
+        }
       }
 
       if (event.reason === "resume" && goal.status === "paused" && ctx.hasUI) {
@@ -154,16 +179,21 @@ export default function initGoal(pi: ExtensionAPI): void {
 
         pi.events.emit("goal:update", goal);
 
-        // Phase 6 will hook continuation / budget-limited prompts here
         if (shouldQueueBudgetLimitedPrompt(goal)) {
-          // TODO: Phase 6 — queueBudgetLimitedPrompt(pi, goal);
+          queueHiddenGoalPrompt(
+            "pi-goal-budget-limit",
+            buildBudgetLimitedPrompt(goal),
+          );
         } else if (
           shouldQueueGoalContinuationAfterAgentEnd(
             goal,
             ctx.hasPendingMessages(),
           )
         ) {
-          // TODO: Phase 6 — queueContinuationPrompt(pi, goal);
+          queueHiddenGoalPrompt(
+            "pi-goal-continuation",
+            buildContinuationPrompt(goal),
+          );
         }
       } catch (e) {
         if (isStaleCtxError(e)) return;
@@ -260,6 +290,19 @@ export default function initGoal(pi: ExtensionAPI): void {
           const label = cmd.status === "paused" ? "paused" : "resumed";
           ctx.ui.notify(`Goal ${label}: ${updated.objective}`, "info");
           pi.events.emit("goal:update", updated);
+          if (
+            cmd.status === "active" &&
+            shouldQueueGoalContinuationWhenIdle(
+              updated,
+              ctx.isIdle(),
+              ctx.hasPendingMessages(),
+            )
+          ) {
+            queueHiddenGoalPrompt(
+              "pi-goal-continuation",
+              buildContinuationPrompt(updated),
+            );
+          }
           return;
         }
 
