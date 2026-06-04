@@ -39,7 +39,7 @@ export const memoryCreateAdapter: ToolDisplayAdapter<MemoryCreateArgs> = {
     const first = preview.split("\n")[0] ?? "";
     const truncated = first.length > 100 ? `${first.slice(0, 99)}…` : first;
     const moreHint = lines > 1 ? theme.fg("dim", ` · ${lines - 1} more`) : "";
-    const line = `${INDENT}${theme.fg("success", "created")} ${theme.fg("dim", truncated)}${moreHint}`;
+    const line = `└ ${theme.fg("success", "created")} ${theme.fg("dim", truncated)}${moreHint}`;
     return [truncateToWidth(line, width, "…")];
   },
 
@@ -97,9 +97,9 @@ export const memoryReadAdapter: ToolDisplayAdapter<MemoryReadArgs> = {
     const truncated =
       preview.length > 100 ? `${preview.slice(0, 99)}…` : preview;
     if (count === 0) {
-      return [`${INDENT}${theme.fg("muted", "empty")}`];
+      return [theme.fg("muted", "└ empty")];
     }
-    const line = `${INDENT}${theme.fg("success", `${count} line${count === 1 ? "" : "s"}`)} ${theme.fg("dim", truncated)}`;
+    const line = `└ ${theme.fg("success", `${count} line${count === 1 ? "" : "s"}`)} ${theme.fg("dim", truncated)}`;
     return [truncateToWidth(line, width, "…")];
   },
 
@@ -176,7 +176,7 @@ export const memoryUpdateAdapter: ToolDisplayAdapter<MemoryUpdateArgs> = {
     const diffSummary =
       parts.length > 0 ? parts.join(" ") : theme.fg("success", "updated");
     const metaStr = meta.length > 0 ? ` · ${meta.join(", ")}` : "";
-    const line = `${INDENT}${diffSummary}${theme.fg("dim", metaStr)}`;
+    const line = `└ ${diffSummary}${theme.fg("dim", metaStr)}`;
     return [truncateToWidth(line, width, "…")];
   },
 
@@ -226,7 +226,7 @@ export const memoryDeleteAdapter: ToolDisplayAdapter<MemoryDeleteArgs> = {
   },
 
   formatCollapsedContent(_args, _output, theme) {
-    return [`${INDENT}${theme.fg("success", "deleted")}`];
+    return [theme.fg("muted", "└ deleted")];
   },
 
   formatExpandedContent(_args, _output, _theme) {
@@ -259,11 +259,11 @@ export const memorySearchAdapter: ToolDisplayAdapter<MemorySearchArgs> = {
     const d = details as MemorySearchDetails | undefined;
     const total = d?.total ?? 0;
     if (total === 0) {
-      return [`${INDENT}${theme.fg("muted", "no results")}`];
+      return [theme.fg("muted", "└ no results")];
     }
     const first = d?.items?.[0];
     const parts: string[] = [
-      INDENT,
+      "└ ",
       theme.fg("success", `${total} result${total === 1 ? "" : "s"}`),
     ];
     if (first) {
@@ -330,11 +330,9 @@ export const memoryListAdapter: ToolDisplayAdapter<MemoryListArgs> = {
   },
 
   formatCollapsedContent(_args, output, theme, width) {
-    if (!output) return [`${INDENT}${theme.fg("muted", "empty")}`];
+    if (!output) return [theme.fg("muted", "└ empty")];
     const n = output.split("\n").length;
-    return [
-      `${INDENT}${theme.fg("success", `${n} line${n === 1 ? "" : "s"}`)}`,
-    ];
+    return [`└ ${theme.fg("success", `${n} line${n === 1 ? "" : "s"}`)}`];
   },
 
   formatExpandedContent(_args, output, theme, width) {
@@ -388,7 +386,7 @@ export const memoryAliasAdapter: ToolDisplayAdapter<MemoryAliasArgs> = {
   formatCollapsedContent(_args, _output, theme, _width, details) {
     const d = details as MemoryAliasDetails | undefined;
     const label = d?.is_remove ? "removed" : "created";
-    return [`${INDENT}${theme.fg("success", label)}`];
+    return [`└ ${theme.fg("success", label)}`];
   },
 
   formatExpandedContent(_args, _output, _theme) {
@@ -439,7 +437,7 @@ export const memoryTriggersAdapter: ToolDisplayAdapter<MemoryTriggersArgs> = {
       );
     const detail =
       parts.length > 0 ? parts.join(", ") : theme.fg("success", "updated");
-    return [`${INDENT}${detail}`];
+    return [`└ ${detail}`];
   },
 
   formatExpandedContent(_args, _output, _theme) {
@@ -472,11 +470,11 @@ export const memoryHistoryAdapter: ToolDisplayAdapter<MemoryHistoryArgs> = {
     const d = details as MemoryHistoryDetails | undefined;
     const total = d?.total ?? 0;
     if (total === 0) {
-      return [`${INDENT}${theme.fg("muted", "no versions")}`];
+      return [theme.fg("muted", "└ no versions")];
     }
     const first = d?.versions?.[0] ?? "";
     const more = total > 1 ? theme.fg("dim", ` · ${total - 1} more`) : "";
-    const line = `${INDENT}${theme.fg("success", `${total} version${total === 1 ? "" : "s"}`)} ${theme.fg("dim", first)}${more}`;
+    const line = `└ ${theme.fg("success", `${total} version${total === 1 ? "" : "s"}`)} ${theme.fg("dim", first)}${more}`;
     return [truncateToWidth(line, width, "…")];
   },
 
@@ -512,11 +510,11 @@ export const memoryDomainsAdapter: ToolDisplayAdapter<Record<string, unknown>> =
       const d = details as MemoryDomainsDetails | undefined;
       const total = d?.total ?? 0;
       if (total === 0) {
-        return [`${INDENT}${theme.fg("muted", "none")}`];
+        return [theme.fg("muted", "└ none")];
       }
       const first = d?.domains?.[0] ?? "";
       const more = total > 1 ? theme.fg("dim", ` · ${total - 1} more`) : "";
-      const line = `${INDENT}${theme.fg("success", `${total} domain${total === 1 ? "" : "s"}`)} ${theme.fg("dim", first)}${more}`;
+      const line = `└ ${theme.fg("success", `${total} domain${total === 1 ? "" : "s"}`)} ${theme.fg("dim", first)}${more}`;
       return [truncateToWidth(line, width, "…")];
     },
 
