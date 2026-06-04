@@ -19,7 +19,8 @@
       "packages/extra-tools",
       "packages/ask-user-question",
       "packages/context-usage",
-      "packages/goal"
+      "packages/goal",
+      "packages/btw"
     ],
     "skills": [],
     "themes": [
