@@ -18,7 +18,8 @@
       "packages/subagents",
       "packages/extra-tools",
       "packages/ask-user-question",
-      "packages/context-usage"
+      "packages/context-usage",
+      "packages/btw"
     ],
     "skills": [],
     "themes": [
