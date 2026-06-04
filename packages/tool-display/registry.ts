@@ -3,6 +3,11 @@ import { askUserQuestionAdapter } from "./adapters/ask-user-question.ts";
 import { bashAdapter } from "./adapters/bash.ts";
 import { editAdapter } from "./adapters/edit.ts";
 import { globAdapter } from "./adapters/glob.ts";
+import {
+  createGoalAdapter,
+  getGoalAdapter,
+  updateGoalAdapter,
+} from "./adapters/goal.ts";
 import { grepAdapter } from "./adapters/grep.ts";
 import { lsAdapter } from "./adapters/ls.ts";
 import { readAdapter } from "./adapters/read.ts";
@@ -21,3 +26,6 @@ globalToolDisplayRegistry.register("edit", editAdapter);
 globalToolDisplayRegistry.register("bash", bashAdapter);
 globalToolDisplayRegistry.register("subagent", subagentAdapter);
 globalToolDisplayRegistry.register("subagent_status", subagentStatusAdapter);
+globalToolDisplayRegistry.register("create_goal", createGoalAdapter);
+globalToolDisplayRegistry.register("update_goal", updateGoalAdapter);
+globalToolDisplayRegistry.register("get_goal", getGoalAdapter);

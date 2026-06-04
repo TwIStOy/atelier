@@ -21,6 +21,11 @@ export { lsAdapter } from "./adapters/ls.ts";
 export { readAdapter } from "./adapters/read.ts";
 export { writeAdapter } from "./adapters/write.ts";
 export { globalToolDisplayRegistry } from "./registry.ts";
+export {
+  createGoalAdapter,
+  getGoalAdapter,
+  updateGoalAdapter,
+} from "./adapters/goal.ts";
 
 import type { ExtensionAPI, Theme } from "@earendil-works/pi-coding-agent";
 import { ToolExecutionComponent } from "@earendil-works/pi-coding-agent";
