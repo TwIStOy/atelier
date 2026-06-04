@@ -3,6 +3,7 @@ import type {
   ExtensionCommandContext,
 } from "@earendil-works/pi-coding-agent";
 import type { AssistantMessage, UserMessage } from "@earendil-works/pi-ai";
+import { registerBtw } from "./btw.ts";
 import { showBtwOverlay } from "./btw-ui.ts";
 import type { BtwTurn } from "./btw-ui.ts";
 
@@ -70,5 +71,6 @@ function registerBtwDemo(pi: ExtensionAPI): void {
 }
 
 export default function (pi: ExtensionAPI): void {
+  registerBtw(pi);
   registerBtwDemo(pi);
 }

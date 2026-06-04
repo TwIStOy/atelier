@@ -154,25 +154,25 @@ Depends on: Step 1.3 (`assistantMessageText`)
 
 Depends on: Phase 1 (all shared modules)
 
-- [ ] Create `packages/btw/btw.ts`
-- [ ] Implement `BtwState` interface and state access via `getGlobalState`
-- [ ] Implement `buildBtwMessages` (branch + history + new question)
-- [ ] Implement `getCrossSessionHint` (last 10 questions across sessions)
-- [ ] Implement `registerMessageEndSnapshot` (write snapshot on assistant message_end)
-- [ ] Implement `registerInvalidationHooks` (invalidate on session_compact / session_tree)
-- [ ] Implement `handleBtwCommand` (guard → overlay → executeSideCall → render result)
-- [ ] Implement `registerBtw` (wire command + hooks)
-- [ ] Export `registerBtw`, `BtwTurn`, `clearSessionHistory`
-- [ ] Run `npm run format`
-- [ ] Verify: `npx tsc --build packages/btw` passes
+- [x] Create `packages/btw/btw.ts`
+- [x] Implement `BtwState` interface and state access via `getGlobalState`
+- [x] Implement `buildBtwMessages` (branch + history + new question)
+- [x] Implement `getCrossSessionHint` (last 10 questions across sessions)
+- [x] Implement `registerMessageEndSnapshot` (write snapshot on assistant message_end)
+- [x] Implement `registerInvalidationHooks` (invalidate on session_compact / session_tree)
+- [x] Implement `handleBtwCommand` (guard → overlay → executeSideCall → render result)
+- [x] Implement `registerBtw` (wire command + hooks)
+- [x] Export `registerBtw`, `BtwTurn`, `clearSessionHistory`
+- [x] Run `npm run format`
+- [x] Verify: `npx tsc --build packages/btw` passes
 
 ### Step 2.5 — Create `index.ts`
 
 **Design ref:** [D4.5](./DESIGN.md#d45-indexts--extension-entry)
 
-- [ ] Create `packages/btw/index.ts` with default export function calling `registerBtw(pi)`
-- [ ] Run `npm run format`
-- [ ] Verify: `npx tsc --build` (full project) passes
+- [x] Create `packages/btw/index.ts` with default export function calling `registerBtw(pi)`
+- [x] Run `npm run format`
+- [x] Verify: `npx tsc --build` (full project) passes
 
 ### Step 2.6 — Create `btw.test.ts`
 
