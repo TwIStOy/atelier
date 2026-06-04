@@ -7,7 +7,6 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import { CodingPlanUsageComponent } from "./components/coding-plan-usage.ts";
 import { GitComponent } from "./components/git.ts";
-import { GoalComponent } from "./components/goal.ts";
 import { TokensComponent } from "./components/tokens.ts";
 import type { StatusLineComponent } from "./components/base.ts";
 
@@ -21,25 +20,21 @@ export function makeFooter(
 ) => Component & { dispose?(): void } {
   const git = new GitComponent(ctx);
   const codingPlan = new CodingPlanUsageComponent(ctx, pi);
-  const goal = new GoalComponent(pi);
 
   const components: StatusLineComponent[] = [
     git,
     codingPlan,
-    goal,
     new TokensComponent(ctx),
   ];
 
   return (tui, theme) => {
     git.bindRender(() => tui.requestRender());
     codingPlan.bindRender(() => tui.requestRender());
-    goal.bindRender(() => tui.requestRender());
 
     return {
       dispose() {
         git.dispose();
         codingPlan.dispose();
-        goal.dispose();
       },
       render(width: number): string[] {
         const parts: string[] = [];

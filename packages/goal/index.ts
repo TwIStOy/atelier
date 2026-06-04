@@ -27,6 +27,11 @@ import {
   buildBudgetLimitedPrompt,
 } from "./goal/prompt.ts";
 import type { Goal, TokenUsageSnapshot } from "./goal/types.ts";
+import {
+  GOAL_WIDGET_KEY,
+  GOAL_WIDGET_OPTIONS,
+  renderGoalWidget,
+} from "./goal/ui.ts";
 
 function getStoreRef(ctx: ExtensionContext): GoalStoreRef {
   const sessionDir = ctx.sessionManager.getSessionDir();
@@ -67,6 +72,32 @@ export default function initGoal(pi: ExtensionAPI): void {
   let agentTurnInProgress = false;
   let goalAccounting: GoalAccounting | null = null;
   let completedThisTurnGoalId: string | null = null;
+  let currentGoalForWidget: Goal | null = null;
+  let widgetCtx: ExtensionContext | null = null;
+
+  function refreshGoalWidget(goal: Goal | null): void {
+    currentGoalForWidget = goal;
+    if (!widgetCtx?.hasUI) return;
+    if (!goal) {
+      widgetCtx.ui.setWidget(GOAL_WIDGET_KEY, undefined, GOAL_WIDGET_OPTIONS);
+      return;
+    }
+    widgetCtx.ui.setWidget(
+      GOAL_WIDGET_KEY,
+      (_tui, theme) => ({
+        render(width: number): string[] {
+          return renderGoalWidget(currentGoalForWidget, theme, width);
+        },
+        invalidate() {},
+      }),
+      GOAL_WIDGET_OPTIONS,
+    );
+  }
+
+  function emitGoalUpdate(goal: Goal | null): void {
+    pi.events.emit("goal:update", goal);
+    refreshGoalWidget(goal);
+  }
 
   function queueHiddenGoalPrompt(customType: string, content: string): void {
     pi.sendMessage(
@@ -96,7 +127,7 @@ export default function initGoal(pi: ExtensionAPI): void {
     const elapsedSeconds = elapsedMs / 1000;
     try {
       const goal = accountGoalUsage(ref, usage, elapsedSeconds, "shutdown");
-      pi.events.emit("goal:update", goal);
+      emitGoalUpdate(goal);
     } catch {
       // goal may have been cleared mid-turn
     }
@@ -106,10 +137,13 @@ export default function initGoal(pi: ExtensionAPI): void {
   // --- Events ---
 
   pi.on("session_start", async (event, ctx) => {
+    widgetCtx = ctx;
     try {
       const ref = getStoreRef(ctx);
       const goal = readGoal(ref);
       if (!goal) return;
+
+      refreshGoalWidget(goal);
 
       if (goal.status === "active") {
         startAccounting(goal);
@@ -136,7 +170,7 @@ export default function initGoal(pi: ExtensionAPI): void {
         if (choice === "Resume") {
           const updated = updateGoal(ref, { status: "active" });
           startAccounting(updated);
-          pi.events.emit("goal:update", updated);
+          emitGoalUpdate(updated);
           ctx.ui.notify(`Goal resumed: ${updated.objective}`, "info");
         }
       }
@@ -177,7 +211,7 @@ export default function initGoal(pi: ExtensionAPI): void {
           completedThisTurnGoalId = goal.id;
         }
 
-        pi.events.emit("goal:update", goal);
+        emitGoalUpdate(goal);
 
         if (shouldQueueBudgetLimitedPrompt(goal)) {
           queueHiddenGoalPrompt(
@@ -206,6 +240,7 @@ export default function initGoal(pi: ExtensionAPI): void {
   });
 
   pi.on("session_shutdown", (_event, ctx) => {
+    widgetCtx = null;
     if (goalAccounting) {
       finalizeAccounting(ctx, {
         input: 0,
@@ -260,7 +295,7 @@ export default function initGoal(pi: ExtensionAPI): void {
             startAccounting(goal);
           }
           ctx.ui.notify(`Goal set: ${goal.objective}`, "info");
-          pi.events.emit("goal:update", goal);
+          emitGoalUpdate(goal);
           return;
         }
 
@@ -289,7 +324,7 @@ export default function initGoal(pi: ExtensionAPI): void {
           }
           const label = cmd.status === "paused" ? "paused" : "resumed";
           ctx.ui.notify(`Goal ${label}: ${updated.objective}`, "info");
-          pi.events.emit("goal:update", updated);
+          emitGoalUpdate(updated);
           if (
             cmd.status === "active" &&
             shouldQueueGoalContinuationWhenIdle(
@@ -315,7 +350,7 @@ export default function initGoal(pi: ExtensionAPI): void {
           clearGoal(ref);
           stopAccounting();
           ctx.ui.notify("Goal cleared.", "info");
-          pi.events.emit("goal:update", null);
+          emitGoalUpdate(null);
           return;
         }
       }
@@ -350,7 +385,7 @@ export default function initGoal(pi: ExtensionAPI): void {
         if (agentTurnInProgress) {
           startAccounting(goal);
         }
-        pi.events.emit("goal:update", goal);
+        emitGoalUpdate(goal);
         return {
           content: [
             {
@@ -393,7 +428,7 @@ export default function initGoal(pi: ExtensionAPI): void {
         const goal = updateGoal(ref, { status: params.status });
         completedThisTurnGoalId = goal.id;
         stopAccounting();
-        pi.events.emit("goal:update", goal);
+        emitGoalUpdate(goal);
         return {
           content: [
             {
