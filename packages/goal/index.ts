@@ -296,6 +296,18 @@ export default function initGoal(pi: ExtensionAPI): void {
           }
           ctx.ui.notify(`Goal set: ${goal.objective}`, "info");
           emitGoalUpdate(goal);
+          if (
+            shouldQueueGoalContinuationWhenIdle(
+              goal,
+              ctx.isIdle(),
+              ctx.hasPendingMessages(),
+            )
+          ) {
+            queueHiddenGoalPrompt(
+              "pi-goal-continuation",
+              buildContinuationPrompt(goal),
+            );
+          }
           return;
         }
 
