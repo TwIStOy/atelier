@@ -10,17 +10,26 @@
 
 | Phase | 目标                                                                                                                                                       | → ANALYSIS.md 章节             | 状态 |
 | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ | ---- |
-| 0     | API 验证：确认 `@earendil-works/pi-coding-agent` 导出 goal 所需的 `sendMessage`、`setFooter`、`setWidget`、`setStatus`、`select`、`getContextUsage` 等符号 | § 3.1 依赖差异                 | [ ]  |
-| 1     | 仓库骨架：`packages/goal` 目录、`package.json`、`tsconfig.json`、空扩展可加载、根 `tsconfig` reference                                                     | § 5.1 目录结构                 | [ ]  |
-| 2     | 核心类型与存储：`Goal` 类型、JSON 文件存储 CRUD、校验函数                                                                                                  | § 2.2 存储模型                 | [ ]  |
-| 3     | 命令注册：`/goal` 命令解析与处理（set / show / pause / resume / clear）                                                                                    | § 2.1 生命周期事件             | [ ]  |
+| 0     | API 验证：确认 `@earendil-works/pi-coding-agent` 导出 goal 所需的 `sendMessage`、`setFooter`、`setWidget`、`setStatus`、`select`、`getContextUsage` 等符号 | § 3.1 依赖差异                 | [x]  |
+| 1     | 仓库骨架：`packages/goal` 目录、`package.json`、`tsconfig.json`、空扩展可加载、根 `tsconfig` reference                                                     | § 5.1 目录结构                 | [x]  |
+| 2     | 核心类型与存储：`Goal` 类型、JSON 文件存储 CRUD、校验函数                                                                                                  | § 2.2 存储模型                 | [x]  |
+| 3     | 命令注册：`/goal` 命令解析与处理（set / show / pause / resume / clear）                                                                                    | § 2.1 生命周期事件             | [x]  |
 | 4     | Agent 工具注册：`create_goal`、`update_goal`、`get_goal`                                                                                                   | § 1 功能表 — Agent 工具        | [ ]  |
 | 5     | Token / time 计量：`agent_start` / `agent_end` / `session_shutdown` 事件中的 usage 收集与累加                                                              | § 2.1 生命周期事件 — agent_end | [ ]  |
 | 6     | 续行 prompt：`continuation.ts` + `prompt.ts`，`pi.sendMessage({ display: false })` 注入                                                                    | § 2.3 续行 prompt 设计         | [ ]  |
 | 7     | Footer 融合：goal 状态渲染与 `packages/statusline` 的集成                                                                                                  | § 5.3 Footer 融合策略          | [ ]  |
 | 8     | 收尾：README、AGENTS.md 链接、`tsc --build`、`npm run format`、发布检查                                                                                    | § 5.5 移植检查清单             | [ ]  |
 
-**当前停在哪一 phase：** —（尚未开始）
+**当前停在哪一 phase：** Phase 4（Agent 工具注册已完成，待 Phase 5 事件计量）
+
+### API 验证结果（Phase 0）
+
+- **@earendil-works/pi-coding-agent 版本**: latest（通过 `node_modules` 类型定义验证）
+- **Step 0.1 sendMessage**: ✅ 齐全 — `sendMessage({ customType, content, display, details? }, { triggerTurn?, deliverAs? })` 签名完全匹配
+- **Step 0.2 ctx.ui 方法**: ✅ 齐全 — `setFooter`, `setWidget`, `setStatus`, `select`, `notify`, `confirm`, `input`, `onTerminalInput` 均可用；`ctx.isIdle()`, `ctx.hasPendingMessages()`, `ctx.sessionManager.getSessionDir/Id`, `ctx.getContextUsage()`, `ctx.model`, `ctx.modelRegistry`, `ctx.hasUI` 全部存在
+- **Step 0.3 事件 hook**: ✅ 齐全 — `session_start`（含 `reason`: `"startup"|"reload"|"new"|"resume"|"fork"`）、`agent_start`、`agent_end`（含 `messages`）、`session_shutdown` 均可注册
+- **Step 0.4 pi.events**: ✅ 齐全 — `EventBus` 提供 `emit(channel, data)` 和 `on(channel, handler)` （返回 unsubscribe 函数）
+- **结论**: 无缺失，所有 Phase 4–7 可直接使用
 
 ---
 

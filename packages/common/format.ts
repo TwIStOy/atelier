@@ -47,6 +47,19 @@ export function formatTokenUsageSummaryLine(
   return line;
 }
 
+export function formatElapsedSeconds(seconds: number): string {
+  if (seconds < 60) return `${Math.round(seconds)}s`;
+  const m = Math.floor(seconds / 60);
+  const s = Math.round(seconds % 60);
+  if (m < 60) return s > 0 ? `${m}m ${s}s` : `${m}m`;
+  const h = Math.floor(m / 60);
+  const rm = m % 60;
+  if (h < 24) return rm > 0 ? `${h}h ${rm}m` : `${h}h`;
+  const d = Math.floor(h / 24);
+  const rh = h % 24;
+  return rh > 0 ? `${d}d ${rh}h` : `${d}d`;
+}
+
 export function formatNumber(n: number): string {
   return n.toLocaleString("en-US");
 }

@@ -8,6 +8,7 @@ export {
   formatNumber,
   formatCwd,
   formatProgressBar,
+  formatElapsedSeconds,
   usagePercentStressLevel,
 } from "./format.ts";
 export type { UsageStressLevel } from "./format.ts";
