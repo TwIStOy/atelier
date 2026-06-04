@@ -120,12 +120,12 @@ Depends on: Step 1.3 (`assistantMessageText`)
 
 **Design ref:** [D4.1](./DESIGN.md#d41-packagejson), [D4.6](./DESIGN.md#d46-tsconfigjson), [D5.1](./DESIGN.md#d51-root-packagejson), [D5.2](./DESIGN.md#d52-root-tsconfigjson)
 
-- [ ] Create `packages/btw/package.json` (see D4.1)
-- [ ] Create `packages/btw/tsconfig.json` (see D4.6)
-- [ ] Add `{ "path": "packages/btw" }` to root `tsconfig.json` references
-- [ ] Add `"packages/btw"` to root `package.json` `pi.extensions` array
-- [ ] Run `npm install` to link the workspace package
-- [ ] Verify: `npx tsc --build packages/btw` — should fail gracefully (no source files yet)
+- [x] Create `packages/btw/package.json` (see D4.1)
+- [x] Create `packages/btw/tsconfig.json` (see D4.6)
+- [x] Add `{ "path": "packages/btw" }` to root `tsconfig.json` references
+- [x] Add `"packages/btw"` to root `package.json` `pi.extensions` array
+- [x] Run `npm install` to link the workspace package
+- [x] Verify: `npx tsc --build packages/btw` — should fail gracefully (no source files yet)
 
 ### Step 2.2 — Create `prompts/btw-system.txt`
 
