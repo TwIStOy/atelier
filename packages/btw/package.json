@@ -10,7 +10,8 @@
     ]
   },
   "dependencies": {
-    "@htwang-contrib/common": "*"
+    "@htwang-contrib/common": "*",
+    "@htwang-contrib/tool-display": "*"
   },
   "devDependencies": {
     "@earendil-works/pi-ai": "^0.76.0",

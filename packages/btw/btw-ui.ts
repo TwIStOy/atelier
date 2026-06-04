@@ -12,6 +12,7 @@ import {
   wrapTextWithAnsi,
 } from "@earendil-works/pi-tui";
 import type { AssistantMessage, UserMessage } from "@earendil-works/pi-ai";
+import { spinnerGlyph } from "@htwang-contrib/tool-display";
 
 const BTW_OVERLAY_OPTIONS: OverlayOptions = {
   anchor: "bottom-center",
@@ -150,7 +151,7 @@ export class BtwOverlayController implements Component {
 
     switch (this.answer.kind) {
       case "pending":
-        lines.push(indent + "…");
+        lines.push(indent + spinnerGlyph(this.theme) + " Working...");
         break;
       case "answer": {
         const wrapped = wrapTextWithAnsi(this.answer.text, answerWidth);
