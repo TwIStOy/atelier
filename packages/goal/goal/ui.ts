@@ -1,6 +1,6 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import type { TUI } from "@earendil-works/pi-tui";
-import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import { visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 import { formatTokens, formatElapsedSeconds } from "@htwang-contrib/common";
 import type { Goal } from "./types.ts";
 
@@ -48,7 +48,13 @@ export function renderGoalWidget(
   const prefixWidth = visibleWidth(prefix);
   const objective = theme.fg("dim", goal.objective);
   const available = Math.max(0, width - prefixWidth);
-  const truncatedObjective = truncateToWidth(objective, available, "…");
+  const wrappedLines = wrapTextWithAnsi(objective, available);
 
-  return [`${prefix}${truncatedObjective}`];
+  if (wrappedLines.length === 0) return [prefix];
+
+  const indent = " ".repeat(prefixWidth);
+  return [
+    `${prefix}${wrappedLines[0]}`,
+    ...wrappedLines.slice(1).map((line) => `${indent}${line}`),
+  ];
 }
