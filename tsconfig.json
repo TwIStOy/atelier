@@ -13,6 +13,7 @@
     { "path": "packages/extra-tools" },
     { "path": "packages/ask-user-question" },
     { "path": "packages/context-usage" },
+    { "path": "packages/goal" },
     { "path": "packages/btw" }
   ]
 }
