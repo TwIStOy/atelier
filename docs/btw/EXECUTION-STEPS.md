@@ -131,8 +131,8 @@ Depends on: Step 1.3 (`assistantMessageText`)
 
 **Design ref:** [D4.4](./DESIGN.md#d44-promptsbtw-systemtxt)
 
-- [ ] Create `packages/btw/prompts/btw-system.txt` with the system prompt text
-- [ ] Run `npm run format`
+- [x] Create `packages/btw/prompts/btw-system.txt` with the system prompt text
+- [x] Run `npm run format`
 
 ### Step 2.3 — Create `btw-ui.ts`
 
