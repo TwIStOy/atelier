@@ -41,3 +41,5 @@ export {
   branchToMessages,
 } from "./session-cache.ts";
 export type { SessionCache } from "./session-cache.ts";
+export { executeSideCall } from "./side-call.ts";
+export type { SideCallResult } from "./side-call.ts";

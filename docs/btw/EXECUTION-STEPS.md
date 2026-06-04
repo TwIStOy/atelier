@@ -84,33 +84,33 @@ Depends on: Step 1.1 (`getGlobalState`)
 
 Depends on: Step 1.3 (`assistantMessageText`)
 
-- [ ] Create `packages/common/side-call.ts` with `executeSideCall` and `SideCallResult` type
-- [ ] Export function and type from `packages/common/index.ts`
-- [ ] Run `npm run format`
-- [ ] Verify: `npx tsc --build packages/common` passes
+- [x] Create `packages/common/side-call.ts` with `executeSideCall` and `SideCallResult` type
+- [x] Export function and type from `packages/common/index.ts`
+- [x] Run `npm run format`
+- [x] Verify: `npx tsc --build packages/common` passes
 
 ### Step 1.8 — Create `side-call.test.ts`
 
 **Design ref:** [D6.4](./DESIGN.md#d64-packagescommonside-calltestts)
 
-- [ ] Create `packages/common/side-call.test.ts`
-- [ ] Mock `completeSimple` from `@earendil-works/pi-ai`
-- [ ] Test: returns ok with answer text on success
-- [ ] Test: returns error when `getApiKeyAndHeaders` returns not ok
-- [ ] Test: returns error when apiKey is empty
-- [ ] Test: returns aborted when stopReason is "aborted"
-- [ ] Test: returns error when stopReason is "error"
-- [ ] Test: returns error when response has no text content
-- [ ] Test: maps thrown error with `signal.aborted` to aborted result
-- [ ] Test: wraps unknown throws as error result
-- [ ] Verify: `npx vitest run packages/common/side-call.test.ts` passes
+- [x] Create `packages/common/side-call.test.ts`
+- [x] Mock `completeSimple` from `@earendil-works/pi-ai`
+- [x] Test: returns ok with answer text on success
+- [x] Test: returns error when `getApiKeyAndHeaders` returns not ok
+- [x] Test: returns error when apiKey is empty
+- [x] Test: returns aborted when stopReason is "aborted"
+- [x] Test: returns error when stopReason is "error"
+- [x] Test: returns error when response has no text content
+- [x] Test: maps thrown error with `signal.aborted` to aborted result
+- [x] Test: wraps unknown throws as error result
+- [x] Verify: `npx vitest run packages/common/side-call.test.ts` passes
 
 ### Step 1.9 — Phase 1 gate
 
-- [ ] Run `npx tsc --build` (full project) — must pass
-- [ ] Run `npm test` — all existing + new tests pass
-- [ ] Run `npm run format`
-- [ ] Verify no regressions in existing extensions
+- [x] Run `npx tsc --build` (full project) — must pass
+- [x] Run `npm test` — all existing + new tests pass
+- [x] Run `npm run format`
+- [x] Verify no regressions in existing extensions
 
 ---
 
