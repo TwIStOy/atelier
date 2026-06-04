@@ -82,13 +82,18 @@ export const getGoalAdapter: ToolDisplayAdapter<GoalArgs> = {
     return theme.fg("toolTitle", theme.bold("GetGoal"));
   },
 
-  formatCollapsedContent(_args, output, theme, _width, details) {
+  formatCollapsedContent(_args, _output, theme, width, details) {
     const d = details as Record<string, unknown> | undefined;
-    const goal = d?.goal;
-    if (goal === null || goal === undefined) {
+    const hasGoal = d?.id !== undefined && d?.id !== null;
+    if (!hasGoal) {
       return [theme.fg("muted", "└ no goal set")];
     }
-    return [theme.fg("muted", `└ ${firstLine(output)}`)];
+    const status = typeof d?.status === "string" ? d.status : "unknown";
+    const objective = typeof d?.objective === "string" ? d.objective : "";
+    const statusGlyph =
+      status === "active" ? "●" : status === "complete" ? "✓" : "○";
+    const preview = truncateDisplay(objective, width - 10);
+    return [theme.fg("muted", `└ ${statusGlyph} ${status} — ${preview}`)];
   },
 
   formatExpandedContent(_args, output, theme, width) {
