@@ -21,7 +21,7 @@ function objectivePreview(
 
 export const createGoalAdapter: ToolDisplayAdapter<GoalArgs> = {
   formatCallHeader(args, theme, _details, _isPartial, _expanded) {
-    const label = theme.fg("toolTitle", theme.bold("Create Goal"));
+    const label = theme.fg("toolTitle", theme.bold("CreateGoal"));
     const obj = objectivePreview(args, theme, 80);
     return obj ? `${label} ${obj}` : label;
   },
@@ -58,7 +58,7 @@ export const createGoalAdapter: ToolDisplayAdapter<GoalArgs> = {
 export const updateGoalAdapter: ToolDisplayAdapter<GoalArgs> = {
   formatCallHeader(args, theme, _details, _isPartial, _expanded) {
     const statusVal = args.status ?? "";
-    const label = theme.fg("toolTitle", theme.bold("Update Goal"));
+    const label = theme.fg("toolTitle", theme.bold("UpdateGoal"));
     const statusLabel = theme.fg("accent", `→ ${statusVal}`);
     return `${label} ${statusLabel}`;
   },
@@ -88,7 +88,7 @@ export const updateGoalAdapter: ToolDisplayAdapter<GoalArgs> = {
 
 export const getGoalAdapter: ToolDisplayAdapter<GoalArgs> = {
   formatCallHeader(_args, theme, _details, _isPartial, _expanded) {
-    return theme.fg("toolTitle", theme.bold("Get Goal"));
+    return theme.fg("toolTitle", theme.bold("GetGoal"));
   },
 
   formatCollapsedContent(_args, output, theme, width, details) {
