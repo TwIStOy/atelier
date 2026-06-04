@@ -18,6 +18,7 @@ Monorepo with packages under `packages/`:
 - `packages/extra-tools/` -- Extra LLM tools `grep`, `glob`, and `ls` (prompt bullets in co-located `.txt`; `grep`/`glob` use ripgrep). Same-named tools override pi built-ins when this extension loads.
 - `packages/ask-user-question/` -- `ask_user_question` tool + rpiv-parity **`state/`** / **`view/`** (editor-slot `ctx.ui.custom` only); dev commands **`/auq-phase0`** / **`/auq-phase1`** / **`/auq-phase2`** in **`demo.ts`** (delete with demos when port is done); see `docs/ask-user-question/`.
 - `packages/context-usage/` -- **`/context`** command: estimated context-window usage in the below-editor widget; **Esc** clears it. Adapted from dotpi `context-usage`.
+- `packages/goal/` -- Persistent goal tracking (Codex-style goal mode): `/goal` command, `create_goal`/`update_goal`/`get_goal` tools, automatic continuation prompts, token budget control, statusline integration. See `docs/goal/`.
 - `.agents/skills/pi-self-extension/` -- skill with authoritative guidance for building pi extensions (API reference, compat gotchas, validation checklist).
 
 ## Subagents
