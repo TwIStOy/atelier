@@ -90,7 +90,7 @@ Location: `~/.pi/agent/extensions/web-search.ts`
 
 ```typescript
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { Type } from "typebox";
+import { Type } from "@sinclair/typebox";
 
 export default function (pi: ExtensionAPI) {
   // Register tools
@@ -112,6 +112,7 @@ export default function (pi: ExtensionAPI) {
         String(params.limit ?? 5)
       ], { signal });
       
+      // NOTE: 'details' is REQUIRED in every tool result, even if empty
       return {
         content: [{ type: "text", text: result.stdout }],
         details: { query: params.query }
@@ -143,7 +144,8 @@ export default function (pi: ExtensionAPI) {
 - ✅ Return proper result shapes with `content` and `details`
 - ✅ Support cancellation via `signal`
 - ✅ Truncate output (50KB/2000 lines max)
-- ✅ Use `Type.Union`/`Type.Literal` from `"typebox"` for enums (StringEnum not available in @earendil-works)
+- ✅ Use `Type.Union`/`Type.Literal` from `"@sinclair/typebox"` for enums (StringEnum not available in @earendil-works)
+- ✅ Every tool result MUST include `details` field (even `{}` or `{ error: "..." }`) — `AgentToolResult` requires it
 
 ### Output Truncation (Mandatory)
 
@@ -422,6 +424,80 @@ pi.registerTool({
 
 ## Common Patterns
 
+### Inter-Extension Communication (EventBus)
+
+Use `pi.events` to emit/subscribe to custom events between extensions:
+
+```typescript
+// Emit (in any extension)
+pi.events.emit("my-extension:update", data);
+
+// Subscribe (in another extension)
+const unsub = pi.events.on("my-extension:update", (data) => {
+  // React to state changes
+});
+// unsub() to stop listening
+```
+
+This is the recommended pattern for cross-extension communication (e.g., goal extension emits `goal:update`, statusline subscribes to render).
+
+### Hidden / Continuation Prompts
+
+Inject messages that the LLM sees but the user does not, useful for driving agent behavior:
+
+```typescript
+pi.sendMessage(
+  { customType: "my-ext:continuation", content: "...", display: false },
+  { triggerTurn: true, deliverAs: "followUp" },
+);
+```
+
+- `display: false` — not shown in chat
+- `triggerTurn: true` — starts a new agent turn
+- `deliverAs: "followUp"` — delivered as a follow-up message
+
+### Stale Context Guards
+
+Event handlers may fire with a stale `ctx` after session replacement/reload. Always guard:
+
+```typescript
+import { isStaleCtxError } from "@htwang-contrib/common";
+
+pi.on("session_start", async (event, ctx) => {
+  try {
+    // ... use ctx ...
+  } catch (e) {
+    if (isStaleCtxError(e)) return;
+    throw e;
+  }
+});
+```
+
+### Extracting Token Usage from agent_end
+
+```typescript
+import type { AssistantMessage } from "@earendil-works/pi-ai";
+
+pi.on("agent_end", (event, ctx) => {
+  for (const msg of event.messages) {
+    const m = msg as unknown as AssistantMessage;
+    if (m.role !== "assistant" || !m.usage) continue;
+    // m.usage.input, m.usage.output, m.usage.cacheRead, m.usage.cacheWrite
+    // m.usage.totalTokens, m.usage.cost.total
+  }
+});
+```
+
+### Atomic JSON File Writes
+
+For crash-safe file persistence, write to a temp file then rename:
+
+```typescript
+const tmp = filePath + ".tmp";
+fs.writeFileSync(tmp, JSON.stringify(data, null, 2) + "\n", "utf8");
+fs.renameSync(tmp, filePath);
+```
+
 ### Permission Gate Extension
 
 ```typescript
@@ -474,9 +550,17 @@ Before considering an extension complete:
 
 **Dependencies:**
 - [ ] All imported `@earendil-works/*` packages listed as explicit `devDependencies` in `package.json` (transitive deps like `pi-tui` are resolved at runtime by jiti but the LSP cannot find type declarations without them)
+- [ ] TypeBox imported from `"@sinclair/typebox"` (not `"typebox"`)
+- [ ] If accessing `AssistantMessage` type, add `@earendil-works/pi-ai` as devDependency
 - [ ] Root `pi-tui`/`pi-ai` versions aligned with what `pi-coding-agent` bundles internally — check `node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-tui/package.json` for the bundled version
+- [ ] If using helpers from `@htwang-contrib/common`, add it as dependency (not devDependency)
 
 ## References
+
+**This monorepo's reference docs:**
+- [API Reference](references/api_reference.md) — full ExtensionAPI, events, context methods
+- [Statusline & UI](references/statusline.md) — footer, widgets, editor customization
+- [Tool Display Adapters](references/tool_display.md) — customizing how tools render in TUI
 
 **Official Documentation:**
 - Extensions: See [extensions.md](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/extensions.md)

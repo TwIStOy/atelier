@@ -4,7 +4,8 @@
 
 ```typescript
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { Type } from "typebox";
+import { Type } from "@sinclair/typebox";
+import type { AssistantMessage } from "@earendil-works/pi-ai";
 ```
 
 ## ExtensionAPI Methods
@@ -18,7 +19,8 @@ import { Type } from "typebox";
 | `pi.registerFlag(name, opts)` | CLI flag | `--my-flag` |
 | `pi.on(event, handler)` | Event subscription | Intercept tool calls |
 | `pi.exec(cmd, args, opts)` | Run shell command | Execute external tools |
-| `pi.sendMessage(msg, opts)` | Inject custom message | Add context to session |
+| `pi.events` | EventBus for cross-extension comms | `emit(channel, data)`, `on(channel, handler)` |
+| `pi.sendMessage(msg, opts)` | Inject custom message | Hidden prompts, continuations |
 | `pi.sendUserMessage(content, opts)` | Send user message | Trigger agent response |
 | `pi.appendEntry(type, data)` | Persist state | Save extension data |
 | `pi.setSessionName(name)` | Name session | "Refactor auth" |
@@ -42,7 +44,7 @@ pi.registerTool({
   }),
   async execute(toolCallId, params, signal, onUpdate, ctx) {
     // Check cancellation
-    if (signal?.aborted) return { content: [{ type: "text", text: "Cancelled" }] };
+    if (signal?.aborted) return { content: [{ type: "text", text: "Cancelled" }], details: {} };
 
     // Stream progress
     onUpdate?.({ content: [{ type: "text", text: "Working..." }] });
@@ -50,7 +52,7 @@ pi.registerTool({
     // Execute
     const result = await doWork(params);
 
-    // Return
+    // Return — 'details' is REQUIRED even if empty
     return {
       content: [{ type: "text", text: "Done" }],
       details: { data: result }
@@ -59,13 +61,15 @@ pi.registerTool({
 });
 ```
 
+> **Important:** Every tool `execute` return MUST include a `details` field. The `AgentToolResult<unknown>` type requires it. Use `{}` for empty, `{ error: "..." }` for error cases, or structured data.
+
 ## Event Handlers
 
 ### Session Events
 
 ```typescript
 pi.on("session_start", async (event, ctx) => {
-  // Session loaded
+  // event.reason: "startup" | "reload" | "new" | "resume" | "fork"
 });
 
 pi.on("session_before_switch", async (event, ctx) => {
@@ -78,7 +82,7 @@ pi.on("session_switch", async (event, ctx) => {
 });
 
 pi.on("session_shutdown", async (event, ctx) => {
-  // Cleanup on exit
+  // event.reason: "quit" | "reload" | "new" | "resume" | "fork"
 });
 ```
 
@@ -94,11 +98,18 @@ pi.on("before_agent_start", async (event, ctx) => {
 });
 
 pi.on("agent_start", async (event, ctx) => {
-  // Agent starting
+  // event: { type: "agent_start" }
 });
 
 pi.on("agent_end", async (event, ctx) => {
-  // Agent finished
+  // event.messages: AgentMessage[] — all messages from this agent turn
+  // Extract token usage from assistant messages:
+  for (const msg of event.messages) {
+    const m = msg as unknown as AssistantMessage;
+    if (m.role === "assistant" && m.usage) {
+      // m.usage: { input, output, cacheRead, cacheWrite, totalTokens, cost: { ... } }
+    }
+  }
 });
 
 pi.on("turn_start", async (event, ctx) => {
@@ -260,6 +271,51 @@ pi.registerCommand("my-cmd", {
 });
 ```
 
+## Hidden Message Injection
+
+Inject messages the LLM sees but the user doesn't (useful for continuation prompts, budget alerts, etc.):
+
+```typescript
+pi.sendMessage(
+  { customType: "my-ext:action", content: "...", display: false },
+  { triggerTurn: true, deliverAs: "followUp" },
+);
+```
+
+| Parameter | Values | Description |
+|-----------|--------|-------------|
+| `display` | `boolean` | `false` = hidden from chat |
+| `triggerTurn` | `boolean` | `true` = starts new agent turn |
+| `deliverAs` | `"steer" \| "followUp" \| "nextTurn"` | How message is delivered |
+
+## EventBus (Cross-Extension Communication)
+
+```typescript
+// Emit a custom event
+pi.events.emit("my-ext:update", { status: "active" });
+
+// Subscribe to a custom event (returns unsubscribe function)
+const unsub = pi.events.on("my-ext:update", (data: unknown) => {
+  // Handle event
+});
+unsub(); // Stop listening
+```
+
+## Stale Context Guard
+
+Event handlers can fire with stale contexts after session replacement/reload:
+
+```typescript
+import { isStaleCtxError } from "@htwang-contrib/common";
+
+try {
+  ctx.ui.notify("...", "info");
+} catch (e) {
+  if (isStaleCtxError(e)) return; // Safely ignore
+  throw e;
+}
+```
+
 ## Provider Registration
 
 ```typescript
@@ -368,7 +424,7 @@ config: Type.Object({
 7. **Document in description** - LLM sees tool descriptions
 8. **Handle errors gracefully** - Return error in `content`
 9. **Store state in details** - For session reconstruction
-10. **Follow naming conventions** - lowercase, hyphens, descriptive
+10. **Follow naming conventions** — `snake_case` tool names, `CamelCase` labels
 
 ## Example: Complete Extension
 
