@@ -36,22 +36,22 @@
 
 **Design ref:** [D3.2](./DESIGN.md#d32-message-textts)
 
-- [ ] Create `packages/common/message-text.ts` with `extractMessageText`, `userMessageText`, `assistantMessageText`
-- [ ] Export from `packages/common/index.ts`
-- [ ] Run `npm run format`
-- [ ] Verify: `npx tsc --build packages/common` passes
+- [x] Create `packages/common/message-text.ts` with `extractMessageText`, `userMessageText`, `assistantMessageText`
+- [x] Export from `packages/common/index.ts`
+- [x] Run `npm run format`
+- [x] Verify: `npx tsc --build packages/common` passes
 
 ### Step 1.4 — Create `message-text.test.ts`
 
 **Design ref:** [D6.2](./DESIGN.md#d62-packagescommonmessage-texttestts)
 
-- [ ] Create `packages/common/message-text.test.ts`
-- [ ] Test: `extractMessageText` with string content
-- [ ] Test: `extractMessageText` with array content (text parts only)
-- [ ] Test: `extractMessageText` with mixed parts (text + non-text, skips non-text)
-- [ ] Test: `userMessageText` with string and array content
-- [ ] Test: `assistantMessageText` skips toolCall parts
-- [ ] Verify: `npx vitest run packages/common/message-text.test.ts` passes
+- [x] Create `packages/common/message-text.test.ts`
+- [x] Test: `extractMessageText` with string content
+- [x] Test: `extractMessageText` with array content (text parts only)
+- [x] Test: `extractMessageText` with mixed parts (text + non-text, skips non-text)
+- [x] Test: `userMessageText` with string and array content
+- [x] Test: `assistantMessageText` skips toolCall parts
+- [x] Verify: `npx vitest run packages/common/message-text.test.ts` passes
 
 ### Step 1.5 — Create `session-cache.ts`
 
@@ -59,24 +59,24 @@
 
 Depends on: Step 1.1 (`getGlobalState`)
 
-- [ ] Create `packages/common/session-cache.ts` with `isStaleCtxError`, `createSessionCache<V>`, `branchToMessages`
-- [ ] Export `SessionCache` type and all functions from `packages/common/index.ts`
-- [ ] Run `npm run format`
-- [ ] Verify: `npx tsc --build packages/common` passes
+- [x] Create `packages/common/session-cache.ts` with `isStaleCtxError`, `createSessionCache<V>`, `branchToMessages`
+- [x] Export `SessionCache` type and all functions from `packages/common/index.ts`
+- [x] Run `npm run format`
+- [x] Verify: `npx tsc --build packages/common` passes
 
 ### Step 1.6 — Create `session-cache.test.ts`
 
 **Design ref:** [D6.3](./DESIGN.md#d63-packagescommonsession-cachetestts)
 
-- [ ] Create `packages/common/session-cache.test.ts`
-- [ ] Test: `branchToMessages` filters to message entries and converts
-- [ ] Test: `createSessionCache` get returns undefined before set
-- [ ] Test: `createSessionCache` set/get round-trip
-- [ ] Test: `invalidate` removes the cached value
-- [ ] Test: `safeInvalidate` swallows stale-ctx error
-- [ ] Test: `safeInvalidate` re-throws non-stale errors
-- [ ] Test: `isStaleCtxError` matches expected substring
-- [ ] Verify: `npx vitest run packages/common/session-cache.test.ts` passes
+- [x] Create `packages/common/session-cache.test.ts`
+- [x] Test: `branchToMessages` filters to message entries and converts
+- [x] Test: `createSessionCache` get returns undefined before set
+- [x] Test: `createSessionCache` set/get round-trip
+- [x] Test: `invalidate` removes the cached value
+- [x] Test: `safeInvalidate` swallows stale-ctx error
+- [x] Test: `safeInvalidate` re-throws non-stale errors
+- [x] Test: `isStaleCtxError` matches expected substring
+- [x] Verify: `npx vitest run packages/common/session-cache.test.ts` passes
 
 ### Step 1.7 — Create `side-call.ts`
 
