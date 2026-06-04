@@ -178,39 +178,38 @@ Depends on: Phase 1 (all shared modules)
 
 **Design ref:** [D6.5](./DESIGN.md#d65-packagesbtwbtwtestts)
 
-- [ ] Create `packages/btw/btw.test.ts`
-- [ ] Mock `completeSimple` and `showBtwOverlay`
-- [ ] Test: `registerBtw` registers the `/btw` command
-- [ ] Test: `registerBtw` registers message_end and invalidation hooks
-- [ ] Test: command handler guards — no UI, empty args, no model
-- [ ] Test: `buildBtwMessages` assembles branch + history + new question in correct order
-- [ ] Test: cross-session hint is empty with no history
-- [ ] Test: cross-session hint includes questions after turns accumulate
-- [ ] Test: `clearSessionHistory` resets the session's history array
-- [ ] Verify: `npx vitest run packages/btw/btw.test.ts` passes
+- [x] Create `packages/btw/btw.test.ts`
+- [x] Mock `completeSimple` and `showBtwOverlay`
+- [x] Test: `registerBtw` registers the `/btw` command
+- [x] Test: `registerBtw` registers message_end and invalidation hooks
+- [x] Test: command handler guards — no UI, empty args, no model
+- [x] Test: `buildBtwMessages` assembles branch + history + new question in correct order
+- [x] Test: cross-session hint is empty with no history
+- [x] Test: cross-session hint includes questions after turns accumulate
+- [x] Test: `clearSessionHistory` resets the session's history array
+- [x] Verify: `npx vitest run packages/btw/btw.test.ts` passes
 
 ### Step 2.7 — Create `btw-ui.test.ts`
 
 **Design ref:** [D6.6](./DESIGN.md#d66-packagesbtwbtw-uitestts)
 
-- [ ] Create `packages/btw/btw-ui.test.ts`
-- [ ] Test: initial render shows banner, echo, pending glyph, dismiss footer
-- [ ] Test: `setAnswer` replaces pending with answer text, enables scroll hint
-- [ ] Test: `setError` renders error text
-- [ ] Test: Esc aborts controller and calls `done()`
-- [ ] Test: `x` clears history, invokes callback, removes clear hint
-- [ ] Test: scroll clipping returns `maxRows` lines when content overflows
-- [ ] Test: banner is padded to full visible width
-- [ ] Test: long questions are truncated with ellipsis in banner
-- [ ] Test: `showBtwOverlay` calls `ctx.ui.custom` with overlay options
-- [ ] Test: `controllerReady` resolves with the `BtwOverlayController`
-- [ ] Verify: `npx vitest run packages/btw/btw-ui.test.ts` passes
+- [x] Create `packages/btw/btw-ui.test.ts`
+- [x] Test: initial render shows banner, echo, pending glyph, dismiss footer
+- [x] Test: `setAnswer` replaces pending with answer text, enables scroll hint
+- [x] Test: `setError` renders error text
+- [x] Test: Esc aborts controller and calls `done()`
+- [x] Test: `x` clears history, invokes callback, removes clear hint
+- [x] Test: scroll clipping returns `maxRows` lines when content overflows
+- [x] Test: banner is padded to full visible width
+- [x] Test: `showBtwOverlay` calls `ctx.ui.custom` with overlay options
+- [x] Test: `controllerReady` resolves with the `BtwOverlayController`
+- [x] Verify: `npx vitest run packages/btw/btw-ui.test.ts` passes
 
 ### Step 2.8 — Phase 2 gate
 
-- [ ] Run `npx tsc --build` (full project) — must pass
-- [ ] Run `npm test` — all tests pass
-- [ ] Run `npm run format`
+- [x] Run `npx tsc --build` (full project) — must pass
+- [x] Run `npm test` — all tests pass
+- [x] Run `npm run format`
 - [ ] Manual smoke test: start pi, type `/btw what is 2+2?`, verify overlay appears with answer
 - [ ] Manual test: Esc closes the overlay
 - [ ] Manual test: `/btw` follow-up uses prior context
