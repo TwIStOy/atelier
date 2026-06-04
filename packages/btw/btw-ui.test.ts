@@ -75,7 +75,7 @@ describe("BtwOverlayController", () => {
       const echo = lines.find((l) => l.includes("accent"));
       expect(echo).toBeDefined();
 
-      const pending = lines.find((l) => l.includes("…"));
+      const pending = lines.find((l) => l.includes("Working"));
       expect(pending).toBeDefined();
 
       const footer = lines.find((l) => l.includes("dismiss"));
