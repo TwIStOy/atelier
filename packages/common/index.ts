@@ -3,6 +3,8 @@ export {
   truncateDisplay,
   trimTrailingEmpty,
   formatTokens,
+  formatTokensCompact,
+  formatGoalElapsedSeconds,
   formatTokenUsageArrows,
   formatTokenUsageSummaryLine,
   formatNumber,

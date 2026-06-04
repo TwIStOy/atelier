@@ -1,6 +1,8 @@
 import { describe, expect, test } from "vitest";
 import {
   truncateDisplay,
+  formatGoalElapsedSeconds,
+  formatTokensCompact,
   formatTokenUsageArrows,
   formatTokenUsageSummaryLine,
   usagePercentStressLevel,
@@ -43,5 +45,22 @@ describe("formatTokenUsageSummaryLine", () => {
       "Tokens: ↑1 ↓2 · context 34%",
     );
     expect(formatTokenUsageSummaryLine(1, 2, null)).toBe("Tokens: ↑1 ↓2");
+  });
+});
+
+describe("formatGoalElapsedSeconds", () => {
+  test("formats elapsed time across ranges", () => {
+    expect(formatGoalElapsedSeconds(30)).toBe("30s");
+    expect(formatGoalElapsedSeconds(90)).toBe("1m");
+    expect(formatGoalElapsedSeconds(3660)).toBe("1h 1m");
+    expect(formatGoalElapsedSeconds(90000)).toBe("1d 1h");
+  });
+});
+
+describe("formatTokensCompact", () => {
+  test("formats token counts in compact units", () => {
+    expect(formatTokensCompact(999)).toBe("999");
+    expect(formatTokensCompact(1_200)).toBe("1.2K");
+    expect(formatTokensCompact(1_500_000)).toBe("1.5M");
   });
 });
