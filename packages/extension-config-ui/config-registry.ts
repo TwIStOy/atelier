@@ -7,9 +7,10 @@ import type {
 } from "@htwang-contrib/common";
 import {
   getConfigItems,
-  readConfig,
   readRawConfig,
-  updateConfig,
+  setConfigKey,
+  deleteConfigKey,
+  deleteConfigSection,
 } from "@htwang-contrib/common";
 import type { SettingRow, TabDef } from "./types.ts";
 import { TAB_ALL, PACKAGE_TAB_PREFIX } from "./types.ts";
@@ -20,15 +21,15 @@ export function resolveOptions<T>(
   return typeof options === "function" ? options() : options;
 }
 
+function resolveValue<T>(value: T | (() => T)): T {
+  return typeof value === "function" ? (value as () => T)() : value;
+}
+
 export function buildSettingRows(): SettingRow[] {
   const registries = getConfigItems() as ConfigItemRegistry[];
   const rows: SettingRow[] = [];
 
   for (const { extensionId, items } of registries) {
-    const defaults = Object.fromEntries(
-      items.map((i) => [i.key, i.defaultValue]),
-    );
-    const config = readConfig(extensionId, { defaults });
     const rawSection = readRawConfig(extensionId);
 
     const extLabel =
@@ -37,19 +38,8 @@ export function buildSettingRows(): SettingRow[] {
         : extensionId;
 
     for (const item of items) {
-      let currentValue: unknown;
-      let isExplicit = false;
-
-      if (item.value !== undefined) {
-        currentValue =
-          typeof item.value === "function"
-            ? (item.value as () => unknown)()
-            : item.value;
-        isExplicit = rawSection ? item.key in rawSection : false;
-      } else {
-        currentValue = config[item.key as keyof typeof config];
-        isExplicit = rawSection ? item.key in rawSection : false;
-      }
+      const currentValue = resolveValue(item.value);
+      const isExplicit = rawSection ? item.key in rawSection : false;
 
       rows.push({
         id: `${extensionId}::${item.key}`,
@@ -114,23 +104,11 @@ export function filterRows(
 }
 
 export function saveSetting(row: SettingRow, newValue: unknown): void {
-  const defaults = Object.fromEntries([
-    [row.item.key, row.item.defaultValue],
-  ] as [string, unknown][]);
-  updateConfig(row.extensionId, { defaults }, { [row.item.key]: newValue });
+  setConfigKey(row.extensionId, row.item.key, newValue);
 }
 
 export function resetSetting(row: SettingRow): void {
-  const defaults = Object.fromEntries([
-    [row.item.key, row.item.defaultValue],
-  ] as [string, unknown][]);
-  updateConfig(
-    row.extensionId,
-    { defaults },
-    {
-      [row.item.key]: row.item.defaultValue,
-    },
-  );
+  deleteConfigKey(row.extensionId, row.item.key);
 }
 
 export function resetExtensionSettings(
@@ -138,10 +116,9 @@ export function resetExtensionSettings(
   extensionId: string,
 ): void {
   const extRows = rows.filter((r) => r.extensionId === extensionId);
-  const defaults = Object.fromEntries(
-    extRows.map((r) => [r.item.key, r.item.defaultValue] as [string, unknown]),
-  );
-  updateConfig(extensionId, { defaults }, defaults);
+  for (const r of extRows) {
+    deleteConfigKey(extensionId, r.item.key);
+  }
 }
 
 export function getSelectOptions(row: SettingRow) {

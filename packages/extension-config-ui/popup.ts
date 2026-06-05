@@ -151,9 +151,7 @@ function createConfigComponent(
       requestRender();
       return;
     }
-    const buffer = stringifyValue(
-      row.currentValue ?? row.item.defaultValue ?? "",
-    );
+    const buffer = stringifyValue(row.currentValue ?? "");
     ui.editing = { buffer, cursor: buffer.length, rowId: row.id };
     requestRender();
   };
@@ -317,7 +315,10 @@ function createConfigComponent(
       const row = selectedRow();
       if (row) {
         resetSetting(row);
-        row.currentValue = row.item.defaultValue;
+        row.currentValue =
+          typeof row.item.value === "function"
+            ? (row.item.value as () => unknown)()
+            : row.item.value;
         row.isExplicit = false;
       }
       requestRender();
@@ -329,7 +330,10 @@ function createConfigComponent(
         resetExtensionSettings(rows, row.extensionId);
         for (const r of rows) {
           if (r.extensionId === row.extensionId) {
-            r.currentValue = r.item.defaultValue;
+            r.currentValue =
+              typeof r.item.value === "function"
+                ? (r.item.value as () => unknown)()
+                : r.item.value;
             r.isExplicit = false;
           }
         }
