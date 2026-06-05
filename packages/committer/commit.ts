@@ -2,7 +2,7 @@ import type {
   ExtensionAPI,
   ExtensionCommandContext,
 } from "@earendil-works/pi-coding-agent";
-import type { Model } from "@earendil-works/pi-ai";
+import type { Model, Message } from "@earendil-works/pi-ai";
 import { executeSideCall } from "@htwang-contrib/common";
 import type { SideCallResult } from "@htwang-contrib/common";
 import {
@@ -17,8 +17,10 @@ import {
 import {
   SINGLE_COMMIT_PROMPT,
   GROUPING_PROMPT,
+  GROUPING_RETRY_PROMPT,
   MAX_DIFF_LENGTH,
   MAX_DIFF_LENGTH_SINGLE,
+  MAX_GROUPING_RETRIES,
 } from "./prompt.ts";
 import type { CommitterProgress } from "./widget.ts";
 import type { CommitterOverlayController } from "./widget.ts";
@@ -209,18 +211,18 @@ async function commitGrouped(
   progress.statusMessage = "Grouping changes into logical commits...";
   ctrl.invalidate();
 
+  const { files: allFiles } = getDiff(cwd);
   const truncatedDiff = diffText.slice(0, MAX_DIFF_LENGTH);
-  const prompt = GROUPING_PROMPT + truncatedDiff;
 
-  const result: SideCallResult = await executeSideCall({
+  const groups = await groupingWithRetry(
+    truncatedDiff,
+    allFiles,
     model,
-    modelRegistry: ctx.modelRegistry,
-    systemPrompt:
-      "You are a commit message generator. Output ONLY valid conventional commit messages with the specified grouping format.",
-    messages: [{ role: "user", content: prompt, timestamp: Date.now() }],
+    ctx,
+    progress,
+    ctrl,
     signal,
-    commandName: "/commit",
-  });
+  );
 
   if (signal.aborted) {
     progress.phase = "cancelled";
@@ -228,17 +230,16 @@ async function commitGrouped(
     return;
   }
 
-  if (!result.ok) {
-    progress.phase = "error";
-    progress.errorMessage = "aborted" in result ? "Aborted." : result.error;
-    ctrl.invalidate();
-    return;
-  }
-
-  const groups = parseGroups(result.answer);
   if (groups.length === 0) {
     await commitSingle(cwd, diffText, model, ctx, progress, ctrl, signal);
     return;
+  }
+
+  const assigned = new Set(groups.flatMap((g) => g.files));
+  const unassigned = allFiles.filter((f) => !assigned.has(f));
+  if (unassigned.length > 0 && groups.length > 0) {
+    const last = groups[groups.length - 1]!;
+    last.files = [...last.files, ...unassigned];
   }
 
   progress.phase = "committing";
@@ -284,35 +285,126 @@ async function commitGrouped(
   ctrl.invalidate();
 }
 
+async function groupingWithRetry(
+  diffText: string,
+  allFiles: string[],
+  model: AnyModel,
+  ctx: ExtensionCommandContext,
+  progress: CommitterProgress,
+  ctrl: CommitterOverlayController,
+  signal: AbortSignal,
+): Promise<CommitGroup[]> {
+  const systemPrompt =
+    "You are a commit message generator. Output ONLY the requested JSON array.";
+  const changedFilesList = allFiles.join("\n");
+
+  const firstPrompt =
+    GROUPING_PROMPT.replace("{changed_files}", changedFilesList) + diffText;
+
+  let messages: Message[] = [
+    { role: "user" as const, content: firstPrompt, timestamp: Date.now() },
+  ];
+
+  for (let attempt = 0; attempt <= MAX_GROUPING_RETRIES; attempt++) {
+    if (signal.aborted) return [];
+
+    const attemptLabel =
+      attempt === 0
+        ? "Grouping changes into logical commits..."
+        : `Retrying grouping (attempt ${attempt + 1}/${MAX_GROUPING_RETRIES})...`;
+    progress.statusMessage = attemptLabel;
+    ctrl.invalidate();
+
+    const result: SideCallResult = await executeSideCall({
+      model,
+      modelRegistry: ctx.modelRegistry,
+      systemPrompt,
+      messages,
+      signal,
+      commandName: "/commit",
+    });
+
+    if (signal.aborted) return [];
+    if (!result.ok) return [];
+
+    const groups = parseGroups(result.answer);
+    if (groups.length === 0) continue;
+
+    const assigned = new Set(groups.flatMap((g) => g.files));
+    const missing = allFiles.filter((f) => !assigned.has(f));
+    if (missing.length === 0) return groups;
+
+    if (attempt < MAX_GROUPING_RETRIES) {
+      const retryPrompt = GROUPING_RETRY_PROMPT.replace(
+        "{changed_files}",
+        changedFilesList,
+      )
+        .replace("{missing_files}", missing.join("\n"))
+        .replace("{previous_groups}", JSON.stringify(groups, null, 2));
+      messages = [
+        ...messages,
+        result.assistantMessage,
+        { role: "user" as const, content: retryPrompt, timestamp: Date.now() },
+      ];
+    }
+  }
+
+  return [];
+}
+
 interface CommitGroup {
   files: string[];
   message: string;
 }
 
 function parseGroups(response: string): CommitGroup[] {
-  const groups: CommitGroup[] = [];
-  const blocks = response.split(/---\s*COMMIT GROUP\s*\d+\s*---/i);
+  const json = extractJson(response);
+  if (!json) return [];
 
-  for (const block of blocks) {
-    if (!block.trim()) continue;
+  try {
+    const parsed = JSON.parse(json);
+    if (!Array.isArray(parsed)) return [];
 
-    const filesMatch = block.match(/Files:\s*(.+)/i);
-    const messageMatch = block.match(
-      /Message:\s*\n([\s\S]*?)(?=---\s*COMMIT GROUP|$)/i,
-    );
+    const groups: CommitGroup[] = [];
+    for (const item of parsed) {
+      if (
+        !item ||
+        typeof item !== "object" ||
+        !Array.isArray(item.files) ||
+        typeof item.message !== "string"
+      )
+        continue;
 
-    if (!filesMatch || !messageMatch) continue;
+      const files = item.files
+        .map((f: unknown) => String(f))
+        .filter((f: string) => f.length > 0);
+      if (files.length === 0 || !item.message.trim()) continue;
 
-    const files = filesMatch[1]
-      .split(",")
-      .map((f) => f.trim())
-      .filter(Boolean);
+      groups.push({ files, message: item.message.trim() });
+    }
 
-    const message = (messageMatch[1] ?? "").trim();
-    if (files.length === 0 || !message) continue;
+    return groups;
+  } catch {
+    return [];
+  }
+}
 
-    groups.push({ files, message });
+function extractJson(text: string): string | null {
+  const trimmed = text.trim();
+
+  const fenceMatch = trimmed.match(/```(?:json)?\s*\n?([\s\S]*?)```/);
+  if (fenceMatch) return fenceMatch[1]!.trim();
+
+  if (trimmed.startsWith("[")) {
+    const end = trimmed.lastIndexOf("]");
+    if (end !== -1) return trimmed.slice(0, end + 1);
   }
 
-  return groups;
+  const arrStart = trimmed.indexOf("[");
+  const arrEnd = trimmed.lastIndexOf("]");
+  if (arrStart !== -1 && arrEnd > arrStart) {
+    return trimmed.slice(arrStart, arrEnd + 1);
+  }
+
+  return null;
 }
