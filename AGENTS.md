@@ -19,6 +19,10 @@ Monorepo with packages under `packages/`:
 - `packages/ask-user-question/` -- `ask_user_question` tool + rpiv-parity **`state/`** / **`view/`** (editor-slot `ctx.ui.custom` only); dev commands **`/auq-phase0`** / **`/auq-phase1`** / **`/auq-phase2`** in **`demo.ts`** (delete with demos when port is done); see `docs/ask-user-question/`.
 - `packages/context-usage/` -- **`/context`** command: estimated context-window usage in the below-editor widget; **Esc** clears it. Adapted from dotpi `context-usage`.
 - `packages/goal/` -- Persistent goal tracking (Codex-style goal mode): `/goal` command, `create_goal`/`update_goal`/`get_goal` tools, automatic continuation prompts, token budget control, statusline integration. See `docs/goal/`.
+- `packages/btw/` -- `/btw` command: one-off side questions answered in a bottom overlay, never entering the main conversation. See `docs/btw/`.
+- `packages/memory/` -- Memory/journal tools (`memory-*`, `journal-*`) + `/self-improve` and `/reorganize-memory` commands for persistent knowledge and reflection.
+- `packages/prompt-snippets/` -- `/snippet` command: file-driven prompt templates sent via `sendUserMessage`. Snippets declared in `pi.snippets` (package.json), discovered from user/project dirs and all registered packages. See `docs/prompt-snippets/`.
+- `snippets/` -- Project-level prompt snippets bundled with this repo (registered via `pi.snippets` in root `package.json`).
 - `.agents/skills/pi-self-extension/` -- skill with authoritative guidance for building pi extensions (API reference, compat gotchas, validation checklist).
 
 ## Subagents
@@ -33,6 +37,7 @@ In-process subagent extension (parallel and background runs, no extra `pi` subpr
 - Root `tsconfig.json` uses project references pointing at each package's own `tsconfig.json`.
 - ESM (`"type": "module"` in root `package.json`). Use `.ts` extensions in imports.
 - `packages/common` is the shared library (`@htwang-contrib/common`) consumed by other packages.
+- `snippets/` holds project-local prompt snippets; packages can declare their own via `pi.snippets` in `package.json`.
 
 ## Commands
 
