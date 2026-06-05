@@ -17,6 +17,7 @@
     { "path": "packages/goal" },
     { "path": "packages/memory" },
     { "path": "packages/prompt-snippets" },
-    { "path": "packages/committer" }
+    { "path": "packages/committer" },
+    { "path": "packages/extension-config-ui" }
   ]
 }

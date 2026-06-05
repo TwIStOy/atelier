@@ -23,7 +23,8 @@
       "packages/btw",
       "packages/memory",
       "packages/prompt-snippets",
-      "packages/committer"
+      "packages/committer",
+      "packages/extension-config-ui"
     ],
     "skills": [
       "skills/code-philosophy",
