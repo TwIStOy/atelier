@@ -86,6 +86,8 @@ Need to extend pi?
 
 ### Mandatory Extension Structure
 
+**Important:** The entry file must always accept `ExtensionAPI` as a parameter, even as a placeholder. An empty signature (`export default function (): void {}`) causes pi to fail on startup.
+
 Location: `~/.pi/agent/extensions/web-search.ts`
 
 ```typescript
@@ -138,6 +140,7 @@ export default function (pi: ExtensionAPI) {
 ### Extension API Checklist
 
 - ✅ Export default function accepting `ExtensionAPI`
+- ✅ Entry function always has `ExtensionAPI` parameter (never empty)
 - ✅ Use `pi.registerTool()` for LLM-callable tools
 - ✅ Use `pi.registerCommand()` for `/slash` commands
 - ✅ Use `pi.on()` for event interception
@@ -308,6 +311,20 @@ type ModelsDevResponse = Record<string, {
 The `opencode-go` provider aggregates models from multiple upstreams and is a good primary source.
 
 ## Prompt Templates
+
+### Parsing Frontmatter in Extensions
+
+Use the built-in `parseFrontmatter` utility instead of hand-rolling regex:
+
+```typescript
+import { parseFrontmatter } from "@earendil-works/pi-coding-agent";
+
+const { frontmatter, body } = parseFrontmatter(content);
+// frontmatter: Record<string, unknown> (parsed YAML)
+// body: string (content after frontmatter, trimmed)
+```
+
+Handles CRLF normalization, empty frontmatter edge cases, and uses the `yaml` package for proper YAML parsing. Exported alongside `stripFrontmatter`.
 
 ### When to Use
 
