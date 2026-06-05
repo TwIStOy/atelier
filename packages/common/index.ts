@@ -44,5 +44,24 @@ export {
 export type { SessionCache } from "./session-cache.ts";
 export { executeSideCall } from "./side-call.ts";
 export type { SideCallResult } from "./side-call.ts";
-export { readConfig, writeConfig, updateConfig } from "./extension-config.ts";
-export type { ExtensionConfigSchema } from "./extension-config.ts";
+export {
+  readConfig,
+  writeConfig,
+  updateConfig,
+  registerConfigItems,
+  getConfigItems,
+  clearConfigItems,
+} from "./config/index.ts";
+export type {
+  ExtensionConfigSchema,
+  ConfigItem,
+  ConfigItemType,
+  ConfigItemBase,
+  StringConfigItem,
+  NumberConfigItem,
+  BooleanConfigItem,
+  SelectConfigItem,
+  ColorConfigItem,
+  ConfigItemSelectOption,
+  ConfigItemRegistry,
+} from "./config/index.ts";
