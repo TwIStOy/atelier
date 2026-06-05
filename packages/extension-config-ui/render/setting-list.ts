@@ -9,7 +9,32 @@ import { glyphs } from "./glyphs.ts";
 import { pad, wrapLine } from "./frame.ts";
 import type { InlineEditState, SelectingState, SettingRow } from "../types.ts";
 
-export function formatSettingValue(item: ConfigItem, value: unknown): string {
+const HEX_COLOR_RE = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+
+export function isValidColor(value: string): boolean {
+  return HEX_COLOR_RE.test(value.trim());
+}
+
+export function colorFg(hex: string, text: string): string {
+  const trimmed = hex.trim();
+  let r: number, g: number, b: number;
+  if (trimmed.length === 4) {
+    r = parseInt(trimmed[1]! + trimmed[1], 16);
+    g = parseInt(trimmed[2]! + trimmed[2], 16);
+    b = parseInt(trimmed[3]! + trimmed[3], 16);
+  } else {
+    r = parseInt(trimmed.slice(1, 3), 16);
+    g = parseInt(trimmed.slice(3, 5), 16);
+    b = parseInt(trimmed.slice(5, 7), 16);
+  }
+  return `\x1b[38;2;${r};${g};${b}m${text}\x1b[39m`;
+}
+
+export function formatSettingValue(
+  item: ConfigItem,
+  value: unknown,
+  colorBlock?: string,
+): string {
   if (value === undefined || value === null) return "(unset)";
   if (item.secret) return "••••••";
   switch (item.type) {
@@ -36,8 +61,10 @@ export function formatSettingValue(item: ConfigItem, value: unknown): string {
         .join(", ");
       return truncateToWidth(labels, 40, "…");
     }
-    case "color":
-      return String(value);
+    case "color": {
+      const block = colorBlock ?? "██";
+      return `${block} ${String(value)}`;
+    }
     case "number":
     case "string":
     default:
@@ -92,10 +119,14 @@ export function renderSettingList(
       ? theme.fg("text", truncateToWidth(labelText, 34, "…"))
       : truncateToWidth(labelText, 34, "…");
 
+    const colorBlock =
+      row.item.type === "color" && isValidColor(String(row.currentValue))
+        ? colorFg(String(row.currentValue), "██")
+        : undefined;
     const displayValue =
       isEditing && editing
         ? renderInlineEditValue(editing)
-        : formatSettingValue(row.item, row.currentValue);
+        : formatSettingValue(row.item, row.currentValue, colorBlock);
 
     const valueText = valueColor(
       theme,
