@@ -42,8 +42,17 @@ export interface CommitterProgress {
   errorMessage?: string;
 }
 
+const SPINNER_INTERVAL_MS = 80;
+
+const ACTIVE_PHASES: ReadonlySet<CommitPhase> = new Set([
+  "preparing",
+  "generating",
+  "committing",
+]);
+
 export class CommitterOverlayController implements Component {
   private scrollOffset = 0;
+  private timer: ReturnType<typeof setInterval> | undefined;
 
   constructor(
     private readonly tui: TUI,
@@ -51,7 +60,28 @@ export class CommitterOverlayController implements Component {
     private readonly progress: CommitterProgress,
     private readonly controller: AbortController,
     private readonly done: () => void,
-  ) {}
+  ) {
+    this.ensureTimer();
+  }
+
+  private ensureTimer(): void {
+    if (ACTIVE_PHASES.has(this.progress.phase)) {
+      this.startTimer();
+    } else {
+      this.stopTimer();
+    }
+  }
+
+  private startTimer(): void {
+    if (this.timer) return;
+    this.timer = setInterval(() => this.invalidate(), SPINNER_INTERVAL_MS);
+  }
+
+  private stopTimer(): void {
+    if (!this.timer) return;
+    clearInterval(this.timer);
+    this.timer = undefined;
+  }
 
   render(width: number): string[] {
     return this.buildLines(width);
@@ -75,7 +105,12 @@ export class CommitterOverlayController implements Component {
   }
 
   invalidate(): void {
+    this.ensureTimer();
     this.tui.requestRender();
+  }
+
+  dispose(): void {
+    this.stopTimer();
   }
 
   private buildLines(width: number): string[] {
