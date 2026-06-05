@@ -41,22 +41,11 @@ export async function handleCommit(
     return;
   }
 
-  if (!isGitRepo(ctx.cwd)) {
-    ctx.ui.notify("Not a git repository.", "warning");
-    return;
-  }
-
-  const model = resolveCommitModel(ctx);
-  if (!model) {
-    ctx.ui.notify("No model available for commit generation.", "warning");
-    return;
-  }
-
   const controller = new AbortController();
   const progress: CommitterProgress = {
     phase: "preparing",
     statusMessage: "",
-    model: `${model.provider}/${model.id}`,
+    model: undefined,
     filesTotal: 0,
     commitsCompleted: 0,
     commitsTotal: 0,
@@ -73,10 +62,35 @@ export async function handleCommit(
   try {
     if (controller.signal.aborted) return;
 
+    progress.statusMessage = "Checking repository...";
+    ctrl.invalidate();
+
+    const isRepo = await isGitRepo(ctx.cwd);
+    if (!isRepo) {
+      progress.phase = "error";
+      progress.errorMessage = "Not a git repository.";
+      ctrl.invalidate();
+      await overlayPromise;
+      return;
+    }
+
+    progress.statusMessage = "Resolving model...";
+    ctrl.invalidate();
+
+    const model = resolveCommitModel(ctx);
+    if (!model) {
+      progress.phase = "error";
+      progress.errorMessage = "No model available for commit generation.";
+      ctrl.invalidate();
+      await overlayPromise;
+      return;
+    }
+    progress.model = `${model.provider}/${model.id}`;
+
     progress.statusMessage = "Checking changes...";
     ctrl.invalidate();
 
-    const changeCount = countChanges(ctx.cwd);
+    const changeCount = await countChanges(ctx.cwd);
     if (changeCount === 0) {
       progress.phase = "error";
       progress.errorMessage = "No changes to commit.";
@@ -88,9 +102,9 @@ export async function handleCommit(
     progress.statusMessage = "Staging changes...";
     ctrl.invalidate();
 
-    stageAll(ctx.cwd);
+    await stageAll(ctx.cwd);
 
-    const diff = getDiff(ctx.cwd);
+    const diff = await getDiff(ctx.cwd);
     progress.filesTotal = diff.files.length;
     progress.diffStat = diff.stat;
     ctrl.invalidate();
@@ -186,7 +200,7 @@ async function commitSingle(
   }
 
   try {
-    const hash = commit(cwd, message);
+    const hash = await commit(cwd, message);
     progress.commitLog.push({ hash, message, success: true });
     progress.commitsCompleted = 1;
   } catch (err) {
@@ -215,7 +229,7 @@ async function commitGrouped(
   progress.statusMessage = "Grouping changes into logical commits...";
   ctrl.invalidate();
 
-  const { files: allFiles } = getDiff(cwd);
+  const { files: allFiles } = await getDiff(cwd);
   const truncatedDiff = diffText.slice(0, MAX_DIFF_LENGTH);
 
   const groups = await groupingWithRetry(
@@ -258,11 +272,11 @@ async function commitGrouped(
     }
 
     const group = groups[i];
-    unstageAll(cwd);
-    stageFiles(cwd, group.files);
+    await unstageAll(cwd);
+    await stageFiles(cwd, group.files);
 
     try {
-      const hash = commit(cwd, group.message);
+      const hash = await commit(cwd, group.message);
       progress.commitLog.push({
         hash,
         message: group.message,

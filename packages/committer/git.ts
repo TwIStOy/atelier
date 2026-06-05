@@ -1,4 +1,20 @@
-import { execSync } from "node:child_process";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+
+const exec = promisify(execFile);
+
+async function git(
+  cwd: string,
+  args: string[],
+  opts?: { maxBuffer?: number },
+): Promise<string> {
+  const { stdout } = await exec("git", args, {
+    cwd,
+    encoding: "utf-8",
+    maxBuffer: opts?.maxBuffer ?? 1_000_000,
+  });
+  return stdout;
+}
 
 export interface GitStatus {
   staged: string[];
@@ -12,25 +28,17 @@ export interface DiffResult {
   files: string[];
 }
 
-export function isGitRepo(cwd: string): boolean {
+export async function isGitRepo(cwd: string): Promise<boolean> {
   try {
-    execSync("git rev-parse --is-inside-work-tree", {
-      cwd,
-      encoding: "utf-8",
-      stdio: ["pipe", "pipe", "pipe"],
-    });
+    await git(cwd, ["rev-parse", "--is-inside-work-tree"]);
     return true;
   } catch {
     return false;
   }
 }
 
-export function getGitStatus(cwd: string): GitStatus {
-  const output = execSync("git status --porcelain", {
-    cwd,
-    encoding: "utf-8",
-    stdio: ["pipe", "pipe", "pipe"],
-  });
+export async function getGitStatus(cwd: string): Promise<GitStatus> {
+  const output = await git(cwd, ["status", "--porcelain"]);
 
   const staged: string[] = [];
   const unstaged: string[] = [];
@@ -54,94 +62,62 @@ export function getGitStatus(cwd: string): GitStatus {
   return { staged, unstaged, untracked };
 }
 
-export function hasStagedChanges(cwd: string): boolean {
-  const status = getGitStatus(cwd);
+export async function hasStagedChanges(cwd: string): Promise<boolean> {
+  const status = await getGitStatus(cwd);
   return status.staged.length > 0;
 }
 
-export function stageAll(cwd: string): void {
-  execSync("git add -A", { cwd, encoding: "utf-8", stdio: "pipe" });
+export async function stageAll(cwd: string): Promise<void> {
+  await git(cwd, ["add", "-A"]);
 }
 
-export function unstageAll(cwd: string): void {
-  execSync("git reset HEAD -- .", { cwd, encoding: "utf-8", stdio: "pipe" });
+export async function unstageAll(cwd: string): Promise<void> {
+  await git(cwd, ["reset", "HEAD", "--", "."]);
 }
 
-export function stageFiles(cwd: string, files: string[]): void {
+export async function stageFiles(cwd: string, files: string[]): Promise<void> {
   if (files.length === 0) return;
-  const args = files.map((f) => (f.includes(" ") ? `"${f}"` : f));
-  execSync(`git add -- ${args.join(" ")}`, {
-    cwd,
-    encoding: "utf-8",
-    stdio: "pipe",
-  });
+  await git(cwd, ["add", "--", ...files]);
 }
 
-export function getDiff(cwd: string, maxBytes = 1_000_000): DiffResult {
-  const stat = execSync("git diff --cached --stat", {
-    cwd,
-    encoding: "utf-8",
-    stdio: "pipe",
-    maxBuffer: maxBytes,
-  });
+export async function getDiff(
+  cwd: string,
+  maxBytes = 1_000_000,
+): Promise<DiffResult> {
+  const [stat, diff, names] = await Promise.all([
+    git(cwd, ["diff", "--cached", "--stat"], { maxBuffer: maxBytes }),
+    git(cwd, ["diff", "--cached"], { maxBuffer: maxBytes }),
+    git(cwd, ["diff", "--cached", "--name-only"]),
+  ]);
 
-  const diff = execSync("git diff --cached", {
-    cwd,
-    encoding: "utf-8",
-    stdio: "pipe",
-    maxBuffer: maxBytes,
-  });
-
-  const files = execSync("git diff --cached --name-only", {
-    cwd,
-    encoding: "utf-8",
-    stdio: "pipe",
-  })
-    .split("\n")
-    .filter(Boolean);
-
-  return { stat, diff, files };
+  return { stat, diff, files: names.split("\n").filter(Boolean) };
 }
 
-export function commit(cwd: string, message: string): string {
-  const fsMsg = message.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-  execSync(`git commit -m "${fsMsg}"`, {
-    cwd,
-    encoding: "utf-8",
-    stdio: "pipe",
-  });
-
-  const commitHash = execSync("git rev-parse --short HEAD", {
-    cwd,
-    encoding: "utf-8",
-    stdio: "pipe",
-  }).trim();
-
-  return commitHash;
+export async function commit(cwd: string, message: string): Promise<string> {
+  await git(cwd, ["commit", "-m", message]);
+  const hash = await git(cwd, ["rev-parse", "--short", "HEAD"]);
+  return hash.trim();
 }
 
-export function getBranchName(cwd: string): string {
+export async function getBranchName(cwd: string): Promise<string> {
   try {
-    return execSync("git branch --show-current", {
-      cwd,
-      encoding: "utf-8",
-      stdio: "pipe",
-    }).trim();
+    const name = await git(cwd, ["branch", "--show-current"]);
+    return name.trim();
   } catch {
     return "";
   }
 }
 
-export function getLastCommitLog(cwd: string, count = 5): string {
-  return execSync(`git log --oneline -n ${count}`, {
-    cwd,
-    encoding: "utf-8",
-    stdio: "pipe",
-  }).trim();
+export async function getLastCommitLog(
+  cwd: string,
+  count = 5,
+): Promise<string> {
+  const log = await git(cwd, ["log", "--oneline", `-n${count}`]);
+  return log.trim();
 }
 
-export function countChanges(cwd: string): number {
-  const status = getGitStatus(cwd);
+export async function countChanges(cwd: string): Promise<number> {
+  const status = await getGitStatus(cwd);
   return (
     status.staged.length + status.unstaged.length + status.untracked.length
   );
