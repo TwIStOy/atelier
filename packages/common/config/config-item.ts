@@ -26,6 +26,7 @@ export interface ConfigItemBase<
   secret?: boolean;
   envVar?: string;
   placeholder?: string;
+  extensionLabel?: string;
 }
 
 export interface StringConfigItem extends ConfigItemBase<string, "string"> {
