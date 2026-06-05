@@ -6,6 +6,7 @@ import type {
   MultiSelectConfigItem,
 } from "@htwang-contrib/common";
 import { glyphs } from "./glyphs.ts";
+import { SELECT_PAGE_SIZE } from "../types.ts";
 import { pad, wrapLine } from "./frame.ts";
 import type { InlineEditState, SelectingState, SettingRow } from "../types.ts";
 
@@ -42,18 +43,26 @@ export function formatSettingValue(
       return value ? "true" : "false";
     case "select": {
       const selectItem = item as SelectConfigItem;
-      const matched = selectItem.options.find(
+      const opts =
+        typeof selectItem.options === "function"
+          ? selectItem.options()
+          : selectItem.options;
+      const matched = opts.find(
         (o) => JSON.stringify(o.value) === JSON.stringify(value),
       );
       return matched?.label ?? String(value);
     }
     case "multiselect": {
       const msItem = item as MultiSelectConfigItem;
+      const opts =
+        typeof msItem.options === "function"
+          ? msItem.options()
+          : msItem.options;
       const vals = value as unknown[];
       if (!Array.isArray(vals) || vals.length === 0) return "(none)";
       const labels = vals
         .map((v) => {
-          const opt = msItem.options.find(
+          const opt = opts.find(
             (o) => JSON.stringify(o.value) === JSON.stringify(v),
           );
           return opt?.label ?? String(v);
@@ -188,10 +197,30 @@ export function renderSelectPage(
   if (desc) lines.push(theme.fg("muted", `    ${desc}`));
   lines.push("");
 
-  if (row.item.type === "select") {
-    const opts = (row.item as SelectConfigItem).options;
-    for (let i = 0; i < opts.length; i++) {
-      const isSelected = i === selecting.selectedOptionIndex;
+  const rawOpts =
+    row.item.type === "select"
+      ? (row.item as SelectConfigItem).options
+      : row.item.type === "multiselect"
+        ? (row.item as MultiSelectConfigItem).options
+        : [];
+  const opts = typeof rawOpts === "function" ? rawOpts() : rawOpts;
+
+  const pageSize = SELECT_PAGE_SIZE;
+  const scrollStart = selecting.scroll;
+  const scrollEnd = Math.min(scrollStart + pageSize, opts.length);
+
+  if (scrollStart > 0) {
+    lines.push(theme.fg("dim", `  ↑ ${scrollStart} more above`));
+  }
+
+  const selectedValues =
+    row.item.type === "multiselect"
+      ? (row.currentValue as unknown[])
+      : undefined;
+
+  for (let i = scrollStart; i < scrollEnd; i++) {
+    const isSelected = i === selecting.selectedOptionIndex;
+    if (row.item.type === "select") {
       const isCurrent =
         JSON.stringify(opts[i]!.value) === JSON.stringify(row.currentValue);
       const marker = isCurrent ? "●" : "○";
@@ -201,12 +230,7 @@ export function renderSelectPage(
       lines.push(
         isSelected ? theme.bg("selectedBg", pad(label, width)) : label,
       );
-    }
-  } else if (row.item.type === "multiselect") {
-    const opts = (row.item as MultiSelectConfigItem).options;
-    const selectedValues = row.currentValue as unknown[];
-    for (let i = 0; i < opts.length; i++) {
-      const isSelected = i === selecting.selectedOptionIndex;
+    } else {
       const isChecked =
         Array.isArray(selectedValues) &&
         selectedValues.some(
@@ -220,6 +244,10 @@ export function renderSelectPage(
         isSelected ? theme.bg("selectedBg", pad(label, width)) : label,
       );
     }
+  }
+
+  if (scrollEnd < opts.length) {
+    lines.push(theme.fg("dim", `  ↓ ${opts.length - scrollEnd} more below`));
   }
 
   return lines;

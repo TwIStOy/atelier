@@ -176,8 +176,10 @@ export function parseSettingInput(
     }
     case "select": {
       const value = input.trim();
-      const opts = (item as import("@htwang-contrib/common").SelectConfigItem)
-        .options;
+      const rawOpts = (
+        item as import("@htwang-contrib/common").SelectConfigItem
+      ).options;
+      const opts = typeof rawOpts === "function" ? rawOpts() : rawOpts;
       const matched = opts.find(
         (o) => o.label.toLowerCase() === value.toLowerCase(),
       );

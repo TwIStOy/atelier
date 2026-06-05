@@ -4,6 +4,7 @@ export const TAB_ALL = "all";
 export const PACKAGE_TAB_PREFIX = "pkg:";
 export const DEFAULT_WIDTH_PERCENT = "92%";
 export const DEFAULT_MAX_HEIGHT = "85%";
+export const SELECT_PAGE_SIZE = 10;
 
 export interface SettingRow {
   id: string;

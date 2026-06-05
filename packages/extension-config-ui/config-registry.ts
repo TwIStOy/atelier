@@ -1,6 +1,7 @@
 import type {
   ConfigItem,
   ConfigItemRegistry,
+  ConfigItemSelectOption,
   MultiSelectConfigItem,
   SelectConfigItem,
 } from "@htwang-contrib/common";
@@ -12,6 +13,12 @@ import {
 } from "@htwang-contrib/common";
 import type { SettingRow, TabDef } from "./types.ts";
 import { TAB_ALL, PACKAGE_TAB_PREFIX } from "./types.ts";
+
+export function resolveOptions<T>(
+  options: ConfigItemSelectOption<T>[] | (() => ConfigItemSelectOption<T>[]),
+): ConfigItemSelectOption<T>[] {
+  return typeof options === "function" ? options() : options;
+}
 
 export function buildSettingRows(): SettingRow[] {
   const registries = getConfigItems() as ConfigItemRegistry[];
@@ -126,10 +133,10 @@ export function resetExtensionSettings(
 
 export function getSelectOptions(row: SettingRow) {
   if (row.item.type === "select") {
-    return (row.item as SelectConfigItem).options;
+    return resolveOptions((row.item as SelectConfigItem).options);
   }
   if (row.item.type === "multiselect") {
-    return (row.item as MultiSelectConfigItem).options;
+    return resolveOptions((row.item as MultiSelectConfigItem).options);
   }
   return [];
 }

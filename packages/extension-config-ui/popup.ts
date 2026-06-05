@@ -33,7 +33,7 @@ import type {
   TabDef,
   UiState,
 } from "./types.ts";
-import { TAB_ALL } from "./types.ts";
+import { TAB_ALL, SELECT_PAGE_SIZE } from "./types.ts";
 
 function makeInitialUiState(): UiState {
   return { tab: TAB_ALL, search: "", selected: 0, scroll: 0 };
@@ -100,14 +100,45 @@ function createConfigComponent(
     requestRender();
   };
 
+  const syncSelectScroll = (sel: SelectingState, total: number): void => {
+    const half = Math.floor(SELECT_PAGE_SIZE / 2);
+    if (sel.selectedOptionIndex < sel.scroll + half) {
+      sel.scroll = Math.max(0, sel.selectedOptionIndex - half);
+    } else if (
+      sel.selectedOptionIndex >=
+      sel.scroll + SELECT_PAGE_SIZE - half
+    ) {
+      sel.scroll = Math.max(
+        0,
+        sel.selectedOptionIndex - SELECT_PAGE_SIZE + half + 1,
+      );
+    }
+    sel.scroll = Math.max(
+      0,
+      Math.min(sel.scroll, Math.max(0, total - SELECT_PAGE_SIZE)),
+    );
+  };
+
   const enterSelectPage = (): void => {
     const row = selectedRow();
     if (!row) return;
     if (row.item.type === "select" || row.item.type === "multiselect") {
+      const opts = getSelectOptions(row);
+      let initialIndex = 0;
+      if (row.item.type === "select") {
+        initialIndex = opts.findIndex(
+          (o) => JSON.stringify(o.value) === JSON.stringify(row.currentValue),
+        );
+        if (initialIndex < 0) initialIndex = 0;
+      }
+      const scroll = Math.max(
+        0,
+        initialIndex - Math.floor(SELECT_PAGE_SIZE / 2),
+      );
       ui.selecting = {
         rowId: row.id,
-        selectedOptionIndex: 0,
-        scroll: 0,
+        selectedOptionIndex: initialIndex,
+        scroll,
       };
       requestRender();
       return;
@@ -182,6 +213,7 @@ function createConfigComponent(
           0,
           ui.selecting.selectedOptionIndex - 1,
         );
+        syncSelectScroll(ui.selecting, opts.length);
         requestRender();
         return;
       }
@@ -190,6 +222,25 @@ function createConfigComponent(
           opts.length - 1,
           ui.selecting.selectedOptionIndex + 1,
         );
+        syncSelectScroll(ui.selecting, opts.length);
+        requestRender();
+        return;
+      }
+      if (matchesKey(data, "-") || matchesKey(data, "pageUp")) {
+        ui.selecting.selectedOptionIndex = Math.max(
+          0,
+          ui.selecting.selectedOptionIndex - SELECT_PAGE_SIZE,
+        );
+        syncSelectScroll(ui.selecting, opts.length);
+        requestRender();
+        return;
+      }
+      if (matchesKey(data, "=") || matchesKey(data, "pageDown")) {
+        ui.selecting.selectedOptionIndex = Math.min(
+          opts.length - 1,
+          ui.selecting.selectedOptionIndex + SELECT_PAGE_SIZE,
+        );
+        syncSelectScroll(ui.selecting, opts.length);
         requestRender();
         return;
       }

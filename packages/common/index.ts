@@ -65,5 +65,6 @@ export type {
   MultiSelectConfigItem,
   ColorConfigItem,
   ConfigItemSelectOption,
+  LazyOptions,
   ConfigItemRegistry,
 } from "./config/index.ts";

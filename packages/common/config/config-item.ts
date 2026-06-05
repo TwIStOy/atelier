@@ -40,18 +40,20 @@ export interface NumberConfigItem extends ConfigItemBase<number, "number"> {
 
 export interface BooleanConfigItem extends ConfigItemBase<boolean, "boolean"> {}
 
+export type LazyOptions<T> = () => ConfigItemSelectOption<T>[];
+
 export interface SelectConfigItem<T = string> extends ConfigItemBase<
   T,
   "select"
 > {
-  options: ConfigItemSelectOption<T>[];
+  options: ConfigItemSelectOption<T>[] | LazyOptions<T>;
 }
 
 export interface MultiSelectConfigItem<T = string> extends ConfigItemBase<
   T[],
   "multiselect"
 > {
-  options: ConfigItemSelectOption<T>[];
+  options: ConfigItemSelectOption<T>[] | LazyOptions<T>;
 }
 
 export interface ColorConfigItem extends ConfigItemBase<string, "color"> {}
