@@ -4,7 +4,12 @@ import {
   truncateToVisualLines,
 } from "@earendil-works/pi-coding-agent";
 import { truncateDisplay, trimTrailingEmpty } from "@htwang-contrib/common";
-import { Container, truncateToWidth } from "@earendil-works/pi-tui";
+import {
+  Container,
+  truncateToWidth,
+  visibleWidth,
+  wrapTextWithAnsi,
+} from "@earendil-works/pi-tui";
 import { formatExpandedToolOutputLines } from "./adapters/shared.ts";
 import { spinnerGlyph } from "./format.ts";
 import type { ContentRenderer, ToolDisplayAdapter } from "./types.ts";
@@ -38,8 +43,6 @@ export function formatToolArgs(args: Record<string, unknown>): string {
     .join(", ");
 }
 
-const GENERIC_DESC_MAX = 120;
-
 function snakeToCamelCase(s: string): string {
   return s
     .split("_")
@@ -56,10 +59,27 @@ export function formatGenericToolHeader(
   width: number,
 ): string {
   const displayName = snakeToCamelCase(toolName);
-  let text = theme.fg("toolTitle", theme.bold(displayName));
+  const namePart = theme.fg("toolTitle", theme.bold(displayName));
   const argStr = formatToolArgs(args);
-  if (argStr) text += ` ${theme.fg("dim", `(${argStr})`)}`;
-  return truncateToWidth(text, width, "…");
+  if (!argStr) return truncateToWidth(namePart, width, "…");
+
+  const prefix = namePart + " ";
+  const prefixWidth = visibleWidth(prefix);
+  const argText = `(${argStr})`;
+  const styledArg = theme.fg("dim", argText);
+  const header = prefix + styledArg;
+
+  if (visibleWidth(header) <= width) return header;
+
+  const wrapped = wrapTextWithAnsi(
+    styledArg,
+    Math.max(1, width - INDENT.length),
+  );
+  const firstLine = truncateToWidth(prefix + wrapped[0], width, "…");
+  const contLines = wrapped
+    .slice(1)
+    .map((line) => INDENT + truncateToWidth(line, width - INDENT.length, "…"));
+  return [firstLine, ...contLines].join("\n");
 }
 
 export function defaultGenericCollapsedRenderer(
@@ -73,7 +93,7 @@ export function defaultGenericCollapsedRenderer(
     INDENT +
     theme.fg(
       "muted",
-      `${n} line${n !== 1 ? "s" : ""} — ${keyText("app.tools.expand")} to expand`,
+      `└ ${n} line${n !== 1 ? "s" : ""} — ${keyText("app.tools.expand")} to expand`,
     );
   return [truncateToWidth(line, width, "…")];
 }
@@ -116,7 +136,7 @@ function makeHeader(
   spinAt: number,
   expanded: boolean,
   details?: unknown,
-): string {
+): string[] {
   let statusIcon: string;
   if (toolName === "subagent") {
     const fin = subagentRunFinished(details);
@@ -160,8 +180,11 @@ function makeHeader(
         width,
       );
 
-  const header = `${statusIcon} ${headerText}`;
-  return truncateToWidth(header, width, "…");
+  const headerLines = headerText.split("\n");
+  return headerLines.map((line, i) => {
+    const prefix = i === 0 ? `${statusIcon} ` : INDENT;
+    return truncateToWidth(prefix + line, width, "…");
+  });
 }
 
 export function defaultCollapsedRenderer(
@@ -256,7 +279,7 @@ export function renderToolCall(
         opts.expanded,
         opts.details,
       );
-      const lines = [header];
+      const lines = [...header];
 
       const out = opts.output ?? "";
       const hasTextOutput = Boolean(out);

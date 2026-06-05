@@ -1,2 +1,2 @@
-- [ ] Generic tool display 在显示参数的时候，如果参数太长一行放不下，可以换行。
-- [ ] Generic tool display 在折叠状态下，后面没有 └ 这个标记
+- [x] Generic tool display 在显示参数的时候，如果参数太长一行放不下，可以换行。
+- [x] Generic tool display 在折叠状态下，后面没有 └ 这个标记
