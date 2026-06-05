@@ -24,7 +24,13 @@
       "packages/memory",
       "packages/prompt-snippets"
     ],
-    "skills": [],
+    "skills": [
+      "skills/code-philosophy",
+      "skills/design-an-interface",
+      "skills/obsidian-bases",
+      "skills/obsidian-markdown",
+      "skills/todoist"
+    ],
     "themes": [
       "themes/catppuccin-mocha.json"
     ],
