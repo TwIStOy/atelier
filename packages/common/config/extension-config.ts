@@ -71,3 +71,13 @@ export function updateConfig<T>(
   writeConfig(extensionId, updated);
   return updated;
 }
+
+export function readRawConfig(
+  extensionId: string,
+): Record<string, unknown> | undefined {
+  const file = readConfigFile();
+  const section = file[extensionId];
+  if (section && typeof section === "object" && !Array.isArray(section))
+    return section as Record<string, unknown>;
+  return undefined;
+}
