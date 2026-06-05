@@ -37,14 +37,27 @@ export function buildSettingRows(): SettingRow[] {
         : extensionId;
 
     for (const item of items) {
-      const rawValue = config[item.key as keyof typeof config];
+      let currentValue: unknown;
+      let isExplicit = false;
+
+      if (item.value !== undefined) {
+        currentValue =
+          typeof item.value === "function"
+            ? (item.value as () => unknown)()
+            : item.value;
+        isExplicit = rawSection ? item.key in rawSection : false;
+      } else {
+        currentValue = config[item.key as keyof typeof config];
+        isExplicit = rawSection ? item.key in rawSection : false;
+      }
+
       rows.push({
         id: `${extensionId}::${item.key}`,
         extensionId,
         extensionLabel: extLabel,
         item,
-        currentValue: rawValue,
-        isExplicit: rawSection ? item.key in rawSection : false,
+        currentValue,
+        isExplicit,
       });
     }
   }
