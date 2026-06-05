@@ -4,7 +4,7 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import { Key, matchesKey, truncateToWidth } from "@earendil-works/pi-tui";
 import type { TUI, OverlayOptions, Component } from "@earendil-works/pi-tui";
-import { spinnerGlyph } from "@htwang-contrib/tool-display";
+import { spinnerGlyph, SpinnerTimer } from "@htwang-contrib/tool-display";
 import { formatElapsedSeconds } from "@htwang-contrib/common";
 
 const OVERLAY_OPTIONS: OverlayOptions = {
@@ -42,17 +42,9 @@ export interface CommitterProgress {
   errorMessage?: string;
 }
 
-const SPINNER_INTERVAL_MS = 80;
-
-const ACTIVE_PHASES: ReadonlySet<CommitPhase> = new Set([
-  "preparing",
-  "generating",
-  "committing",
-]);
-
 export class CommitterOverlayController implements Component {
   private scrollOffset = 0;
-  private timer: ReturnType<typeof setInterval> | undefined;
+  private spinner: SpinnerTimer;
 
   constructor(
     private readonly tui: TUI,
@@ -61,26 +53,12 @@ export class CommitterOverlayController implements Component {
     private readonly controller: AbortController,
     private readonly done: () => void,
   ) {
-    this.ensureTimer();
+    this.spinner = new SpinnerTimer(() => this.tui.requestRender());
+    this.spinner.start();
   }
 
-  private ensureTimer(): void {
-    if (ACTIVE_PHASES.has(this.progress.phase)) {
-      this.startTimer();
-    } else {
-      this.stopTimer();
-    }
-  }
-
-  private startTimer(): void {
-    if (this.timer) return;
-    this.timer = setInterval(() => this.invalidate(), SPINNER_INTERVAL_MS);
-  }
-
-  private stopTimer(): void {
-    if (!this.timer) return;
-    clearInterval(this.timer);
-    this.timer = undefined;
+  dispose(): void {
+    this.spinner.stop();
   }
 
   render(width: number): string[] {
@@ -105,12 +83,7 @@ export class CommitterOverlayController implements Component {
   }
 
   invalidate(): void {
-    this.ensureTimer();
     this.tui.requestRender();
-  }
-
-  dispose(): void {
-    this.stopTimer();
   }
 
   private buildLines(width: number): string[] {

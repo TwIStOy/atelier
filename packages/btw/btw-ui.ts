@@ -12,7 +12,7 @@ import {
   wrapTextWithAnsi,
 } from "@earendil-works/pi-tui";
 import type { AssistantMessage, UserMessage } from "@earendil-works/pi-ai";
-import { spinnerGlyph } from "@htwang-contrib/tool-display";
+import { spinnerGlyph, SpinnerTimer } from "@htwang-contrib/tool-display";
 
 const BTW_OVERLAY_OPTIONS: OverlayOptions = {
   anchor: "bottom-center",
@@ -53,6 +53,7 @@ export class BtwOverlayController implements Component {
   private answer: AnswerState = { kind: "pending" };
   private scrollOffset = 0;
   private historyCleared = false;
+  private spinner: SpinnerTimer;
 
   constructor(
     private readonly tui: TUI,
@@ -62,17 +63,22 @@ export class BtwOverlayController implements Component {
     private readonly controller: AbortController,
     private readonly onClearHistory: () => void,
     private readonly done: () => void,
-  ) {}
+  ) {
+    this.spinner = new SpinnerTimer(() => this.tui.requestRender());
+    this.spinner.start();
+  }
 
   setAnswer(text: string): void {
     this.answer = { kind: "answer", text };
     this.scrollOffset = 0;
+    this.spinner.stop();
     this.invalidate();
   }
 
   setError(message: string): void {
     this.answer = { kind: "error", message };
     this.scrollOffset = 0;
+    this.spinner.stop();
     this.invalidate();
   }
 

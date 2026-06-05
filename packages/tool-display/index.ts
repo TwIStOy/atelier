@@ -11,7 +11,12 @@ export {
   defaultGenericExpandedRenderer,
 } from "./tool-call-display.ts";
 export type { ContentRenderer, ToolDisplayAdapter } from "./types.ts";
-export { prefixLine, wrapTextWithAnsi, spinnerGlyph } from "./format.ts";
+export {
+  prefixLine,
+  wrapTextWithAnsi,
+  spinnerGlyph,
+  SpinnerTimer,
+} from "./format.ts";
 export { askUserQuestionAdapter } from "./adapters/ask-user-question.ts";
 export { bashAdapter } from "./adapters/bash.ts";
 export { editAdapter } from "./adapters/edit.ts";

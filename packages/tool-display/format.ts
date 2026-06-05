@@ -23,3 +23,22 @@ export function prefixLine(
   const innerWidth = Math.max(1, width - prefixWidth);
   return prefix + truncateToWidth(line, innerWidth, "");
 }
+
+const SPINNER_INTERVAL_MS = 80;
+
+export class SpinnerTimer {
+  private timer: ReturnType<typeof setInterval> | undefined;
+
+  constructor(private readonly invalidate: () => void) {}
+
+  start(): void {
+    if (this.timer) return;
+    this.timer = setInterval(this.invalidate, SPINNER_INTERVAL_MS);
+  }
+
+  stop(): void {
+    if (!this.timer) return;
+    clearInterval(this.timer);
+    this.timer = undefined;
+  }
+}
