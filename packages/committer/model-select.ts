@@ -7,17 +7,25 @@ import { resolveModel, readConfig, updateConfig } from "@htwang-contrib/common";
 import type { ExtensionConfigSchema } from "@htwang-contrib/common";
 import { ModelSelectController, buildModelEntries } from "./model-selector.ts";
 
-type AnyModel = Model<any>;
-
 export interface CommitterConfig {
   model: string;
+  groupingThreshold: number;
+  maxDiffLength: number;
+  maxDiffLengthSingle: number;
+  maxGroupingRetries: number;
 }
+
+type AnyModel = Model<any>;
 
 const CONFIG_NAME = "committer";
 
 const CONFIG_SCHEMA: ExtensionConfigSchema<CommitterConfig> = {
   defaults: {
     model: "",
+    groupingThreshold: 4,
+    maxDiffLength: 12_000,
+    maxDiffLengthSingle: 8_000,
+    maxGroupingRetries: 3,
   },
 };
 
