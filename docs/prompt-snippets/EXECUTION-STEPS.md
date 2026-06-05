@@ -154,97 +154,97 @@
 
 **设计关联：** [D2 Snippet 解析结果](./DESIGN.md#snippet-解析结果)、[D5 Frontmatter 解析](./DESIGN.md#frontmatter-解析)
 
-- [ ] 创建 `packages/prompt-snippets/snippets.ts`
-- [ ] 定义并导出 `Snippet` 接口（name, filePath, description, argumentHint, body, source）
-- [ ] 实现 `parseSnippet(filePath: string, source: string): Snippet`
-  - [ ] 读取文件，`basename(path, ".md")` 为 name
-  - [ ] 正则匹配 `^---\n([\s\S]*?)\n---\n?([\s\S]*)$` 提取 frontmatter 和 body
-  - [ ] 从 frontmatter 提取 `description` 和 `argument-hint`
-  - [ ] 无 frontmatter 时 body = 全文
-  - [ ] body 执行 `.trim()`
+- [x] 创建 `packages/prompt-snippets/snippets.ts`
+- [x] 定义并导出 `Snippet` 接口（name, filePath, description, argumentHint, body, source）
+- [x] 实现 `parseSnippet(filePath: string, source: string): Snippet`
+  - [x] 读取文件，`basename(path, ".md")` 为 name
+  - [x] 正则匹配提取 frontmatter 和 body
+  - [x] 从 frontmatter 提取 `description` 和 `argument-hint`
+  - [x] 无 frontmatter 时 body = 全文
+  - [x] body 执行 `.trim()`
 
 ### Step 3.2 — 实现 `expandPositional` 与 `expandSnippet`
 
 **设计关联：** [D5 模板展开算法](./DESIGN.md#模板展开算法)
 
-- [ ] 实现 `expandPositional(body: string, args: string[]): string`
-  - [ ] 替换 `${@:N:L}` — 最具体，先处理
-  - [ ] 替换 `${@:N}` — 次之
-  - [ ] 替换 `$@` 和 `$ARGUMENTS` — 全参数拼接
-  - [ ] 替换 `$1`, `$2`, ... — 位置参数，越界为空字符串
-- [ ] 实现 `expandSnippet(snippet: Snippet, rawArgs: string): string`
-  - [ ] 空参数 → `args = []`
-  - [ ] 否则 `rawArgs.trim().split(/\s+/)`
-  - [ ] 调用 `expandPositional(snippet.body, args)`
+- [x] 实现 `expandPositional(body: string, args: string[]): string`
+  - [x] 替换 `${@:N:L}` — 最具体，先处理
+  - [x] 替换 `${@:N}` — 次之
+  - [x] 替换 `$@` 和 `$ARGUMENTS` — 全参数拼接
+  - [x] 替换 `$1`, `$2`, ... — 位置参数，越界为空字符串
+- [x] 实现 `expandSnippet(snippet: Snippet, rawArgs: string): string`
+  - [x] 空参数 → `args = []`
+  - [x] 否则 `rawArgs.trim().split(/\s+/)`
+  - [x] 调用 `expandPositional(snippet.body, args)`
 
 ### Step 3.3 — 实现 `discoverSnippets`
 
 **设计关联：** [D3.4 发现算法](./DESIGN.md#d34-发现算法)、[D3.7 完整优先级](./DESIGN.md#d37-完整优先级最终版)
 
-- [ ] 实现 `discoverSnippets(cwd: string, agentDir: string): Snippet[]`
-  - [ ] 调用 `collectSnippetDirs(cwd, agentDir)` 获取 `SnippetSource[]`
-  - [ ] 对每个 source 的 `dir`，glob `*.md` 文件
-  - [ ] 每个文件调用 `parseSnippet(file, source.source)`
-  - [ ] 用 `Map<name, Snippet>` 收集，后写覆盖先写（保证高优先级胜出）
-  - [ ] 返回按 name 排序的数组
+- [x] 实现 `discoverSnippets(cwd: string, agentDir: string): Snippet[]`
+  - [x] 调用 `collectSnippetDirs(cwd, agentDir)` 获取 `SnippetSource[]`
+  - [x] 对每个 source 的 `dir`，readdir 过滤 `*.md` 文件
+  - [x] 每个文件调用 `parseSnippet(file, source.source)`
+  - [x] 用 `Map<name, Snippet>` 收集，后写覆盖先写（保证高优先级胜出）
+  - [x] 返回按 name 排序的数组
 
 ### Step 3.4 — 实现 `listSnippets`
 
 **设计关联：** [D4 命令设计 — 列表展示](./DESIGN.md#列表展示)
 
-- [ ] 实现 `listSnippets(snippets: Snippet[], ctx: ExtensionCommandContext): void`
-  - [ ] 无 snippet 时提示 "No snippets found. Create …"
-  - [ ] 有 snippet 时格式化为对齐列表：
-    - [ ] 每行：名称（左对齐）、描述、argument-hint、来源标签 `[source]`
-  - [ ] 末尾统计总数
-  - [ ] 通过 `ctx.ui.notify(formatted, "info")` 输出
+- [x] 实现 `listSnippets(snippets: Snippet[], ctx: ExtensionCommandContext): void`
+  - [x] 无 snippet 时提示 "No snippets found. Create …"
+  - [x] 有 snippet 时格式化为对齐列表：
+    - [x] 每行：名称（左对齐）、描述、argument-hint、来源标签 `[source]`
+  - [x] 末尾统计总数
+  - [x] 通过 `ctx.ui.notify(formatted, "info")` 输出
 
 ### Step 3.5 — 实现 `registerSnippetCommand`
 
 **设计关联：** [D4 命令设计 — 命令格式](./DESIGN.md#命令格式)、[D4 命令设计 — 处理流程](./DESIGN.md#处理流程)
 
-- [ ] 实现并导出 `registerSnippetCommand(pi: ExtensionAPI): void`
-- [ ] 注册 `/snippet` 命令，handler 逻辑：
-  - [ ] 解析 args：空或 `list` → 调用 `listSnippets`
-  - [ ] 非空 → 查找 snippet by name
-    - [ ] 未找到 → `ctx.ui.notify("snippet not found", "error")`; return
-    - [ ] 找到 → `expandSnippet(snippet, remainingArgs)`
-  - [ ] 发送前检查 `ctx.isIdle()`
-    - [ ] 忙碌 → `ctx.ui.notify("Agent is busy…", "warning")`; return
-  - [ ] 调用 `pi.sendUserMessage(expanded)` 发送展开后的内容
-- [ ] 运行 `npm run format`
-- [ ] 验证：`npx tsc --build packages/prompt-snippets` 通过
+- [x] 实现并导出 `registerSnippetCommand(pi: ExtensionAPI): void`
+- [x] 注册 `/snippet` 命令，handler 逻辑：
+  - [x] 解析 args：空或 `list` → 调用 `listSnippets`
+  - [x] 非空 → 查找 snippet by name
+    - [x] 未找到 → `ctx.ui.notify("snippet not found", "error")`; return
+    - [x] 找到 → `expandSnippet(snippet, remainingArgs)`
+  - [x] 发送前检查 `ctx.isIdle()`
+    - [x] 忙碌 → `ctx.ui.notify("Agent is busy…", "warning")`; return
+  - [x] 调用 `pi.sendUserMessage(expanded)` 发送展开后的内容
+- [x] 运行 `npm run format`
+- [x] 验证：`npx tsc --build packages/prompt-snippets` 通过
 
 ### Step 3.6 — 创建 `snippets.test.ts`
 
 **设计关联：** [D9.2 `snippets.test.ts`](./DESIGN.md#d92-snippetstestts)
 
-- [ ] 创建 `packages/prompt-snippets/snippets.test.ts`
-- [ ] `parseSnippet` 测试：
-  - [ ] 有 frontmatter → 正确提取 description、argumentHint、body
-  - [ ] 无 frontmatter → body 为全文
-  - [ ] 空 body → 返回空字符串
-  - [ ] frontmatter 中仅有 description → argumentHint 为空
-- [ ] `expandPositional` 测试：
-  - [ ] `$1`, `$2` 替换
-  - [ ] `$ARGUMENTS` 替换为所有参数拼接
-  - [ ] `$@` 替换为所有参数拼接
-  - [ ] `${@:2}` 从第二个参数开始
-  - [ ] `${@:2:3}` 从第二个参数取三个
-  - [ ] 越界位置参数替换为空字符串
-  - [ ] 混合使用多种变量类型
-  - [ ] 无参数时所有变量替换为空
-- [ ] `discoverSnippets` 测试（使用临时目录）：
-  - [ ] 多来源正确合并
-  - [ ] 高优先级同名 snippet 覆盖低优先级
-  - [ ] 目录不存在时返回空数组
-- [ ] 命令处理测试（mock `pi` 和 `ctx`）：
-  - [ ] `/snippet list` 无 snippet 时提示创建
-  - [ ] `/snippet list` 有 snippet 时输出对齐列表
-  - [ ] `/snippet <name>` 未找到时通知错误
-  - [ ] `/snippet <name>` agent 忙碌时通知警告
-  - [ ] `/snippet <name>` agent 空闲且找到 → 调用 `sendUserMessage`
-- [ ] 验证：`npx vitest run packages/prompt-snippets/snippets.test.ts` 全部通过
+- [x] 创建 `packages/prompt-snippets/snippets.test.ts`
+- [x] `parseSnippet` 测试：
+  - [x] 有 frontmatter → 正确提取 description、argumentHint、body
+  - [x] 无 frontmatter → body 为全文
+  - [x] 空 body → 返回空字符串
+  - [x] frontmatter 中仅有 description → argumentHint 为空
+- [x] `expandPositional` 测试：
+  - [x] `$1`, `$2` 替换
+  - [x] `$ARGUMENTS` 替换为所有参数拼接
+  - [x] `$@` 替换为所有参数拼接
+  - [x] `${@:2}` 从第二个参数开始
+  - [x] `${@:2:3}` 从第二个参数取三个
+  - [x] 越界位置参数替换为空字符串
+  - [x] 混合使用多种变量类型
+  - [x] 无参数时所有变量替换为空
+- [x] `discoverSnippets` 测试（使用临时目录）：
+  - [x] 多来源正确合并
+  - [x] 高优先级同名 snippet 覆盖低优先级
+  - [x] 目录不存在时返回空数组
+- [x] 命令处理测试（mock `pi` 和 `ctx`）：
+  - [x] `/snippet list` 无 snippet 时提示创建
+  - [x] `/snippet list` 有 snippet 时输出对齐列表
+  - [x] `/snippet <name>` 未找到时通知错误
+  - [x] `/snippet <name>` agent 忙碌时通知警告
+  - [x] `/snippet <name>` agent 空闲且找到 → 调用 `sendUserMessage`
+- [x] 验证：`npx vitest run packages/prompt-snippets/snippets.test.ts` 全部通过（22 tests）
 
 ---
 
@@ -254,20 +254,20 @@
 
 **设计关联：** [D5 `index.ts` — 扩展入口](./DESIGN.md#indexts--扩展入口)
 
-- [ ] 创建 `packages/prompt-snippets/index.ts`
-  - [ ] 导入 `ExtensionAPI` 类型
-  - [ ] 导入 `registerSnippetCommand` from `./snippets.ts`
-  - [ ] `export default function(pi: ExtensionAPI): void` 调用 `registerSnippetCommand(pi)`
-- [ ] 运行 `npm run format`
-- [ ] 验证：`npx tsc --build`（完整项目）通过
+- [x] 更新 `packages/prompt-snippets/index.ts`
+  - [x] 导入 `ExtensionAPI` 类型
+  - [x] 导入 `registerSnippetCommand` from `./snippets.ts`
+  - [x] `export default function(pi: ExtensionAPI): void` 调用 `registerSnippetCommand(pi)`
+- [x] 运行 `npm run format`
+- [x] 验证：`npx tsc --build`（完整项目）通过
 
 ### Step 4.2 — 全项目 gate
 
 **设计关联：** [D7 集成点](./DESIGN.md#d7-集成点)
 
-- [ ] `npx tsc --build` — 必须通过
-- [ ] `npm test` — 所有测试通过（含新测试）
-- [ ] `npm run format`
+- [x] `npx tsc --build` — 通过
+- [x] `npm test` — 所有测试通过（51 tests: 29 discover + 22 snippets）
+- [x] `npm run format`
 
 ---
 

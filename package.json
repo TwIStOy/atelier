@@ -27,6 +27,9 @@
     "skills": [],
     "themes": [
       "themes/catppuccin-mocha.json"
+    ],
+    "snippets": [
+      "snippets"
     ]
   },
   "devDependencies": {
