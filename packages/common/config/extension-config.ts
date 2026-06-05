@@ -81,3 +81,31 @@ export function readRawConfig(
     return section as Record<string, unknown>;
   return undefined;
 }
+
+export function setConfigKey(
+  extensionId: string,
+  key: string,
+  value: unknown,
+): void {
+  const file = readConfigFile();
+  if (!file[extensionId] || typeof file[extensionId] !== "object") {
+    file[extensionId] = {};
+  }
+  (file[extensionId] as Record<string, unknown>)[key] = value;
+  writeConfigFile(file);
+}
+
+export function deleteConfigKey(extensionId: string, key: string): void {
+  const file = readConfigFile();
+  const section = file[extensionId];
+  if (section && typeof section === "object") {
+    delete (section as Record<string, unknown>)[key];
+  }
+  writeConfigFile(file);
+}
+
+export function deleteConfigSection(extensionId: string): void {
+  const file = readConfigFile();
+  delete file[extensionId];
+  writeConfigFile(file);
+}

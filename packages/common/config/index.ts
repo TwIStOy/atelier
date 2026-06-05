@@ -3,6 +3,9 @@ export {
   writeConfig,
   updateConfig,
   readRawConfig,
+  setConfigKey,
+  deleteConfigKey,
+  deleteConfigSection,
 } from "./extension-config.ts";
 export type { ExtensionConfigSchema } from "./extension-config.ts";
 export {
