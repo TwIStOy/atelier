@@ -44,3 +44,5 @@ export {
 export type { SessionCache } from "./session-cache.ts";
 export { executeSideCall } from "./side-call.ts";
 export type { SideCallResult } from "./side-call.ts";
+export { readConfig, writeConfig, updateConfig } from "./extension-config.ts";
+export type { ExtensionConfigSchema } from "./extension-config.ts";
