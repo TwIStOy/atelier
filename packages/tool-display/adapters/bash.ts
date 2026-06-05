@@ -1,6 +1,7 @@
 import { shortenPath, truncateDisplay } from "@htwang-contrib/common";
 import type { ToolDisplayAdapter } from "../types.ts";
 import { formatExpandedToolOutputLines, formatLineCount } from "./shared.ts";
+import { loadConfig } from "../config.ts";
 
 interface BashArgs {
   command?: string;
@@ -20,7 +21,10 @@ export const bashAdapter: ToolDisplayAdapter<BashArgs> = {
     const desc = args?.description;
     const cwd = args?.workdir;
 
-    const cmdDisplay = truncateDisplay(cmd, 60);
+    const cmdDisplay = truncateDisplay(
+      cmd,
+      loadConfig().bashCommandDisplayLength,
+    );
     const header = desc
       ? theme.fg("toolTitle", theme.bold("Bash")) +
         " " +
