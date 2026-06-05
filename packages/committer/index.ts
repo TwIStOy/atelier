@@ -1,7 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { registerConfigItems } from "@htwang-contrib/common";
 import { handleCommit } from "./commit.ts";
-import { selectModel } from "./model-select.ts";
+import { selectModel, loadConfig } from "./model-select.ts";
 import {
   MAX_DIFF_LENGTH,
   MAX_DIFF_LENGTH_SINGLE,
@@ -23,6 +23,7 @@ export default function (pi: ExtensionAPI): void {
       type: "select",
       label: "Commit Model",
       defaultValue: "",
+      value: () => loadConfig().model,
       description:
         "Model used for commit message generation. Use /commit-model for quick switching.",
       extensionLabel: "Committer",
