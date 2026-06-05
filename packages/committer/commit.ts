@@ -3,11 +3,8 @@ import type {
   ExtensionCommandContext,
 } from "@earendil-works/pi-coding-agent";
 import type { Model, Message } from "@earendil-works/pi-ai";
-import { executeSideCall, readConfig } from "@htwang-contrib/common";
-import type {
-  SideCallResult,
-  ExtensionConfigSchema,
-} from "@htwang-contrib/common";
+import { executeSideCall } from "@htwang-contrib/common";
+import type { SideCallResult } from "@htwang-contrib/common";
 import {
   isGitRepo,
   stageAll,
@@ -28,31 +25,9 @@ import {
 import type { CommitterProgress } from "./widget.ts";
 import type { CommitterOverlayController } from "./widget.ts";
 import { showCommitterOverlay } from "./widget.ts";
-import { resolveCommitModel } from "./model-select.ts";
+import { resolveCommitModel, loadConfig } from "./model-select.ts";
 
 type AnyModel = Model<any>;
-
-const GROUPING_THRESHOLD_DEFAULT = 4;
-
-const COMMITTER_CONFIG_SCHEMA: ExtensionConfigSchema<{
-  model: string;
-  groupingThreshold: number;
-  maxDiffLength: number;
-  maxDiffLengthSingle: number;
-  maxGroupingRetries: number;
-}> = {
-  defaults: {
-    model: "",
-    groupingThreshold: GROUPING_THRESHOLD_DEFAULT,
-    maxDiffLength: MAX_DIFF_LENGTH,
-    maxDiffLengthSingle: MAX_DIFF_LENGTH_SINGLE,
-    maxGroupingRetries: MAX_GROUPING_RETRIES,
-  },
-};
-
-function loadCommitterConfig() {
-  return readConfig("committer", COMMITTER_CONFIG_SCHEMA);
-}
 
 export async function handleCommit(
   pi: ExtensionAPI,
@@ -135,7 +110,7 @@ export async function handleCommit(
     if (controller.signal.aborted) return;
 
     const shouldGroup =
-      diff.files.length >= loadCommitterConfig().groupingThreshold &&
+      diff.files.length >= loadConfig().groupingThreshold &&
       !args.includes("--single");
 
     if (shouldGroup) {
@@ -186,10 +161,7 @@ async function commitSingle(
   progress.commitsTotal = 1;
   ctrl.invalidate();
 
-  const truncatedDiff = diffText.slice(
-    0,
-    loadCommitterConfig().maxDiffLengthSingle,
-  );
+  const truncatedDiff = diffText.slice(0, loadConfig().maxDiffLengthSingle);
   const prompt = SINGLE_COMMIT_PROMPT + truncatedDiff;
 
   const result: SideCallResult = await executeSideCall({
@@ -257,7 +229,7 @@ async function commitGrouped(
   ctrl.invalidate();
 
   const { files: allFiles } = await getDiff(cwd);
-  const truncatedDiff = diffText.slice(0, loadCommitterConfig().maxDiffLength);
+  const truncatedDiff = diffText.slice(0, loadConfig().maxDiffLength);
 
   const groups = await groupingWithRetry(
     truncatedDiff,
@@ -350,7 +322,7 @@ async function groupingWithRetry(
     { role: "user" as const, content: firstPrompt, timestamp: Date.now() },
   ];
 
-  const maxRetries = loadCommitterConfig().maxGroupingRetries;
+  const maxRetries = loadConfig().maxGroupingRetries;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     if (signal.aborted) return [];
 
