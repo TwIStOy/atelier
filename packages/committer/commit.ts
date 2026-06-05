@@ -41,15 +41,8 @@ export async function handleCommit(
     return;
   }
 
-  const cwd = ctx.cwd;
-  if (!isGitRepo(cwd)) {
+  if (!isGitRepo(ctx.cwd)) {
     ctx.ui.notify("Not a git repository.", "warning");
-    return;
-  }
-
-  const changeCount = countChanges(cwd);
-  if (changeCount === 0) {
-    ctx.ui.notify("No changes to commit.", "warning");
     return;
   }
 
@@ -80,13 +73,24 @@ export async function handleCommit(
   try {
     if (controller.signal.aborted) return;
 
-    progress.phase = "preparing";
+    progress.statusMessage = "Checking changes...";
+    ctrl.invalidate();
+
+    const changeCount = countChanges(ctx.cwd);
+    if (changeCount === 0) {
+      progress.phase = "error";
+      progress.errorMessage = "No changes to commit.";
+      ctrl.invalidate();
+      await overlayPromise;
+      return;
+    }
+
     progress.statusMessage = "Staging changes...";
     ctrl.invalidate();
 
-    stageAll(cwd);
+    stageAll(ctx.cwd);
 
-    const diff = getDiff(cwd);
+    const diff = getDiff(ctx.cwd);
     progress.filesTotal = diff.files.length;
     progress.diffStat = diff.stat;
     ctrl.invalidate();
@@ -98,7 +102,7 @@ export async function handleCommit(
 
     if (shouldGroup) {
       await commitGrouped(
-        cwd,
+        ctx.cwd,
         diff.diff,
         model,
         ctx,
@@ -108,7 +112,7 @@ export async function handleCommit(
       );
     } else {
       await commitSingle(
-        cwd,
+        ctx.cwd,
         diff.diff,
         model,
         ctx,
