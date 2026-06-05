@@ -1,14 +1,15 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-import { execSync } from "node:child_process";
-import { diffLines } from "diff";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth } from "@earendil-works/pi-tui";
 import { shortenPath, extractAnsiRgb } from "@htwang-contrib/common";
 import type { ToolDisplayAdapter } from "../types.ts";
 import { INDENT, replaceTabs } from "./shared.ts";
+import { loadConfig } from "../config.ts";
 
-const SPLIT_MIN_WIDTH = 100;
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { execSync } from "node:child_process";
+import { diffLines } from "diff";
+
 const BAR_WIDTH = 6;
 
 interface DeltaStyles {
@@ -256,13 +257,20 @@ function generateUnifiedDiff(
   return header + "\n" + hunks.join("\n") + "\n";
 }
 
+function resolveIsSplit(width: number, innerWidth: number): boolean {
+  const cfg = loadConfig();
+  if (cfg.diffMode === "side-by-side") return true;
+  if (cfg.diffMode === "unified") return false;
+  return innerWidth >= cfg.splitDiffMinWidth;
+}
+
 function renderWithDelta(
   unifiedDiff: string,
   width: number,
   theme: Theme,
 ): string[] {
   const innerWidth = Math.max(1, width - INDENT.length);
-  const isSplit = innerWidth >= SPLIT_MIN_WIDTH;
+  const isSplit = resolveIsSplit(width, innerWidth);
   const styles = probeDeltaStyles(theme);
 
   const deltaArgs = styles
@@ -340,7 +348,12 @@ export const editAdapter: ToolDisplayAdapter<EditArgs> = {
     if (added > 0) parts.push(theme.fg("success", `+${added}`));
     if (removed > 0) parts.push(theme.fg("error", `-${removed}`));
     parts.push(
-      theme.fg("muted", width >= SPLIT_MIN_WIDTH ? "side-by-side" : "unified"),
+      theme.fg(
+        "muted",
+        resolveIsSplit(width, width - INDENT.length * 2)
+          ? "side-by-side"
+          : "unified",
+      ),
     );
     if (added > 0 || removed > 0) {
       parts.push(renderChangeBar(added, removed, theme));
