@@ -7,34 +7,11 @@ import type {
 import {
   getConfigItems,
   readConfig,
+  readRawConfig,
   updateConfig,
 } from "@htwang-contrib/common";
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
-import { homedir } from "node:os";
 import type { SettingRow, TabDef } from "./types.ts";
 import { TAB_ALL, PACKAGE_TAB_PREFIX } from "./types.ts";
-
-function configPath(): string {
-  const xdg = process.env.XDG_CONFIG_HOME;
-  const base = xdg ? join(xdg, "pi") : join(homedir(), ".config", "pi");
-  return join(base, "extensions.json");
-}
-
-function readRawSection(
-  extensionId: string,
-): Record<string, unknown> | undefined {
-  try {
-    if (!existsSync(configPath())) return undefined;
-    const file = JSON.parse(readFileSync(configPath(), "utf8"));
-    const section = file[extensionId];
-    if (section && typeof section === "object" && !Array.isArray(section))
-      return section as Record<string, unknown>;
-    return undefined;
-  } catch {
-    return undefined;
-  }
-}
 
 export function buildSettingRows(): SettingRow[] {
   const registries = getConfigItems() as ConfigItemRegistry[];
@@ -45,14 +22,19 @@ export function buildSettingRows(): SettingRow[] {
       items.map((i) => [i.key, i.defaultValue]),
     );
     const config = readConfig(extensionId, { defaults });
-    const rawSection = readRawSection(extensionId);
+    const rawSection = readRawConfig(extensionId);
+
+    const extLabel =
+      items.length > 0 && items[0]!.extensionLabel
+        ? items[0]!.extensionLabel!
+        : extensionId;
 
     for (const item of items) {
       const rawValue = config[item.key as keyof typeof config];
       rows.push({
         id: `${extensionId}::${item.key}`,
         extensionId,
-        extensionLabel: extensionId,
+        extensionLabel: extLabel,
         item,
         currentValue: rawValue,
         isExplicit: rawSection ? item.key in rawSection : false,
