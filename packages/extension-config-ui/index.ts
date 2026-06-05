@@ -34,6 +34,7 @@ export default function initConfigUI(pi: ExtensionAPI): void {
           label: "Enabled",
           defaultValue: true,
           description: "Whether the demo extension is active",
+          extensionLabel: "Feature Flags",
         },
         {
           key: "verbose",
@@ -131,6 +132,7 @@ export default function initConfigUI(pi: ExtensionAPI): void {
           label: "Enabled Features",
           defaultValue: ["autocomplete", "syntax"],
           description: "Select which editor features to enable",
+          extensionLabel: "Editor Features",
           options: [
             { label: "Autocomplete", value: "autocomplete" },
             { label: "Syntax Highlighting", value: "syntax" },
@@ -180,6 +182,7 @@ export default function initConfigUI(pi: ExtensionAPI): void {
           defaultValue: "~/output",
           description: "Directory for generated files",
           order: 1,
+          extensionLabel: "Project Settings",
         },
         {
           key: "concurrency",
