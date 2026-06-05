@@ -48,6 +48,7 @@ export {
   readConfig,
   writeConfig,
   updateConfig,
+  readRawConfig,
   registerConfigItems,
   getConfigItems,
   clearConfigItems,
