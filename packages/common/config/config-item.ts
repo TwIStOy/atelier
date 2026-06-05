@@ -19,6 +19,7 @@ export interface ConfigItemBase<
   type: Type;
   label: string;
   defaultValue: T;
+  value?: T | (() => T);
   description?: string;
   required?: boolean;
   group?: string;
