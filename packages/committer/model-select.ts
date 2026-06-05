@@ -5,12 +5,7 @@ import type {
 import type { Model } from "@earendil-works/pi-ai";
 import { resolveModel, readConfig, updateConfig } from "@htwang-contrib/common";
 import type { ExtensionConfigSchema } from "@htwang-contrib/common";
-import {
-  ModelSelectController,
-  buildModelEntries,
-  buildUseCurrentEntry,
-  SPECIAL_USE_CURRENT,
-} from "./model-selector.ts";
+import { ModelSelectController, buildModelEntries } from "./model-selector.ts";
 
 type AnyModel = Model<any>;
 
@@ -54,34 +49,39 @@ export async function selectModel(
     return undefined;
   }
 
-  const current = ctx.model;
-  const useCurrentEntry = buildUseCurrentEntry(current as AnyModel | undefined);
+  const sessionModel = ctx.model as AnyModel | undefined;
+  const config = loadConfig();
+  const configuredModel = config.model
+    ? (resolveModel(models, config.model) as AnyModel | undefined)
+    : undefined;
+  const effectiveDefault = configuredModel ?? sessionModel;
+
   const modelEntries = buildModelEntries(models as AnyModel[]);
 
-  const entries = useCurrentEntry
-    ? [useCurrentEntry, ...modelEntries]
-    : modelEntries;
+  let defaultIdx = 0;
+  if (effectiveDefault) {
+    const idx = modelEntries.findIndex(
+      (e) =>
+        e.model.provider === effectiveDefault.provider &&
+        e.model.id === effectiveDefault.id,
+    );
+    if (idx >= 0) defaultIdx = idx;
+  }
 
   const result = await ModelSelectController.show(
     ctx,
-    entries,
-    current as AnyModel | undefined,
+    modelEntries,
+    sessionModel,
+    defaultIdx,
   );
 
   if (result === undefined) return undefined;
 
-  if (result === SPECIAL_USE_CURRENT) {
-    saveConfig({ model: "" });
-    ctx.ui.notify("Commit model: using current session model", "info");
-    return undefined;
+  if (result) {
+    saveConfig({ model: `${result.provider}/${result.id}` });
+    ctx.ui.notify(`Commit model: ${result.provider}/${result.id}`, "info");
   }
-
-  const model = result;
-  if (model) {
-    saveConfig({ model: `${model.provider}/${model.id}` });
-    ctx.ui.notify(`Commit model: ${model.provider}/${model.id}`, "info");
-  }
-  return model;
+  return result;
 }
 
 export function resolveCommitModel(

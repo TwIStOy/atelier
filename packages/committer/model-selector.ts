@@ -22,8 +22,7 @@ const OVERLAY_OPTIONS: OverlayOptions = {
   margin: { left: 0, right: 0, bottom: 0 },
 };
 
-const SPECIAL_USE_CURRENT = Symbol("use-current");
-type SelectResult = AnyModel | typeof SPECIAL_USE_CURRENT | undefined;
+type SelectResult = AnyModel | undefined;
 
 interface ModelEntry {
   model: AnyModel;
@@ -52,6 +51,7 @@ export class ModelSelectController implements Component {
     ctx: ExtensionCommandContext,
     models: ModelEntry[],
     currentModel: AnyModel | undefined,
+    defaultIndex?: number,
   ): Promise<SelectResult> {
     return new Promise<SelectResult>((resolve) => {
       ctx.ui.custom<void>(
@@ -64,6 +64,14 @@ export class ModelSelectController implements Component {
             resolve,
             done,
           );
+          if (
+            defaultIndex != null &&
+            defaultIndex >= 0 &&
+            defaultIndex < models.length
+          ) {
+            ctrl.cursorIndex = defaultIndex;
+            ctrl.adjustScroll();
+          }
           return ctrl;
         },
         { overlay: true, overlayOptions: OVERLAY_OPTIONS },
@@ -152,11 +160,7 @@ export class ModelSelectController implements Component {
       if (this.filtered.length === 0) return;
       const entry = this.filtered[this.cursorIndex];
       if (!entry) return;
-      if ((entry as any)._useCurrent) {
-        this.resolve(SPECIAL_USE_CURRENT);
-      } else {
-        this.resolve(entry.model);
-      }
+      this.resolve(entry.model);
       this.done();
       return;
     }
@@ -244,17 +248,4 @@ export function buildModelEntries(models: AnyModel[]): ModelEntry[] {
   }));
 }
 
-export function buildUseCurrentEntry(
-  current: AnyModel | undefined,
-): (ModelEntry & { _useCurrent: true }) | null {
-  if (!current) return null;
-  return {
-    model: current,
-    label: `Use current model (${current.provider}/${current.id})`,
-    text: `current ${current.provider}/${current.id}`,
-    _useCurrent: true,
-  } as ModelEntry & { _useCurrent: true };
-}
-
-export { SPECIAL_USE_CURRENT };
 export type { SelectResult };
