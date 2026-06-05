@@ -11,12 +11,11 @@ import {
   wrapTextWithAnsi,
 } from "@earendil-works/pi-tui";
 import { formatExpandedToolOutputLines } from "./adapters/shared.ts";
+import { loadConfig } from "./config.ts";
 import { spinnerGlyph } from "./format.ts";
 import type { ContentRenderer, ToolDisplayAdapter } from "./types.ts";
 
 export type { ContentRenderer, ToolDisplayAdapter };
-
-const PREVIEW_LINES = 3;
 
 const INDENT = "    ";
 
@@ -193,6 +192,7 @@ export function defaultCollapsedRenderer(
   width: number,
 ): string[] {
   if (!content) return [];
+  const previewLines = loadConfig().previewLines;
   const styledOutput = content
     .split("\n")
     .map((line) => theme.fg("toolOutput", line))
@@ -201,7 +201,7 @@ export function defaultCollapsedRenderer(
   const innerWidth = Math.max(1, width - INDENT.length);
   const result = truncateToVisualLines(
     styledOutput,
-    PREVIEW_LINES,
+    previewLines,
     innerWidth,
     0,
   );
