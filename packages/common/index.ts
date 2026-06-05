@@ -61,6 +61,7 @@ export type {
   NumberConfigItem,
   BooleanConfigItem,
   SelectConfigItem,
+  MultiSelectConfigItem,
   ColorConfigItem,
   ConfigItemSelectOption,
   ConfigItemRegistry,
