@@ -1,4 +1,9 @@
-export { readConfig, writeConfig, updateConfig } from "./extension-config.ts";
+export {
+  readConfig,
+  writeConfig,
+  updateConfig,
+  readRawConfig,
+} from "./extension-config.ts";
 export type { ExtensionConfigSchema } from "./extension-config.ts";
 export {
   registerConfigItems,
