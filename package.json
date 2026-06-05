@@ -21,7 +21,8 @@
       "packages/context-usage",
       "packages/goal",
       "packages/btw",
-      "packages/memory"
+      "packages/memory",
+      "packages/prompt-snippets"
     ],
     "skills": [],
     "themes": [

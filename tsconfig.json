@@ -15,6 +15,7 @@
     { "path": "packages/context-usage" },
     { "path": "packages/btw" },
     { "path": "packages/goal" },
-    { "path": "packages/memory" }
+    { "path": "packages/memory" },
+    { "path": "packages/prompt-snippets" }
   ]
 }
