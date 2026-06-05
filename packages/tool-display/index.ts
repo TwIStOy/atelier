@@ -53,6 +53,7 @@ import type { ExtensionAPI, Theme } from "@earendil-works/pi-coding-agent";
 import { ToolExecutionComponent } from "@earendil-works/pi-coding-agent";
 import { globalToolDisplayRegistry } from "./registry.ts";
 import { renderToolCall } from "./tool-call-display.ts";
+import { registerToolDisplayConfigItems } from "./config.ts";
 
 type ToolExecutionPatchThis = {
   hideComponent?: boolean;
@@ -148,6 +149,8 @@ function patchToolExecutionRender(
 
 export default function (pi: ExtensionAPI) {
   let activeTheme: Theme = FALLBACK_THEME;
+
+  registerToolDisplayConfigItems();
 
   patchToolExecutionRender(() => activeTheme, globalToolDisplayRegistry);
 
