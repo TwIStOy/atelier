@@ -192,7 +192,12 @@ export function parseSettingInput(
     }
     case "multiselect":
       throw new Error("Use the option picker for multi-select settings");
-    case "color":
+    case "color": {
+      const trimmed = input.trim();
+      if (trimmed && !/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(trimmed))
+        throw new Error("Expected a hex color (e.g. #ff6600 or #f60)");
+      return trimmed;
+    }
     case "string":
       return input;
   }
