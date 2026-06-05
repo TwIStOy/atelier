@@ -21,7 +21,7 @@ const CONFIG_SCHEMA: ExtensionConfigSchema<CommitterConfig> = {
   },
 };
 
-function loadConfig(): CommitterConfig {
+export function loadConfig(): CommitterConfig {
   return readConfig(CONFIG_NAME, CONFIG_SCHEMA);
 }
 
