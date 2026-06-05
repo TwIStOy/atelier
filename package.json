@@ -22,7 +22,8 @@
       "packages/goal",
       "packages/btw",
       "packages/memory",
-      "packages/prompt-snippets"
+      "packages/prompt-snippets",
+      "packages/committer"
     ],
     "skills": [
       "skills/code-philosophy",
