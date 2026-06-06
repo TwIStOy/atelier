@@ -22,7 +22,6 @@
       "packages/goal",
       "packages/btw",
       "packages/memory",
-      "packages/prompt-snippets",
       "packages/committer",
       "packages/extension-config-ui"
     ],
@@ -36,8 +35,8 @@
     "themes": [
       "themes/catppuccin-mocha.json"
     ],
-    "snippets": [
-      "snippets"
+    "prompts": [
+      "prompts"
     ]
   },
   "devDependencies": {
