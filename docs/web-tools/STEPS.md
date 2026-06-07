@@ -10,9 +10,9 @@
 - [x] **Step 2:** Provider 注册表 + 工厂 — §3.3
 - [x] **Step 3:** HTTP 工具 + HTML-to-text + SSRF 防护 — §5, §2.3
 - [x] **Step 4:** Brave Provider（search-only） — §3.1
-- [ ] **Step 5:** web_search 工具注册 — §7, §2.3
-- [ ] **Step 6:** Tavily Provider（full） — §3.1
-- [ ] **Step 7:** web_fetch 工具注册 + 三级调度 — §7, §2.3, §5
+- [x] **Step 5:** web_search 工具注册 — §7, §2.3
+- [x] **Step 6:** Tavily Provider（full） — §3.1
+- [x] **Step 7:** web_fetch 工具注册 + 三级调度 — §7, §2.3, §5
 - [ ] **Step 8:** 配置系统集成 — §6
 - [ ] **Step 9:** 工具渲染适配器 — §8.1
 - [ ] **Step 10:** 入口文件 — §2.1
