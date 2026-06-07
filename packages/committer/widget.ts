@@ -66,8 +66,17 @@ export class CommitterOverlayController implements Component {
   }
 
   handleInput(data: string): void {
+    const terminal =
+      this.progress.phase === "done" ||
+      this.progress.phase === "error" ||
+      this.progress.phase === "cancelled";
+
     if (matchesKey(data, Key.escape)) {
       this.controller.abort();
+      this.done();
+      return;
+    }
+    if (terminal && matchesKey(data, Key.enter)) {
       this.done();
       return;
     }
