@@ -1,0 +1,6 @@
+- Fetch the content of a specific URL
+- Returns text content for HTML pages (tags stripped), raw text for plain text or JSON
+- Supports http and https only; refuses private/loopback addresses
+- Large responses are truncated to avoid overwhelming the context window; full content is spilled to a temp file
+- web_fetch is complementary to web_search: search finds URLs, fetch reads them
+- After answering using fetched content, include a "Sources:" section with a markdown hyperlink to the fetched URL
