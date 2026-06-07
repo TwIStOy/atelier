@@ -1,4 +1,5 @@
 import { BraveProvider } from "./brave.ts";
+import { TavilyProvider } from "./tavily.ts";
 import type { FullProvider, SearchProvider } from "./types.ts";
 
 export interface ProviderCredentials {
@@ -14,7 +15,7 @@ export function createSearchProvider(
     case "brave":
       return new BraveProvider(apiKey);
     case "tavily":
-      throw new Error(`Provider "${name}" not yet implemented`);
+      return new TavilyProvider(apiKey);
     default:
       throw new Error(`Unknown search provider: "${name}"`);
   }

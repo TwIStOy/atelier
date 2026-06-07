@@ -22,6 +22,7 @@ export {
 } from "./providers/index.ts";
 
 export { BraveProvider } from "./providers/brave.ts";
+export { TavilyProvider } from "./providers/tavily.ts";
 export {
   createSearchProvider,
   type ProviderCredentials,
@@ -36,3 +37,14 @@ export {
   fetchUrlOrThrow,
   fetchViaGenericHtml,
 } from "./providers/fetch-helpers.ts";
+
+export {
+  loadConfig,
+  resolveApiKey,
+  instantiateActiveProvider,
+  CONFIG_SCHEMA,
+  type WebToolsConfig,
+} from "./config.ts";
+
+export { registerWebSearchTool } from "./search/index.ts";
+export { registerWebFetchTool } from "./fetch/index.ts";

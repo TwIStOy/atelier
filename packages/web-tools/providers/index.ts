@@ -1,6 +1,7 @@
 import type { ProviderMeta } from "./types.ts";
 
 export { BraveProvider } from "./brave.ts";
+export { TavilyProvider } from "./tavily.ts";
 export { type ProviderCredentials, createSearchProvider } from "./factory.ts";
 export {
   htmlToText,
