@@ -66,17 +66,12 @@ export class CommitterOverlayController implements Component {
   }
 
   handleInput(data: string): void {
-    const terminal =
-      this.progress.phase === "done" ||
-      this.progress.phase === "error" ||
-      this.progress.phase === "cancelled";
-
     if (matchesKey(data, Key.escape)) {
       this.controller.abort();
       this.done();
       return;
     }
-    if (terminal && matchesKey(data, Key.enter)) {
+    if (this.isTerminal && matchesKey(data, Key.enter)) {
       this.done();
       return;
     }
@@ -93,6 +88,11 @@ export class CommitterOverlayController implements Component {
 
   invalidate(): void {
     this.tui.requestRender();
+  }
+
+  private get isTerminal(): boolean {
+    const p = this.progress.phase;
+    return p === "done" || p === "error" || p === "cancelled";
   }
 
   private buildLines(width: number): string[] {
@@ -183,7 +183,8 @@ export class CommitterOverlayController implements Component {
     lines.push("");
 
     const footer: string[] = [this.theme.fg("dim", "Esc") + " dismiss"];
-    if (this.progress.phase === "done" || this.progress.phase === "error") {
+    if (this.isTerminal) {
+      footer.push(this.theme.fg("dim", "Enter") + " close");
       footer.push(this.theme.fg("dim", "↑↓") + " scroll");
     }
     lines.push(this.theme.fg("dim", footer.join("  ")));
