@@ -21,7 +21,18 @@ export {
   PERPLEXITY_PROVIDER_META,
 } from "./providers/index.ts";
 
+export { BraveProvider } from "./providers/brave.ts";
 export {
   createSearchProvider,
   type ProviderCredentials,
 } from "./providers/factory.ts";
+export {
+  htmlToText,
+  extractTitle,
+  isHtmlContentType,
+  assertTextContentType,
+  isPrivateOrLoopbackHostname,
+  parseAndAssertHttpUrl,
+  fetchUrlOrThrow,
+  fetchViaGenericHtml,
+} from "./providers/fetch-helpers.ts";

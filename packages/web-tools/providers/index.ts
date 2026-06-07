@@ -1,5 +1,18 @@
 import type { ProviderMeta } from "./types.ts";
 
+export { BraveProvider } from "./brave.ts";
+export { type ProviderCredentials, createSearchProvider } from "./factory.ts";
+export {
+  htmlToText,
+  extractTitle,
+  isHtmlContentType,
+  assertTextContentType,
+  isPrivateOrLoopbackHostname,
+  parseAndAssertHttpUrl,
+  fetchUrlOrThrow,
+  fetchViaGenericHtml,
+} from "./fetch-helpers.ts";
+
 export const BRAVE_API_KEY_ENV_VAR = "BRAVE_SEARCH_API_KEY";
 export const BRAVE_PROVIDER_META: ProviderMeta = {
   name: "brave",

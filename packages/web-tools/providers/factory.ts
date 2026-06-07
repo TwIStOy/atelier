@@ -1,3 +1,4 @@
+import { BraveProvider } from "./brave.ts";
 import type { FullProvider, SearchProvider } from "./types.ts";
 
 export interface ProviderCredentials {
@@ -6,10 +7,12 @@ export interface ProviderCredentials {
 
 export function createSearchProvider(
   name: string,
-  _creds: ProviderCredentials,
+  creds: ProviderCredentials,
 ): SearchProvider | FullProvider {
+  const apiKey = creds.apiKey ?? "";
   switch (name) {
     case "brave":
+      return new BraveProvider(apiKey);
     case "tavily":
       throw new Error(`Provider "${name}" not yet implemented`);
     default:
