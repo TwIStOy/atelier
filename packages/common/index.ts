@@ -71,3 +71,5 @@ export type {
   LazyOptions,
   ConfigItemRegistry,
 } from "./config/index.ts";
+export { mcpInit, mcpCall } from "./mcp.ts";
+export type { McpSession, McpClientInfo } from "./mcp.ts";
