@@ -25,6 +25,7 @@ import {
 import { resolveModel } from "@htwang-contrib/common";
 import extraTools from "@htwang-contrib/extra-tools/index.ts";
 import protectSecrets from "@htwang-contrib/protect-secrets/index.ts";
+import webTools from "@htwang-contrib/web-tools/index.ts";
 import { appendSubagentLinkRecord, SUBAGENT_SESSION_DIR } from "./paths.ts";
 import {
   buildSubagentAgentCatalog,
@@ -37,6 +38,7 @@ import { resolveChildToolNames } from "./child-tools.ts";
 const CHILD_SESSION_EXTENSION_FACTORIES: ExtensionFactory[] = [
   protectSecrets,
   extraTools,
+  webTools,
 ];
 
 const THINKING_LEVELS = new Set<string>([

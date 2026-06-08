@@ -12,7 +12,8 @@
   "dependencies": {
     "@htwang-contrib/common": "*",
     "@htwang-contrib/extra-tools": "*",
-    "@htwang-contrib/protect-secrets": "*"
+    "@htwang-contrib/protect-secrets": "*",
+    "@htwang-contrib/web-tools": "*"
   },
   "devDependencies": {
     "@earendil-works/pi-agent-core": "^0.76.0",
