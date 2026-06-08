@@ -18,11 +18,20 @@ function isTruncated(details: unknown): boolean {
   return t != null && typeof t === "object";
 }
 
+function backendFromDetails(details: unknown): string | undefined {
+  if (details == null || typeof details !== "object") return undefined;
+  const b = (details as Record<string, unknown>).backend;
+  return typeof b === "string" && b.length > 0 ? b : undefined;
+}
+
 export const webFetchAdapter: ToolDisplayAdapter<WebFetchArgs> = {
-  formatCallHeader(args, theme) {
+  formatCallHeader(args, theme, _details?: unknown) {
     const url = typeof args.url === "string" ? args.url : "";
+    const backend = backendFromDetails(_details);
+    const tag = backend ? " " + theme.fg("dim", `(${backend})`) : "";
     return (
-      theme.fg("toolTitle", theme.bold("Web Fetch")) +
+      theme.fg("toolTitle", theme.bold("WebFetch")) +
+      tag +
       " " +
       theme.fg("accent", url)
     );

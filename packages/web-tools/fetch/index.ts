@@ -33,6 +33,7 @@ interface FetchDetails {
   contentLength?: number;
   truncation?: TruncationResult;
   fullOutputPath?: string;
+  backend?: string;
 }
 
 async function spillFullContentToTempFile(content: string): Promise<string> {
@@ -117,12 +118,16 @@ export function registerWebFetchTool(pi: ExtensionAPI): void {
       }
 
       // Level 2: Provider native fetch (with fallback chain)
+      let usedProviderName: string | undefined;
       if (!fetchResponse) {
-        for (const { provider } of providers) {
+        for (const { name, provider } of providers) {
           if (!("fetch" in provider)) continue;
           try {
             fetchResponse = await provider.fetch(url, raw, signal);
-            if (fetchResponse) break;
+            if (fetchResponse) {
+              usedProviderName = name;
+              break;
+            }
           } catch (err: unknown) {
             if (!isRateLimitError(err)) throw err;
           }
@@ -151,6 +156,7 @@ export function registerWebFetchTool(pi: ExtensionAPI): void {
         title,
         contentType,
         contentLength,
+        backend: usedProviderName,
       };
 
       let output = truncation.content;
