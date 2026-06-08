@@ -49,7 +49,8 @@ export {
 export {
   loadConfig,
   resolveApiKey,
-  instantiateActiveProvider,
+  instantiateProviders,
+  isRateLimitError,
   registerWebToolsConfigItems,
   CONFIG_SCHEMA,
   type WebToolsConfig,
@@ -69,6 +70,7 @@ export {
   type GitHubUrlInfo,
   type UrlInterceptor,
 } from "./interceptors/index.ts";
+export { ProviderError, throwIfApiError } from "./providers/errors.ts";
 
 export default function (pi: ExtensionAPI): void {
   registerWebToolsConfigItems();

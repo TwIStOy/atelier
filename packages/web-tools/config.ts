@@ -10,10 +10,11 @@ import {
   createSearchProvider,
   type ProviderCredentials,
 } from "./providers/factory.ts";
+import { ProviderError } from "./providers/errors.ts";
 import type { FullProvider, SearchProvider } from "./providers/types.ts";
 
 export interface WebToolsConfig {
-  provider: string;
+  providers: string[];
   apiKeys: Record<string, string>;
   githubInterceptorEnabled: boolean;
   githubMaxRepoSizeMB: number;
@@ -23,7 +24,7 @@ export interface WebToolsConfig {
 
 export const CONFIG_SCHEMA: ExtensionConfigSchema<WebToolsConfig> = {
   defaults: {
-    provider: "brave",
+    providers: PROVIDERS.map((p) => p.name),
     apiKeys: {},
     githubInterceptorEnabled: false,
     githubMaxRepoSizeMB: 350,
@@ -43,27 +44,33 @@ export function resolveApiKey(providerName: string): string | undefined {
   return loadConfig().apiKeys[providerName]?.trim();
 }
 
-export function instantiateActiveProvider(): {
-  providerName: string;
-  provider: SearchProvider | FullProvider;
+export function isRateLimitError(err: unknown): boolean {
+  return err instanceof ProviderError && err.isRateLimit;
+}
+
+export function instantiateProviders(): {
+  providerNames: string[];
+  providers: Array<{ name: string; provider: SearchProvider | FullProvider }>;
 } {
   const config = loadConfig();
-  const providerName = config.provider;
-  const apiKey = resolveApiKey(providerName);
-  const provider = createSearchProvider(providerName, {
-    apiKey: apiKey ?? "",
+  const names = config.providers.length > 0 ? config.providers : ["brave"];
+  const providers = names.map((name) => {
+    const apiKey = resolveApiKey(name);
+    const provider = createSearchProvider(name, { apiKey: apiKey ?? "" });
+    return { name, provider };
   });
-  return { providerName, provider };
+  return { providerNames: names, providers };
 }
 
 export function registerWebToolsConfigItems(): void {
   registerConfigItems("web-tools", [
     {
-      key: "provider",
-      type: "select",
-      label: "Search Provider",
-      value: () => loadConfig().provider,
-      description: "Active search backend",
+      key: "providers",
+      type: "reorderable",
+      label: "Search Providers",
+      value: () => loadConfig().providers,
+      description:
+        "Ordered provider chain. On rate limit, falls through to the next provider.",
       extensionLabel: "Web Tools",
       order: 0,
       options: PROVIDERS.map((p) => ({ label: p.label, value: p.name })),
