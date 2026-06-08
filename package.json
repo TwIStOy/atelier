@@ -24,7 +24,8 @@
       "packages/memory",
       "packages/committer",
       "packages/extension-config-ui",
-      "packages/web-tools"
+      "packages/web-tools",
+      "packages/message-queue"
     ],
     "skills": [
       "skills/code-philosophy",

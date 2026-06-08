@@ -18,6 +18,7 @@
     { "path": "packages/memory" },
     { "path": "packages/committer" },
     { "path": "packages/extension-config-ui" },
-    { "path": "packages/web-tools" }
+    { "path": "packages/web-tools" },
+    { "path": "packages/message-queue" }
   ]
 }
