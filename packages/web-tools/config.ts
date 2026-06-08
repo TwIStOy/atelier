@@ -1,3 +1,5 @@
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import {
   readConfig,
   registerConfigItems,
@@ -13,12 +15,20 @@ import type { FullProvider, SearchProvider } from "./providers/types.ts";
 export interface WebToolsConfig {
   provider: string;
   apiKeys: Record<string, string>;
+  githubInterceptorEnabled: boolean;
+  githubMaxRepoSizeMB: number;
+  githubCloneTimeoutSeconds: number;
+  githubClonePath: string;
 }
 
 export const CONFIG_SCHEMA: ExtensionConfigSchema<WebToolsConfig> = {
   defaults: {
     provider: "brave",
     apiKeys: {},
+    githubInterceptorEnabled: false,
+    githubMaxRepoSizeMB: 350,
+    githubCloneTimeoutSeconds: 30,
+    githubClonePath: join(tmpdir(), "pi-github-repos"),
   },
 };
 
@@ -70,5 +80,47 @@ export function registerWebToolsConfigItems(): void {
       placeholder: `${p.envVar} or enter key here`,
       envVar: p.envVar,
     })),
+    {
+      key: "githubInterceptorEnabled",
+      type: "boolean",
+      label: "GitHub URL Interceptor",
+      value: () => loadConfig().githubInterceptorEnabled,
+      description: "Route github.com URLs through gh/git for repo content",
+      extensionLabel: "Web Tools",
+      order: 100,
+    },
+    {
+      key: "githubMaxRepoSizeMB",
+      type: "number",
+      label: "GitHub Max Repo Size (MB)",
+      value: () => loadConfig().githubMaxRepoSizeMB,
+      description:
+        "Repos above this threshold use the API view instead of cloning",
+      extensionLabel: "Web Tools",
+      order: 101,
+      min: 10,
+      max: 5000,
+    },
+    {
+      key: "githubCloneTimeoutSeconds",
+      type: "number",
+      label: "GitHub Clone Timeout (seconds)",
+      value: () => loadConfig().githubCloneTimeoutSeconds,
+      description: "Timeout for git clone operations",
+      extensionLabel: "Web Tools",
+      order: 102,
+      min: 5,
+      max: 300,
+    },
+    {
+      key: "githubClonePath",
+      type: "string",
+      label: "GitHub Clone Path",
+      value: () => loadConfig().githubClonePath,
+      description: "Directory where cloned repos are stored",
+      extensionLabel: "Web Tools",
+      order: 103,
+      placeholder: join(tmpdir(), "pi-github-repos"),
+    },
   ]);
 }
