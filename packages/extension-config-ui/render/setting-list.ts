@@ -238,9 +238,7 @@ export function renderSelectPage(
     const selectedSet = new Set(
       reorderableValues.map((v) => JSON.stringify(v)),
     );
-    const optMap = new Map(
-      opts.map((o) => [JSON.stringify(o.value), o]),
-    );
+    const optMap = new Map(opts.map((o) => [JSON.stringify(o.value), o]));
     const selected = reorderableValues
       .map((v) => optMap.get(JSON.stringify(v)))
       .filter((o): o is (typeof opts)[number] => o !== undefined);

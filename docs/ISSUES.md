@@ -1,2 +1,4 @@
 - [x] Generic tool display 在显示参数的时候，如果参数太长一行放不下，可以换行。
 - [x] Generic tool display 在折叠状态下，后面没有 └ 这个标记
+- [ ] Goal 在状态栏的运行时间，不会实时的变化。最后也没有更新到运行了的时间。
+- [ ] Bash tool 的 header line 能展示的命令部分太少了。让它可以展示屏幕宽度的内容之后再截断
