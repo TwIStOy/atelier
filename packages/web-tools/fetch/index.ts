@@ -13,6 +13,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Type } from "typebox";
 import { instantiateActiveProvider } from "../config.ts";
+import { buildInterceptors, getInterceptors } from "../interceptors/index.ts";
 import {
   fetchViaGenericHtml,
   parseAndAssertHttpUrl,
@@ -100,7 +101,20 @@ export function registerWebFetchTool(pi: ExtensionAPI): void {
 
       let fetchResponse: FetchResponse | undefined;
 
-      // Level 1: URL interceptor chain (empty for now; Phase 2 adds GitHub)
+      // Level 1: URL interceptor chain
+      if (getInterceptors().length === 0) {
+        buildInterceptors();
+      }
+      for (const interceptor of getInterceptors()) {
+        const intercepted = await interceptor.intercept(url, {
+          raw,
+          signal,
+        });
+        if (intercepted) {
+          fetchResponse = intercepted;
+          break;
+        }
+      }
 
       // Level 2: Provider native fetch (Tavily, Exa, etc.)
       if (!fetchResponse && "fetch" in provider) {

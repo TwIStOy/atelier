@@ -58,12 +58,21 @@ export {
 import { registerWebToolsConfigItems } from "./config.ts";
 import { registerWebSearchTool } from "./search/index.ts";
 import { registerWebFetchTool } from "./fetch/index.ts";
+import { buildInterceptors } from "./interceptors/index.ts";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 export { registerWebSearchTool, registerWebFetchTool };
 
+export {
+  GitHubInterceptor,
+  type GitHubInterceptorOptions,
+  type GitHubUrlInfo,
+  type UrlInterceptor,
+} from "./interceptors/index.ts";
+
 export default function (pi: ExtensionAPI): void {
   registerWebToolsConfigItems();
+  buildInterceptors();
   registerWebSearchTool(pi);
   registerWebFetchTool(pi);
 }
