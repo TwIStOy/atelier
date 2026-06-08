@@ -22,6 +22,7 @@ export type {
   BooleanConfigItem,
   SelectConfigItem,
   MultiSelectConfigItem,
+  ReorderableConfigItem,
   ColorConfigItem,
   ConfigItemSelectOption,
   LazyOptions,

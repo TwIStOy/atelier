@@ -4,6 +4,7 @@ export type ConfigItemType =
   | "boolean"
   | "select"
   | "multiselect"
+  | "reorderable"
   | "color";
 
 export interface ConfigItemSelectOption<T = unknown> {
@@ -56,6 +57,13 @@ export interface MultiSelectConfigItem<T = string> extends ConfigItemBase<
   options: ConfigItemSelectOption<T>[] | LazyOptions<T>;
 }
 
+export interface ReorderableConfigItem<T = string> extends ConfigItemBase<
+  T[],
+  "reorderable"
+> {
+  options: ConfigItemSelectOption<T>[] | LazyOptions<T>;
+}
+
 export interface ColorConfigItem extends ConfigItemBase<string, "color"> {}
 
 export type ConfigItem =
@@ -64,6 +72,7 @@ export type ConfigItem =
   | BooleanConfigItem
   | SelectConfigItem
   | MultiSelectConfigItem
+  | ReorderableConfigItem
   | ColorConfigItem;
 
 export interface ConfigItemRegistry {
