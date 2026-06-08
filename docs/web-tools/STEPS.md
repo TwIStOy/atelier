@@ -22,12 +22,11 @@
 
 - [x] **Step 12:** search-only Provider（Serper, Perplexity） — §3.1
 - [x] **Step 13:** full Provider（Exa, You.com, Jina, Firecrawl） — §3.1
-- [ ] **Step 14:** GitHub URL 拦截器 — §4
+- [x] **Step 14:** GitHub URL 拦截器 — §4
 
 ### Phase 3 — 生态集成
 
-- [ ] **Step 15:** subagent 工具白名单集成 — §8.3
-- [ ] **Step 16:** protect-secrets URL 检查 — §8.5
+- [x] **Step 15:** subagent 工具白名单集成 — §8.3
 - [x] **Step 17:** Z.AI MCP Provider — §10.4
 - [x] **Step 18:** 迁移 web_search_prime / web_read_prime — §10.4
 - [x] **Step 19:** 清理遗留 — §10.4
