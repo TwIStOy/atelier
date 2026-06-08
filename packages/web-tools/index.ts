@@ -42,6 +42,7 @@ export {
   loadConfig,
   resolveApiKey,
   instantiateActiveProvider,
+  registerWebToolsConfigItems,
   CONFIG_SCHEMA,
   type WebToolsConfig,
 } from "./config.ts";

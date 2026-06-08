@@ -82,6 +82,44 @@ export function readRawConfig(
   return undefined;
 }
 
+function setDeep(
+  obj: Record<string, unknown>,
+  path: string[],
+  value: unknown,
+): void {
+  let current: Record<string, unknown> = obj;
+  for (let i = 0; i < path.length - 1; i++) {
+    const seg = path[i];
+    const next = current[seg];
+    if (next == null || typeof next !== "object" || Array.isArray(next)) {
+      current[seg] = {};
+    }
+    current = current[seg] as Record<string, unknown>;
+  }
+  current[path[path.length - 1]] = value;
+}
+
+function deleteDeep(obj: Record<string, unknown>, path: string[]): void {
+  if (path.length === 1) {
+    delete obj[path[0]];
+    return;
+  }
+  const parent = path
+    .slice(0, -1)
+    .reduce<Record<string, unknown> | undefined>((cur, seg) => {
+      if (
+        cur == null ||
+        typeof cur[seg] !== "object" ||
+        Array.isArray(cur[seg])
+      )
+        return undefined;
+      return cur[seg] as Record<string, unknown>;
+    }, obj);
+  if (parent != null) {
+    delete parent[path[path.length - 1]];
+  }
+}
+
 export function setConfigKey(
   extensionId: string,
   key: string,
@@ -91,7 +129,8 @@ export function setConfigKey(
   if (!file[extensionId] || typeof file[extensionId] !== "object") {
     file[extensionId] = {};
   }
-  (file[extensionId] as Record<string, unknown>)[key] = value;
+  const segs = key.split(".");
+  setDeep(file[extensionId] as Record<string, unknown>, segs, value);
   writeConfigFile(file);
 }
 
@@ -99,7 +138,8 @@ export function deleteConfigKey(extensionId: string, key: string): void {
   const file = readConfigFile();
   const section = file[extensionId];
   if (section && typeof section === "object") {
-    delete (section as Record<string, unknown>)[key];
+    const segs = key.split(".");
+    deleteDeep(section as Record<string, unknown>, segs);
   }
   writeConfigFile(file);
 }

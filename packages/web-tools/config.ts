@@ -1,4 +1,8 @@
-import { readConfig, type ExtensionConfigSchema } from "@htwang-contrib/common";
+import {
+  readConfig,
+  registerConfigItems,
+  type ExtensionConfigSchema,
+} from "@htwang-contrib/common";
 import { PROVIDERS } from "./providers/index.ts";
 import {
   createSearchProvider,
@@ -40,4 +44,31 @@ export function instantiateActiveProvider(): {
     apiKey: apiKey ?? "",
   });
   return { providerName, provider };
+}
+
+export function registerWebToolsConfigItems(): void {
+  registerConfigItems("web-tools", [
+    {
+      key: "provider",
+      type: "select",
+      label: "Search Provider",
+      value: () => loadConfig().provider,
+      description: "Active search backend",
+      extensionLabel: "Web Tools",
+      order: 0,
+      options: PROVIDERS.map((p) => ({ label: p.label, value: p.name })),
+    },
+    ...PROVIDERS.map((p, i) => ({
+      key: `apiKeys.${p.name}`,
+      type: "string" as const,
+      label: `${p.label} API Key`,
+      value: () => resolveApiKey(p.name) ?? "",
+      description: `${p.label} API key (env: ${p.envVar})`,
+      extensionLabel: "Web Tools",
+      order: 10 + i,
+      secret: true,
+      placeholder: `${p.envVar} or enter key here`,
+      envVar: p.envVar,
+    })),
+  ]);
 }
