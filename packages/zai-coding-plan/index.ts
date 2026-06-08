@@ -2,9 +2,7 @@ import type {
   ExtensionAPI,
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
-import { Type } from "typebox";
 import { queryUsage } from "./quota.ts";
-import { zaiWebSearch, zaiWebRead } from "./search.ts";
 import {
   ZAI_CODING_PLAN_EVENTS,
   resetForegroundBeforeText,
@@ -82,13 +80,6 @@ export default function (pi: ExtensionAPI) {
 
   pi.on("session_start", (_event, ctx) => {
     maybeRefreshUsage(pi, ctx);
-    if (process.env.ZAI_API_KEY) {
-      pi.setActiveTools([
-        ...pi.getActiveTools(),
-        "web_search_prime",
-        "web_read_prime",
-      ]);
-    }
   });
   pi.on("turn_end", (_event, ctx) => maybeRefreshUsage(pi, ctx));
   pi.on("model_select", (event, ctx) => {
@@ -117,111 +108,6 @@ export default function (pi: ExtensionAPI) {
           `Failed to query quota: ${e instanceof Error ? e.message : String(e)}`,
           "error",
         );
-      }
-    },
-  });
-
-  pi.registerTool({
-    name: "web_search_prime",
-    label: "Web Search Prime",
-    description:
-      "Search the web using Z.AI Web Search Prime (MCP). Returns ranked results with titles, URLs, and snippets. Requires ZAI_API_KEY.",
-    parameters: Type.Object({
-      query: Type.String({ description: "Search query" }),
-    }),
-    async execute(_id, params, signal, _onUpdate, _ctx) {
-      const apiKey = process.env.ZAI_API_KEY;
-      if (!apiKey) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: "ZAI_API_KEY is not set. Cannot perform web search.",
-            },
-          ],
-          details: { error: "no_api_key" },
-          isError: true,
-        };
-      }
-
-      try {
-        const { results, raw } = await zaiWebSearch(
-          params.query,
-          apiKey,
-          signal,
-        );
-        return {
-          content: [{ type: "text" as const, text: raw }],
-          details: { query: params.query, resultCount: results.length },
-        };
-      } catch (err: unknown) {
-        if (signal?.aborted) {
-          return {
-            content: [{ type: "text" as const, text: "Search cancelled." }],
-            details: { error: "cancelled" },
-          };
-        }
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Search error: ${err instanceof Error ? err.message : String(err)}`,
-            },
-          ],
-          details: { error: err instanceof Error ? err.message : String(err) },
-          isError: true,
-        };
-      }
-    },
-  });
-
-  pi.registerTool({
-    name: "web_read_prime",
-    label: "Web Read Prime",
-    description:
-      "Read and extract the full content of a web page using Z.AI Web Reader (MCP). Returns page title, main content, metadata, and links. Requires ZAI_API_KEY.",
-    parameters: Type.Object({
-      url: Type.String({ description: "URL of the web page to read" }),
-    }),
-    async execute(_id, params, signal, _onUpdate, _ctx) {
-      const apiKey = process.env.ZAI_API_KEY;
-      if (!apiKey) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: "ZAI_API_KEY is not set. Cannot read web page.",
-            },
-          ],
-          details: { error: "no_api_key" },
-          isError: true,
-        };
-      }
-
-      try {
-        const { raw, content } = await zaiWebRead(params.url, apiKey, signal);
-        const lines = content.split("\n").length;
-        return {
-          content: [{ type: "text" as const, text: raw }],
-          details: { url: params.url, lineCount: lines },
-        };
-      } catch (err: unknown) {
-        if (signal?.aborted) {
-          return {
-            content: [{ type: "text" as const, text: "Read cancelled." }],
-            details: { error: "cancelled" },
-          };
-        }
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Read error: ${err instanceof Error ? err.message : String(err)}`,
-            },
-          ],
-          details: { error: err instanceof Error ? err.message : String(err) },
-          isError: true,
-        };
       }
     },
   });
