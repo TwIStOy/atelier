@@ -33,6 +33,8 @@ import { subagentStatusAdapter } from "./adapters/subagent-status.ts";
 import { writeAdapter } from "./adapters/write.ts";
 import { webSearchPrimeAdapter } from "./adapters/web-search-prime.ts";
 import { webReadPrimeAdapter } from "./adapters/web-read-prime.ts";
+import { webSearchAdapter } from "./adapters/web-search.ts";
+import { webFetchAdapter } from "./adapters/web-fetch.ts";
 
 export const globalToolDisplayRegistry = new ToolDisplayRegistry();
 globalToolDisplayRegistry.register("ask_user_question", askUserQuestionAdapter);
@@ -63,3 +65,5 @@ globalToolDisplayRegistry.register("journal-read", journalReadAdapter);
 globalToolDisplayRegistry.register("journal-search", journalSearchAdapter);
 globalToolDisplayRegistry.register("web_search_prime", webSearchPrimeAdapter);
 globalToolDisplayRegistry.register("web_read_prime", webReadPrimeAdapter);
+globalToolDisplayRegistry.register("web_search", webSearchAdapter);
+globalToolDisplayRegistry.register("web_fetch", webFetchAdapter);
