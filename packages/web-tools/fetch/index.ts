@@ -12,7 +12,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Type } from "typebox";
-import { instantiateActiveProvider } from "../config.ts";
+import { instantiateProviders, isRateLimitError } from "../config.ts";
 import { buildInterceptors, getInterceptors } from "../interceptors/index.ts";
 import {
   fetchViaGenericHtml,
@@ -97,7 +97,7 @@ export function registerWebFetchTool(pi: ExtensionAPI): void {
         details: { url } as FetchDetails,
       });
 
-      const { provider } = instantiateActiveProvider();
+      const { providers } = instantiateProviders();
 
       let fetchResponse: FetchResponse | undefined;
 
@@ -116,9 +116,17 @@ export function registerWebFetchTool(pi: ExtensionAPI): void {
         }
       }
 
-      // Level 2: Provider native fetch (Tavily, Exa, etc.)
-      if (!fetchResponse && "fetch" in provider) {
-        fetchResponse = await provider.fetch(url, raw, signal);
+      // Level 2: Provider native fetch (with fallback chain)
+      if (!fetchResponse) {
+        for (const { provider } of providers) {
+          if (!("fetch" in provider)) continue;
+          try {
+            fetchResponse = await provider.fetch(url, raw, signal);
+            if (fetchResponse) break;
+          } catch (err: unknown) {
+            if (!isRateLimitError(err)) throw err;
+          }
+        }
       }
 
       // Level 3: Generic HTML pipeline

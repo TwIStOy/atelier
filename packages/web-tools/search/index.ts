@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Type } from "typebox";
-import { instantiateActiveProvider } from "../config.ts";
+import { instantiateProviders, isRateLimitError } from "../config.ts";
 import type { SearchResult } from "../providers/types.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -56,41 +56,73 @@ export function registerWebSearchTool(pi: ExtensionAPI): void {
 
     async execute(_toolCallId, params, signal, onUpdate, _ctx) {
       const maxResults = clampSearchResultCount(params.max_results);
-      const { providerName, provider } = instantiateActiveProvider();
+      const { providers } = instantiateProviders();
 
-      onUpdate?.({
-        content: [
-          {
-            type: "text",
-            text: `Searching ${provider.label} for: "${params.query}"...`,
-          },
-        ],
-        details: { query: params.query, backend: providerName, resultCount: 0 },
-      });
-
-      const response = await provider.search(params.query, maxResults, signal);
-
-      if (response.results.length === 0) {
-        return {
+      let lastError: Error | undefined;
+      for (const { name: providerName, provider } of providers) {
+        onUpdate?.({
           content: [
-            { type: "text", text: `No results found for "${params.query}".` },
+            {
+              type: "text",
+              text: `Searching ${provider.label} for: "${params.query}"...`,
+            },
           ],
           details: {
             query: params.query,
             backend: providerName,
             resultCount: 0,
           },
-        };
+        });
+
+        try {
+          const response = await provider.search(
+            params.query,
+            maxResults,
+            signal,
+          );
+
+          if (response.results.length === 0) {
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: `No results found for "${params.query}".`,
+                },
+              ],
+              details: {
+                query: params.query,
+                backend: providerName,
+                resultCount: 0,
+              },
+            };
+          }
+
+          return {
+            content: [
+              { type: "text", text: formatSearchResultsBody(response) },
+            ],
+            details: {
+              query: params.query,
+              backend: providerName,
+              resultCount: response.results.length,
+              results: response.results,
+            },
+          };
+        } catch (err: unknown) {
+          lastError = err instanceof Error ? err : new Error(String(err));
+          if (!isRateLimitError(err)) break;
+        }
       }
 
       return {
-        content: [{ type: "text", text: formatSearchResultsBody(response) }],
-        details: {
-          query: params.query,
-          backend: providerName,
-          resultCount: response.results.length,
-          results: response.results,
-        },
+        content: [
+          {
+            type: "text",
+            text: `Search error: ${lastError?.message ?? "all providers failed"}`,
+          },
+        ],
+        details: { error: lastError?.message, query: params.query },
+        isError: true,
       };
     },
   });
