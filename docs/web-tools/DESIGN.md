@@ -184,6 +184,36 @@ interface ProviderMeta {
 }
 ```
 
+### 3.6 Provider 限额与错误响应
+
+各 Provider 在请求超过限额时返回的 HTTP 状态码和响应体格式：
+
+| Provider | 场景 | HTTP Status | 响应体 / 关键信息 |
+| --- | --- | --- | --- |
+| **Brave** | 频率 / 月度配额 | `429` | 无明确 JSON body；通过 `X-RateLimit-Remaining` / `X-RateLimit-Reset` header 传递限额状态 |
+| **Tavily** | 频率限制 | `429` | `{"error":{"code":"1302","message":"Rate limit reached for requests"}}`，带 `Retry-After` header |
+| **Tavily** | 月度 plan 用尽 | `432` | 需升级 plan |
+| **Tavily** | PAYG 额度用尽 | `433` | 需提高额度上限 |
+| **Serper** | 频率 / 配额 | `429` | 文档未明确 body 格式；社区代码检测 `"Quota exceed"` 文本 |
+| **Exa** | 频率限制（10 QPS） | `429` | `{"error":"You've exceeded your Exa rate limit of 10 requests per second..."}` |
+| **Exa** | 月度额度用尽 | `402` | `{"error":"...","tag":"NO_MORE_CREDITS"}`（也可能是 `API_KEY_BUDGET_EXCEEDED`、`TEAM_BUDGET_EXCEEDED`） |
+| **You.com** | 频率 / 配额 | `429` | 未公开文档，按惯例返回标准 429 |
+| **Jina** | RPM 限制 | `429` | 错误标识 `RATE_REQUEST_LIMIT_EXCEEDED`，带 `X-RateLimit-Remaining-Requests` header |
+| **Jina** | TPM 限制 | `429` | 错误标识 `RATE_TOKEN_LIMIT_EXCEEDED`，带 `X-RateLimit-Remaining-Tokens` header |
+| **Firecrawl** | 频率限制 | `429` | `{"error":"Request rate limit exceeded. Please wait and try again later."}`，带 `Retry-After` header |
+| **Firecrawl** | 并发限制 | `429` | `{"error":"Concurrency limit reached"}` |
+| **Perplexity** | 频率限制 | `429` | `"Too Many Requests"`；漏桶算法，推荐指数退避 1s→32s |
+| **Z.AI (MCP)** | 并发过高 | `429` | `{"error":{"code":"1302","message":"并发数过高..."}}` |
+| **Z.AI (MCP)** | 余额不足 | `429` | `{"error":{"code":"1113","message":"余额不足或无可用资源包..."}}` |
+| **Z.AI (MCP)** | 配额用尽 | `429` | code `1308`（usage quota）/ `1310`（周/月配额）/ `1313`（公平使用违规） |
+
+**当前处理：** 所有 Provider 的 `!res.ok` 分支统一抛出 `Error("${label} API error (${status}): ${text}")`，将原始 HTTP 状态码和响应文本透传给调用方。Exa 的 `402`（额度用尽）是唯一的非 429 例外，同样被该分支捕获。
+
+**后续优化方向：**
+- 识别 `Retry-After` header / `X-RateLimit-Reset` header，在错误信息中包含建议等待时间
+- 对 429 做自动重试（指数退避），而非直接抛错
+- 区分「频率限制」（可重试）和「额度用尽」（不可重试，需提示用户升级）
+
 ## 4. URL 拦截器机制
 
 ### 4.1 接口定义
