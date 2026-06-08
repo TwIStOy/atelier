@@ -226,33 +226,54 @@ export function renderSelectPage(
           : [];
   const opts = typeof rawOpts === "function" ? rawOpts() : rawOpts;
 
+  let displayOpts: typeof opts;
+  let selectedValues: unknown[] | undefined;
+  let reorderableValues: unknown[] | undefined;
+
+  if (row.item.type === "reorderable") {
+    reorderableValues = Array.isArray(row.currentValue)
+      ? (row.currentValue as unknown[])
+      : [];
+    selectedValues = reorderableValues;
+    const selectedSet = new Set(
+      reorderableValues.map((v) => JSON.stringify(v)),
+    );
+    const optMap = new Map(
+      opts.map((o) => [JSON.stringify(o.value), o]),
+    );
+    const selected = reorderableValues
+      .map((v) => optMap.get(JSON.stringify(v)))
+      .filter((o): o is (typeof opts)[number] => o !== undefined);
+    const unselected = opts.filter(
+      (o) => !selectedSet.has(JSON.stringify(o.value)),
+    );
+    displayOpts = [...selected, ...unselected];
+  } else {
+    displayOpts = opts;
+    selectedValues =
+      row.item.type === "multiselect"
+        ? (row.currentValue as unknown[])
+        : undefined;
+  }
+
   const pageSize = SELECT_PAGE_SIZE;
   const scrollStart = selecting.scroll;
-  const scrollEnd = Math.min(scrollStart + pageSize, opts.length);
+  const scrollEnd = Math.min(scrollStart + pageSize, displayOpts.length);
 
   if (scrollStart > 0) {
     lines.push(theme.fg("dim", `  ↑ ${scrollStart} more above`));
   }
 
-  const selectedValues =
-    row.item.type === "multiselect" || row.item.type === "reorderable"
-      ? (row.currentValue as unknown[])
-      : undefined;
-
-  const reorderableValues =
-    row.item.type === "reorderable"
-      ? (row.currentValue as unknown[])
-      : undefined;
-
   for (let i = scrollStart; i < scrollEnd; i++) {
     const isSelected = i === selecting.selectedOptionIndex;
     if (row.item.type === "select") {
       const isCurrent =
-        JSON.stringify(opts[i]!.value) === JSON.stringify(row.currentValue);
+        JSON.stringify(displayOpts[i]!.value) ===
+        JSON.stringify(row.currentValue);
       const marker = isCurrent ? "●" : "○";
       const label = isSelected
-        ? theme.fg("text", `  ${marker} ${opts[i]!.label}`)
-        : `  ${marker} ${opts[i]!.label}`;
+        ? theme.fg("text", `  ${marker} ${displayOpts[i]!.label}`)
+        : `  ${marker} ${displayOpts[i]!.label}`;
       lines.push(
         isSelected ? theme.bg("selectedBg", pad(label, width)) : label,
       );
@@ -260,13 +281,13 @@ export function renderSelectPage(
       const isChecked =
         Array.isArray(selectedValues) &&
         selectedValues.some(
-          (v) => JSON.stringify(v) === JSON.stringify(opts[i]!.value),
+          (v) => JSON.stringify(v) === JSON.stringify(displayOpts[i]!.value),
         );
       const checkMarker = isChecked ? "\uDB80\uDD35" : "\uDB80\uDD31";
       const orderNum = (() => {
         if (!Array.isArray(reorderableValues)) return "";
         const idx = reorderableValues.findIndex(
-          (v) => JSON.stringify(v) === JSON.stringify(opts[i]!.value),
+          (v) => JSON.stringify(v) === JSON.stringify(displayOpts[i]!.value),
         );
         return idx >= 0 ? `${idx + 1}.` : "";
       })();
@@ -275,9 +296,9 @@ export function renderSelectPage(
       const label = isSelected
         ? theme.fg(
             "text",
-            `  ${checkMarker} ${numStr}${opts[i]!.label}${reorderGlyph}`,
+            `  ${checkMarker} ${numStr}${displayOpts[i]!.label}${reorderGlyph}`,
           )
-        : `  ${checkMarker} ${numStr}${opts[i]!.label}${reorderGlyph}`;
+        : `  ${checkMarker} ${numStr}${displayOpts[i]!.label}${reorderGlyph}`;
       lines.push(
         isSelected ? theme.bg("selectedBg", pad(label, width)) : label,
       );
@@ -285,20 +306,22 @@ export function renderSelectPage(
       const isChecked =
         Array.isArray(selectedValues) &&
         selectedValues.some(
-          (v) => JSON.stringify(v) === JSON.stringify(opts[i]!.value),
+          (v) => JSON.stringify(v) === JSON.stringify(displayOpts[i]!.value),
         );
       const marker = isChecked ? "\uDB80\uDD35" : "\uDB80\uDD31";
       const label = isSelected
-        ? theme.fg("text", `  ${marker} ${opts[i]!.label}`)
-        : `  ${marker} ${opts[i]!.label}`;
+        ? theme.fg("text", `  ${marker} ${displayOpts[i]!.label}`)
+        : `  ${marker} ${displayOpts[i]!.label}`;
       lines.push(
         isSelected ? theme.bg("selectedBg", pad(label, width)) : label,
       );
     }
   }
 
-  if (scrollEnd < opts.length) {
-    lines.push(theme.fg("dim", `  ↓ ${opts.length - scrollEnd} more below`));
+  if (scrollEnd < displayOpts.length) {
+    lines.push(
+      theme.fg("dim", `  ↓ ${displayOpts.length - scrollEnd} more below`),
+    );
   }
 
   return lines;

@@ -205,7 +205,27 @@ function createConfigComponent(
 
     if (ui.selecting) {
       const row = findRowById(rows, ui.selecting.rowId);
-      const opts = row ? getSelectOptions(row) : [];
+      const rawOpts = row ? getSelectOptions(row) : [];
+
+      let opts: typeof rawOpts;
+      if (row?.item.type === "reorderable") {
+        const vals = Array.isArray(row.currentValue)
+          ? (row.currentValue as unknown[])
+          : [];
+        const selectedSet = new Set(vals.map((v) => JSON.stringify(v)));
+        const optMap = new Map(
+          rawOpts.map((o) => [JSON.stringify(o.value), o]),
+        );
+        const selected = vals
+          .map((v) => optMap.get(JSON.stringify(v)))
+          .filter((o): o is (typeof rawOpts)[number] => o !== undefined);
+        const unselected = rawOpts.filter(
+          (o) => !selectedSet.has(JSON.stringify(o.value)),
+        );
+        opts = [...selected, ...unselected];
+      } else {
+        opts = rawOpts;
+      }
 
       if (matchesKey(data, Key.escape)) {
         ui.selecting = undefined;
@@ -286,6 +306,10 @@ function createConfigComponent(
           saveSetting(row, newVals);
           row.currentValue = newVals;
           row.isExplicit = true;
+          ui.selecting.selectedOptionIndex = Math.max(
+            0,
+            ui.selecting.selectedOptionIndex - 1,
+          );
         }
         requestRender();
         return;
@@ -306,6 +330,10 @@ function createConfigComponent(
           saveSetting(row, newVals);
           row.currentValue = newVals;
           row.isExplicit = true;
+          ui.selecting.selectedOptionIndex = Math.min(
+            opts.length - 1,
+            ui.selecting.selectedOptionIndex + 1,
+          );
         }
         requestRender();
         return;
