@@ -15,6 +15,8 @@ import {
   resetExtensionSettings,
   getSelectOptions,
   toggleMultiSelectValue,
+  toggleReorderableValue,
+  moveReorderableItem,
   stringifyValue,
 } from "./config-registry.ts";
 import {
@@ -122,7 +124,11 @@ function createConfigComponent(
   const enterSelectPage = (): void => {
     const row = selectedRow();
     if (!row) return;
-    if (row.item.type === "select" || row.item.type === "multiselect") {
+    if (
+      row.item.type === "select" ||
+      row.item.type === "multiselect" ||
+      row.item.type === "reorderable"
+    ) {
       const opts = getSelectOptions(row);
       let initialIndex = 0;
       if (row.item.type === "select") {
@@ -250,8 +256,53 @@ function createConfigComponent(
           row.currentValue = opt.value;
           row.isExplicit = true;
           ui.selecting = undefined;
-        } else {
+        } else if (row.item.type === "multiselect") {
           const newVals = toggleMultiSelectValue(row, opt.value);
+          saveSetting(row, newVals);
+          row.currentValue = newVals;
+          row.isExplicit = true;
+        } else if (row.item.type === "reorderable") {
+          const newVals = toggleReorderableValue(row, opt.value);
+          saveSetting(row, newVals);
+          row.currentValue = newVals;
+          row.isExplicit = true;
+        }
+        requestRender();
+        return;
+      }
+      if (
+        row?.item.type === "reorderable" &&
+        (matchesKey(data, "alt+up") || matchesKey(data, "ctrl+p"))
+      ) {
+        const vals = Array.isArray(row.currentValue)
+          ? [...row.currentValue]
+          : [];
+        const optVal = opts[ui.selecting.selectedOptionIndex]?.value;
+        const fromIdx = vals.findIndex(
+          (v) => JSON.stringify(v) === JSON.stringify(optVal),
+        );
+        if (fromIdx > 0) {
+          const newVals = moveReorderableItem(row, fromIdx, -1);
+          saveSetting(row, newVals);
+          row.currentValue = newVals;
+          row.isExplicit = true;
+        }
+        requestRender();
+        return;
+      }
+      if (
+        row?.item.type === "reorderable" &&
+        (matchesKey(data, "alt+down") || matchesKey(data, "ctrl+n"))
+      ) {
+        const vals = Array.isArray(row.currentValue)
+          ? [...row.currentValue]
+          : [];
+        const optVal = opts[ui.selecting.selectedOptionIndex]?.value;
+        const fromIdx = vals.findIndex(
+          (v) => JSON.stringify(v) === JSON.stringify(optVal),
+        );
+        if (fromIdx >= 0 && fromIdx < vals.length - 1) {
+          const newVals = moveReorderableItem(row, fromIdx, 1);
           saveSetting(row, newVals);
           row.currentValue = newVals;
           row.isExplicit = true;
@@ -365,7 +416,12 @@ function createConfigComponent(
         lines.push(...renderSelectPage(row, ui.selecting, safeWidth, theme));
         lines.push("");
         lines.push(divider(safeWidth, theme));
-        lines.push(...wrapLine(renderFooter(theme, "selecting"), safeWidth));
+        lines.push(
+          ...wrapLine(
+            renderFooter(theme, "selecting", row.item.type === "reorderable"),
+            safeWidth,
+          ),
+        );
       }
       return lines;
     }
