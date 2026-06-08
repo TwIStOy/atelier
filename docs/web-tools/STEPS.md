@@ -28,7 +28,9 @@
 
 - [ ] **Step 15:** subagent 工具白名单集成 — §8.3
 - [ ] **Step 16:** protect-secrets URL 检查 — §8.5
-- [ ] **Step 17:** Z.AI Provider 集成（可选） — §8.2
+- [ ] **Step 17:** Z.AI MCP Provider — §10.4
+- [ ] **Step 18:** 迁移 web_search_prime / web_read_prime — §10.4
+- [ ] **Step 19:** 清理遗留 — §10.4
 
 ---
 
@@ -445,15 +447,85 @@ globalToolDisplayRegistry.register("web_fetch", webFetchAdapter);
 
 ---
 
-### Step 17: Z.AI Provider 集成（可选）
+### Step 17: Z.AI MCP Provider
 
-将 Z.AI 的 web search/read 能力作为 web-tools 的 Provider 之一，通过 `mcpInit`/`mcpCall` 调用。
+**产出文件：**
 
-**目的：** 逐步替代 `web_search_prime` / `web_read_prime`，统一到 web-tools 的 Provider 体系。
+- `packages/web-tools/providers/zai.ts`
 
-**前置条件：** 需要评估与 `zai-coding-plan` 的依赖关系，确保不影响现有功能。
+**实现内容：**
 
-> **参考：** DESIGN.md §8.2 zai-coding-plan — 与现有 web search/read 的关系
+1. **`ZaiProvider`** 实现 `FullProvider` 接口（search + fetch）
+   - `search()` — 调用 `mcpInit` + `mcpCall`，MCP endpoint `web_search_prime/mcp`，tool `web_search_prime`
+   - `fetch()` — 调用 `mcpInit` + `mcpCall`，MCP endpoint `web_reader/mcp`，tool `webReader`
+   - 响应解析：Z.AI 返回的 `content[0].text` 可能被多层 JSON 编码，需最多 3 轮 `JSON.parse`
+   - `search()` 将 `WebSearchResult[]` 映射为标准 `SearchResult[]`（`link` → `url`，`content` → `snippet`）
+   - `fetch()` 返回标准 `FetchResponse`（`title`，`content` → `text`）
+
+2. **Provider 元数据注册**
+   - `ZAI_PROVIDER_META` — `name: "zai"`，`label: "Z.AI"`，`envVar: "ZAI_API_KEY"`，`roles: ["search", "fetch"]`
+   - 添加到 `PROVIDERS` 数组
+
+3. **工厂扩展**
+   - `createSearchProvider` 的 `switch` 加入 `"zai"` 分支 → `new ZaiProvider(apiKey)`
+
+4. **配置更新**
+   - `registerWebToolsConfigItems` 的 provider options 和 apiKeys 自动覆盖（已通过 `PROVIDERS` 数组驱动）
+
+> **参考：** DESIGN.md §10.1 Z.AI MCP Provider 设计
+>
+> **参考实现：** `packages/zai-coding-plan/search.ts`（`zaiWebSearch` / `zaiWebRead` 的 MCP 调用逻辑）
+
+---
+
+### Step 18: 迁移 `web_search_prime` / `web_read_prime` 到 web-tools
+
+**修改文件：**
+
+- `packages/zai-coding-plan/index.ts`
+- `packages/zai-coding-plan/search.ts`
+- `packages/web-tools/search/index.ts`
+- `packages/web-tools/fetch/index.ts`
+
+**实现内容：**
+
+1. **`zai-coding-plan/index.ts` 移除工具注册**
+   - 删除 `web_search_prime` / `web_read_prime` 的 `pi.registerTool()` 调用
+   - 删除 `session_start` 中将这两个工具加入 `setActiveTools` 的逻辑
+   - 保留 provider 注册、quota 命令、事件钩子等不变
+   - `search.ts` 中 `zaiWebSearch` / `zaiWebRead` 函数可以删除（逻辑已迁移到 `ZaiProvider`）
+
+2. **`web-tools` 统一入口**
+   - 当 active provider 为 `"zai"` 时，`web_search` 和 `web_fetch` 通过 `ZaiProvider` 走 MCP
+   - 工具名保持 `web_search` / `web_fetch`，不再注册 `web_search_prime` / `web_read_prime`
+
+3. **tool-display 适配器**
+   - `web_search_prime` / `web_read_prime` 适配器可保留（兼容过渡期），也可一并移除
+
+4. **验证**
+   - 设置 `ZAI_API_KEY` + `provider: "zai"`，确认 `web_search` / `web_fetch` 端到端工作
+   - 确认 `zai-coding-plan` 的 provider/quota 功能不受影响
+
+> **参考：** DESIGN.md §10.2 迁移策略
+
+---
+
+### Step 19: 清理遗留
+
+**修改文件：**
+
+- `packages/tool-display/registry.ts`
+- `packages/tool-display/adapters/web-search-prime.ts`
+- `packages/tool-display/adapters/web-read-prime.ts`
+- `packages/zai-coding-plan/search.ts`
+
+**实现内容：**
+
+1. 移除 `web_search_prime` / `web_read_prime` 的 tool-display 适配器及注册
+2. 删除 `packages/zai-coding-plan/search.ts`（如 Step 18 未清理）
+3. 最终验证全量 `tsc --build` 和 `npm test` 通过
+
+> **参考：** DESIGN.md §10.3 清理
 
 ---
 
@@ -477,4 +549,6 @@ globalToolDisplayRegistry.register("web_fetch", webFetchAdapter);
 | 14   | §4 URL 拦截器        | §4.1–4.3            |
 | 15   | §8.3 subagents       | —                   |
 | 16   | §8.5 protect-secrets | —                   |
-| 17   | §8.2 zai-coding-plan | —                   |
+| 17   | §10.1 Z.AI Provider   | §3.1、§3.3        |
+| 18   | §10.2 迁移策略        | §8.2               |
+| 19   | §10.3 清理            | —                  |

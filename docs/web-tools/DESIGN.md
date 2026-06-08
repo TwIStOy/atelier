@@ -546,6 +546,8 @@ Web-tools 需要：
 
 两者可以共存。长远来看，可以考虑让 web-tools 吸收 Z.AI 作为 Provider 之一，将 `web_search_prime` / `web_read_prime` 逐步迁移为 web-tools 的 Z.AI 后端。但这不阻塞初始实现。
 
+详见 §10.4 Z.AI MCP Provider 设计与迁移。
+
 ### 8.3 subagents — 子代理中的 web 访问
 
 `packages/subagents/` 管理子代理的工具白名单：
@@ -695,4 +697,101 @@ typebox                           # Schema 定义 + 校验
 
 **Phase 2 — 扩展 Provider** 8. 添加其余 Provider（Serper、Exa、Jina 等）9. GitHub URL 拦截器
 
-**Phase 3 — 生态集成** 10. subagent 工具白名单集成 11. protect-secrets URL 检查 12. 考虑将 Z.AI 后端纳入 Provider 体系，逐步替代 `web_search_prime`/`web_read_prime`
+**Phase 3 — 生态集成** 10. subagent 工具白名单集成 11. protect-secrets URL 检查 12. Z.AI MCP Provider + 迁移（详见 §10.4）
+
+### 10.4 Z.AI MCP Provider 设计与迁移
+
+#### 10.4.1 现状
+
+`packages/zai-coding-plan/` 直接注册了两个独立工具：
+
+- `web_search_prime` — 通过 `mcpInit` / `mcpCall` 调用 Z.AI `web_search_prime/mcp` endpoint
+- `web_read_prime` — 通过 `mcpInit` / `mcpCall` 调用 Z.AI `web_reader/mcp` endpoint
+
+这两个工具绕过了 web-tools 的 Provider 体系，各自管理 MCP session 生命周期，与 web-tools 的 `web_search` / `web_fetch` 是平行的独立工具。
+
+#### 10.4.2 Z.AI as FullProvider
+
+将 Z.AI 的 web search + web read 能力封装为 `ZaiProvider`，实现 `FullProvider` 接口：
+
+```typescript
+// packages/web-tools/providers/zai.ts
+
+class ZaiProvider implements FullProvider {
+  readonly name = "zai";
+  readonly label = "Z.AI";
+  readonly envVar = "ZAI_API_KEY";
+
+  constructor(private apiKey: string) {}
+
+  async search(query: string, maxResults: number, signal?: AbortSignal): Promise<SearchResponse> {
+    // 1. mcpInit → ZAI_SEARCH_MCP_URL
+    // 2. mcpCall → tool "web_search_prime", args { search_query: query }
+    // 3. 解析多层 JSON 编码的响应（最多 3 轮 JSON.parse）
+    // 4. WebSearchResult[] → SearchResult[]（link→url, content→snippet）
+    // 5. 截取 maxResults 条
+  }
+
+  async fetch(url: string, raw: boolean, signal?: AbortSignal): Promise<FetchResponse> {
+    // 1. mcpInit → ZAI_READER_MCP_URL
+    // 2. mcpCall → tool "webReader", args { url }
+    // 3. 解析多层 JSON 编码的响应
+    // 4. 提取 title + content → FetchResponse
+  }
+}
+```
+
+**关键实现细节：**
+
+- Z.AI MCP 响应的 `content[0].text` 可能被多层 JSON 编码（最多 3 层），需要循环 `JSON.parse` 直到得到非 string 对象或 parse 失败
+- `search()` 中 `WebSearchResult` 的字段映射：`link` → `url`，`content` → `snippet`，`refer` 丢弃
+- `fetch()` 中 `WebReadResult` 的字段映射：`content` → `text`，`title` 保留
+- 依赖 `@htwang-contrib/common` 的 `mcpInit` / `mcpCall`，不需要从 `zai-coding-plan` 重新导出
+- 每次 `search` / `fetch` 调用都创建新的 MCP session（与现有行为一致），不做 session 复用
+
+**Provider 元数据：**
+
+```typescript
+export const ZAI_PROVIDER_META: ProviderMeta = {
+  name: "zai",
+  label: "Z.AI",
+  envVar: "ZAI_API_KEY",
+  roles: ["search", "fetch"] as const,
+};
+```
+
+#### 10.4.3 迁移策略
+
+迁移分三步，每步可独立验证：
+
+**Step 17 — 新增 Z.AI Provider（增量）**
+
+- 新建 `packages/web-tools/providers/zai.ts`
+- 在 `PROVIDERS` 数组加入 `ZAI_PROVIDER_META`
+- 在 `createSearchProvider` 工厂加入 `"zai"` 分支
+- 不影响任何现有功能——`zai-coding-plan` 的 `web_search_prime` / `web_read_prime` 继续工作
+
+**Step 18 — 迁移工具注册（替换）**
+
+- `zai-coding-plan/index.ts`：移除 `web_search_prime` / `web_read_prime` 的 `registerTool` 调用和 `setActiveTools` 逻辑
+- `zai-coding-plan/search.ts`：删除 `zaiWebSearch` / `zaiWebRead` 函数（逻辑已迁移到 `ZaiProvider`）
+- 此后 Z.AI 的 web 能力完全通过 web-tools 的 `web_search` / `web_fetch` + `provider: "zai"` 配置提供
+- `zai-coding-plan` 包的其他功能（provider 注册、quota 命令、事件钩子）不受影响
+
+**Step 19 — 清理遗留（删除）**
+
+- 移除 `tool-display` 中 `web_search_prime` / `web_read_prime` 的适配器和注册
+- 删除 `packages/zai-coding-plan/search.ts`
+- 全量 `tsc --build` + `npm test` 验证
+
+#### 10.4.4 迁移前后对比
+
+| 方面         | 迁移前                                 | 迁移后                                           |
+| ------------ | -------------------------------------- | ------------------------------------------------ |
+| 工具名       | `web_search_prime` / `web_read_prime` | `web_search` / `web_fetch`                       |
+| 代码位置     | `zai-coding-plan/search.ts`           | `web-tools/providers/zai.ts`                     |
+| 调用方式     | 独立 `registerTool` + `setActiveTools`| 统一 Provider 体系 + `instantiateActiveProvider` |
+| MCP 逻辑     | `zaiWebSearch` / `zaiWebRead` 独立函数 | `ZaiProvider.search()` / `.fetch()` 方法          |
+| 配置         | 无（依赖 `ZAI_API_KEY` env）          | `/config` TUI + env var 优先级                    |
+| 渲染         | `web-search-prime` / `web-read-prime` 适配器 | `web-search` / `web-fetch` 适配器         |
+| 与其他 Provider | 独立，不可切换                       | 统一，可通过 `/config` 一键切换                   |
