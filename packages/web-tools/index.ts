@@ -19,10 +19,18 @@ export {
   JINA_PROVIDER_META,
   FIRECRAWL_PROVIDER_META,
   PERPLEXITY_PROVIDER_META,
+  ZAI_PROVIDER_META,
 } from "./providers/index.ts";
 
 export { BraveProvider } from "./providers/brave.ts";
 export { TavilyProvider } from "./providers/tavily.ts";
+export { SerperProvider } from "./providers/serper.ts";
+export { PerplexityProvider } from "./providers/perplexity.ts";
+export { ExaProvider } from "./providers/exa.ts";
+export { YouComProvider } from "./providers/youcom.ts";
+export { JinaProvider } from "./providers/jina.ts";
+export { FirecrawlProvider } from "./providers/firecrawl.ts";
+export { ZaiProvider } from "./providers/zai.ts";
 export {
   createSearchProvider,
   type ProviderCredentials,

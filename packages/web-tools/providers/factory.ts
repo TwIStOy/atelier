@@ -1,5 +1,12 @@
 import { BraveProvider } from "./brave.ts";
 import { TavilyProvider } from "./tavily.ts";
+import { SerperProvider } from "./serper.ts";
+import { PerplexityProvider } from "./perplexity.ts";
+import { ExaProvider } from "./exa.ts";
+import { YouComProvider } from "./youcom.ts";
+import { JinaProvider } from "./jina.ts";
+import { FirecrawlProvider } from "./firecrawl.ts";
+import { ZaiProvider } from "./zai.ts";
 import type { FullProvider, SearchProvider } from "./types.ts";
 
 export interface ProviderCredentials {
@@ -16,6 +23,20 @@ export function createSearchProvider(
       return new BraveProvider(apiKey);
     case "tavily":
       return new TavilyProvider(apiKey);
+    case "serper":
+      return new SerperProvider(apiKey);
+    case "perplexity":
+      return new PerplexityProvider(apiKey);
+    case "exa":
+      return new ExaProvider(apiKey);
+    case "youcom":
+      return new YouComProvider(apiKey);
+    case "jina":
+      return new JinaProvider(apiKey);
+    case "firecrawl":
+      return new FirecrawlProvider(apiKey);
+    case "zai":
+      return new ZaiProvider(apiKey);
     default:
       throw new Error(`Unknown search provider: "${name}"`);
   }

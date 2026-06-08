@@ -2,6 +2,13 @@ import type { ProviderMeta } from "./types.ts";
 
 export { BraveProvider } from "./brave.ts";
 export { TavilyProvider } from "./tavily.ts";
+export { SerperProvider } from "./serper.ts";
+export { PerplexityProvider } from "./perplexity.ts";
+export { ExaProvider } from "./exa.ts";
+export { YouComProvider } from "./youcom.ts";
+export { JinaProvider } from "./jina.ts";
+export { FirecrawlProvider } from "./firecrawl.ts";
+export { ZaiProvider } from "./zai.ts";
 export { type ProviderCredentials, createSearchProvider } from "./factory.ts";
 export {
   htmlToText,
@@ -78,6 +85,14 @@ export const PERPLEXITY_PROVIDER_META: ProviderMeta = {
   roles: ["search"] as const,
 };
 
+export const ZAI_API_KEY_ENV_VAR = "ZAI_API_KEY";
+export const ZAI_PROVIDER_META: ProviderMeta = {
+  name: "zai",
+  label: "Z.AI",
+  envVar: ZAI_API_KEY_ENV_VAR,
+  roles: ["search", "fetch"] as const,
+};
+
 export const PROVIDERS: readonly ProviderMeta[] = [
   BRAVE_PROVIDER_META,
   TAVILY_PROVIDER_META,
@@ -87,4 +102,5 @@ export const PROVIDERS: readonly ProviderMeta[] = [
   JINA_PROVIDER_META,
   FIRECRAWL_PROVIDER_META,
   PERPLEXITY_PROVIDER_META,
+  ZAI_PROVIDER_META,
 ];
