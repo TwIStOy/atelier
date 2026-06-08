@@ -4,6 +4,7 @@ import type {
   SearchResponse,
   SearchResult,
 } from "./types.ts";
+import { throwIfApiError } from "./errors.ts";
 
 const JINA_SEARCH_API_URL = "https://s.jina.ai/";
 const JINA_READER_API_URL = "https://r.jina.ai/";
@@ -63,10 +64,7 @@ export class JinaProvider implements FullProvider {
     });
 
     if (!res.ok) {
-      const text = await res.text();
-      throw new Error(
-        `${this.label} Search API error (${res.status}): ${text}`,
-      );
+      throwIfApiError(this.name, this.label, res.status, await res.text());
     }
 
     const raw = (await res.json()) as JinaSearchResponse;
@@ -95,8 +93,7 @@ export class JinaProvider implements FullProvider {
     });
 
     if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`${this.label} Fetch API error (${res.status}): ${text}`);
+      throwIfApiError(this.name, this.label, res.status, await res.text());
     }
 
     const text = await res.text();

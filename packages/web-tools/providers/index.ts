@@ -9,6 +9,7 @@ export { YouComProvider } from "./youcom.ts";
 export { JinaProvider } from "./jina.ts";
 export { FirecrawlProvider } from "./firecrawl.ts";
 export { ZaiProvider } from "./zai.ts";
+export { ProviderError, throwIfApiError } from "./errors.ts";
 export { type ProviderCredentials, createSearchProvider } from "./factory.ts";
 export {
   htmlToText,

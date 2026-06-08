@@ -4,6 +4,7 @@ import type {
   SearchResponse,
   SearchResult,
 } from "./types.ts";
+import { throwIfApiError } from "./errors.ts";
 
 const YOUCOM_SEARCH_URL = "https://ydc-index.io/v1/search";
 const YOUCOM_CONTENTS_URL = "https://ydc-index.io/v1/contents";
@@ -62,10 +63,7 @@ export class YouComProvider implements FullProvider {
     });
 
     if (!res.ok) {
-      const text = await res.text();
-      throw new Error(
-        `${this.label} Search API error (${res.status}): ${text}`,
-      );
+      throwIfApiError(this.name, this.label, res.status, await res.text());
     }
 
     const raw = (await res.json()) as YouComSearchResponse;
@@ -97,8 +95,7 @@ export class YouComProvider implements FullProvider {
     });
 
     if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`${this.label} Fetch API error (${res.status}): ${text}`);
+      throwIfApiError(this.name, this.label, res.status, await res.text());
     }
 
     const raw = (await res.json()) as YouComContentsResponseItem[];

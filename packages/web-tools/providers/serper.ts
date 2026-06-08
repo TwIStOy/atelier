@@ -1,4 +1,5 @@
 import type { SearchProvider, SearchResponse, SearchResult } from "./types.ts";
+import { throwIfApiError } from "./errors.ts";
 
 const SERPER_API_URL = "https://google.serper.dev/search";
 
@@ -53,9 +54,7 @@ export class SerperProvider implements SearchProvider {
 
     if (!res.ok) {
       const text = await res.text();
-      throw new Error(
-        `${this.label} Search API error (${res.status}): ${text}`,
-      );
+      throwIfApiError(this.name, this.label, res.status, text);
     }
 
     const raw = (await res.json()) as SerperRawResponse;

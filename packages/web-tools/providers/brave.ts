@@ -1,4 +1,5 @@
 import type { SearchProvider, SearchResponse, SearchResult } from "./types.ts";
+import { throwIfApiError } from "./errors.ts";
 
 const BRAVE_SEARCH_API_URL = "https://api.search.brave.com/res/v1/web/search";
 
@@ -50,9 +51,7 @@ export class BraveProvider implements SearchProvider {
 
     if (!res.ok) {
       const text = await res.text();
-      throw new Error(
-        `${this.label} Search API error (${res.status}): ${text}`,
-      );
+      throwIfApiError(this.name, this.label, res.status, text);
     }
 
     const raw = (await res.json()) as BraveRawResponse;

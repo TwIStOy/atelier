@@ -4,6 +4,7 @@ import type {
   SearchResponse,
   SearchResult,
 } from "./types.ts";
+import { throwIfApiError } from "./errors.ts";
 
 const EXA_API_URL = "https://api.exa.ai/search";
 const EXA_CONTENTS_API_URL = "https://api.exa.ai/contents";
@@ -62,10 +63,7 @@ export class ExaProvider implements FullProvider {
     });
 
     if (!res.ok) {
-      const text = await res.text();
-      throw new Error(
-        `${this.label} Search API error (${res.status}): ${text}`,
-      );
+      throwIfApiError(this.name, this.label, res.status, await res.text());
     }
 
     const raw = (await res.json()) as ExaRawResponse;
@@ -97,8 +95,7 @@ export class ExaProvider implements FullProvider {
     });
 
     if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`${this.label} Fetch API error (${res.status}): ${text}`);
+      throwIfApiError(this.name, this.label, res.status, await res.text());
     }
 
     const data = (await res.json()) as ExaRawResponse;
