@@ -3,6 +3,7 @@ import type { Theme } from "@earendil-works/pi-coding-agent";
 export function renderFooter(
   theme: Theme,
   mode: "browse" | "editing" | "selecting",
+  isReorderable?: boolean,
 ): string {
   const k = (s: string) => theme.fg("warning", s);
   const d = (s: string) => theme.fg("dim", s);
@@ -28,14 +29,12 @@ export function renderFooter(
   }
 
   if (mode === "selecting") {
-    return [
-      k("↑↓"),
-      d("navigate"),
-      k("enter"),
-      d("select"),
-      k("esc"),
-      d("back"),
-    ].join(sep);
+    const base = [k("↑↓"), d("navigate"), k("enter"), d("select")];
+    if (isReorderable) {
+      base.push(k("alt+↑↓"), d("reorder"));
+    }
+    base.push(k("esc"), d("back"));
+    return base.join(sep);
   }
 
   return [

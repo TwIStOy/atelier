@@ -3,6 +3,7 @@ import type {
   ConfigItemRegistry,
   ConfigItemSelectOption,
   MultiSelectConfigItem,
+  ReorderableConfigItem,
   SelectConfigItem,
 } from "@htwang-contrib/common";
 import {
@@ -128,6 +129,9 @@ export function getSelectOptions(row: SettingRow) {
   if (row.item.type === "multiselect") {
     return resolveOptions((row.item as MultiSelectConfigItem).options);
   }
+  if (row.item.type === "reorderable") {
+    return resolveOptions((row.item as ReorderableConfigItem).options);
+  }
   return [];
 }
 
@@ -145,6 +149,37 @@ export function toggleMultiSelectValue(
   } else {
     vals.push(optionValue);
   }
+  return vals;
+}
+
+export function toggleReorderableValue(
+  row: SettingRow,
+  optionValue: unknown,
+): unknown[] {
+  const current = row.currentValue;
+  const vals = Array.isArray(current) ? [...current] : [];
+  const idx = vals.findIndex(
+    (v) => JSON.stringify(v) === JSON.stringify(optionValue),
+  );
+  if (idx >= 0) {
+    vals.splice(idx, 1);
+  } else {
+    vals.push(optionValue);
+  }
+  return vals;
+}
+
+export function moveReorderableItem(
+  row: SettingRow,
+  fromIndex: number,
+  direction: -1 | 1,
+): unknown[] {
+  const current = row.currentValue;
+  const vals = Array.isArray(current) ? [...current] : [];
+  const toIndex = fromIndex + direction;
+  if (toIndex < 0 || toIndex >= vals.length) return vals;
+  const [removed] = vals.splice(fromIndex, 1);
+  vals.splice(toIndex, 0, removed!);
   return vals;
 }
 

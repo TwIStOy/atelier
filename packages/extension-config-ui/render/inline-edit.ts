@@ -193,7 +193,8 @@ export function parseSettingInput(
       );
     }
     case "multiselect":
-      throw new Error("Use the option picker for multi-select settings");
+    case "reorderable":
+      throw new Error("Use the option picker for this setting");
     case "color": {
       const trimmed = input.trim();
       if (trimmed && !/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(trimmed))

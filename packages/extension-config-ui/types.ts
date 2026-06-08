@@ -40,6 +40,7 @@ export interface SelectingState {
   rowId: string;
   selectedOptionIndex: number;
   scroll: number;
+  reordering?: boolean;
 }
 
 export interface TabDef {

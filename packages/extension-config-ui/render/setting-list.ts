@@ -2,6 +2,7 @@ import type { Theme } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import type {
   ConfigItem,
+  ReorderableConfigItem,
   SelectConfigItem,
   MultiSelectConfigItem,
 } from "@htwang-contrib/common";
@@ -69,6 +70,24 @@ export function formatSettingValue(
         })
         .join(", ");
       return truncateToWidth(labels, 40, "…");
+    }
+    case "reorderable": {
+      const roItem = item as ReorderableConfigItem;
+      const opts =
+        typeof roItem.options === "function"
+          ? roItem.options()
+          : roItem.options;
+      const vals = value as unknown[];
+      if (!Array.isArray(vals) || vals.length === 0) return "(none)";
+      const labels = vals
+        .map((v, i) => {
+          const opt = opts.find(
+            (o) => JSON.stringify(o.value) === JSON.stringify(v),
+          );
+          return `${i + 1}. ${opt?.label ?? String(v)}`;
+        })
+        .join(", ");
+      return truncateToWidth(labels, 50, "…");
     }
     case "color": {
       const block = colorBlock ?? "██";
@@ -202,7 +221,9 @@ export function renderSelectPage(
       ? (row.item as SelectConfigItem).options
       : row.item.type === "multiselect"
         ? (row.item as MultiSelectConfigItem).options
-        : [];
+        : row.item.type === "reorderable"
+          ? (row.item as ReorderableConfigItem).options
+          : [];
   const opts = typeof rawOpts === "function" ? rawOpts() : rawOpts;
 
   const pageSize = SELECT_PAGE_SIZE;
@@ -214,7 +235,12 @@ export function renderSelectPage(
   }
 
   const selectedValues =
-    row.item.type === "multiselect"
+    row.item.type === "multiselect" || row.item.type === "reorderable"
+      ? (row.currentValue as unknown[])
+      : undefined;
+
+  const reorderableValues =
+    row.item.type === "reorderable"
       ? (row.currentValue as unknown[])
       : undefined;
 
@@ -227,6 +253,31 @@ export function renderSelectPage(
       const label = isSelected
         ? theme.fg("text", `  ${marker} ${opts[i]!.label}`)
         : `  ${marker} ${opts[i]!.label}`;
+      lines.push(
+        isSelected ? theme.bg("selectedBg", pad(label, width)) : label,
+      );
+    } else if (row.item.type === "reorderable") {
+      const isChecked =
+        Array.isArray(selectedValues) &&
+        selectedValues.some(
+          (v) => JSON.stringify(v) === JSON.stringify(opts[i]!.value),
+        );
+      const checkMarker = isChecked ? "\uDB80\uDD35" : "\uDB80\uDD31";
+      const orderNum = (() => {
+        if (!Array.isArray(reorderableValues)) return "";
+        const idx = reorderableValues.findIndex(
+          (v) => JSON.stringify(v) === JSON.stringify(opts[i]!.value),
+        );
+        return idx >= 0 ? `${idx + 1}.` : "";
+      })();
+      const numStr = orderNum ? `${orderNum.padStart(3)} ` : "    ";
+      const reorderGlyph = isSelected && isChecked ? " ↕" : "  ";
+      const label = isSelected
+        ? theme.fg(
+            "text",
+            `  ${checkMarker} ${numStr}${opts[i]!.label}${reorderGlyph}`,
+          )
+        : `  ${checkMarker} ${numStr}${opts[i]!.label}${reorderGlyph}`;
       lines.push(
         isSelected ? theme.bg("selectedBg", pad(label, width)) : label,
       );
