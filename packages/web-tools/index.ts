@@ -47,5 +47,15 @@ export {
   type WebToolsConfig,
 } from "./config.ts";
 
-export { registerWebSearchTool } from "./search/index.ts";
-export { registerWebFetchTool } from "./fetch/index.ts";
+import { registerWebToolsConfigItems } from "./config.ts";
+import { registerWebSearchTool } from "./search/index.ts";
+import { registerWebFetchTool } from "./fetch/index.ts";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+
+export { registerWebSearchTool, registerWebFetchTool };
+
+export default function (pi: ExtensionAPI): void {
+  registerWebToolsConfigItems();
+  registerWebSearchTool(pi);
+  registerWebFetchTool(pi);
+}
