@@ -1,4 +1,5 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
+import { truncateToWidth } from "@earendil-works/pi-tui";
 import type { ToolDisplayAdapter } from "../types.ts";
 import { formatExpandedToolOutputLines } from "./shared.ts";
 
@@ -46,14 +47,15 @@ export const webFetchAdapter: ToolDisplayAdapter<WebFetchArgs> = {
     isPartial?: boolean,
     _spinAt?: number,
   ) {
-    if (isPartial) return [theme.fg("muted", "└ fetching…")];
+    if (isPartial)
+      return [theme.fg("muted", truncateToWidth("└ fetching…", _width))];
     const title = titleFromDetails(details);
     const truncated = isTruncated(details);
     const parts: string[] = ["└"];
     if (title) parts.push(title);
     if (truncated) parts.push("(truncated)");
     if (parts.length === 1) return [];
-    return [theme.fg("muted", parts.join(" "))];
+    return [theme.fg("muted", truncateToWidth(parts.join(" "), _width))];
   },
 
   formatExpandedContent(_args, output, theme, width, _details?: unknown) {
