@@ -32,7 +32,8 @@
       "skills/design-an-interface",
       "skills/obsidian-bases",
       "skills/obsidian-markdown",
-      "skills/todoist"
+      "skills/todoist",
+      "skills/write-a-skill"
     ],
     "themes": [
       "themes/catppuccin-mocha.json"

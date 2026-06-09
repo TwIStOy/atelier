@@ -27,12 +27,15 @@ description: Create new agent skills with proper structure, progressive disclosu
 
 ```
 skill-name/
-├── SKILL.md           # Main instructions (required)
-├── REFERENCE.md       # Detailed docs (if needed)
-├── EXAMPLES.md        # Usage examples (if needed)
-└── scripts/           # Utility scripts (if needed)
+├── SKILL.md              # Main instructions (required)
+├── references/           # Split reference docs (if needed)
+│   ├── TOPIC_A.md        # Each file covers one topic
+│   └── TOPIC_B.md
+└── scripts/              # Utility scripts (if needed)
     └── helper.js
 ```
+
+Prefer a `references/` folder with multiple focused files over a single monolithic file. Each reference file should cover one distinct topic (e.g. `CALLOUTS.md`, `EMBEDS.md`, `PROPERTIES.md`). This keeps individual files scannable and lets the agent load only what's relevant.
 
 ## SKILL.md Template
 
@@ -54,7 +57,7 @@ description: Brief description of capability. Use when [specific triggers].
 
 ## Advanced features
 
-[Link to separate files: See [REFERENCE.md](REFERENCE.md)]
+[Link to split references: See [Topic A](references/TOPIC_A.md), [Topic B](references/TOPIC_B.md)]
 ```
 
 ## Description Requirements
@@ -97,13 +100,20 @@ Add utility scripts when:
 
 Scripts save tokens and improve reliability vs generated code.
 
-## When to Split Files
+## When to Split into References
 
-Split into separate files when:
+Create `references/` with split files when:
 
 - SKILL.md exceeds 100 lines
-- Content has distinct domains (finance vs sales schemas)
+- Content has distinct domains (e.g. `CALLOUTS.md` vs `EMBEDS.md`)
 - Advanced features are rarely needed
+- A single reference file would exceed 200 lines
+
+Each file in `references/` should:
+
+- Cover **one** topic or domain
+- Be self-contained (readable without loading other reference files)
+- Have a descriptive, ALL_CAPS file name matching its topic
 
 ## Review Checklist
 
