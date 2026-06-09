@@ -73,7 +73,11 @@ export function registerWebToolsConfigItems(): void {
         "Ordered provider chain. On rate limit, falls through to the next provider.",
       extensionLabel: "Web Tools",
       order: 0,
-      options: PROVIDERS.map((p) => ({ label: p.label, value: p.name })),
+      options: () =>
+        PROVIDERS.map((p) => ({
+          label: resolveApiKey(p.name) ? `${p.label} ✓` : `${p.label} ✗`,
+          value: p.name,
+        })),
     },
     ...PROVIDERS.map((p, i) => ({
       key: `apiKeys.${p.name}`,
