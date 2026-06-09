@@ -111,7 +111,7 @@ function countChanges(edits: Array<{ oldText: string; newText: string }>): {
   let added = 0;
   let removed = 0;
   for (const edit of edits) {
-    const changes = diffLines(edit.oldText, edit.newText, {
+    const changes = diffLines(edit.oldText ?? "", edit.newText ?? "", {
       newlineIsToken: true,
     });
     for (const change of changes) {
@@ -160,7 +160,9 @@ function generateUnifiedDiff(
   oldText: string,
   newText: string,
 ): string {
-  const changes = diffLines(oldText, newText, { newlineIsToken: true });
+  const changes = diffLines(oldText ?? "", newText ?? "", {
+    newlineIsToken: true,
+  });
 
   let oldLine = 1;
   let newLine = 1;
