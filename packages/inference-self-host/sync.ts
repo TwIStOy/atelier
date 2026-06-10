@@ -31,7 +31,7 @@ type ModelSource = {
   provider: string;
   modelId: string;
   fallbacks?: { provider: string; modelId: string }[];
-  compatFamily?: "zai" | "deepseek" | "moonshot" | "qwen";
+  compatFamily?: "zai" | "deepseek" | "moonshot" | "qwen" | "anthropic";
 };
 
 const MODELS_DEV_URL = "https://models.dev/api.json";
@@ -113,6 +113,60 @@ const MODEL_SOURCES: Record<string, ModelSource> = {
     compatFamily: "zai",
   },
   "glm-4.6": { provider: "zhipuai", modelId: "glm-4.6", compatFamily: "zai" },
+  "gpt-5.5": {
+    provider: "openai",
+    modelId: "gpt-5.5",
+    fallbacks: [
+      { provider: "azure", modelId: "gpt-5.5" },
+      { provider: "github-copilot", modelId: "gpt-5.5" },
+    ],
+  },
+  "gpt-image-2": {
+    provider: "openai",
+    modelId: "gpt-image-2",
+  },
+  "gpt-5.4-mini": {
+    provider: "openai",
+    modelId: "gpt-5.4-mini",
+    fallbacks: [
+      { provider: "azure", modelId: "gpt-5.4-mini" },
+      { provider: "github-copilot", modelId: "gpt-5.4-mini" },
+    ],
+  },
+  "claude-haiku-4-5-20251001": {
+    provider: "anthropic",
+    modelId: "claude-haiku-4-5-20251001",
+    fallbacks: [
+      {
+        provider: "amazon-bedrock",
+        modelId: "anthropic.claude-haiku-4-5-20251001-v1:0",
+      },
+    ],
+    compatFamily: "anthropic",
+  },
+  "claude-fable-5": {
+    provider: "anthropic",
+    modelId: "claude-fable-5",
+    compatFamily: "anthropic",
+  },
+  "claude-sonnet-4-6": {
+    provider: "anthropic",
+    modelId: "claude-sonnet-4-6",
+    fallbacks: [
+      { provider: "amazon-bedrock", modelId: "anthropic.claude-sonnet-4-6" },
+    ],
+    compatFamily: "anthropic",
+  },
+  "claude-opus-4-7": {
+    provider: "anthropic",
+    modelId: "claude-opus-4-7",
+    compatFamily: "anthropic",
+  },
+  "claude-opus-4-8": {
+    provider: "anthropic",
+    modelId: "claude-opus-4-8",
+    compatFamily: "anthropic",
+  },
 };
 
 type ProviderModelConfig = {
@@ -128,7 +182,7 @@ type ProviderModelConfig = {
   };
   contextWindow: number;
   maxTokens: number;
-  compatFamily?: "zai" | "deepseek" | "moonshot" | "qwen";
+  compatFamily?: "zai" | "deepseek" | "moonshot" | "qwen" | "anthropic";
 };
 
 function toModelConfig(
