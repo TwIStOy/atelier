@@ -53,6 +53,7 @@ import type { ExtensionAPI, Theme } from "@earendil-works/pi-coding-agent";
 import { ToolExecutionComponent } from "@earendil-works/pi-coding-agent";
 import { globalToolDisplayRegistry } from "./registry.ts";
 import { renderToolCall } from "./tool-call-display.ts";
+import type { ToolDisplayAdapter } from "./types.ts";
 import { registerToolDisplayConfigItems } from "./config.ts";
 
 type ToolExecutionPatchThis = {
@@ -153,6 +154,16 @@ export default function (pi: ExtensionAPI) {
   registerToolDisplayConfigItems();
 
   patchToolExecutionRender(() => activeTheme, globalToolDisplayRegistry);
+
+  pi.events.on("tool-display:register", (data) => {
+    const { toolName, adapter } = data as {
+      toolName: string;
+      adapter: ToolDisplayAdapter;
+    };
+    globalToolDisplayRegistry.register(toolName, adapter);
+  });
+
+  pi.events.emit("tool-display:ready", undefined);
 
   pi.on("session_start", (_event, ctx) => {
     if (ctx.ui?.theme) {
