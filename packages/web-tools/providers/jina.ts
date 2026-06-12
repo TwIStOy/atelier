@@ -64,7 +64,7 @@ export class JinaProvider implements FullProvider {
     });
 
     if (!res.ok) {
-      throwIfApiError(this.name, this.label, res.status, await res.text());
+      throwIfApiError(this.name, res.status, await res.text());
     }
 
     const raw = (await res.json()) as JinaSearchResponse;
@@ -93,7 +93,7 @@ export class JinaProvider implements FullProvider {
     });
 
     if (!res.ok) {
-      throwIfApiError(this.name, this.label, res.status, await res.text());
+      throwIfApiError(this.name, res.status, await res.text());
     }
 
     const text = await res.text();

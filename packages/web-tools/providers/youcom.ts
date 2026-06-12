@@ -63,7 +63,7 @@ export class YouComProvider implements FullProvider {
     });
 
     if (!res.ok) {
-      throwIfApiError(this.name, this.label, res.status, await res.text());
+      throwIfApiError(this.name, res.status, await res.text());
     }
 
     const raw = (await res.json()) as YouComSearchResponse;
@@ -95,7 +95,7 @@ export class YouComProvider implements FullProvider {
     });
 
     if (!res.ok) {
-      throwIfApiError(this.name, this.label, res.status, await res.text());
+      throwIfApiError(this.name, res.status, await res.text());
     }
 
     const raw = (await res.json()) as YouComContentsResponseItem[];

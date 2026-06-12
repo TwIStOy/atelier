@@ -21,7 +21,6 @@ const RATE_LIMIT_CODES = new Set([429, 402, 432, 433]);
 
 export function throwIfApiError(
   providerName: string,
-  label: string,
   status: number,
   body: string,
 ): void {

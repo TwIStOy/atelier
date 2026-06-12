@@ -51,7 +51,7 @@ export class BraveProvider implements SearchProvider {
 
     if (!res.ok) {
       const text = await res.text();
-      throwIfApiError(this.name, this.label, res.status, text);
+      throwIfApiError(this.name, res.status, text);
     }
 
     const raw = (await res.json()) as BraveRawResponse;

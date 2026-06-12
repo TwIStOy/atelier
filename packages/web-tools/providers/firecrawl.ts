@@ -74,7 +74,7 @@ export class FirecrawlProvider implements FullProvider {
     });
 
     if (!res.ok) {
-      throwIfApiError(this.name, this.label, res.status, await res.text());
+      throwIfApiError(this.name, res.status, await res.text());
     }
 
     const raw = (await res.json()) as FirecrawlSearchResponse;
@@ -103,7 +103,7 @@ export class FirecrawlProvider implements FullProvider {
     });
 
     if (!res.ok) {
-      throwIfApiError(this.name, this.label, res.status, await res.text());
+      throwIfApiError(this.name, res.status, await res.text());
     }
 
     const raw = (await res.json()) as FirecrawlScrapeResponse;
