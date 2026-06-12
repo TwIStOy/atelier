@@ -5,6 +5,10 @@ import type {
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import { Type } from "@sinclair/typebox";
 import { isStaleCtxError } from "@htwang-contrib/common";
+import {
+  registerGoalConfigItems,
+  setCachedModelOptions,
+} from "./goal/config.ts";
 import { parseGoalCommand } from "./goal/command.ts";
 import {
   createGoal,
@@ -26,6 +30,7 @@ import {
   buildContinuationPrompt,
   buildBudgetLimitedPrompt,
 } from "./goal/prompt.ts";
+import { verifyGoalCompletion } from "./goal/verify.ts";
 import type { Goal, TokenUsageSnapshot } from "./goal/types.ts";
 import {
   GOAL_WIDGET_KEY,
@@ -134,7 +139,19 @@ export default function initGoal(pi: ExtensionAPI): void {
     stopAccounting();
   }
 
+  registerGoalConfigItems();
+
   // --- Events ---
+
+  pi.on("session_start", (_event, ctx) => {
+    const models = ctx.modelRegistry.getAvailable();
+    setCachedModelOptions(
+      models.map((m) => ({
+        label: `${m.provider}/${m.id}`,
+        value: `${m.provider}/${m.id}`,
+      })),
+    );
+  });
 
   pi.on("session_start", async (event, ctx) => {
     widgetCtx = ctx;
@@ -428,14 +445,54 @@ export default function initGoal(pi: ExtensionAPI): void {
     name: "update_goal",
     label: "Update Goal",
     description:
-      "Update the current goal. Currently only supports marking the goal as complete. Before marking complete, verify ALL of the following: (1) the objective has been fully addressed, (2) all code changes compile/pass tests, (3) no remaining edge cases or errors. Do NOT mark complete if any work remains.",
+      "Mark the current goal as complete. Before the goal is actually marked complete, an independent verification agent is launched in a fresh session to confirm the objective is fully satisfied (it runs the project build/tests and inspects the repo). If verification fails, the goal stays active and you must keep working. Only call this when you believe the objective is genuinely done.",
     parameters: Type.Object({
       status: Type.Literal("complete", {
         description: 'Mark the goal as complete. Must be "complete".',
       }),
     }),
-    async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+    async execute(_toolCallId, params, signal, _onUpdate, ctx) {
       const ref = getStoreRef(ctx);
+      const existing = readGoal(ref);
+      if (!existing) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: "No goal found for this session. Create one first with create_goal.",
+            },
+          ],
+          details: { error: "goal_not_found" },
+        };
+      }
+
+      const verification = await verifyGoalCompletion(ctx, existing, signal);
+      if ("error" in verification) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Goal completion verification could not run: ${verification.message}. The goal was NOT marked complete — try again or continue working.`,
+            },
+          ],
+          details: { error: "verification_failed" },
+        };
+      }
+      if (!verification.complete) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Independent verification REJECTED completion. The objective is not fully satisfied yet — do NOT mark it complete. Keep working until every part is done.
+
+Verifier findings:
+${verification.reasoning}`,
+            },
+          ],
+          details: { error: "verification_rejected" },
+        };
+      }
+
       try {
         const goal = updateGoal(ref, { status: params.status });
         completedThisTurnGoalId = goal.id;
@@ -445,7 +502,7 @@ export default function initGoal(pi: ExtensionAPI): void {
           content: [
             {
               type: "text",
-              text: `Goal completed:\n${formatGoalForTool(goal)}`,
+              text: `Goal verified and completed:\n${formatGoalForTool(goal)}\n\nVerifier summary:\n${verification.reasoning}`,
             },
           ],
           details: formatGoalToolResponse(goal),
