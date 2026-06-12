@@ -76,7 +76,6 @@ function extractAssistantUsage(messages: unknown[]): TokenUsageSnapshot {
 export default function initGoal(pi: ExtensionAPI): void {
   let agentTurnInProgress = false;
   let goalAccounting: GoalAccounting | null = null;
-  let completedThisTurnGoalId: string | null = null;
   let currentGoalForWidget: Goal | null = null;
   let widgetCtx: ExtensionContext | null = null;
 
@@ -199,7 +198,6 @@ export default function initGoal(pi: ExtensionAPI): void {
 
   pi.on("agent_start", (_event, ctx) => {
     agentTurnInProgress = true;
-    completedThisTurnGoalId = null;
 
     try {
       const ref = getStoreRef(ctx);
@@ -222,11 +220,6 @@ export default function initGoal(pi: ExtensionAPI): void {
       try {
         const ref = getStoreRef(ctx);
         const goal = accountGoalUsage(ref, usage, elapsedSeconds, "agentEnd");
-
-        // Track if goal was completed by the agent this turn
-        if (goal.status === "complete") {
-          completedThisTurnGoalId = goal.id;
-        }
 
         emitGoalUpdate(goal);
 
@@ -495,7 +488,6 @@ ${verification.reasoning}`,
 
       try {
         const goal = updateGoal(ref, { status: params.status });
-        completedThisTurnGoalId = goal.id;
         stopAccounting();
         emitGoalUpdate(goal);
         return {
