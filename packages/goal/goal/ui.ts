@@ -1,5 +1,4 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import type { TUI } from "@earendil-works/pi-tui";
 import { visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 import { formatTokens, formatElapsedSeconds } from "@htwang-contrib/common";
 import type { Goal } from "./types.ts";
