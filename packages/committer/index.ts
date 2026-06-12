@@ -80,7 +80,7 @@ export default function (pi: ExtensionAPI): void {
     description:
       "Generate a conventional commit from staged/unstaged changes using a side-call to an LLM.",
     async handler(args, ctx) {
-      await handleCommit(pi, args, ctx);
+      await handleCommit(args, ctx);
     },
   });
 

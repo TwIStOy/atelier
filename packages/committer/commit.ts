@@ -1,7 +1,4 @@
-import type {
-  ExtensionAPI,
-  ExtensionCommandContext,
-} from "@earendil-works/pi-coding-agent";
+import type { ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import type { Model, Message } from "@earendil-works/pi-ai";
 import { executeSideCall } from "@htwang-contrib/common";
 import type { SideCallResult } from "@htwang-contrib/common";
@@ -18,9 +15,6 @@ import {
   SINGLE_COMMIT_PROMPT,
   GROUPING_PROMPT,
   GROUPING_RETRY_PROMPT,
-  MAX_DIFF_LENGTH,
-  MAX_DIFF_LENGTH_SINGLE,
-  MAX_GROUPING_RETRIES,
 } from "./prompt.ts";
 import type { CommitterProgress } from "./widget.ts";
 import type { CommitterOverlayController } from "./widget.ts";
@@ -30,7 +24,6 @@ import { resolveCommitModel, loadConfig } from "./model-select.ts";
 type AnyModel = Model<any>;
 
 export async function handleCommit(
-  pi: ExtensionAPI,
   args: string,
   ctx: ExtensionCommandContext,
 ): Promise<void> {

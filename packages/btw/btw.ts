@@ -126,7 +126,6 @@ function registerInvalidationHooks(
 }
 
 async function handleBtwCommand(
-  pi: ExtensionAPI,
   args: string,
   ctx: ExtensionCommandContext,
 ): Promise<void> {
@@ -212,7 +211,7 @@ export function registerBtw(pi: ExtensionAPI): void {
     description:
       "Ask a one-off side question to the current model. Answer appears in an overlay and does not enter the conversation.",
     async handler(args, ctx) {
-      await handleBtwCommand(pi, args, ctx);
+      await handleBtwCommand(args, ctx);
     },
   });
 }
