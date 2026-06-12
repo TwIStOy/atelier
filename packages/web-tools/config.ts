@@ -6,10 +6,7 @@ import {
   type ExtensionConfigSchema,
 } from "@htwang-contrib/common";
 import { PROVIDERS } from "./providers/index.ts";
-import {
-  createSearchProvider,
-  type ProviderCredentials,
-} from "./providers/factory.ts";
+import { createSearchProvider } from "./providers/factory.ts";
 import { ProviderError } from "./providers/errors.ts";
 import type { FullProvider, SearchProvider } from "./providers/types.ts";
 
