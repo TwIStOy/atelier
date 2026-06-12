@@ -1,5 +1,4 @@
 import type {
-  ConfigItem,
   ConfigItemRegistry,
   ConfigItemSelectOption,
   MultiSelectConfigItem,
@@ -11,7 +10,6 @@ import {
   readRawConfig,
   setConfigKey,
   deleteConfigKey,
-  deleteConfigSection,
 } from "@htwang-contrib/common";
 import type { SettingRow, TabDef } from "./types.ts";
 import { TAB_ALL, PACKAGE_TAB_PREFIX } from "./types.ts";
