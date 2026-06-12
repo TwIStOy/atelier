@@ -129,10 +129,7 @@ function patchAddToHistory(ed: EditorWithHistory): void {
   };
 }
 
-async function openReverseSearch(
-  pi: ExtensionAPI,
-  ctx: ExtensionContext,
-): Promise<void> {
+async function openReverseSearch(ctx: ExtensionContext): Promise<void> {
   if (!ctx.hasUI) return;
   const all = loadHistoryTextsNewestFirst();
   if (all.length === 0) {
@@ -188,6 +185,6 @@ export default function userInputHistoryExtension(pi: ExtensionAPI): void {
   pi.registerShortcut(Key.ctrl("r"), {
     description:
       "Interactive prompt history search (replaces editor; skim fuzzy rank)",
-    handler: (ctx) => openReverseSearch(pi, ctx),
+    handler: (ctx) => openReverseSearch(ctx),
   });
 }
