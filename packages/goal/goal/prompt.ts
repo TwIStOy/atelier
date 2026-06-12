@@ -45,7 +45,6 @@ export function buildContinuationPrompt(goal: Goal): string {
 }
 
 export function buildBudgetLimitedPrompt(goal: Goal): string {
-  const remaining = Math.max(0, (goal.tokenBudget ?? 0) - goal.tokensUsed);
   const lines: string[] = [
     "The active goal has exceeded its token budget and is now marked as budget_limited.",
     "",
