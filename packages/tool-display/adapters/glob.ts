@@ -1,4 +1,3 @@
-import type { Theme } from "@earendil-works/pi-coding-agent";
 import { shortenPath } from "@htwang-contrib/common";
 import type { ToolDisplayAdapter } from "../types.ts";
 import { formatExpandedToolOutputLines, formatLineCount } from "./shared.ts";

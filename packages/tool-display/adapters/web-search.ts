@@ -1,4 +1,3 @@
-import type { Theme } from "@earendil-works/pi-coding-agent";
 import type { ToolDisplayAdapter } from "../types.ts";
 import { formatExpandedToolOutputLines } from "./shared.ts";
 

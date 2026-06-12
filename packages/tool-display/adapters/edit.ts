@@ -259,7 +259,7 @@ function generateUnifiedDiff(
   return header + "\n" + hunks.join("\n") + "\n";
 }
 
-function resolveIsSplit(width: number, innerWidth: number): boolean {
+function resolveIsSplit(innerWidth: number): boolean {
   const cfg = loadConfig();
   if (cfg.diffMode === "side-by-side") return true;
   if (cfg.diffMode === "unified") return false;
@@ -272,7 +272,7 @@ function renderWithDelta(
   theme: Theme,
 ): string[] {
   const innerWidth = Math.max(1, width - INDENT.length);
-  const isSplit = resolveIsSplit(width, innerWidth);
+  const isSplit = resolveIsSplit(innerWidth);
   const styles = probeDeltaStyles(theme);
 
   const deltaArgs = styles
@@ -352,9 +352,7 @@ export const editAdapter: ToolDisplayAdapter<EditArgs> = {
     parts.push(
       theme.fg(
         "muted",
-        resolveIsSplit(width, width - INDENT.length * 2)
-          ? "side-by-side"
-          : "unified",
+        resolveIsSplit(width - INDENT.length * 2) ? "side-by-side" : "unified",
       ),
     );
     if (added > 0 || removed > 0) {

@@ -51,8 +51,6 @@ function snakeToCamelCase(s: string): string {
 
 export function formatGenericToolHeader(
   toolName: string,
-  toolLabel: string | undefined,
-  toolDescription: string | undefined,
   args: Record<string, unknown>,
   theme: Theme,
   width: number,
@@ -63,7 +61,6 @@ export function formatGenericToolHeader(
   if (!argStr) return truncateToWidth(namePart, width, "…");
 
   const prefix = namePart + " ";
-  const prefixWidth = visibleWidth(prefix);
   const argText = `(${argStr})`;
   const styledArg = theme.fg("dim", argText);
   const header = prefix + styledArg;
@@ -125,8 +122,6 @@ function subagentRunFinished(details: unknown): "ok" | "err" | undefined {
 function makeHeader(
   toolName: string,
   args: Record<string, unknown>,
-  toolLabel: string | undefined,
-  toolDescription: string | undefined,
   adapter: ToolDisplayAdapter | undefined,
   isPartial: boolean,
   isError: boolean,
@@ -170,14 +165,7 @@ function makeHeader(
 
   const headerText = adapter
     ? adapter.formatCallHeader(args, theme, details, isPartial, expanded)
-    : formatGenericToolHeader(
-        toolName,
-        toolLabel,
-        toolDescription,
-        args,
-        theme,
-        width,
-      );
+    : formatGenericToolHeader(toolName, args, theme, width);
 
   const headerLines = headerText.split("\n");
   return headerLines.map((line, i) => {
@@ -243,8 +231,6 @@ export function defaultGenericExpandedRenderer(
 
 export interface ToolCallDisplayOpts {
   toolName: string;
-  toolLabel?: string;
-  toolDescription?: string;
   args: Record<string, unknown>;
   output?: string;
   details?: unknown;
@@ -268,8 +254,6 @@ export function renderToolCall(
       const header = makeHeader(
         opts.toolName,
         opts.args,
-        opts.toolLabel,
-        opts.toolDescription,
         adapter,
         opts.isPartial,
         opts.isError,

@@ -124,14 +124,11 @@ function patchToolExecutionRender(
       return originalRender.call(this, width);
     }
 
-    const def = this.toolDefinition ?? this.builtInToolDefinition;
     const getTextOutput = this.getTextOutput?.bind(this);
     const output = this.result ? getTextOutput?.() : undefined;
 
     const opts = {
       toolName: this.toolName,
-      toolLabel: def?.label,
-      toolDescription: def?.description,
       args: this.args,
       output,
       details: this.result?.details,

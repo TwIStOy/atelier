@@ -1,6 +1,5 @@
 import { diffLines } from "diff";
 import { truncateToWidth } from "@earendil-works/pi-tui";
-import type { Theme } from "@earendil-works/pi-coding-agent";
 import type { ToolDisplayAdapter } from "../types.ts";
 import { INDENT } from "./shared.ts";
 
@@ -43,8 +42,7 @@ export const memoryCreateAdapter: ToolDisplayAdapter<MemoryCreateArgs> = {
     return [truncateToWidth(line, width, "…")];
   },
 
-  formatExpandedContent(args, _output, theme, width, details) {
-    const d = details as MemoryCreateDetails | undefined;
+  formatExpandedContent(args, _output, theme, width) {
     const content = args?.content ?? "";
     const allLines = content.split(/\r?\n/);
     const limit = 20;
@@ -103,7 +101,7 @@ export const memoryReadAdapter: ToolDisplayAdapter<MemoryReadArgs> = {
     return [truncateToWidth(line, width, "…")];
   },
 
-  formatExpandedContent(_args, output, theme, width, details) {
+  formatExpandedContent(_args, _output, theme, width, details) {
     const d = details as MemoryReadDetails | undefined;
     const content = d?.content_preview ?? "";
     if (!content) return [];
@@ -281,7 +279,7 @@ export const memorySearchAdapter: ToolDisplayAdapter<MemorySearchArgs> = {
     return [truncateToWidth(parts.join("") + more, width, "…")];
   },
 
-  formatExpandedContent(_args, _output, theme, width, details) {
+  formatExpandedContent(_args, _output, theme, _width, details) {
     const d = details as MemorySearchDetails | undefined;
     const items = d?.items ?? [];
     const total = d?.total ?? 0;
@@ -329,7 +327,7 @@ export const memoryListAdapter: ToolDisplayAdapter<MemoryListArgs> = {
     );
   },
 
-  formatCollapsedContent(_args, output, theme, width) {
+  formatCollapsedContent(_args, output, theme) {
     if (!output) return [theme.fg("muted", "└ empty")];
     const n = output.split("\n").length;
     return [`└ ${theme.fg("success", `${n} line${n === 1 ? "" : "s"}`)}`];
@@ -478,7 +476,7 @@ export const memoryHistoryAdapter: ToolDisplayAdapter<MemoryHistoryArgs> = {
     return [truncateToWidth(line, width, "…")];
   },
 
-  formatExpandedContent(_args, _output, theme, width, details) {
+  formatExpandedContent(_args, _output, theme, _width, details) {
     const d = details as MemoryHistoryDetails | undefined;
     const versions = d?.versions ?? [];
     const total = d?.total ?? 0;

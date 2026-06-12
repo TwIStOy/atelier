@@ -1,5 +1,4 @@
 import { truncateToWidth } from "@earendil-works/pi-tui";
-import type { Theme } from "@earendil-works/pi-coding-agent";
 import type { ToolDisplayAdapter } from "../types.ts";
 import { INDENT } from "./shared.ts";
 
@@ -136,7 +135,7 @@ export const journalSearchAdapter: ToolDisplayAdapter<JournalSearchArgs> = {
     return [truncateToWidth(parts.join("") + more, width, "…")];
   },
 
-  formatExpandedContent(_args, _output, theme, width, details) {
+  formatExpandedContent(_args, _output, theme, _width, details) {
     const d = details as JournalSearchDetails | undefined;
     const items = d?.items ?? [];
     const total = d?.total ?? 0;
