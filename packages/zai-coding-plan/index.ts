@@ -25,6 +25,23 @@ export default function (pi: ExtensionAPI) {
     authHeader: true,
     models: [
       {
+        id: "glm-5.2",
+        name: "GLM-5.2",
+        reasoning: true,
+        thinkingLevelMap: {
+          off: "high",
+          minimal: "high",
+          low: "high",
+          medium: "high",
+          high: "high",
+          xhigh: "max",
+        },
+        input: ["text"],
+        cost: { input: 1.6, output: 5.2, cacheRead: 0.3, cacheWrite: 0 },
+        contextWindow: 1000000,
+        maxTokens: 131072,
+      },
+      {
         id: "glm-5.1",
         name: "GLM-5.1",
         reasoning: true,
