@@ -13,6 +13,7 @@ Monorepo with packages under `packages/`:
 - `packages/subagents/` -- In-process subagent extension (WIP). See `docs/subagents/`.
 - `packages/statusline/` -- Custom status bar widgets for the pi TUI.
 - `packages/tool-display/` -- Tool call rendering adapters for the pi TUI.
+- `packages/todo/` -- 移植自 rpiv-todo 的任务管理扩展,提供 `todo` 工具(create/update/list/get/delete/clear)+ `/todos` 命令 + aboveEditor overlay widget,状态通过 session branch replay 持久化。参考 `docs/todo/`.
 - `packages/user-message/` -- User message handling extension.
 - `packages/user-input-history/` -- Persistent prompt history in `history-store.ts` (`XDG_CACHE_HOME/pi/user-input-history.json`, locked multi-process merge); Ctrl+R panel in `interactive-search.ts` ranks lines with **skim** (`sk --filter`, stdin = history; falls back to built-in fuzzy if `sk` missing); extension entry `index.ts` clears built-in `ctrl+r` on `app.session.rename` via in-memory `getKeybindings().setUserBindings` only (does not edit `keybindings.json`).
 - `packages/extra-tools/` -- Extra LLM tools `grep`, `glob`, and `ls` (prompt bullets in co-located `.txt`; `grep`/`glob` use ripgrep). Same-named tools override pi built-ins when this extension loads.

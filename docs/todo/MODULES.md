@@ -334,7 +334,7 @@ export const ACTIVE_STATUSES: ReadonlySet<TaskStatus>;
 
 ### 测试
 
-- 覆盖在 `todo-overlay.render.test.ts`（布局截断）与 `todo.command.test.ts`（分组顺序 completed→inProgress→pending）。
+- 覆盖在 `todo-overlay.render.test.ts`（布局截断）与 `todo.command.test.ts`（分组顺序 pending→inProgress→completed）。
 
 ---
 
@@ -515,7 +515,7 @@ export function registerTodosCommand(pi: ExtensionAPI): void;
 - **`registerTodosCommand(pi)`**：
   1. 无 UI → `ctx.ui.notify(ERR_REQUIRES_INTERACTIVE, "error")` return。
   2. visible 为空 → `ctx.ui.notify(MSG_NO_TODOS, "info")` return。
-  3. 否则按 `selectTasksByStatus` 分三组（completed→inProgress→pending 顺序），header 用 `selectTodoCounts` 拼 `X/total completed · Y in_progress · Z pending`，每段带 `── Section ──` 标题 + `formatCommandTaskLine`，`ctx.ui.notify(lines.join("\n"), "info")`。
+  3. 否则按 `selectTasksByStatus` 分三组（section 顺序 pending→inProgress→completed），header 用 `selectTodoCounts` 拼 `X/total completed · Y in_progress · Z pending`，每段带 `── Section ──` 标题 + `formatCommandTaskLine`，`ctx.ui.notify(lines.join("\n"), "info")`。
 - **`DEFAULT_PROMPT_GUIDELINES`**：上游 7 条 guidelines 逐字保留（LLM 行为约束，见 SOURCE-ANALYSIS）。
 
 ### 关键改动（adapt）
