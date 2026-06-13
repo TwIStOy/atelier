@@ -204,9 +204,10 @@ export default function (pi: ExtensionAPI) {
 1. Remove the entire backward-compat re-export block — no legacy consumers.
 2. Remove `reconstructTodoState` shim — callers use `replaceState(replayFromBranch(ctx))` directly.
 3. Remove `import { formatStatusLabel, t } from "./state/i18n-bridge.ts"`.
-4. Replace `t("command.requires_interactive", …)` / `t("command.no_todos", …)` / `t("command.section.*", …)` with inline English consts.
+4. Replace `t("command.requires_interactive", …)` / `t("command.no_todos", …)` / `t("command.section.*", …)` with inline English consts (`SECTION_PENDING` / `SECTION_IN_PROGRESS` / `SECTION_COMPLETED`, etc.).
 5. Replace `formatStatusLabel(status)` in the `/todos` header with the raw `status` string.
 6. Keep `DEFAULT_PROMPT_SNIPPET` / `DEFAULT_PROMPT_GUIDELINES` as inline consts.
+7. **Remove `renderCall` / `renderResult`** — upstream registers the tool with these two renderers and imports `renderTodoCall` / `renderTodoResult` from `view/format.ts`; our version drops both. The `registerTool` object only carries `name` / `label` / `description` / `promptSnippet` / `promptGuidelines` / `parameters` / `execute`. Rendering moves out of the todo package entirely into the [tool-display adapter](#tool-display-adapter--new) (see §6). Correspondingly we only import `formatCommandTaskLine` from `./view/format.ts`.
 
 ### `config.ts` — Guidance Configuration
 
@@ -311,11 +312,16 @@ export function loadConfig(): TodoConfig {
 
 ### `view/format.ts` — TUI Rendering
 
-**Does:** `STATUS_GLYPH` / `STATUS_COLOR` / `ACTION_GLYPH` tables; `overlayStatusGlyph`, `formatOverlayTaskLine`, `formatCommandTaskLine`, `renderTodoCall`, `renderTodoResult`.
+**Does (upstream):** `STATUS_GLYPH` / `STATUS_COLOR` / `ACTION_GLYPH` tables; `overlayStatusGlyph`, `formatOverlayTaskLine`, `formatCommandTaskLine`, `renderTodoCall`, `renderTodoResult`.
+
 **Changes:**
 
 1. Remove `import { formatStatusLabel } from "../state/i18n-bridge.ts"` and the `export { formatStatusLabel }` re-export.
 2. Inline English status labels where `formatStatusLabel` was called (`args.status` is already an English word).
+3. **Delete `renderTodoCall` / `renderTodoResult`** — tool call/result rendering is no longer the responsibility of this file (or the todo package at all). It moves to `packages/tool-display/adapters/todo.ts` (see §6).
+4. **Delete the three tables** `STATUS_GLYPH` / `STATUS_COLOR` / `ACTION_GLYPH`. The overlay glyph/color logic is inlined into `overlayStatusGlyph` (and differs from the old `STATUS_GLYPH`: completed uses `✓`, deleted uses `✗`); the `ACTION_GLYPH` table is no longer needed — the tool-display adapter header uses the action name directly.
+
+After these changes, the file exports only three functions: `overlayStatusGlyph(status, theme)`, `formatOverlayTaskLine(t, theme, showId)`, and `formatCommandTaskLine(t, glyph)` — all serving the overlay widget and the `/todos` command, none serving the tool call/result rendering.
 
 ### `locales/*` — Translation Files — **DROP**
 
@@ -329,7 +335,7 @@ export function loadConfig(): TodoConfig {
 | File                        | Status   | Changes                                                         |
 | --------------------------- | -------- | --------------------------------------------------------------- |
 | `index.ts`                  | Adapt    | Remove i18n block; import `isStaleCtxError` from common         |
-| `todo.ts`                   | Adapt    | Remove re-exports + i18n; inline English; rewrite config import |
+| `todo.ts`                   | Adapt    | Remove re-exports + i18n; inline English; rewrite config import; **drop `renderCall`/`renderResult` (→ tool-display adapter)** |
 | `config.ts`                 | Rewrite  | Use `readConfig` from `@htwang-contrib/common`                  |
 | `todo-overlay.ts`           | Adapt    | Remove i18n imports; inline English strings                     |
 | `state/state.ts`            | Port     | No changes                                                      |
@@ -342,7 +348,8 @@ export function loadConfig(): TodoConfig {
 | `state/i18n-bridge.ts`      | **Drop** | No i18n in our monorepo                                         |
 | `tool/types.ts`             | Adapt    | `@sinclair/typebox`; `Type.Union` instead of `StringEnum`       |
 | `tool/response-envelope.ts` | Port     | No changes                                                      |
-| `view/format.ts`            | Adapt    | Remove `formatStatusLabel` import/re-export; inline labels      |
+| `view/format.ts`            | Adapt    | Remove `formatStatusLabel` + i18n; **delete `renderTodoCall`/`renderTodoResult` + `STATUS_GLYPH`/`STATUS_COLOR`/`ACTION_GLYPH` (→ tool-display adapter)** |
+| `tool-display/adapters/todo.ts` | **New** | New adapter: `todoAdapter` takes over tool call/result rendering |
 | `locales/*`                 | **Drop** | No i18n                                                         |
 
 ---
@@ -360,3 +367,39 @@ function isStaleCtxError(e: unknown): boolean {
 // After (ours)
 import { isStaleCtxError } from "@htwang-contrib/common";
 ```
+
+---
+
+## 6. `tool-display/adapters/todo.ts` — Tool Call/Result Rendering Adapter (NEW)
+
+This module is **new** relative to upstream `rpiv-todo` — the upstream package renders tool calls/results inside itself (`renderTodoCall` / `renderTodoResult` in `view/format.ts`, wired via `renderCall` / `renderResult` on the registered tool). Our monorepo standardizes rendering through `packages/tool-display/`, so every tool (goal / memory / read / bash / todo / …) renders the same way. The todo package therefore drops its own renderers and the rendering moves here.
+
+**File:** `packages/tool-display/adapters/todo.ts` (not in `packages/todo/`).
+
+**Exports:**
+
+```ts
+export interface TodoArgs {
+  action?: string;  // create | update | list | get | delete | clear
+  subject?: string;
+  id?: number;
+  status?: string;
+}
+export const todoAdapter: ToolDisplayAdapter<TodoArgs>;
+```
+
+The adapter header uses the action name directly (no glyph symbols).
+
+**Method behavior:**
+
+- `formatCallHeader` — label `Todo` (bold, `toolTitle`) + action name (`accent`) + key param(s): `create`→subject; `update`→`[state] #id <subject>` (the `[state]` bracket appears only when `status` is passed, colored by status — `in_progress` warning / `completed` success / `deleted` error / else dim); `get`/`delete`→`#id <subject>`; `list`→status; `clear`→nothing. The subject for `update`/`get`/`delete` is looked up from `details.tasks` by `args.id` (it isn't part of the args), so it appears once the result lands — not during the partial/streaming phase. E.g. `Todo create 设计API`, `Todo update [in_progress] #2 写测试`. The action is the focus (accent); params are secondary (dim/muted). When the available `width` can't fit the subject on the header line, the subject wraps to continuation line(s) (wrapped to `width-4` via `wrapTextWithAnsi`) instead of being truncated — each wrapped segment stays within the continuation budget so the downstream `truncateToWidth` in `makeHeader` is a no-op on it.
+- `formatCollapsedContent` — one-line summary `└ <summary>` (muted): error path `└ Error:…`; `list` gives a count `└ N tasks`; otherwise the first line of the tool output.
+- `formatExpandedContent` — delegates to the shared `formatExpandedToolOutputLines(output, theme, width)`.
+
+**Wiring / patch mechanism:**
+
+- `packages/tool-display/registry.ts` registers it: `globalToolDisplayRegistry.register("todo", todoAdapter)`. `packages/tool-display/index.ts` re-exports `todoAdapter`.
+- `packages/tool-display/index.ts` patches `ToolExecutionComponent.prototype.render`: it first looks up the registry — **if an adapter exists, use it**; otherwise, if the tool definition defines its own `renderCall` / `renderResult`, it falls back to the built-in rendering. Because todo is registered, it always takes the adapter branch — which is exactly why `todo.ts` can drop `renderCall` / `renderResult` entirely.
+- The todo package has **no import** dependency on `packages/tool-display`; the render patch is transparent to the tool.
+
+> The detailed adapter spec (method-by-method behavior, signatures, deps) lives in [MODULES.md § tool-display adapter](./MODULES.md#tool-display-adapter--new).

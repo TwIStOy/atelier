@@ -28,7 +28,7 @@ packages/todo/
 │   ├── selectors.ts          # 纯选择器
 │   └── replay.ts             # Branch replay
 ├── view/
-│   └── format.ts             # renderCall/renderResult/overlay 格式化
+│   └── format.ts             # overlay 行 / /todos 命令行格式化（渲染已迁移到 tool-display adapter）
 └── test/
     ├── helpers.ts            # createMockPi / createMockCtx 等
     └── *.test.ts
@@ -62,7 +62,7 @@ packages/todo/
 | `state/selectors.ts`        | 过滤/分组/计数/布局                       | 原样（去掉 i18n import）                    |
 | `state/replay.ts`           | 从 branch 恢复状态                        | 原样                                        |
 | `tool/response-envelope.ts` | `(op, state) → LLM 返回信封`              | 原样                                        |
-| `view/format.ts`            | renderCall/renderResult/overlay           | 去 i18n，内联英文                           |
+| `view/format.ts`            | overlay/command 格式化                    | 去 i18n；renderCall/renderResult 迁移到 tool-display adapter（见 MODULES § tool-display adapter） |
 | `todo-overlay.ts`           | Overlay widget 生命周期                   | 去 i18n，内联英文                           |
 | `config.ts`                 | guidance 配置                             | 重写（readConfig）                          |
 | `todo.ts`                   | Tool + Command 注册                       | 去 re-export/i18n                           |

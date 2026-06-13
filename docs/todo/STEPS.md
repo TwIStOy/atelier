@@ -16,9 +16,12 @@
 | 3     | Replay + 注册层：`replay.ts` · `todo.ts`                                                | replay · todo                                  | §4          | [x]  |
 | 4     | UI 层：`view/format.ts` · `todo-overlay.ts` · `index.ts`                                | view/format · todo-overlay · index             | §4          | [x]  |
 | 5     | 测试：helpers + 9 个测试文件                                                            | 测试矩阵                                       | §5          | [x]  |
-| 6     | 集成收尾：tsc / format / 手测 / AGENTS.md / README                                      | —                                              | —           | [ ]  |
+| 6     | 集成收尾：tsc / format / 手测 / AGENTS.md / README                                      | —                                              | —           | [x]  |
+| 7     | tool-display 适配：渲染层从 todo 包迁移到 `packages/tool-display/adapters/todo.ts`      | [tool-display adapter](./MODULES.md#tool-display-adapter--new) | —  | [x]  |
 
-**当前停在哪一 Phase：** Phase 6（仅剩 S6.3 手测）（完成日期 2026-06-13）
+**当前停在哪一 Phase：** Phase 7 完成（2026-06-13）。Phase 6 仅剩 S6.3 手测。
+
+> **Phase 7 说明（渲染层迁移）：** 首版完成后为对齐 monorepo 风格（goal / memory / read / bash 等都走 tool-display adapter），把 `todo.ts` 的 `renderCall`/`renderResult` 与 `view/format.ts` 的 `renderTodoCall`/`renderTodoResult`/`STATUS_GLYPH`/`STATUS_COLOR`/`ACTION_GLYPH` 全部删除，新建 `packages/tool-display/adapters/todo.ts` 接管渲染。详见 [MODULES.md § tool-display adapter](./MODULES.md#tool-display-adapter--new) 与 [SOURCE-ANALYSIS.md §6](./SOURCE-ANALYSIS.md#6-tooldisplayadapterstodots--tool-callresult-rendering-adapter-new)。
 
 ---
 
@@ -90,10 +93,10 @@
 - [x] **S3.2** `todo.ts`（**ADAPT**）：
   - **删**：整块 backward-compat re-export（`isTransitionValid`/`applyTaskMutation`/`store` 符号/`task-graph` 符号/类型/`TOOL_NAME`）、`reconstructTodoState` shim、`import { formatStatusLabel, t } from "./state/i18n-bridge.ts"`。
   - 内联常量：`SECTION_PENDING` / `SECTION_IN_PROGRESS` / `SECTION_COMPLETED`、`DEFAULT_PROMPT_SNIPPET`、`DEFAULT_PROMPT_GUIDELINES`（7 条，逐字保留）。
-  - `registerTodoTool(pi)`：`guidance = loadConfig().guidance`（**不**过 `validateGuidanceFields`）→ `pi.registerTool({ name, label, description, promptSnippet: guidance?.promptSnippet ?? DEFAULT, promptGuidelines: guidance?.promptGuidelines ?? DEFAULT, parameters: TodoParamsSchema, execute, renderCall, renderResult })`。
+  - `registerTodoTool(pi)`：`guidance = loadConfig().guidance`（**不**过 `validateGuidanceFields`）→ `pi.registerTool({ name, label, description, promptSnippet: guidance?.promptSnippet ?? DEFAULT, promptGuidelines: guidance?.promptGuidelines ?? DEFAULT, parameters: TodoParamsSchema, execute })`。**不传 `renderCall` / `renderResult`**（渲染迁移到 tool-display adapter，见 Phase 7）。
     - `execute`：`result = applyTaskMutation(getState(), params.action, params)` → `commitState(result.state)` → `return buildToolResult(...)`。三步固定管线。
-    - `renderCall` → `renderTodoCall(args, theme, getState())`；`renderResult` → `renderTodoResult(result, theme)`。
-  - `registerTodosCommand(pi)`：无 UI → `notify(ERR_REQUIRES_INTERACTIVE,"error")`；空 → `notify(MSG_NO_TODOS,"info")`；否则三段（pending→inProgress→completed）+ header 计数 + `formatCommandTaskLine`，`notify(lines.join("\n"),"info")`。`t(...)`/`formatStatusLabel(...)` 全替换为字面量。
+  - `registerTodosCommand(pi)`：无 UI → `notify(ERR_REQUIRES_INTERACTIVE,"error")`；空 → `notify(MSG_NO_TODOS,"info")`；否则三段（section 顺序 pending→in_progress→completed）+ header 计数（顺序 completed·in_progress·pending）+ `formatCommandTaskLine`，`notify(lines.join("\n"),"info")`。`t(...)`/`formatStatusLabel(...)` 全替换为字面量。
+  - 从 `./view/format.ts` 只 import `formatCommandTaskLine`（不 import `renderTodoCall`/`renderTodoResult`）。
 - [x] **S3.3** `npx tsc --build` 通过 + `npm run format`。
 
 ---
@@ -104,8 +107,9 @@
 
 - [x] **S4.1** `view/format.ts`（**ADAPT**）：
   - **删** `import { formatStatusLabel } from "../state/i18n-bridge.ts"` 与 `export { formatStatusLabel }` 再导出。
-  - 保留 `STATUS_GLYPH` / `STATUS_COLOR` / `ACTION_GLYPH` 表 + `overlayStatusGlyph` / `formatOverlayTaskLine` / `formatCommandTaskLine` / `renderTodoCall` / `renderTodoResult`。
-  - `formatStatusLabel(args.status)` 调用点 → 直接用 `args.status` 字面量（已是英文枚举）。
+  - 现在文件只剩 3 个导出函数：`overlayStatusGlyph(status, theme)`（overlay 字形：pending○/in_progress◐/completed✓/deleted✗）、`formatOverlayTaskLine(t, theme, showId)`、`formatCommandTaskLine(t, glyph)`。
+  - **删** `renderTodoCall` / `renderTodoResult`（渲染迁移到 tool-display adapter，见 Phase 7）。
+  - **删** 颜色/字形表 `STATUS_GLYPH` / `STATUS_COLOR` / `ACTION_GLYPH`（overlay 字形内联进 `overlayStatusGlyph`；ACTION_GLYPH 不再需要——tool-display adapter 的 header 直接用 action 名字）。
 - [x] **S4.2** `todo-overlay.ts`（**ADAPT**）：
   - **删** `import { formatStatusLabel, t } from "./state/i18n-bridge.ts"`。
   - `WIDGET_KEY = "rpiv-todos"`（**保留**，迁移用户不丢 widget）；`MAX_WIDGET_LINES = 12`；`OVERLAY_HEADING = "Todos"`；`OVERLAY_MORE = "more"`。
@@ -131,7 +135,7 @@
 - [x] **S5.5** `response-envelope.test.ts`：6 种 op 输出 + list 过滤 + get 的 blocks 反查 + error。
 - [x] **S5.6** `replay.test.ts`：mock branch（混杂非 todo toolResult）→ 取最后一条 todo 快照；空 → EMPTY_STATE；损坏 details 跳过。
 - [x] **S5.7** `config.test.ts`：临时 XDG 目录 → 写 `{"todo":{...}}` → 读；空目录 → `{}`。
-- [x] **S5.8** `todo.register.test.ts`：注册后 schema 形状、execute 三步管线、renderCall/renderResult、guidance `?? DEFAULT` 兜底。
+- [x] **S5.8** `todo.register.test.ts`：注册后 schema 形状、execute 三步管线、guidance `?? DEFAULT` 兜底（renderCall/renderResult 已不再测——见 Phase 7）。
 - [x] **S5.9** `todo.command.test.ts`：无 UI guard、空、分组输出（section 顺序 pending→inProgress→completed,header 计数顺序相反）。
 - [x] **S5.10** `todo-overlay.render.test.ts`：heading（有/无 active）、溢出摘要行、width 截断、空状态注销。
 - [x] **S5.11** `todo-overlay.lifecycle.test.ts`：setUICtx 幂等、reset、dispose、agent_start 折叠、/reload 身份变化重注册。
@@ -152,6 +156,20 @@
 - [x] **S6.4** 更新根 `AGENTS.md` 包列表，追加 `packages/todo/` 一行。
 - [x] **S6.5** 写 `packages/todo/README.md`：功能、`/todos` 用法、`todo` 工具 action 表、配置项（`extensions.json` 的 `"todo"` 段）、链接到本 docs。
 - [x] **S6.6** 更新本文件总进度表：Phase 0–6 全 `[x]` + 填完成日期。
+
+---
+
+## Phase 7 — tool-display 适配（渲染层迁移）
+
+> 完成日期：2026-06-13。首版完成后，为对齐 monorepo 风格（goal / memory / read / bash 等工具都走 tool-display adapter 统一渲染），把 todo 工具的调用/结果渲染从 todo 包内部迁出到 `packages/tool-display/`。规格见 [MODULES.md § tool-display adapter](./MODULES.md#tool-display-adapter--new)，上游对照见 [SOURCE-ANALYSIS.md §6](./SOURCE-ANALYSIS.md#6-tooldisplayadapterstodots--tool-callresult-rendering-adapter-new)。
+
+- [x] **S7.1** 新建 `packages/tool-display/adapters/todo.ts`：导出 `todoAdapter: ToolDisplayAdapter<TodoArgs>`（`TodoArgs = {action?, subject?, id?, status?}`），实现 `formatCallHeader` / `formatCollapsedContent` / `formatExpandedContent`（header 直接用 action 名字，不再用字形符号）。
+- [x] **S7.2** `packages/tool-display/registry.ts`：`globalToolDisplayRegistry.register("todo", todoAdapter)`。
+- [x] **S7.3** `packages/tool-display/index.ts`：导出 `todoAdapter`。
+- [x] **S7.4** 删除 `packages/todo/todo.ts` 的 `renderCall` / `renderResult`：`registerTool` 对象不再传这两个字段；从 `./view/format.ts` 只 import `formatCommandTaskLine`。
+- [x] **S7.5** 删除 `packages/todo/view/format.ts` 的 `renderTodoCall` / `renderTodoResult` / `STATUS_GLYPH` / `STATUS_COLOR` / `ACTION_GLYPH`，文件只剩 `overlayStatusGlyph` / `formatOverlayTaskLine` / `formatCommandTaskLine` 三个导出。
+- [x] **S7.6** `npx tsc --build` 通过 + `npm run format`。
+- [x] **S7.7** 手测：todo 工具调用头（action 名字 + 关键参数）、折叠摘要（`└ ...`）、error 路径、list 计数，均由 tool-display adapter 渲染。
 
 ---
 
