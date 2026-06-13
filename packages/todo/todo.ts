@@ -1,0 +1,122 @@
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { loadConfig } from "./config.ts";
+import {
+  selectTasksByStatus,
+  selectTodoCounts,
+  selectVisibleTasks,
+} from "./state/selectors.ts";
+import { applyTaskMutation } from "./state/state-reducer.ts";
+import { commitState, getState } from "./state/store.ts";
+import { buildToolResult } from "./tool/response-envelope.ts";
+import {
+  COMMAND_NAME,
+  ERR_REQUIRES_INTERACTIVE,
+  MSG_NO_TODOS,
+  type TaskMutationParams,
+  TOOL_LABEL,
+  TOOL_NAME,
+  TodoParamsSchema,
+} from "./tool/types.ts";
+import {
+  formatCommandTaskLine,
+  renderTodoCall,
+  renderTodoResult,
+} from "./view/format.ts";
+
+const SECTION_PENDING = "── Pending ──";
+const SECTION_IN_PROGRESS = "── In Progress ──";
+const SECTION_COMPLETED = "── Completed ──";
+
+export const DEFAULT_PROMPT_SNIPPET =
+  "Manage a task list to track multi-step progress";
+export const DEFAULT_PROMPT_GUIDELINES: string[] = [
+  "Use `todo` for complex work with 3+ steps, when the user gives you a list of tasks, or immediately after receiving new instructions to capture requirements. Skip it for single trivial tasks and purely conversational requests.",
+  "When starting any task, mark it in_progress BEFORE beginning work. Mark it completed IMMEDIATELY when done — never batch completions. Exactly one task should be in_progress at a time.",
+  "Never mark a task completed if tests are failing, the implementation is partial, or you hit unresolved errors — keep it in_progress and create a new task for the blocker instead.",
+  "Task status is a 4-state machine: pending → in_progress → completed, plus deleted as a tombstone. Pass activeForm (present-continuous label, e.g. 'researching existing tool') when marking in_progress.",
+  "Use blockedBy to express dependencies (A is blocked by B). On create, pass blockedBy as the initial set. On update, use addBlockedBy / removeBlockedBy (additive merge — do not resend the full array). Cycles are rejected.",
+  "list hides tombstoned (deleted) tasks by default; pass includeDeleted:true to see them. Pass status to filter by a single status.",
+  "Subject must be short and imperative (e.g. 'Research existing tool'); description is for long-form detail. activeForm is a present-continuous label shown while in_progress.",
+];
+
+export function registerTodoTool(pi: ExtensionAPI): void {
+  const guidance = loadConfig().guidance;
+  pi.registerTool({
+    name: TOOL_NAME,
+    label: TOOL_LABEL,
+    description:
+      "Manage a task list for tracking multi-step progress. Actions: create (new task), update (change status/fields/dependencies), list (all tasks, optionally filtered by status), get (single task details), delete (tombstone), clear (reset all). Status: pending → in_progress → completed, plus deleted tombstone. Use this to plan and track multi-step work like research, design, and implementation.",
+    promptSnippet: guidance?.promptSnippet ?? DEFAULT_PROMPT_SNIPPET,
+    promptGuidelines: guidance?.promptGuidelines ?? DEFAULT_PROMPT_GUIDELINES,
+    parameters: TodoParamsSchema,
+
+    async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
+      const result = applyTaskMutation(
+        getState(),
+        params.action,
+        params as TaskMutationParams,
+      );
+      commitState(result.state);
+      return buildToolResult(
+        params.action,
+        params as TaskMutationParams,
+        result.state,
+        result.op,
+      );
+    },
+
+    renderCall(args, theme, _context) {
+      return renderTodoCall(args as never, theme, getState());
+    },
+
+    renderResult(result, _opts, theme, _context) {
+      return renderTodoResult(result, theme);
+    },
+  });
+}
+
+export function registerTodosCommand(pi: ExtensionAPI): void {
+  pi.registerCommand(COMMAND_NAME, {
+    description: "Show all todos on the current branch, grouped by status",
+    handler: async (_args, ctx) => {
+      if (!ctx.hasUI) {
+        ctx.ui.notify(ERR_REQUIRES_INTERACTIVE, "error");
+        return;
+      }
+      const state = getState();
+      const visible = selectVisibleTasks(state);
+      if (visible.length === 0) {
+        ctx.ui.notify(MSG_NO_TODOS, "info");
+        return;
+      }
+      const groups = selectTasksByStatus(state);
+      const counts = selectTodoCounts(state);
+
+      const header: string[] = [];
+      if (counts.completed > 0)
+        header.push(`${counts.completed}/${counts.total} completed`);
+      if (counts.inProgress > 0)
+        header.push(`${counts.inProgress} in_progress`);
+      if (counts.pending > 0) header.push(`${counts.pending} pending`);
+
+      const lines: string[] = [header.join(" · ")];
+      if (groups.pending.length > 0) {
+        lines.push(SECTION_PENDING);
+        for (const task of groups.pending)
+          lines.push(formatCommandTaskLine(task, "○"));
+      }
+      if (groups.inProgress.length > 0) {
+        lines.push(SECTION_IN_PROGRESS);
+        for (const task of groups.inProgress)
+          lines.push(formatCommandTaskLine(task, "◐"));
+      }
+      if (groups.completed.length > 0) {
+        lines.push(SECTION_COMPLETED);
+        for (const task of groups.completed)
+          lines.push(formatCommandTaskLine(task, "✓"));
+      }
+
+      ctx.ui.notify(lines.join("\n"), "info");
+    },
+  });
+}
