@@ -164,7 +164,7 @@ function makeHeader(
   }
 
   const headerText = adapter
-    ? adapter.formatCallHeader(args, theme, details, isPartial, expanded)
+    ? adapter.formatCallHeader(args, theme, details, isPartial, expanded, width)
     : formatGenericToolHeader(toolName, args, theme, width);
 
   const headerLines = headerText.split("\n");

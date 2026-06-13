@@ -1,40 +1,5 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { Text } from "@earendil-works/pi-tui";
-import { selectTaskSubjectById } from "../state/selectors.ts";
-import type { TaskState } from "../state/state.ts";
-import type {
-  Task,
-  TaskAction,
-  TaskDetails,
-  TaskMutationParams,
-  TaskStatus,
-} from "../tool/types.ts";
-
-export const STATUS_GLYPH: Record<TaskStatus, string> = {
-  pending: "○",
-  in_progress: "◐",
-  completed: "●",
-  deleted: "⊘",
-};
-
-export const STATUS_COLOR: Record<
-  TaskStatus,
-  "dim" | "warning" | "success" | "muted"
-> = {
-  pending: "dim",
-  in_progress: "warning",
-  completed: "success",
-  deleted: "muted",
-};
-
-export const ACTION_GLYPH: Record<TaskAction, string> = {
-  create: "+",
-  update: "→",
-  delete: "×",
-  get: "›",
-  list: "☰",
-  clear: "∅",
-};
+import type { Task, TaskStatus } from "../tool/types.ts";
 
 export function overlayStatusGlyph(status: TaskStatus, theme: Theme): string {
   switch (status) {
@@ -80,65 +45,4 @@ export function formatCommandTaskLine(t: Task, glyph: string): string {
     ? `    ⛓ ${t.blockedBy.map((id) => `#${id}`).join(",")}`
     : "";
   return `  ${glyph} #${t.id} ${t.subject}${form}${block}`;
-}
-
-export function renderTodoCall(
-  args: TaskMutationParams & { action: TaskAction },
-  theme: Theme,
-  state: TaskState,
-): Text {
-  const glyph = ACTION_GLYPH[args.action] ?? args.action;
-  let text =
-    theme.fg("toolTitle", theme.bold("todo ")) + theme.fg("muted", glyph);
-
-  if (args.action === "create" && args.subject) {
-    text += ` ${theme.fg("dim", args.subject)}`;
-  } else if (
-    (args.action === "update" ||
-      args.action === "get" ||
-      args.action === "delete") &&
-    args.id !== undefined
-  ) {
-    const subject = selectTaskSubjectById(state, args.id);
-    text += ` ${theme.fg("accent", subject ?? `#${args.id}`)}`;
-  } else if (args.action === "list" && args.status) {
-    text += ` ${theme.fg("muted", args.status)}`;
-  }
-  return new Text(text, 0, 0);
-}
-
-export function renderTodoResult(
-  result: { details?: unknown },
-  theme: Theme,
-): Text {
-  const details = result.details as TaskDetails | undefined;
-  let status: TaskStatus | undefined;
-  if (details) {
-    const params = details.params as TaskMutationParams;
-    switch (details.action) {
-      case "create":
-        status = details.tasks[details.tasks.length - 1]?.status;
-        break;
-      case "update":
-        status =
-          params.status ??
-          details.tasks.find((t) => t.id === params.id)?.status;
-        break;
-      case "delete":
-        status = details.tasks.find((t) => t.id === params.id)?.status;
-        break;
-      case "list":
-      case "get":
-      case "clear":
-        break;
-    }
-  }
-  if (status) {
-    return new Text(
-      theme.fg(STATUS_COLOR[status], `${STATUS_GLYPH[status]} ${status}`),
-      0,
-      0,
-    );
-  }
-  return new Text(theme.fg("success", "✓"), 0, 0);
 }

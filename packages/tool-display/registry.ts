@@ -30,6 +30,7 @@ import {
 import { readAdapter } from "./adapters/read.ts";
 import { subagentAdapter } from "./adapters/subagent.ts";
 import { subagentStatusAdapter } from "./adapters/subagent-status.ts";
+import { todoAdapter } from "./adapters/todo.ts";
 import { writeAdapter } from "./adapters/write.ts";
 import { webSearchAdapter } from "./adapters/web-search.ts";
 import { webFetchAdapter } from "./adapters/web-fetch.ts";
@@ -45,6 +46,7 @@ globalToolDisplayRegistry.register("edit", editAdapter);
 globalToolDisplayRegistry.register("bash", bashAdapter);
 globalToolDisplayRegistry.register("subagent", subagentAdapter);
 globalToolDisplayRegistry.register("subagent_status", subagentStatusAdapter);
+globalToolDisplayRegistry.register("todo", todoAdapter);
 globalToolDisplayRegistry.register("create_goal", createGoalAdapter);
 globalToolDisplayRegistry.register("update_goal", updateGoalAdapter);
 globalToolDisplayRegistry.register("get_goal", getGoalAdapter);

@@ -11,6 +11,7 @@ export interface ToolDisplayAdapter<TArgs = Record<string, unknown>> {
     details?: unknown,
     isPartial?: boolean,
     expanded?: boolean,
+    width?: number,
   ): string;
   formatCollapsedContent(
     args: TArgs,

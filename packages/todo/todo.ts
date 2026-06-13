@@ -17,11 +17,7 @@ import {
   TOOL_NAME,
   TodoParamsSchema,
 } from "./tool/types.ts";
-import {
-  formatCommandTaskLine,
-  renderTodoCall,
-  renderTodoResult,
-} from "./view/format.ts";
+import { formatCommandTaskLine } from "./view/format.ts";
 
 const SECTION_PENDING = "── Pending ──";
 const SECTION_IN_PROGRESS = "── In Progress ──";
@@ -63,14 +59,6 @@ export function registerTodoTool(pi: ExtensionAPI): void {
         result.state,
         result.op,
       );
-    },
-
-    renderCall(args, theme, _context) {
-      return renderTodoCall(args as never, theme, getState());
-    },
-
-    renderResult(result, _opts, theme, _context) {
-      return renderTodoResult(result, theme);
     },
   });
 }

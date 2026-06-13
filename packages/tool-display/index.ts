@@ -24,6 +24,7 @@ export { globAdapter } from "./adapters/glob.ts";
 export { grepAdapter } from "./adapters/grep.ts";
 export { lsAdapter } from "./adapters/ls.ts";
 export { readAdapter } from "./adapters/read.ts";
+export { todoAdapter } from "./adapters/todo.ts";
 export { writeAdapter } from "./adapters/write.ts";
 export { globalToolDisplayRegistry } from "./registry.ts";
 export {
