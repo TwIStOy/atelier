@@ -1,0 +1,25 @@
+{
+  "name": "@htwang-contrib/todo",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "index.ts",
+  "types": "index.ts",
+  "dependencies": {
+    "@htwang-contrib/common": "*"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-agent-core": "latest",
+    "@earendil-works/pi-ai": "latest",
+    "@earendil-works/pi-coding-agent": "latest",
+    "@earendil-works/pi-tui": "latest",
+    "@sinclair/typebox": "^0.34.0",
+    "@types/node": "^25.9.1",
+    "typescript": "^6.0.0",
+    "vitest": "^4.1.7"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  }
+}
