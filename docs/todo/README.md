@@ -4,9 +4,12 @@
 
 ## Documents
 
-- **[SOURCE-ANALYSIS.md](./SOURCE-ANALYSIS.md)** — Upstream architecture, data flow, and a per-file port mapping (what each file does, what we change, before/after snippets). The reference catalog.
-- **[DESIGN.md](./DESIGN.md)** — Our port's design: package structure, key decisions, module responsibilities, test strategy, and package config.
-- **[STEPS.md](./STEPS.md)** — Step-by-step implementation checklist (the execution plan).
+- **[MODULES.md](./MODULES.md)** — 每个模块的实现规格：导出、签名、行为、校验规则、依赖、移植动作（PORT/ADAPT/REWRITE）、测试覆盖。实现时的逐模块参照表。
+- **[SOURCE-ANALYSIS.md](./SOURCE-ANALYSIS.md)** — 上游架构、数据流、逐文件 before/after（rpiv → 本 monorepo 的改动片段）。reference catalog。
+- **[DESIGN.md](./DESIGN.md)** — 端口设计：包结构、关键决策、模块职责一览、测试策略、package 配置。
+- **[STEPS.md](./STEPS.md)** — 分阶段实施 checklist（Phase 0–6），每步对应模块与设计章节。
+
+> 四份文档的关系：MODULES = 「做成什么样」（what），DESIGN = 「为什么这么定」（why），SOURCE-ANALYSIS = 「上游长啥样/改哪」（reference），STEPS = 「按什么顺序做」（how/when）。
 
 ## Quick Summary
 
