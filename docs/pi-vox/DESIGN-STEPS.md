@@ -16,11 +16,11 @@
 | 3 | 安全层:`secrets.ts`(`redactSecrets` / `safeError`) | § 11.1 | [x] |
 | 4 | 录音抽象:`audio/recorder.ts`(跨平台命令选择)+ `audio/capture.ts`(`LocalAudioCapture`) | § 6 | [x] |
 | 5 | STT Provider:`providers/mimo-stt.ts` + `providers/index.ts` + `providers/presets.ts` | § 5.2 / § 7 | [x] |
-| 6 | Flow 编排:`flow.ts`(`VoiceInputFlow` + `mergeTranscript` + `withTimeout`) | § 4 / § 8 | [ ] |
+| 6 | Flow 编排:`flow.ts`(`VoiceInputFlow` + `mergeTranscript` + `withTimeout`) | § 4 / § 8 | [x] |
 | 7 | 扩展入口:`index.ts`(3 命令 + `session_start` + 模块级 `commandFlow`) | § 9 | [ ] |
 | 8 | 收尾:README、AGENTS.md 链接、`tsc --build`、`npm run format`、验收清单逐项过 | § 13 | [ ] |
 
-**当前停在哪一 phase:** Phase 5 完成(mimo-stt chat 多模态转写 + SttError + createSttProvider 工厂 + 24 单测全绿,OpenAI 标准 input_audio 格式 + 密钥脱敏全覆盖),待进 Phase 6 Flow 编排
+**当前停在哪一 phase:** Phase 6 完成(flow.ts:mergeTranscript + withTimeout + VoiceInputFlow 全流程编排 + 20 单测全绿,整合 Phase 2-5 产物),待进 Phase 7 扩展入口
 
 ---
 
