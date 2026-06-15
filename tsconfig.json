@@ -21,6 +21,7 @@
     { "path": "packages/web-tools" },
     { "path": "packages/message-queue" },
     { "path": "packages/auto-compact" },
-    { "path": "packages/todo" }
+    { "path": "packages/todo" },
+    { "path": "packages/voice-input" }
   ]
 }

@@ -26,7 +26,7 @@
       "packages/extension-config-ui",
       "packages/web-tools",
       "packages/message-queue",
-    "packages/auto-compact"
+      "packages/auto-compact"
     ],
     "skills": [
       "skills/code-philosophy",

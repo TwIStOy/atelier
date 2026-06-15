@@ -1,0 +1,47 @@
+{
+  "name": "@htwang-contrib/voice-input",
+  "version": "0.1.0",
+  "description": "Pi extension. Voice dictation via spawn-based cross-platform recording + cloud OpenAI-compatible STT, appended to the editor.",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "voice-input",
+    "stt",
+    "speech-to-text",
+    "dictation",
+    "ai",
+    "llm",
+    "agent"
+  ],
+  "type": "module",
+  "main": "index.ts",
+  "types": "index.ts",
+  "license": "MIT",
+  "files": [
+    "index.ts",
+    "config.ts",
+    "types.ts",
+    "flow.ts",
+    "secrets.ts",
+    "base64.ts",
+    "audio/",
+    "providers/"
+  ],
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "dependencies": {
+    "@htwang-contrib/common": "*"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "latest",
+    "@types/node": "^25.9.1",
+    "typescript": "^6.0.0",
+    "vitest": "^4.1.7"
+  }
+}
