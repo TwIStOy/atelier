@@ -26,7 +26,8 @@
       "packages/extension-config-ui",
       "packages/web-tools",
       "packages/message-queue",
-      "packages/auto-compact"
+      "packages/auto-compact",
+      "packages/voice-input"
     ],
     "skills": [
       "skills/code-philosophy",
