@@ -134,11 +134,11 @@ function makeHeader(
   let statusIcon: string;
   if (toolName === "subagent") {
     const fin = subagentRunFinished(details);
-    if (fin === "ok") statusIcon = theme.fg("success", "✓");
-    else if (fin === "err") statusIcon = theme.fg("error", "✗");
+    if (fin === "ok") statusIcon = theme.fg("success", "◆");
+    else if (fin === "err") statusIcon = theme.fg("error", "◆");
     else if (isPartial) statusIcon = spinnerGlyph(theme, spinAt);
-    else if (isError) statusIcon = theme.fg("error", "✗");
-    else statusIcon = theme.fg("success", "✓");
+    else if (isError) statusIcon = theme.fg("error", "◆");
+    else statusIcon = theme.fg("success", "◆");
   } else if (toolName === "subagent_status") {
     const d =
       details && typeof details === "object"
@@ -147,20 +147,20 @@ function makeHeader(
     const st = typeof d?.status === "string" ? d.status : "";
     if (st === "running") statusIcon = spinnerGlyph(theme, spinAt);
     else if (st === "unknown" || st === "error") {
-      statusIcon = theme.fg("error", "✗");
+      statusIcon = theme.fg("error", "◆");
     } else if (st === "done" && d?.ok === false) {
-      statusIcon = theme.fg("error", "✗");
+      statusIcon = theme.fg("error", "◆");
     } else if (isError) {
-      statusIcon = theme.fg("error", "✗");
+      statusIcon = theme.fg("error", "◆");
     } else {
-      statusIcon = theme.fg("success", "✓");
+      statusIcon = theme.fg("success", "◆");
     }
   } else {
     statusIcon = isPartial
       ? spinnerGlyph(theme, spinAt)
       : isError
-        ? theme.fg("error", "✗")
-        : theme.fg("success", "✓");
+        ? theme.fg("error", "◆")
+        : theme.fg("success", "◆");
   }
 
   const headerText = adapter
