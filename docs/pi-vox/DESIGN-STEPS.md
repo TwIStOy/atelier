@@ -10,7 +10,7 @@
 
 | Phase | 目标 | → DESIGN.md 章节 | 状态 |
 | --- | --- | --- | --- |
-| 0 | API 验证:确认 `ctx.ui.setWidget` / `getEditorText` / `setEditorText` / `notify`、`registerCommand`、`session_start`、`@htwang-contrib/common` 配置 API 可用 | § 2.2 / § 9 / § 12 | [ ] |
+| 0 | API 验证:确认 `ctx.ui.setWidget` / `getEditorText` / `setEditorText` / `notify`、`registerCommand`、`session_start`、`@htwang-contrib/common` 配置 API 可用 | § 2.2 / § 9 / § 12 | [x] |
 | 1 | 仓库骨架:`packages/voice-input` 目录、`package.json`、`tsconfig.json`、空扩展可加载、根 `tsconfig` reference | § 3 | [ ] |
 | 2 | 配置层:`config.ts` schema + `loadConfig` + `registerConfigItems` + provider 预设 | § 5 / § 12 | [ ] |
 | 3 | 安全层:`secrets.ts`(`redactSecrets` / `safeError`) | § 11.1 | [ ] |
@@ -20,13 +20,34 @@
 | 7 | 扩展入口:`index.ts`(3 命令 + `session_start` + 模块级 `commandFlow`) | § 9 | [ ] |
 | 8 | 收尾:README、AGENTS.md 链接、`tsc --build`、`npm run format`、验收清单逐项过 | § 13 | [ ] |
 
-**当前停在哪一 phase:** 未开始
+**当前停在哪一 phase:** Phase 0 完成(API 验证 + inference 网关实测),待进 Phase 1 仓库骨架
 
 ---
 
 ## Phase 0:API 验证
 
 > **关联**:DESIGN.md § 2.2(extension-config-ui 接入范式)、§ 9(扩展入口依赖的 ctx.ui 方法)、§ 12(与 common 的边界)。所有后续 Phase 的前提。
+
+### API 验证结果(2026-06-15 完成)
+
+- **@earendil-works/pi-coding-agent 版本**: dist 类型定义实测
+- **Step 0.1 ctx.ui 方法**: ✅ 齐全 — `setWidget(key, content: string[] | undefined, options?: { placement?: "aboveEditor" | "belowEditor" })`、`getEditorText(): string`、`setEditorText(text: string)`、`notify(message, type?: "info"|"warning"|"error")` 签名完全匹配。`setWidget` 默认 placement 是 `aboveEditor`(与 DESIGN § 10 浮层设计一致)。注意:命令 handler 收到的是 `ExtensionCommandContext`(含 `waitForIdle`/`reload` 等),事件 handler 收到 `ExtensionContext`。
+- **Step 0.2 registerCommand / on**: ✅ 齐全 — `pi.registerCommand(name, { description, handler: (args: string, ctx: ExtensionCommandContext) => Promise<void> })`;`pi.on("session_start", handler)` 支持。
+- **Step 0.3 @htwang-contrib/common 配置 API**: ✅ 齐全 — `registerConfigItems`/`readConfig`/`writeConfig`/`ExtensionConfigSchema`/`ConfigItem` 及子类型(`SelectConfigItem`/`StringConfigItem`/`NumberConfigItem`)均为 runtime export(common `main: "index.ts"`,pi 直接加载 .ts,无构建步骤)。用临时骨架跑 `tsc --noEmit` 零错误。
+- **Step 0.4 inference 网关 mimo-v2.5 转写**: ✅ 实测通过,见下方独立小节。**发现关键差异:网关要求 OpenAI 标准 `input_audio: { format: "wav", data: <纯base64> }`,非 pi-mimo-voice 的 data URL 格式**(后者静默失败返回 `[NO SPEECH]`)。DESIGN.md § 2.2/§ 7.2 已据此更新。
+- **结论**: 无缺失,Phase 1–8 可直接开工。
+
+#### Step 0.4 实测详情(journal 20260615-062010-001)
+
+用 macOS `say` 合成中英文音频 → ffmpeg 转 16kHz mono s16le wav → base64 → POST `inference.twistoy.cn/v1/chat/completions`:
+
+| 格式 | 结果 |
+| --- | --- |
+| `{ input_audio: { format: "wav", data: <纯base64> } }`(OpenAI 标准) | ✅ HTTP 200,中英文都正确转写,~5s |
+| `{ input_audio: { data: "data:audio/wav;base64,..." } }`(pi-mimo-voice 的 data URL) | ⚠️ HTTP 200 但返回 `[NO SPEECH]`、`audio_tokens: 0`(静默失败) |
+| `{ image_url: { url: "data:audio/wav;base64,..." } }` | ❌ 400 "Multimodal data is corrupted" |
+
+响应解析:`choices[0].message.content`(fallback `reasoning_content`,实测一般为空)。鉴权头 `Authorization: Bearer` 被网关接受。`usage.prompt_tokens_details.audio_tokens` 始终 0(网关未统计,不影响功能)。
 
 ### Step 0.1 — 确认 `ExtensionContext.ui` 方法
 
@@ -97,12 +118,34 @@ curl -s -X POST https://inference.twistoy.cn/v1/chat/completions \
 
 ### Step 0.5 — 记录验证结果
 
-在本文件 Phase 0 标题下方新增「API 验证结果」小节,记录:
+已完成,见上方「API 验证结果」小节。
 
-- `@earendil-works/pi-coding-agent` 版本号
-- 各 Step 0.1–0.3 的结论(齐全 / 缺失 / 有差异)
-- Step 0.4 的 curl 实测结果(端点、model、响应格式)
-- 若缺失或实测不符:记录影响哪个 Phase,DESIGN.md 哪一节需要更新
+### 后续 Phase 的 API 验证盘点
+
+Phase 0 验证后,以下是后续 Phase 涉及的 API 分类。**类型检查全部通过**(Node ≥22 原生全局 + pi 类型定义),只有少数需运行时实测:
+
+| Phase | API | 类型检查 | 运行时实测 | 备注 |
+| --- | --- | --- | --- | --- |
+| 4 录音 | `node:child_process` spawn/spawnSync | ✅ | ⏳ 手测 | web-tools `interceptors/github.ts` 已用同模式 |
+| 4 录音 | `node:fs` mkdtempSync/rmSync/existsSync | ✅ | ✅ 稳定 | 同上 |
+| 4 录音 | ffmpeg/parecord/sox 命令存在性 | N/A | ⏳ 各平台手测 | `commandExists` 用 `spawnSync('command',['-v',name])` |
+| 4 录音 | ffmpeg exit code 白名单(0/130/255) | N/A | ⏳ macOS 手测 | 255 是 avfoundation SIGINT 怪行为 |
+| 5 STT | `fetch` / `FormData` / `Blob` | ✅ | ✅ 实测 | Node 22 原生全局,Step 0.4 已验证 |
+| 5 STT | `node:fs` readFile(音频进内存) | ✅ | ✅ 稳定 | |
+| 5 STT | inference 网关 `/chat/completions` | ✅ | ✅ Step 0.4 实测 | OpenAI 标准 input_audio 格式 |
+| 6 flow | `Promise.race` + setTimeout(withTimeout) | ✅ | ✅ 稳定 | |
+| 7 入口 | `setWidget(placement?: 'aboveEditor'\|'belowEditor')` | ✅ | ⏳ 手测浮层渲染 | 默认 aboveEditor,与 DESIGN § 10 一致 |
+| 7 入口 | `getEditorText` / `setEditorText` | ✅ | ⏳ 手测 append | |
+| 7 入口 | `session_start` 事件 reload 重置 commandFlow | ✅ | ⏳ 手测 | DESIGN § 9 风险点 |
+
+**需运行时实测的项**(留到 Phase 7 手测阶段一次性验证):
+
+1. ffmpeg 录音 → SIGINT 停止 → exit code 是否落在白名单(macOS)
+2. setWidget 浮层是否正确渲染在输入框上方并随状态切换
+3. getEditorText/setEditorText 的 append 流程
+4. `/reload` 后 `session_start` 是否可靠重置 `commandFlow`(避免漏清)
+
+这些都在 Phase 7 Step 7.2 的手测清单里,无需提前做。
 
 ---
 
