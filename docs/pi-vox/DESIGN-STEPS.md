@@ -18,9 +18,9 @@
 | 5 | STT Provider:`providers/mimo-stt.ts` + `providers/index.ts` + `providers/presets.ts` | § 5.2 / § 7 | [x] |
 | 6 | Flow 编排:`flow.ts`(`VoiceInputFlow` + `mergeTranscript` + `withTimeout`) | § 4 / § 8 | [x] |
 | 7 | 扩展入口:`index.ts`(3 命令 + `session_start` + 模块级 `commandFlow`) | § 9 | [x] |
-| 8 | 收尾:README、AGENTS.md 链接、`tsc --build`、`npm run format`、验收清单逐项过 | § 13 | [ ] |
+| 8 | 收尾:README、AGENTS.md 链接、`tsc --build`、`npm run format`、验收清单逐项过 | § 13 | [x] |
 
-**当前停在哪一 phase:** Phase 7 完成(index.ts:3 命令 + session_start + VoiceInputController 可测试状态机,演进 DESIGN 的模块全局为实例状态 + 12 单测覆盖重入/失败/脱敏),待进 Phase 8 收尾(README + AGENTS.md + 验收清单);Step 7.2 手测需在真实 pi TUI 中跑
+**当前停在哪一 phase:** Phase 0–8 代码全部完成(tsc/format/392 单测全绿、jiti 加载验证 3 命令注册 + session_start)。代码侧收尾完毕。剩余仅 Step 7.2 + §13 中需要真实麦克风/真实 pi TUI 的人测项(/voice-toggle 录音→转写→插入、/voice-cancel、错误脱敏、临时文件清理、macOS+Linux 双平台),需用户在本机执行
 
 ---
 
