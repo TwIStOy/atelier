@@ -17,10 +17,10 @@
 | 4 | 录音抽象:`audio/recorder.ts`(跨平台命令选择)+ `audio/capture.ts`(`LocalAudioCapture`) | § 6 | [x] |
 | 5 | STT Provider:`providers/mimo-stt.ts` + `providers/index.ts` + `providers/presets.ts` | § 5.2 / § 7 | [x] |
 | 6 | Flow 编排:`flow.ts`(`VoiceInputFlow` + `mergeTranscript` + `withTimeout`) | § 4 / § 8 | [x] |
-| 7 | 扩展入口:`index.ts`(3 命令 + `session_start` + 模块级 `commandFlow`) | § 9 | [ ] |
+| 7 | 扩展入口:`index.ts`(3 命令 + `session_start` + 模块级 `commandFlow`) | § 9 | [x] |
 | 8 | 收尾:README、AGENTS.md 链接、`tsc --build`、`npm run format`、验收清单逐项过 | § 13 | [ ] |
 
-**当前停在哪一 phase:** Phase 6 完成(flow.ts:mergeTranscript + withTimeout + VoiceInputFlow 全流程编排 + 20 单测全绿,整合 Phase 2-5 产物),待进 Phase 7 扩展入口
+**当前停在哪一 phase:** Phase 7 完成(index.ts:3 命令 + session_start + VoiceInputController 可测试状态机,演进 DESIGN 的模块全局为实例状态 + 12 单测覆盖重入/失败/脱敏),待进 Phase 8 收尾(README + AGENTS.md + 验收清单);Step 7.2 手测需在真实 pi TUI 中跑
 
 ---
 
