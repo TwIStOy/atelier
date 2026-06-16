@@ -26,6 +26,7 @@ import {
 import { renderTabBar } from "./render/tab-bar.ts";
 import { renderSearchBar } from "./render/search-bar.ts";
 import { renderSettingList, renderSelectPage } from "./render/setting-list.ts";
+import type { ConfigItemPreviewHandle } from "@htwang-contrib/common";
 import { renderFooter } from "./render/footer.ts";
 import { divider, wrapLine } from "./render/frame.ts";
 import type {
@@ -82,6 +83,34 @@ function createConfigComponent(
   const selectedRow = (): SettingRow | undefined => {
     clamp();
     return filtered()[ui.selected];
+  };
+
+  let previewHandle: ConfigItemPreviewHandle | undefined;
+
+  const disposePreview = (): void => {
+    previewHandle?.dispose?.();
+    previewHandle = undefined;
+  };
+
+  const ensurePreview = (): void => {
+    const row = selectedRow();
+    const preview = row?.item.preview;
+    if (!preview) {
+      disposePreview();
+      return;
+    }
+    if (previewHandle) return;
+    previewHandle = preview({
+      getValue: () => {
+        if (ui.selecting && row) {
+          const opts = getSelectOptions(row);
+          const opt = opts[ui.selecting.selectedOptionIndex];
+          if (opt) return opt.value;
+        }
+        return row?.currentValue;
+      },
+      requestRender,
+    });
   };
 
   const cycle = <T extends string>(
@@ -439,9 +468,18 @@ function createConfigComponent(
     if (ui.selecting) {
       const row = findRowById(rows, ui.selecting.rowId);
       if (row) {
+        ensurePreview();
         lines.push(theme.fg("accent", theme.bold(" Extension Settings")));
         lines.push("");
-        lines.push(...renderSelectPage(row, ui.selecting, safeWidth, theme));
+        lines.push(
+          ...renderSelectPage(
+            row,
+            ui.selecting,
+            safeWidth,
+            theme,
+            previewHandle,
+          ),
+        );
         lines.push("");
         lines.push(divider(safeWidth, theme));
         lines.push(
@@ -453,6 +491,8 @@ function createConfigComponent(
       }
       return lines;
     }
+
+    disposePreview();
 
     lines.push(theme.fg("accent", theme.bold(" Extension Settings")));
     lines.push("");
@@ -492,7 +532,7 @@ function createConfigComponent(
     return lines;
   }
 
-  return { handleInput, invalidate() {}, render };
+  return { handleInput, invalidate() {}, render, dispose: disposePreview };
 }
 
 export async function openConfigPopup(

@@ -5,10 +5,11 @@ import type {
   ReorderableConfigItem,
   SelectConfigItem,
   MultiSelectConfigItem,
+  ConfigItemPreviewHandle,
 } from "@htwang-contrib/common";
 import { glyphs } from "./glyphs.ts";
 import { SELECT_PAGE_SIZE } from "../types.ts";
-import { pad, wrapLine } from "./frame.ts";
+import { divider, pad, wrapLine } from "./frame.ts";
 import type { InlineEditState, SelectingState, SettingRow } from "../types.ts";
 
 const HEX_COLOR_RE = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
@@ -206,6 +207,7 @@ export function renderSelectPage(
   selecting: SelectingState,
   width: number,
   theme: Theme,
+  preview?: ConfigItemPreviewHandle,
 ): string[] {
   const lines: string[] = [];
   lines.push(
@@ -320,6 +322,15 @@ export function renderSelectPage(
     lines.push(
       theme.fg("dim", `  ↓ ${displayOpts.length - scrollEnd} more below`),
     );
+  }
+
+  if (preview) {
+    const previewLines = preview.render(width, theme);
+    if (previewLines.length > 0) {
+      lines.push("");
+      lines.push(divider(width, theme));
+      lines.push(...previewLines);
+    }
   }
 
   return lines;
