@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { Theme } from "@earendil-works/pi-coding-agent";
+import { visibleWidth } from "@earendil-works/pi-tui";
 import { renderToolCall } from "./tool-call-display.ts";
 import { globalToolDisplayRegistry } from "./registry.ts";
 import { editAdapter } from "./adapters/edit.ts";
 import { writeAdapter } from "./adapters/write.ts";
+import { todoAdapter } from "./adapters/todo.ts";
 
 const PLAIN_THEME: Theme = {
   fg: (_c: string, text: string) => text,
@@ -94,5 +96,32 @@ describe("renderToolCall collapsed error reason", () => {
     ).render(80);
     const joined = lines.join("\n");
     expect(joined).toContain("Read the file before editing it.");
+  });
+});
+
+describe("todo adapter collapsed-content width safety", () => {
+  it("truncates long create output to fit a narrow terminal", () => {
+    globalToolDisplayRegistry.register("todo", todoAdapter);
+    const result = renderToolCall(
+      {
+        toolName: "todo",
+        args: {
+          action: "create",
+          subject:
+            "Fix todo adapter collapsed-content overflow crash in narrow terminals",
+        },
+        output:
+          "Created #1: Fix todo adapter collapsed-content overflow crash in narrow terminals (pending)",
+        expanded: false,
+        isPartial: false,
+        isError: false,
+        registry: globalToolDisplayRegistry,
+      },
+      PLAIN_THEME,
+    );
+    const lines = result.render(45);
+    for (const line of lines) {
+      expect(visibleWidth(line)).toBeLessThanOrEqual(45);
+    }
   });
 });

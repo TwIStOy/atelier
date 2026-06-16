@@ -1,5 +1,9 @@
 import type { ThemeColor } from "@earendil-works/pi-coding-agent";
-import { visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
+import {
+  truncateToWidth,
+  visibleWidth,
+  wrapTextWithAnsi,
+} from "@earendil-works/pi-tui";
 import type { ToolDisplayAdapter } from "../types.ts";
 import { formatExpandedToolOutputLines } from "./shared.ts";
 
@@ -88,7 +92,7 @@ export const todoAdapter: ToolDisplayAdapter<TodoArgs> = {
     return attachSubject(core, theme.fg("dim", subject), width);
   },
 
-  formatCollapsedContent(args, output, theme, _width, details) {
+  formatCollapsedContent(args, output, theme, width, details) {
     if (!output) return [];
 
     const d = details as { error?: string } | undefined;
@@ -96,19 +100,25 @@ export const todoAdapter: ToolDisplayAdapter<TodoArgs> = {
     const line = firstLine(output);
 
     if (d?.error || line.startsWith("Error:")) {
-      return [theme.fg("muted", `└ ${line}`)];
+      return [truncateToWidth(theme.fg("muted", `└ ${line}`), width, "…")];
     }
 
     switch (action) {
       case "list": {
         if (line === "No tasks" || !line) {
-          return [theme.fg("muted", "└ 0 tasks")];
+          return [truncateToWidth(theme.fg("muted", "└ 0 tasks"), width, "…")];
         }
         const count = output.split("\n").filter((l) => l.trim()).length;
-        return [theme.fg("muted", `└ ${count} task${count === 1 ? "" : "s"}`)];
+        return [
+          truncateToWidth(
+            theme.fg("muted", `└ ${count} task${count === 1 ? "" : "s"}`),
+            width,
+            "…",
+          ),
+        ];
       }
       default:
-        return [theme.fg("muted", `└ ${line}`)];
+        return [truncateToWidth(theme.fg("muted", `└ ${line}`), width, "…")];
     }
   },
 
