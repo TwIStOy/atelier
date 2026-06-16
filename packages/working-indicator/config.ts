@@ -4,6 +4,7 @@ import {
   type ExtensionConfigSchema,
 } from "@htwang-contrib/common";
 import { DEFAULT_SPINNER, SPINNER_STYLES } from "./spinner.ts";
+import { createSpinnerPreview } from "./preview.ts";
 
 export interface WorkingIndicatorConfig {
   spinner: string;
@@ -31,13 +32,14 @@ export function registerWorkingIndicatorConfigItems(): void {
       label: "Spinner Style",
       value: () => loadConfig().spinner,
       options: Object.entries(SPINNER_STYLES).map(([value, style]) => ({
-        label: `${value} (${style.frames[0]} ${style.intervalMs}ms)`,
+        label: `${style.frames[0]}  ${value} · ${style.intervalMs}ms`,
         value,
       })),
       description:
         "Spinner preset: the glyph sequence, its visual width, and frame interval.",
       extensionLabel: "Working Indicator",
       order: 0,
+      preview: createSpinnerPreview(),
     },
   ]);
 }
