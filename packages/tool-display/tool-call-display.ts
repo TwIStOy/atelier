@@ -296,7 +296,29 @@ export function renderToolCall(
           lsCollapsedPartial ||
           (opts.toolName === "subagent" && !opts.expanded));
 
-      if (useAdapter) {
+      const erroredReason =
+        opts.isError && !opts.isPartial && out.trim().length > 0;
+
+      if (erroredReason) {
+        const reason = out.replace(/\n+/g, " ").trim();
+        const innerWidth = Math.max(1, width - INDENT.length - 2);
+        if (opts.expanded) {
+          const wrapped = wrapTextWithAnsi(reason, innerWidth);
+          for (const wl of wrapped) {
+            lines.push(
+              INDENT +
+                theme.fg("error", "\u2260 ") +
+                theme.fg("muted", truncateToWidth(wl, innerWidth, "\u2026")),
+            );
+          }
+        } else {
+          lines.push(
+            INDENT +
+              theme.fg("error", "\u2260 ") +
+              theme.fg("muted", truncateToWidth(reason, innerWidth, "\u2026")),
+          );
+        }
+      } else if (useAdapter) {
         const contentLines = opts.expanded
           ? adapter.formatExpandedContent(
               opts.args,
