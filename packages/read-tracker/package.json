@@ -1,0 +1,15 @@
+{
+  "name": "@htwang-contrib/read-tracker",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "index.ts",
+  "types": "index.ts",
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "latest",
+    "@htwang-contrib/common": "*",
+    "@types/node": "^25.9.1",
+    "cli-table3": "^0.6.5",
+    "typescript": "^6.0.0",
+    "vitest": "^4.1.7"
+  }
+}
