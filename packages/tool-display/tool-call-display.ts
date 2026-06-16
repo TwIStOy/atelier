@@ -307,14 +307,14 @@ export function renderToolCall(
           for (const wl of wrapped) {
             lines.push(
               INDENT +
-                theme.fg("error", "\u2260 ") +
+                theme.fg("error", " ") +
                 theme.fg("muted", truncateToWidth(wl, innerWidth, "\u2026")),
             );
           }
         } else {
           lines.push(
             INDENT +
-              theme.fg("error", "\u2260 ") +
+              theme.fg("error", " ") +
               theme.fg("muted", truncateToWidth(reason, innerWidth, "\u2026")),
           );
         }
