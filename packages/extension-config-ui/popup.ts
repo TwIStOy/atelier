@@ -14,6 +14,7 @@ import {
   resetSetting,
   resetExtensionSettings,
   getSelectOptions,
+  buildSelectDisplayOptions,
   toggleMultiSelectValue,
   toggleReorderableValue,
   moveReorderableItem,
@@ -105,8 +106,11 @@ function createConfigComponent(
     previewHandle = preview({
       getValue: () => {
         if (ui.selecting && row) {
-          const opts = getSelectOptions(row);
-          const opt = opts[ui.selecting.selectedOptionIndex];
+          const { options } = buildSelectDisplayOptions(
+            row,
+            ui.selecting.filter,
+          );
+          const opt = options[ui.selecting.selectedOptionIndex];
           if (opt) return opt.value;
         }
         return row?.currentValue;
@@ -176,6 +180,7 @@ function createConfigComponent(
         rowId: row.id,
         selectedOptionIndex: initialIndex,
         scroll,
+        filter: "",
       };
       requestRender();
       return;
@@ -236,30 +241,37 @@ function createConfigComponent(
 
     if (ui.selecting) {
       const row = findRowById(rows, ui.selecting.rowId);
-      const rawOpts = row ? getSelectOptions(row) : [];
-
-      let opts: typeof rawOpts;
-      if (row?.item.type === "reorderable") {
-        const vals = Array.isArray(row.currentValue)
-          ? (row.currentValue as unknown[])
-          : [];
-        const selectedSet = new Set(vals.map((v) => JSON.stringify(v)));
-        const optMap = new Map(
-          rawOpts.map((o) => [JSON.stringify(o.value), o]),
-        );
-        const selected = vals
-          .map((v) => optMap.get(JSON.stringify(v)))
-          .filter((o): o is (typeof rawOpts)[number] => o !== undefined);
-        const unselected = rawOpts.filter(
-          (o) => !selectedSet.has(JSON.stringify(o.value)),
-        );
-        opts = [...selected, ...unselected];
-      } else {
-        opts = rawOpts;
-      }
+      const { options: opts, canFilter } = row
+        ? buildSelectDisplayOptions(row, ui.selecting.filter)
+        : { options: [], canFilter: false };
+      const filterActive = ui.selecting.filter.length > 0;
 
       if (matchesKey(data, Key.escape)) {
-        ui.selecting = undefined;
+        if (filterActive) {
+          ui.selecting.filter = "";
+          ui.selecting.selectedOptionIndex = 0;
+          ui.selecting.scroll = 0;
+        } else {
+          ui.selecting = undefined;
+        }
+        requestRender();
+        return;
+      }
+      if (
+        canFilter &&
+        (matchesKey(data, "backspace") || matchesKey(data, "ctrl+u"))
+      ) {
+        if (matchesKey(data, "ctrl+u")) ui.selecting.filter = "";
+        else ui.selecting.filter = ui.selecting.filter.slice(0, -1);
+        ui.selecting.selectedOptionIndex = 0;
+        syncSelectScroll(ui.selecting, opts.length);
+        requestRender();
+        return;
+      }
+      if (canFilter && data.length === 1 && data >= " " && data !== "\x7f") {
+        ui.selecting.filter += data;
+        ui.selecting.selectedOptionIndex = 0;
+        syncSelectScroll(ui.selecting, opts.length);
         requestRender();
         return;
       }
@@ -323,6 +335,7 @@ function createConfigComponent(
       }
       if (
         row?.item.type === "reorderable" &&
+        !filterActive &&
         (matchesKey(data, "alt+up") || matchesKey(data, "ctrl+p"))
       ) {
         const vals = Array.isArray(row.currentValue)
@@ -347,6 +360,7 @@ function createConfigComponent(
       }
       if (
         row?.item.type === "reorderable" &&
+        !filterActive &&
         (matchesKey(data, "alt+down") || matchesKey(data, "ctrl+n"))
       ) {
         const vals = Array.isArray(row.currentValue)
@@ -486,7 +500,12 @@ function createConfigComponent(
         lines.push(divider(safeWidth, theme));
         lines.push(
           ...wrapLine(
-            renderFooter(theme, "selecting", row.item.type === "reorderable"),
+            renderFooter(
+              theme,
+              "selecting",
+              row.item.type === "reorderable",
+              !!ui.selecting && ui.selecting.filter.length > 0,
+            ),
             safeWidth,
           ),
         );

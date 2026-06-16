@@ -40,6 +40,7 @@ export interface SelectingState {
   rowId: string;
   selectedOptionIndex: number;
   scroll: number;
+  filter: string;
   reordering?: boolean;
 }
 

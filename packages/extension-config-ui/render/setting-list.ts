@@ -9,6 +9,7 @@ import type {
 } from "@htwang-contrib/common";
 import { glyphs } from "./glyphs.ts";
 import { SELECT_PAGE_SIZE } from "../types.ts";
+import { buildSelectDisplayOptions } from "../config-registry.ts";
 import { divider, pad, wrapLine } from "./frame.ts";
 import type { InlineEditState, SelectingState, SettingRow } from "../types.ts";
 
@@ -209,47 +210,42 @@ export function renderSelectPage(
   theme: Theme,
   preview?: ConfigItemPreviewHandle,
 ): string[] {
+  const safeWidth = Math.max(1, width);
   const lines: string[] = [];
   lines.push(
-    theme.fg("accent", theme.bold(`  ${row.item.label ?? row.item.key}`)),
+    truncateToWidth(
+      theme.fg("accent", theme.bold(`  ${row.item.label ?? row.item.key}`)),
+      safeWidth,
+      "…",
+    ),
   );
 
   const desc = row.item.description;
-  if (desc) lines.push(theme.fg("muted", `    ${desc}`));
+  if (desc) {
+    for (const dl of wrapLine(`    ${desc}`, safeWidth)) {
+      lines.push(theme.fg("muted", dl));
+    }
+  }
   lines.push("");
 
-  const rawOpts =
-    row.item.type === "select"
-      ? (row.item as SelectConfigItem).options
-      : row.item.type === "multiselect"
-        ? (row.item as MultiSelectConfigItem).options
-        : row.item.type === "reorderable"
-          ? (row.item as ReorderableConfigItem).options
-          : [];
-  const opts = typeof rawOpts === "function" ? rawOpts() : rawOpts;
+  const {
+    options: displayOpts,
+    reorderableOrder,
+    canFilter,
+  } = buildSelectDisplayOptions(row, selecting.filter);
 
-  let displayOpts: typeof opts;
+  if (canFilter) {
+    lines.push(renderSelectSearchBar(selecting.filter, safeWidth, theme));
+    lines.push("");
+  }
+
   let selectedValues: unknown[] | undefined;
-  let reorderableValues: unknown[] | undefined;
 
   if (row.item.type === "reorderable") {
-    reorderableValues = Array.isArray(row.currentValue)
+    selectedValues = Array.isArray(row.currentValue)
       ? (row.currentValue as unknown[])
       : [];
-    selectedValues = reorderableValues;
-    const selectedSet = new Set(
-      reorderableValues.map((v) => JSON.stringify(v)),
-    );
-    const optMap = new Map(opts.map((o) => [JSON.stringify(o.value), o]));
-    const selected = reorderableValues
-      .map((v) => optMap.get(JSON.stringify(v)))
-      .filter((o): o is (typeof opts)[number] => o !== undefined);
-    const unselected = opts.filter(
-      (o) => !selectedSet.has(JSON.stringify(o.value)),
-    );
-    displayOpts = [...selected, ...unselected];
   } else {
-    displayOpts = opts;
     selectedValues =
       row.item.type === "multiselect"
         ? (row.currentValue as unknown[])
@@ -261,79 +257,95 @@ export function renderSelectPage(
   const scrollEnd = Math.min(scrollStart + pageSize, displayOpts.length);
 
   if (scrollStart > 0) {
-    lines.push(theme.fg("dim", `  ↑ ${scrollStart} more above`));
+    lines.push(
+      truncateToWidth(
+        theme.fg("dim", `  ↑ ${scrollStart} more above`),
+        safeWidth,
+        "",
+      ),
+    );
+  }
+
+  if (displayOpts.length === 0) {
+    lines.push(theme.fg("muted", "  No matching options."));
   }
 
   for (let i = scrollStart; i < scrollEnd; i++) {
+    const opt = displayOpts[i]!;
     const isSelected = i === selecting.selectedOptionIndex;
     if (row.item.type === "select") {
       const isCurrent =
-        JSON.stringify(displayOpts[i]!.value) ===
-        JSON.stringify(row.currentValue);
+        JSON.stringify(opt.value) === JSON.stringify(row.currentValue);
       const marker = isCurrent ? "●" : "○";
-      const label = isSelected
-        ? theme.fg("text", `  ${marker} ${displayOpts[i]!.label}`)
-        : `  ${marker} ${displayOpts[i]!.label}`;
-      lines.push(
-        isSelected ? theme.bg("selectedBg", pad(label, width)) : label,
-      );
+      const content = `  ${marker} ${opt.label}`;
+      lines.push(renderOptionLine(content, isSelected, safeWidth, theme));
     } else if (row.item.type === "reorderable") {
       const isChecked =
         Array.isArray(selectedValues) &&
         selectedValues.some(
-          (v) => JSON.stringify(v) === JSON.stringify(displayOpts[i]!.value),
+          (v) => JSON.stringify(v) === JSON.stringify(opt.value),
         );
       const checkMarker = isChecked ? "\uDB80\uDD35" : "\uDB80\uDD31";
-      const orderNum = (() => {
-        if (!Array.isArray(reorderableValues)) return "";
-        const idx = reorderableValues.findIndex(
-          (v) => JSON.stringify(v) === JSON.stringify(displayOpts[i]!.value),
-        );
-        return idx >= 0 ? `${idx + 1}.` : "";
-      })();
-      const numStr = orderNum ? `${orderNum.padStart(3)} ` : "    ";
+      const orderNum = reorderableOrder.get(JSON.stringify(opt.value)) ?? 0;
+      const numStr = orderNum > 0 ? `${orderNum}.`.padStart(3) + " " : "    ";
       const reorderGlyph = isSelected && isChecked ? " ↕" : "  ";
-      const label = isSelected
-        ? theme.fg(
-            "text",
-            `  ${checkMarker} ${numStr}${displayOpts[i]!.label}${reorderGlyph}`,
-          )
-        : `  ${checkMarker} ${numStr}${displayOpts[i]!.label}${reorderGlyph}`;
-      lines.push(
-        isSelected ? theme.bg("selectedBg", pad(label, width)) : label,
-      );
+      const content = `  ${checkMarker} ${numStr}${opt.label}${reorderGlyph}`;
+      lines.push(renderOptionLine(content, isSelected, safeWidth, theme));
     } else {
       const isChecked =
         Array.isArray(selectedValues) &&
         selectedValues.some(
-          (v) => JSON.stringify(v) === JSON.stringify(displayOpts[i]!.value),
+          (v) => JSON.stringify(v) === JSON.stringify(opt.value),
         );
       const marker = isChecked ? "\uDB80\uDD35" : "\uDB80\uDD31";
-      const label = isSelected
-        ? theme.fg("text", `  ${marker} ${displayOpts[i]!.label}`)
-        : `  ${marker} ${displayOpts[i]!.label}`;
-      lines.push(
-        isSelected ? theme.bg("selectedBg", pad(label, width)) : label,
-      );
+      const content = `  ${marker} ${opt.label}`;
+      lines.push(renderOptionLine(content, isSelected, safeWidth, theme));
     }
   }
 
   if (scrollEnd < displayOpts.length) {
     lines.push(
-      theme.fg("dim", `  ↓ ${displayOpts.length - scrollEnd} more below`),
+      truncateToWidth(
+        theme.fg("dim", `  ↓ ${displayOpts.length - scrollEnd} more below`),
+        safeWidth,
+        "",
+      ),
     );
   }
 
   if (preview) {
-    const previewLines = preview.render(width, theme);
+    const previewLines = preview.render(safeWidth, theme);
     if (previewLines.length > 0) {
       lines.push("");
-      lines.push(divider(width, theme));
+      lines.push(divider(safeWidth, theme));
       lines.push(...previewLines);
     }
   }
 
   return lines;
+}
+
+function renderOptionLine(
+  content: string,
+  isSelected: boolean,
+  width: number,
+  theme: Theme,
+): string {
+  const safeWidth = Math.max(1, width);
+  const body = isSelected ? theme.fg("text", content) : content;
+  const truncated = truncateToWidth(body, safeWidth, "…");
+  if (isSelected) return theme.bg("selectedBg", pad(truncated, safeWidth));
+  return truncated;
+}
+
+function renderSelectSearchBar(
+  search: string,
+  width: number,
+  theme: Theme,
+): string {
+  const cursor = theme.inverse(" ");
+  const text = ` ${theme.fg("dim", ">")} ${search}${cursor}`;
+  return theme.bg("toolPendingBg", pad(text, width));
 }
 
 function renderInlineEditValue(editing: InlineEditState): string {

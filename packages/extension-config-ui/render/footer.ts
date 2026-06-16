@@ -4,6 +4,7 @@ export function renderFooter(
   theme: Theme,
   mode: "browse" | "editing" | "selecting",
   isReorderable?: boolean,
+  filterActive?: boolean,
 ): string {
   const k = (s: string) => theme.fg("warning", s);
   const d = (s: string) => theme.fg("dim", s);
@@ -30,10 +31,13 @@ export function renderFooter(
 
   if (mode === "selecting") {
     const base = [k("↑↓"), d("navigate"), k("enter"), d("select")];
-    if (isReorderable) {
+    if (filterActive) {
+      base.push(k("type"), d("filter"), k("ctrl+u"), d("clear"));
+    }
+    if (isReorderable && !filterActive) {
       base.push(k("alt+↑↓"), d("reorder"));
     }
-    base.push(k("esc"), d("back"));
+    base.push(k("esc"), d(filterActive ? "clear filter" : "back"));
     return base.join(sep);
   }
 

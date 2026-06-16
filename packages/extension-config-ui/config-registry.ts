@@ -181,6 +181,61 @@ export function moveReorderableItem(
   return vals;
 }
 
+export interface SelectDisplayResult {
+  options: ConfigItemSelectOption[];
+  reorderableOrder: Map<string, number>;
+  canFilter: boolean;
+}
+
+export function filterSelectOptions(
+  options: ConfigItemSelectOption[],
+  query: string,
+): ConfigItemSelectOption[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return options;
+  return options.filter((opt) => opt.label.toLowerCase().includes(q));
+}
+
+export function buildSelectDisplayOptions(
+  row: SettingRow,
+  query: string,
+): SelectDisplayResult {
+  const opts: ConfigItemSelectOption[] = getSelectOptions(row);
+  const canFilter =
+    opts.length > 0 &&
+    opts.every((o) => typeof o.label === "string" && o.label.length > 0);
+
+  if (row.item.type !== "reorderable") {
+    return {
+      options: filterSelectOptions(opts, query),
+      reorderableOrder: new Map(),
+      canFilter,
+    };
+  }
+
+  const vals = Array.isArray(row.currentValue) ? row.currentValue : [];
+  const selectedSet = new Set(vals.map((v) => JSON.stringify(v)));
+  const optMap = new Map(opts.map((o) => [JSON.stringify(o.value), o]));
+  const reorderableOrder = new Map<string, number>();
+  vals.forEach((v, idx) => {
+    const key = JSON.stringify(v);
+    if (optMap.has(key)) reorderableOrder.set(key, idx + 1);
+  });
+  const selected = vals
+    .map((v) => optMap.get(JSON.stringify(v)))
+    .filter((o): o is ConfigItemSelectOption => o !== undefined);
+  const unselected = opts.filter(
+    (o) => !selectedSet.has(JSON.stringify(o.value)),
+  );
+  const ordered = [...selected, ...unselected];
+
+  return {
+    options: filterSelectOptions(ordered, query),
+    reorderableOrder,
+    canFilter,
+  };
+}
+
 export function stringifyValue(value: unknown): string {
   if (value === undefined || value === null) return "";
   if (typeof value === "boolean") return value ? "true" : "false";
