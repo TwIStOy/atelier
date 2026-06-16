@@ -3,7 +3,7 @@ import {
   registerConfigItems,
   type ExtensionConfigSchema,
 } from "@htwang-contrib/common";
-import { DEFAULT_SPINNER, SPINNER_STYLES } from "./spinner.ts";
+import { DEFAULT_SPINNER, SPINNER_STYLES } from "@htwang-contrib/common";
 import { createSpinnerPreview } from "./preview.ts";
 
 export interface WorkingIndicatorConfig {

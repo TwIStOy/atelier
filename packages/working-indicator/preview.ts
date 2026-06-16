@@ -1,5 +1,5 @@
 import type { ConfigItemPreview } from "@htwang-contrib/common";
-import { resolveSpinner } from "./spinner.ts";
+import { resolveSpinner } from "@htwang-contrib/common";
 
 export function createSpinnerPreview(): ConfigItemPreview {
   return ({ getValue, requestRender }) => {

@@ -42,8 +42,10 @@ function makeInitialUiState(): UiState {
   return { tab: TAB_ALL, search: "", selected: 0, scroll: 0 };
 }
 
+const MAX_POPUP_BODY_ROWS = 40;
+
 function computeLayout(terminalRows: number): PopupLayout {
-  const bodyRows = Math.max(8, terminalRows - 2);
+  const bodyRows = Math.max(8, Math.min(MAX_POPUP_BODY_ROWS, terminalRows - 2));
   const listRows = Math.max(4, bodyRows - 7);
   return { bodyRows, innerRows: bodyRows, listRows };
 }

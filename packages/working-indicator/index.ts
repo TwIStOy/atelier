@@ -4,7 +4,7 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import { loadConfig, registerWorkingIndicatorConfigItems } from "./config.ts";
 import { pickPhrase } from "./phrase.ts";
-import { resolveSpinner, SPINNER_STYLES } from "./spinner.ts";
+import { resolveSpinner, SPINNER_STYLES } from "@htwang-contrib/common";
 
 type ThinkingEvent =
   | { type: "thinking_start" }
@@ -70,8 +70,11 @@ export default function (pi: ExtensionAPI) {
     applySpinner(ctx);
   });
 
-  pi.on("agent_start", () => {
+  pi.on("agent_start", (_event, ctx) => {
     currentPhrase = pickPhrase();
+    if (ctx.hasUI) {
+      ctx.ui.setWorkingMessage(currentPhrase);
+    }
   });
 
   pi.on("message_update", (event, ctx) => {
@@ -102,7 +105,6 @@ export default function (pi: ExtensionAPI) {
     if (event.message.role !== "assistant") return;
     thinking = false;
     stopTicking();
-    ctx.ui.setWorkingMessage();
   });
 
   pi.on("session_shutdown", () => {
