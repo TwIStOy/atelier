@@ -135,8 +135,16 @@ export class MyEditor extends CustomEditor {
   private getModelLabel(maxWidth: number): string {
     const model = this.ctx.model;
     const name = model?.name ?? "model unknown";
-    const reasoning = model?.reasoning && this.pi.getThinkingLevel() !== "off";
-    const label = reasoning ? `${name} 🧠` : name;
+    const level = this.pi.getThinkingLevel();
+    const reasoning = model?.reasoning && level !== "off";
+    const parts = [name];
+    if (reasoning) {
+      parts.push("🧠");
+      if (level !== "medium" && level !== "minimal") {
+        parts.push(level);
+      }
+    }
+    const label = parts.join(" ");
     const text = this.fg("text", truncateToWidth(label, maxWidth, "…"));
     return ` ${text} `;
   }

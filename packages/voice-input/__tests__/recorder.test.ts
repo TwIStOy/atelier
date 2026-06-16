@@ -159,7 +159,9 @@ describe("commandExists", () => {
   });
 
   it("returns true for a known-present command", () => {
-    expect(commandExists("ls") || commandExists("node") || commandExists("true")).toBe(true);
+    expect(
+      commandExists("ls") || commandExists("node") || commandExists("true"),
+    ).toBe(true);
   });
 
   it("returns true for the always-present `true` builtin wrapper", () => {

@@ -7,7 +7,10 @@ export function commandExists(name: string): boolean {
   if (process.platform === "win32") {
     return spawnExists("where", [name]);
   }
-  return spawnExists("sh", ["-c", `command -v ${shellQuote(name)} >/dev/null 2>&1`]);
+  return spawnExists("sh", [
+    "-c",
+    `command -v ${shellQuote(name)} >/dev/null 2>&1`,
+  ]);
 }
 
 function spawnExists(cmd: string, args: string[]): boolean {
