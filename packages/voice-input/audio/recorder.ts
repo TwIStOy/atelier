@@ -4,14 +4,23 @@ import type { RecorderKind } from "../types.ts";
 export type ResolvedRecorder = Exclude<RecorderKind, "auto">;
 
 export function commandExists(name: string): boolean {
-  const cmd = process.platform === "win32" ? "where" : "command";
-  const args = process.platform === "win32" ? [name] : ["-v", name];
+  if (process.platform === "win32") {
+    return spawnExists("where", [name]);
+  }
+  return spawnExists("sh", ["-c", `command -v ${shellQuote(name)} >/dev/null 2>&1`]);
+}
+
+function spawnExists(cmd: string, args: string[]): boolean {
   try {
     const result = spawnSync(cmd, args, { stdio: "ignore" });
     return result.status === 0;
   } catch {
     return false;
   }
+}
+
+function shellQuote(name: string): string {
+  return "'" + name.replace(/'/g, "'\\''") + "'";
 }
 
 export function selectRecorder(

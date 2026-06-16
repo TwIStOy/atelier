@@ -159,11 +159,19 @@ describe("commandExists", () => {
   });
 
   it("returns true for a known-present command", () => {
-    expect(commandExists("ls") || commandExists("node")).toBe(true);
+    expect(commandExists("ls") || commandExists("node") || commandExists("true")).toBe(true);
+  });
+
+  it("returns true for the always-present `true` builtin wrapper", () => {
+    expect(commandExists("true")).toBe(true);
   });
 
   it("returns false for a clearly-bogus command name", () => {
     expect(commandExists("definitely-not-a-real-cmd-xyzzy")).toBe(false);
+  });
+
+  it("does not execute shell injection via the command name", () => {
+    expect(commandExists("ls; echo INJECTED")).toBe(false);
   });
 });
 
