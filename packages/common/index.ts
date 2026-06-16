@@ -20,6 +20,8 @@ export {
   extractAnsiRgb,
   mixAnsiRgb,
 } from "./terminal.ts";
+export { SPINNER_STYLES, DEFAULT_SPINNER, resolveSpinner } from "./spinner.ts";
+export type { SpinnerStyle } from "./spinner.ts";
 export type {
   CodingPlanUsage,
   CodingPlanUsageLimit,
