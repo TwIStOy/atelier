@@ -27,6 +27,20 @@ export function selectRecorder(
   );
 }
 
+export function selectStreamRecorder(
+  config: { recorder: RecorderKind },
+  exists: (name: string) => boolean = commandExists,
+): ResolvedRecorder {
+  if (config.recorder !== "auto" && config.recorder !== "parecord") {
+    return config.recorder;
+  }
+  if (exists("ffmpeg")) return "ffmpeg";
+  if (exists("sox")) return "sox";
+  throw new Error(
+    "Stream recording requires ffmpeg or sox (parecord cannot pipe to stdout). Install one of them.",
+  );
+}
+
 export function buildRecorderArgs(
   recorder: ResolvedRecorder,
   file: string,
@@ -68,5 +82,45 @@ function ffmpegInputArgs(device?: string): string[] {
       return ["-f", "dshow", "-i", device || "audio=Microphone"];
     default:
       return ["-f", "pulse", "-i", device || "default"];
+  }
+}
+
+export function buildStreamRecorderArgs(
+  recorder: ResolvedRecorder,
+  device?: string,
+): string[] {
+  const rate = "16000";
+  switch (recorder) {
+    case "ffmpeg":
+      return [
+        "-y",
+        ...ffmpegInputArgs(device),
+        "-ar",
+        rate,
+        "-ac",
+        "1",
+        "-f",
+        "s16le",
+        "-",
+      ];
+    case "sox":
+      return [
+        "-d",
+        "-t",
+        "raw",
+        "-r",
+        rate,
+        "-c",
+        "1",
+        "-b",
+        "16",
+        "-e",
+        "signed-integer",
+        "-",
+      ];
+    case "parecord":
+      throw new Error(
+        "parecord cannot stream raw PCM to stdout; use ffmpeg or sox for VAD mode.",
+      );
   }
 }

@@ -5,12 +5,24 @@ import {
   resolveApiKey,
 } from "./config.ts";
 import { LocalAudioCapture } from "./audio/capture.ts";
-import { selectRecorder } from "./audio/recorder.ts";
+import { selectRecorder, selectStreamRecorder } from "./audio/recorder.ts";
+import { StreamCapture } from "./audio/stream-capture.ts";
+import { VadPipeline } from "./audio/vad-pipeline.ts";
+import { SileroVad } from "./audio/vad/silero.ts";
 import { createSttProvider } from "./providers/index.ts";
 import { VoiceInputFlow, type FlowContext } from "./flow.ts";
 import { safeError } from "./secrets.ts";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 
 const EXTENSION_ID = "voice-input";
+const MODEL_SHA256 =
+  "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3";
+
+function resolveModelPath(): string {
+  const here = dirname(fileURLToPath(import.meta.url));
+  return join(here, "models", "silero_vad.onnx");
+}
 
 export interface VoiceInputFlowLike {
   startRecording(): Promise<void>;
@@ -72,14 +84,60 @@ function clearUi(ctx: FlowContext): void {
 
 async function createFlow(ctx: FlowContext): Promise<VoiceInputFlow> {
   const config = loadConfig();
-  const recorder = selectRecorder(config);
   const provider = await createSttProvider(config.provider);
+
+  if (config.vad.enabled) {
+    const pipeline = await tryCreateVadPipeline(ctx, config, provider);
+    if (pipeline) {
+      const recorder = selectRecorder(config);
+      return new VoiceInputFlow({
+        ctx,
+        provider,
+        config,
+        recorder: new LocalAudioCapture({ recorder, device: config.micDevice }),
+        pipeline,
+      });
+    }
+    ctx.ui.notify(
+      "VAD enabled but unavailable — falling back to whole-file recording.",
+      "warning",
+    );
+  }
+
+  const recorder = selectRecorder(config);
   return new VoiceInputFlow({
     ctx,
     provider,
     config,
     recorder: new LocalAudioCapture({ recorder, device: config.micDevice }),
   });
+}
+
+async function tryCreateVadPipeline(
+  ctx: FlowContext,
+  config: ReturnType<typeof loadConfig>,
+  provider: Awaited<ReturnType<typeof createSttProvider>>,
+): Promise<VadPipeline | null> {
+  try {
+    const streamRecorder = selectStreamRecorder(config);
+    const vad = await SileroVad.create({
+      modelPath: resolveModelPath(),
+      expectedSha256: MODEL_SHA256,
+    });
+    return new VadPipeline({
+      capture: new StreamCapture({
+        recorder: streamRecorder,
+        device: config.micDevice,
+      }),
+      vad,
+      config: config.vad,
+      transcribe: (file, signal) => provider.transcribe(file, signal),
+      transcribeTimeoutMs: config.transcribeTimeoutMs,
+    });
+  } catch (err) {
+    ctx.ui.notify(`VAD init failed: ${safeError(err)}`, "warning");
+    return null;
+  }
 }
 
 export default function (pi: ExtensionAPI): void {

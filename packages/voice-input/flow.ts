@@ -1,4 +1,5 @@
 import type { LocalAudioCapture } from "./audio/capture.ts";
+import type { VadPipeline } from "./audio/vad-pipeline.ts";
 import type { SttProvider } from "./providers/index.ts";
 import type { VoiceInputConfig } from "./types.ts";
 import { safeError } from "./secrets.ts";
@@ -6,6 +7,9 @@ import { safeError } from "./secrets.ts";
 const WIDGET_KEY = "voice-input";
 const RECORDING_WIDGET = [
   "🎙 recording — /voice-toggle to stop, /voice-cancel to cancel",
+];
+const LISTENING_WIDGET = [
+  "🎙 listening (VAD) — /voice-toggle to stop, /voice-cancel to cancel",
 ];
 const TRANSCRIBING_WIDGET = ["… transcribing"];
 
@@ -25,6 +29,7 @@ export interface FlowOpts {
   recorder: LocalAudioCapture;
   provider: SttProvider;
   config: VoiceInputConfig;
+  pipeline?: VadPipeline;
 }
 
 export interface InsertResult {
@@ -66,20 +71,55 @@ export class VoiceInputFlow {
   private readonly recorder: LocalAudioCapture;
   private readonly provider: SttProvider;
   private readonly config: VoiceInputConfig;
+  private readonly pipeline: VadPipeline | undefined;
+  private readonly appender: OrderedAppender | undefined;
 
   constructor(opts: FlowOpts) {
     this.ctx = opts.ctx;
     this.recorder = opts.recorder;
     this.provider = opts.provider;
     this.config = opts.config;
+    this.pipeline = opts.pipeline;
+    if (opts.pipeline) {
+      this.appender = new OrderedAppender((text) =>
+        this.appendTranscript(text),
+      );
+    }
   }
 
   async startRecording(): Promise<void> {
+    if (this.pipeline) {
+      this.pipeline.setCallbacks({
+        onTranscript: (text, index) => this.appender!.submit(index, text),
+        onState: (state) =>
+          this.setWidget(
+            state === "transcribing" ? TRANSCRIBING_WIDGET : LISTENING_WIDGET,
+          ),
+        onError: (err) => this.fail(err),
+      });
+      this.pipeline.start();
+      this.setWidget(LISTENING_WIDGET);
+      return;
+    }
     this.recorder.start();
     this.setWidget(RECORDING_WIDGET);
   }
 
   async finalizeRecording(): Promise<InsertResult> {
+    if (this.pipeline) {
+      this.setWidget(TRANSCRIBING_WIDGET);
+      try {
+        await this.pipeline.stop();
+        await this.appender!.drain();
+        return { inserted: true };
+      } catch (error) {
+        this.fail(error);
+        throw error;
+      } finally {
+        await this.pipeline.release();
+        this.setWidget(undefined);
+      }
+    }
     this.setWidget(TRANSCRIBING_WIDGET);
     try {
       const stopped = await this.recorder.stop();
@@ -99,8 +139,19 @@ export class VoiceInputFlow {
   }
 
   async cancel(): Promise<void> {
+    if (this.pipeline) {
+      await this.pipeline.cancel();
+      this.setWidget(undefined);
+      return;
+    }
     await this.recorder.cancel();
     this.setWidget(undefined);
+  }
+
+  private appendTranscript(text: string): void {
+    const current = this.ctx.ui.getEditorText();
+    const next = mergeTranscript(current, text);
+    this.ctx.ui.setEditorText(next);
   }
 
   private insertTranscript(transcript: string): InsertResult {
@@ -122,5 +173,42 @@ export class VoiceInputFlow {
 
   private fail(error: unknown): void {
     this.ctx.ui.notify(`Voice input failed: ${safeError(error)}`, "warning");
+  }
+}
+
+export class OrderedAppender {
+  private readonly flush: (text: string) => void;
+  private nextIndex = 1;
+  private readonly pending = new Map<number, string>();
+  private drainResolvers: Array<() => void> = [];
+
+  constructor(flush: (text: string) => void) {
+    this.flush = flush;
+  }
+
+  submit(index: number, text: string): void {
+    this.pending.set(index, text);
+    this.pump();
+  }
+
+  async drain(): Promise<void> {
+    if (this.pending.size === 0) return;
+    await new Promise<void>((resolve) => {
+      this.drainResolvers.push(resolve);
+    });
+  }
+
+  private pump(): void {
+    while (this.pending.has(this.nextIndex)) {
+      const text = this.pending.get(this.nextIndex)!;
+      this.pending.delete(this.nextIndex);
+      this.nextIndex += 1;
+      this.flush(text);
+    }
+    if (this.pending.size === 0) {
+      const resolvers = this.drainResolvers;
+      this.drainResolvers = [];
+      for (const resolve of resolvers) resolve();
+    }
   }
 }

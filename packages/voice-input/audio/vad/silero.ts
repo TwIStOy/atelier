@@ -48,7 +48,7 @@ export class SileroVad {
     const backend =
       typeof opts.backend === "function"
         ? await opts.backend(buf)
-        : opts.backend ?? (await defaultBackend(buf));
+        : (opts.backend ?? (await defaultBackend(buf)));
     return new SileroVad(backend);
   }
 
@@ -86,11 +86,7 @@ async function defaultBackend(model: Uint8Array): Promise<VadModelBackend> {
           INPUT_SAMPLES,
         ]),
         state: new ort.Tensor("float32", feeds.state, [...STATE_DIMS]),
-        sr: new ort.Tensor(
-          "int64",
-          new BigInt64Array([BigInt(16000)]),
-          [],
-        ),
+        sr: new ort.Tensor("int64", new BigInt64Array([BigInt(16000)]), []),
       });
       const prob = (out.output.data as Float32Array)[0];
       const state = new Float32Array(out.stateN.data as Float32Array);

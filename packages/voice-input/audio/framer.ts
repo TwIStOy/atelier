@@ -14,11 +14,7 @@ export function createFramerState(): FramerState {
 export function s16leBytesToFloat32(bytes: Uint8Array): Float32Array {
   const samples = bytes.length / 2;
   const out = new Float32Array(samples);
-  const view = new DataView(
-    bytes.buffer,
-    bytes.byteOffset,
-    bytes.byteLength,
-  );
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   for (let i = 0; i < samples; i++) {
     out[i] = view.getInt16(i * 2, true) / 32768;
   }
