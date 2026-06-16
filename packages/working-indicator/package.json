@@ -1,0 +1,17 @@
+{
+  "name": "@htwang-contrib/working-indicator",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "index.ts",
+  "types": "index.ts",
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "latest",
+    "@types/node": "^25.9.1",
+    "typescript": "^6.0.0"
+  }
+}

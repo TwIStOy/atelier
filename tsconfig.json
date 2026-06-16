@@ -23,6 +23,7 @@
     { "path": "packages/auto-compact" },
     { "path": "packages/todo" },
     { "path": "packages/voice-input" },
-    { "path": "packages/read-tracker" }
+    { "path": "packages/read-tracker" },
+    { "path": "packages/working-indicator" }
   ]
 }

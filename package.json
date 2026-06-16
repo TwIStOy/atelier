@@ -28,7 +28,8 @@
       "packages/message-queue",
       "packages/auto-compact",
       "packages/voice-input",
-      "packages/read-tracker"
+      "packages/read-tracker",
+      "packages/working-indicator"
     ],
     "skills": [
       "skills/code-philosophy",
