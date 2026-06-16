@@ -27,7 +27,8 @@
       "packages/web-tools",
       "packages/message-queue",
       "packages/auto-compact",
-      "packages/voice-input"
+      "packages/voice-input",
+      "packages/read-tracker"
     ],
     "skills": [
       "skills/code-philosophy",
