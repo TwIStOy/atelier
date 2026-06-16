@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   buildRecorderArgs,
+  buildStreamRecorderArgs,
   commandExists,
   selectRecorder,
+  selectStreamRecorder,
 } from "../audio/recorder.ts";
 import type { RecorderKind } from "../types.ts";
 
@@ -169,5 +171,69 @@ describe("RecorderKind type completeness", () => {
   it("covers all variants", () => {
     const kinds: RecorderKind[] = ["auto", "ffmpeg", "parecord", "sox"];
     expect(kinds).toHaveLength(4);
+  });
+});
+
+describe("selectStreamRecorder", () => {
+  it("returns an explicit non-parecord recorder without probing", () => {
+    const exists = vi.fn();
+    expect(selectStreamRecorder({ recorder: "ffmpeg" }, exists)).toBe("ffmpeg");
+    expect(selectStreamRecorder({ recorder: "sox" }, exists)).toBe("sox");
+    expect(exists).not.toHaveBeenCalled();
+  });
+
+  it("falls through auto and parecord to probe ffmpeg/sox", () => {
+    const exists = vi.fn((name: string) => name === "ffmpeg");
+    expect(selectStreamRecorder({ recorder: "auto" }, exists)).toBe("ffmpeg");
+    expect(selectStreamRecorder({ recorder: "parecord" }, exists)).toBe(
+      "ffmpeg",
+    );
+  });
+
+  it("prefers ffmpeg when both ffmpeg and sox are present", () => {
+    const exists = vi.fn(() => true);
+    expect(selectStreamRecorder({ recorder: "auto" }, exists)).toBe("ffmpeg");
+  });
+
+  it("falls back to sox when only sox is present", () => {
+    const exists = vi.fn((name: string) => name === "sox");
+    expect(selectStreamRecorder({ recorder: "auto" }, exists)).toBe("sox");
+  });
+
+  it("throws when neither ffmpeg nor sox is available", () => {
+    const exists = vi.fn(() => false);
+    expect(() => selectStreamRecorder({ recorder: "auto" }, exists)).toThrow(
+      /requires ffmpeg or sox/,
+    );
+  });
+});
+
+describe("buildStreamRecorderArgs", () => {
+  it("emits raw s16le PCM to stdout for ffmpeg", () => {
+    const args = buildStreamRecorderArgs("ffmpeg");
+    expect(args[args.length - 1]).toBe("-");
+    expect(args).toContain("-f");
+    expect(args).toContain("s16le");
+    expect(args).toContain("-ar");
+    expect(args).toContain("16000");
+    expect(args).toContain("-ac");
+    expect(args).toContain("1");
+  });
+
+  it("emits raw signed-integer PCM to stdout for sox", () => {
+    const args = buildStreamRecorderArgs("sox");
+    expect(args[args.length - 1]).toBe("-");
+    expect(args).toContain("-t");
+    expect(args).toContain("raw");
+    expect(args).toContain("-b");
+    expect(args).toContain("16");
+    expect(args).toContain("-e");
+    expect(args).toContain("signed-integer");
+  });
+
+  it("throws for parecord (cannot pipe to stdout)", () => {
+    expect(() => buildStreamRecorderArgs("parecord")).toThrow(
+      /cannot stream raw PCM to stdout/,
+    );
   });
 });

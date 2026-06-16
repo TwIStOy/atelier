@@ -3,7 +3,11 @@ import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { SileroVad, type VadModelBackend, type VadOutputs } from "../audio/vad/silero.ts";
+import {
+  SileroVad,
+  type VadModelBackend,
+  type VadOutputs,
+} from "../audio/vad/silero.ts";
 
 function makeTmpModel(payload = "not-real-onnx"): string {
   const dir = mkdtempSync(join(tmpdir(), "silero-test-"));

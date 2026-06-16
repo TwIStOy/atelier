@@ -30,10 +30,7 @@ describe("VadSegmenter — silence stays silent", () => {
 describe("VadSegmenter — speech detection", () => {
   it("fires onSpeechStart after minSpeechMs of above-threshold frames", () => {
     const onSpeechStart = vi.fn();
-    const seg = new VadSegmenter(
-      { minSpeechMs: 250 },
-      { onSpeechStart },
-    );
+    const seg = new VadSegmenter({ minSpeechMs: 250 }, { onSpeechStart });
     const needed = framesForMs(250);
     for (let i = 0; i < needed; i++) {
       seg.push({ prob: 0.9, frameMs: FRAME_MS, samples: makeSamples() });
@@ -43,10 +40,7 @@ describe("VadSegmenter — speech detection", () => {
 
   it("does not start speech if above-threshold frames are interrupted by silence", () => {
     const onSpeechStart = vi.fn();
-    const seg = new VadSegmenter(
-      { minSpeechMs: 250 },
-      { onSpeechStart },
-    );
+    const seg = new VadSegmenter({ minSpeechMs: 250 }, { onSpeechStart });
     for (let i = 0; i < framesForMs(100); i++) {
       seg.push({ prob: 0.9, frameMs: FRAME_MS, samples: makeSamples() });
     }

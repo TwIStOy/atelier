@@ -34,13 +34,14 @@ function writeConfig(section: Record<string, unknown>): void {
 
 describe("loadConfig", () => {
   it("returns defaults when no config file exists", async () => {
-    const { loadConfig } = await import("../config.ts");
+    const { loadConfig, DEFAULT_VAD_CONFIG } = await import("../config.ts");
     expect(loadConfig()).toEqual({
       provider: "inference-self-host",
       providers: {},
       recorder: "auto",
       micDevice: "",
       transcribeTimeoutMs: 60_000,
+      vad: DEFAULT_VAD_CONFIG,
     });
   });
 
@@ -56,11 +57,13 @@ describe("loadConfig", () => {
   });
 
   it("overrides top-level fields from the section", async () => {
+    const { DEFAULT_VAD_CONFIG } = await import("../config.ts");
     writeConfig({
       provider: "inference-self-host",
       recorder: "ffmpeg",
       micDevice: ":0",
       transcribeTimeoutMs: 12_000,
+      vad: DEFAULT_VAD_CONFIG,
     });
     const { loadConfig } = await import("../config.ts");
     expect(loadConfig()).toMatchObject({
@@ -180,5 +183,41 @@ describe("STT_PROVIDER_PRESETS", () => {
     expect(STT_PROVIDER_PRESETS.map((p) => p.name)).toContain(
       "inference-self-host",
     );
+  });
+});
+
+describe("VAD config", () => {
+  it("fills in missing vad sub-fields with defaults when only one is set", async () => {
+    writeConfig({
+      vad: { threshold: 0.7 },
+    });
+    const { loadConfig, DEFAULT_VAD_CONFIG } = await import("../config.ts");
+    const cfg = loadConfig();
+    expect(cfg.vad.threshold).toBe(0.7);
+    expect(cfg.vad.enabled).toBe(DEFAULT_VAD_CONFIG.enabled);
+    expect(cfg.vad.minSpeechMs).toBe(DEFAULT_VAD_CONFIG.minSpeechMs);
+    expect(cfg.vad.minSilenceMs).toBe(DEFAULT_VAD_CONFIG.minSilenceMs);
+    expect(cfg.vad.maxSpeechMs).toBe(DEFAULT_VAD_CONFIG.maxSpeechMs);
+  });
+
+  it("accepts a fully overridden vad config", async () => {
+    writeConfig({
+      vad: {
+        enabled: true,
+        threshold: 0.6,
+        minSpeechMs: 300,
+        minSilenceMs: 700,
+        maxSpeechMs: 20000,
+      },
+    });
+    const { loadConfig } = await import("../config.ts");
+    const cfg = loadConfig();
+    expect(cfg.vad).toEqual({
+      enabled: true,
+      threshold: 0.6,
+      minSpeechMs: 300,
+      minSilenceMs: 700,
+      maxSpeechMs: 20000,
+    });
   });
 });

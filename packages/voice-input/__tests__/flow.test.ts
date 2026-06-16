@@ -1,6 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
-import { mergeTranscript, VoiceInputFlow, withTimeout } from "../flow.ts";
+import {
+  mergeTranscript,
+  OrderedAppender,
+  VoiceInputFlow,
+  withTimeout,
+} from "../flow.ts";
 import type { LocalAudioCapture } from "../audio/capture.ts";
+import type {
+  VadPipeline,
+  VadPipelineCallbacks,
+} from "../audio/vad-pipeline.ts";
 import type { SttProvider } from "../providers/index.ts";
 import type { VoiceInputConfig } from "../types.ts";
 
@@ -10,6 +19,13 @@ const CONFIG: VoiceInputConfig = {
   recorder: "auto",
   micDevice: "",
   transcribeTimeoutMs: 1000,
+  vad: {
+    enabled: false,
+    threshold: 0.5,
+    minSpeechMs: 250,
+    minSilenceMs: 500,
+    maxSpeechMs: 30000,
+  },
 };
 
 describe("mergeTranscript", () => {
@@ -330,5 +346,117 @@ describe("VoiceInputFlow — redaction on failure", () => {
     const note = calls.notifications[0];
     expect(note.message).not.toContain("sk-leaked-123");
     expect(note.message).toContain("<redacted>");
+  });
+});
+
+describe("OrderedAppender", () => {
+  it("flushes segments strictly in index order even when submitted out of order", () => {
+    const flushed: string[] = [];
+    const appender = new OrderedAppender((text) => flushed.push(text));
+    appender.submit(2, "second");
+    appender.submit(1, "first");
+    appender.submit(3, "third");
+    expect(flushed).toEqual(["first", "second", "third"]);
+  });
+
+  it("flushes immediately when segments arrive in order", () => {
+    const flushed: string[] = [];
+    const appender = new OrderedAppender((text) => flushed.push(text));
+    appender.submit(1, "a");
+    appender.submit(2, "b");
+    appender.submit(3, "c");
+    expect(flushed).toEqual(["a", "b", "c"]);
+  });
+
+  it("resolves drain() once the pending queue empties", async () => {
+    const flushed: string[] = [];
+    const appender = new OrderedAppender((text) => flushed.push(text));
+    appender.submit(2, "late");
+    const drain = appender.drain();
+    appender.submit(1, "early");
+    await drain;
+    expect(flushed).toEqual(["early", "late"]);
+  });
+
+  it("drain() resolves immediately when nothing is pending", async () => {
+    const appender = new OrderedAppender(() => {});
+    await expect(appender.drain()).resolves.toBeUndefined();
+  });
+});
+
+function makeFakePipeline(): {
+  pipeline: VadPipeline;
+} {
+  let savedCallbacks: VadPipelineCallbacks | undefined;
+  return {
+    pipeline: {
+      setCallbacks: vi.fn((cb: VadPipelineCallbacks) => {
+        savedCallbacks = cb;
+      }),
+      start: vi.fn(() => {
+        savedCallbacks?.onState?.("listening");
+      }),
+      stop: vi.fn(async () => {}),
+      cancel: vi.fn(async () => {}),
+      release: vi.fn(async () => {}),
+    } as unknown as VadPipeline,
+  };
+}
+
+describe("VoiceInputFlow — VAD mode", () => {
+  it("starts the pipeline and shows the listening widget", async () => {
+    const recorder = makeFakeRecorder();
+    const provider = makeFakeProvider();
+    const { ctx, calls } = makeCtx();
+    const { pipeline } = makeFakePipeline();
+    const flow = new VoiceInputFlow({
+      ctx,
+      recorder: recorder.asCapture(),
+      provider: provider.asProvider(),
+      config: CONFIG,
+      pipeline,
+    });
+    await flow.startRecording();
+    expect(pipeline.start).toHaveBeenCalledTimes(1);
+    expect(pipeline.setCallbacks).toHaveBeenCalledTimes(1);
+    expect(calls.widgets.at(-1)).toEqual([
+      "🎙 listening (VAD) — /voice-toggle to stop, /voice-cancel to cancel",
+    ]);
+  });
+
+  it("stops, drains pending segments, and clears the widget", async () => {
+    const recorder = makeFakeRecorder();
+    const provider = makeFakeProvider();
+    const { ctx, calls } = makeCtx("existing");
+    const { pipeline } = makeFakePipeline();
+    const flow = new VoiceInputFlow({
+      ctx,
+      recorder: recorder.asCapture(),
+      provider: provider.asProvider(),
+      config: CONFIG,
+      pipeline,
+    });
+    await flow.startRecording();
+    await flow.finalizeRecording();
+    expect(pipeline.stop).toHaveBeenCalledTimes(1);
+    expect(pipeline.release).toHaveBeenCalledTimes(1);
+    expect(calls.widgets.at(-1)).toBeUndefined();
+  });
+
+  it("cancel delegates to the pipeline and clears the widget", async () => {
+    const recorder = makeFakeRecorder();
+    const provider = makeFakeProvider();
+    const { ctx, calls } = makeCtx();
+    const { pipeline } = makeFakePipeline();
+    const flow = new VoiceInputFlow({
+      ctx,
+      recorder: recorder.asCapture(),
+      provider: provider.asProvider(),
+      config: CONFIG,
+      pipeline,
+    });
+    await flow.cancel();
+    expect(pipeline.cancel).toHaveBeenCalledTimes(1);
+    expect(calls.widgets.at(-1)).toBeUndefined();
   });
 });
