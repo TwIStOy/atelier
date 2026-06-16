@@ -7,11 +7,20 @@ import { findPreset, STT_PROVIDER_PRESETS } from "./providers/presets.ts";
 import type {
   RecorderKind,
   SttProviderConfig,
+  VadConfig,
   VoiceInputConfig,
 } from "./types.ts";
 
 export const DEFAULT_PROVIDER = "inference-self-host";
 export const DEFAULT_TRANSCRIBE_TIMEOUT_MS = 60_000;
+
+export const DEFAULT_VAD_CONFIG: VadConfig = {
+  enabled: false,
+  threshold: 0.5,
+  minSpeechMs: 250,
+  minSilenceMs: 500,
+  maxSpeechMs: 30_000,
+};
 
 export const CONFIG_SCHEMA: ExtensionConfigSchema<VoiceInputConfig> = {
   defaults: {
@@ -20,11 +29,16 @@ export const CONFIG_SCHEMA: ExtensionConfigSchema<VoiceInputConfig> = {
     recorder: "auto",
     micDevice: "",
     transcribeTimeoutMs: DEFAULT_TRANSCRIBE_TIMEOUT_MS,
+    vad: { ...DEFAULT_VAD_CONFIG },
   },
 };
 
 export function loadConfig(): VoiceInputConfig {
-  return readConfig("voice-input", CONFIG_SCHEMA);
+  const config = readConfig("voice-input", CONFIG_SCHEMA);
+  return {
+    ...config,
+    vad: { ...DEFAULT_VAD_CONFIG, ...(config.vad ?? {}) },
+  };
 }
 
 export function resolveApiKey(providerName: string): string | undefined {
@@ -141,6 +155,64 @@ export function registerVoiceInputConfigItems(): void {
       order: 102,
       min: 5_000,
       max: 300_000,
+    },
+    {
+      key: "vad.enabled",
+      type: "boolean",
+      label: "VAD Segmentation",
+      value: () => loadConfig().vad.enabled,
+      description:
+        "Stream audio through Silero VAD: auto-split utterances by silence and transcribe each segment as you speak. Falls back to whole-file recording if the model fails to load.",
+      extensionLabel: "Voice Input",
+      order: 200,
+    },
+    {
+      key: "vad.threshold",
+      type: "number",
+      label: "VAD Speech Threshold",
+      value: () => loadConfig().vad.threshold,
+      description:
+        "Probability above which a frame counts as speech (0–1). Higher = stricter.",
+      extensionLabel: "Voice Input",
+      order: 201,
+      min: 0,
+      max: 1,
+    },
+    {
+      key: "vad.minSpeechMs",
+      type: "number",
+      label: "VAD Min Speech (ms)",
+      value: () => loadConfig().vad.minSpeechMs,
+      description:
+        "Minimum speech duration to open a segment. Filters out brief noises.",
+      extensionLabel: "Voice Input",
+      order: 202,
+      min: 50,
+      max: 5_000,
+    },
+    {
+      key: "vad.minSilenceMs",
+      type: "number",
+      label: "VAD Min Silence (ms)",
+      value: () => loadConfig().vad.minSilenceMs,
+      description:
+        "Silence duration that closes a segment and triggers transcription.",
+      extensionLabel: "Voice Input",
+      order: 203,
+      min: 100,
+      max: 5_000,
+    },
+    {
+      key: "vad.maxSpeechMs",
+      type: "number",
+      label: "VAD Max Speech (ms)",
+      value: () => loadConfig().vad.maxSpeechMs,
+      description:
+        "Hard cap on a single segment length. Forces a split at this duration.",
+      extensionLabel: "Voice Input",
+      order: 204,
+      min: 1_000,
+      max: 120_000,
     },
   ]);
 }
