@@ -1,3 +1,5 @@
+import type { Theme } from "@earendil-works/pi-coding-agent";
+
 export type ConfigItemType =
   | "string"
   | "number"
@@ -11,6 +13,20 @@ export interface ConfigItemSelectOption<T = unknown> {
   label: string;
   value: T;
 }
+
+export interface ConfigItemPreviewContext {
+  getValue: () => unknown;
+  requestRender: () => void;
+}
+
+export interface ConfigItemPreviewHandle {
+  render(width: number, theme: Theme): string[];
+  dispose?(): void;
+}
+
+export type ConfigItemPreview = (
+  ctx: ConfigItemPreviewContext,
+) => ConfigItemPreviewHandle;
 
 export interface ConfigItemBase<
   T,
@@ -28,6 +44,7 @@ export interface ConfigItemBase<
   envVar?: string;
   placeholder?: string;
   extensionLabel?: string;
+  preview?: ConfigItemPreview;
 }
 
 export interface StringConfigItem extends ConfigItemBase<string, "string"> {

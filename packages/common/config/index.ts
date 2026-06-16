@@ -25,6 +25,9 @@ export type {
   ReorderableConfigItem,
   ColorConfigItem,
   ConfigItemSelectOption,
+  ConfigItemPreview,
+  ConfigItemPreviewHandle,
+  ConfigItemPreviewContext,
   LazyOptions,
   ConfigItemRegistry,
 } from "./config-item.ts";
