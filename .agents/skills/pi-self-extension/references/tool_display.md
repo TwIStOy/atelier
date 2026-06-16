@@ -35,19 +35,38 @@ interface ToolDisplayAdapter<TArgs = Record<string, unknown>> {
 }
 ```
 
+## Errored / Blocked Tools (fast path)
+
+When a tool result is an error (`isError: true`) — which is also what a blocked
+`tool_call` becomes — `renderToolCall` renders the output as `≠ <reason>` BEFORE
+the adapter runs. The adapter is skipped entirely for errored tools.
+
+Consequences for adapter authors:
+
+- `formatCollapsedContent` / `formatExpandedContent` are NOT called when the tool
+  errored — your `└ failed` style lines won't show; the `≠ reason` line does.
+- Adapters receive `output` but `edit`/`write` adapters ignore it (they compute
+  diffs/line-counts from args). That's fine normally, but it's WHY the error fast
+  path exists: without it a blocked edit would show a misleading diff.
+- Don't rely on `details` to signal errors in collapsed content; use the standard
+  error result path instead.
+
 ## Conventions
 
 ### Header
+
 - Use `theme.fg("toolTitle", theme.bold("ToolName"))` for the label
 - Tool labels use `CamelCase` (e.g., `CreateGoal`, `UpdateGoal`), **not** `Create Goal`
 - Show key args inline (path, objective preview, etc.)
 
 ### Collapsed Content
+
 - Use `theme.fg("muted", "└ ...")` — no manual indent prefix, the rendering system adds it
 - Keep to 1-2 lines maximum
 - Show status summary from `details`
 
 ### Expanded Content
+
 - Use `theme.fg("toolOutput", line)` per line with `truncateToWidth`
 - Can use `formatExpandedToolOutputLines` from `./shared.ts` for standard output rendering
 
@@ -105,24 +124,24 @@ export const myToolAdapter: ToolDisplayAdapter<MyToolArgs> = {
 
 From `packages/tool-display/adapters/shared.ts`:
 
-| Helper | Purpose |
-|--------|---------|
-| `formatExpandedToolOutputLines(output, theme, width)` | Indented, truncated output lines |
-| `formatLineCount(content, theme)` | `└ N lines` summary |
+| Helper                                                                     | Purpose                                   |
+| -------------------------------------------------------------------------- | ----------------------------------------- |
+| `formatExpandedToolOutputLines(output, theme, width)`                      | Indented, truncated output lines          |
+| `formatLineCount(content, theme)`                                          | `└ N lines` summary                       |
 | `renderContentWithLineNumbers(content, startLine, filePath, theme, width)` | Syntax-highlighted code with line numbers |
 
 ## Theme Colors for Tool Display
 
-| Color | Usage |
-|-------|-------|
-| `"toolTitle"` | Tool name label |
-| `"toolOutput"` | Output text content |
-| `"accent"` | Highlighted args (paths, actions) |
-| `"muted"` | Collapsed summaries, tree branches |
-| `"dim"` | Secondary info |
-| `"success"` | Success indicators (✓, ●) |
-| `"error"` | Error indicators (✗) |
-| `"warning"` | Warning indicators |
+| Color          | Usage                              |
+| -------------- | ---------------------------------- |
+| `"toolTitle"`  | Tool name label                    |
+| `"toolOutput"` | Output text content                |
+| `"accent"`     | Highlighted args (paths, actions)  |
+| `"muted"`      | Collapsed summaries, tree branches |
+| `"dim"`        | Secondary info                     |
+| `"success"`    | Success indicators (✓, ●)          |
+| `"error"`      | Error indicators (✗)               |
+| `"warning"`    | Warning indicators                 |
 
 ## Common Imports
 
