@@ -153,6 +153,12 @@ ctx.ui.setWorkingIndicator(); // restore default
 ctx.ui.setWorkingIndicator({ frames: [] }); // hide
 ```
 
+The loader row renders `<frame> <message>`. The spinner comes from `setWorkingIndicator`; **the message comes from `setWorkingMessage(text)`** (no arg resets to default "Working..."). The two are independent.
+
+**Gotcha — `agent_start` recreates the loader.** On every `agent_start`, interactive-mode stops and recreates the working loader, re-reading `workingMessage ?? "Working..."`. If you call `setWorkingMessage()` (no arg) on `message_end`, the next turn's `agent_start` flashes "Working..." until your next `message_update` repushes. To keep a custom message stable across turns: **push it in `agent_start`** (`setWorkingMessage(text)` before tokens stream) and **don't clear it in `message_end`**.
+
+To drive a live timer (e.g. "thinking Ns..."), detect phase from `message_update`'s `event.assistantMessageEvent` discriminant (`thinking_start`/`thinking_delta` to enter, `text_*`/`toolcall_start` to exit) and run a `setInterval` that re-calls `setWorkingMessage`.
+
 ### 6. `ctx.ui.setWorkingVisible(visible)` — Show/Hide Loader Row
 
 ```typescript

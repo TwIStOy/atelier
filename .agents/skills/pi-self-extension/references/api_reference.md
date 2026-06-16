@@ -370,6 +370,26 @@ pi.registerProvider("provider-id", {
 | `supportsReasoningEffort`                     | boolean | true                    | Whether `reasoning_effort` parameter is supported              |
 | `maxTokensField`                              | string  | "max_completion_tokens" | Field name for max output tokens                               |
 
+## Extension Configuration (ConfigItem pattern)
+
+Prefer the shared ConfigItem mechanism (`@htwang-contrib/common`) over a custom `/command` for exposing **settings**. It surfaces in the `/config` popup (`extension-config-ui` package) and persists to `~/.config/pi/extensions.json`.
+
+```typescript
+import { readConfig, registerConfigItems, type ExtensionConfigSchema } from "@htwang-contrib/common";
+
+interface MyConfig { level: number; mode: string; }
+const CONFIG_SCHEMA: ExtensionConfigSchema<MyConfig> = { defaults: { level: 3, mode: "auto" } };
+const loadConfig = () => readConfig("my-ext", CONFIG_SCHEMA);
+
+registerConfigItems("my-ext", [
+  { key: "level", type: "number", label: "Level", value: () => loadConfig().level, min: 1, max: 10, extensionLabel: "My Ext" },
+  { key: "mode", type: "select", label: "Mode", value: () => loadConfig().mode,
+    options: [{ label: "Auto", value: "auto" }, { label: "Manual", value: "manual" }], extensionLabel: "My Ext" },
+]);
+```
+
+Item types: `string`, `number`, `boolean`, `select`, `multiselect`, `reorderable`, `color`. `value` may be a getter `() => T`. Optional `preview?: ConfigItemPreview` on select items renders a live (animatable) preview of the **highlighted** option in the select page — see `packages/working-indicator/preview.ts` for a timer-driven example. Call `registerConfigItems(...)` once at extension init.
+
 ## Output Truncation
 
 ```typescript
