@@ -29,7 +29,8 @@
       "packages/auto-compact",
       "packages/voice-input",
       "packages/read-tracker",
-      "packages/working-indicator"
+      "packages/working-indicator",
+      "packages/todo"
     ],
     "skills": [
       "skills/code-philosophy",
