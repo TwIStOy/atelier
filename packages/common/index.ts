@@ -79,3 +79,20 @@ export type {
 } from "./config/index.ts";
 export { mcpInit, mcpCall } from "./mcp.ts";
 export type { McpSession, McpClientInfo } from "./mcp.ts";
+export {
+  createClickableWidget,
+  ENABLE_SGR_MOUSE,
+  DISABLE_SGR_MOUSE,
+  parseSgrMouseEvents,
+  isMouseInput,
+  hitTestSegment,
+  renderClickableRows,
+} from "./clickable-widget.ts";
+export type {
+  WidgetPlacement,
+  ClickableSegment,
+  ClickableRow,
+  ClickableWidgetOptions,
+  ClickableWidgetHandle,
+  MouseEvent as ClickableMouseEvent,
+} from "./clickable-widget.ts";
