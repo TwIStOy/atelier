@@ -10,7 +10,7 @@ Monorepo with packages under `packages/`:
 - `packages/zai-coding-plan/` -- Z.AI provider (GLM models) + `zai-quota` command. Reads `ZAI_API_KEY` env var.
 - `packages/inference-self-host/` -- Self-hosted proxy provider aggregating models from multiple upstreams (GLM, Qwen, DeepSeek, MiMo, Kimi, MiniMax, etc). Reads `INFERENCE_TWISTOY_API_KEY` env var.
 - `packages/protect-secrets/` -- Blocks read-like tool calls targeting files under `/run/agenix`. Uses `unbash` AST parser to analyze bash commands and distinguish secret exposure (e.g. `cat`) from safe capture (e.g. `VAR=$(cat ...) curl`).
-- `packages/subagents/` -- In-process subagent extension (WIP). See `docs/subagents/`.
+- `packages/subagents/` -- In-process subagent extension (`subagent`/`subagent_status` tools + `/view-subagents` output viewer + `/subagents-agents` persona inspector). See `docs/subagents/` and `packages/subagents/README.md`.
 - `packages/statusline/` -- Custom status bar widgets for the pi TUI.
 - `packages/tool-display/` -- Tool call rendering adapters for the pi TUI.
 - `packages/todo/` -- 移植自 rpiv-todo 的任务管理扩展,提供 `todo` 工具(create/update/list/get/delete/clear)+ `/todos` 命令 + aboveEditor overlay widget,状态通过 session branch replay 持久化。参考 `docs/todo/`.
