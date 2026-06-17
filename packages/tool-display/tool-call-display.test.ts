@@ -6,6 +6,7 @@ import { globalToolDisplayRegistry } from "./registry.ts";
 import { editAdapter } from "./adapters/edit.ts";
 import { writeAdapter } from "./adapters/write.ts";
 import { todoAdapter } from "./adapters/todo.ts";
+import { bashAdapter } from "./adapters/bash.ts";
 
 const PLAIN_THEME: Theme = {
   fg: (_c: string, text: string) => text,
@@ -123,5 +124,51 @@ describe("todo adapter collapsed-content width safety", () => {
     for (const line of lines) {
       expect(visibleWidth(line)).toBeLessThanOrEqual(45);
     }
+  });
+});
+
+describe("bash adapter command display width", () => {
+  const LONG_CMD =
+    "nix build .#default --print-build-logs --fallback --extra-experimental-features 'nix-command flakes ca-derivations' --cores 8 --max-jobs 4";
+
+  it("truncates the command on a narrow terminal", () => {
+    globalToolDisplayRegistry.register("bash", bashAdapter);
+    const lines = renderToolCall(
+      {
+        toolName: "bash",
+        args: { command: LONG_CMD },
+        output: "",
+        expanded: false,
+        isPartial: true,
+        isError: false,
+        registry: globalToolDisplayRegistry,
+      },
+      PLAIN_THEME,
+    ).render(40);
+    for (const line of lines) {
+      expect(visibleWidth(line)).toBeLessThanOrEqual(40);
+    }
+    const joined = lines.join(" ");
+    expect(joined).toContain("…");
+  });
+
+  it("shows more than the old 60-char cap on a wide terminal", () => {
+    globalToolDisplayRegistry.register("bash", bashAdapter);
+    const width = 200;
+    const lines = renderToolCall(
+      {
+        toolName: "bash",
+        args: { command: LONG_CMD },
+        output: "",
+        expanded: false,
+        isPartial: true,
+        isError: false,
+        registry: globalToolDisplayRegistry,
+      },
+      PLAIN_THEME,
+    ).render(width);
+    const joined = lines.join(" ");
+    expect(joined).not.toContain("…");
+    expect(joined).toContain(LONG_CMD);
   });
 });

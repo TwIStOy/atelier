@@ -80,7 +80,7 @@ export function registerToolDisplayConfigItems(): void {
       label: "Bash Command Display Length",
       value: () => loadConfig().bashCommandDisplayLength,
       description:
-        "Maximum number of characters shown for bash commands in the tool header (default 60)",
+        "Minimum characters shown for bash commands in the tool header (default 60). Wide terminals use the full available line width; this only caps the floor on narrow screens.",
       extensionLabel: "Tool Display",
       order: 3,
       min: 20,
