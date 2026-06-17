@@ -45,7 +45,7 @@ export default function (pi: ExtensionAPI) {
       0,
       Math.floor((Date.now() - thinkingStartMs) / 1000),
     );
-    return `${base} [thinking ${seconds}s...]`;
+    return `${base}... [thinking ${seconds}s...]`;
   }
 
   function pushMessage(ctx: ExtensionContext): void {
