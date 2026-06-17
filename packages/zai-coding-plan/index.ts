@@ -37,7 +37,7 @@ export default function (pi: ExtensionAPI) {
           xhigh: "max",
         },
         input: ["text"],
-        cost: { input: 1.6, output: 5.2, cacheRead: 0.3, cacheWrite: 0 },
+        cost: { input: 1.4, output: 4.4, cacheRead: 0.26, cacheWrite: 0 },
         contextWindow: 1000000,
         maxTokens: 131072,
       },
