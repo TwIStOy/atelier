@@ -28,6 +28,19 @@ Loaded personas are listed for the model only inside the **`<subagents>`** block
 
 **Command `/subagents-agents`:** TUI only. Opens a **picker** (same family of prompts as other Pi settings-style flows). Choose an agent to open a **read-only editor** with the Markdown **source path**, merged **defaults** (single-call merge: persona then `defaults_by_agent_type`, no tool-call overrides), **resolved model** via the parent registry + `resolveModel`, **thinking / isolated / inherit_context / max_turns**, the **builtin tool** list for that isolation mode, and a short note on child **resource loader** and batch overrides.
 
+**Command `/view-subagents`:** TUI only. Since the TUI never shows child-agent output inline, this command opens a **picker** of every subagent run that recorded itself against the **current parent session** (read from `~/.agent/subagents/by-parent/<parent_session_id>.jsonl`). Each row shows the run’s first user line (truncated), model, and tool-call count. Selecting a run opens a **bordered popup overlay** (centered, sized to **80% × 80%** of the terminal, drawn with a `┌─┐`/`│ │`/`└─┘` box so it’s clearly a floating window) that replays that child session exactly as Pi would render it in chat — **user** messages (boxed + markdown-highlighted), **assistant** messages (markdown + inline tool calls), **thinking** blocks, and **tool results** (with the `@htwang-contrib/tool-display` adapters when loaded, so headers match `Read` / `Bash` / `Grep` styling). Tools are **collapsed by default** (one-line summary each); press **e** to expand. Inside the popup:
+
+**Live (in-flight) viewing:** a run records itself to the `by-parent` index with `status: "running"` as soon as its child `AgentSession` is created (`recordSubagentStarted` in `paths.ts`), and the child session file is appended to live by the child `SessionManager` — so the picker lists **running** runs too (marked with a `⏳` prefix and a `running…` meta line). When a `running` run is open, the viewer tails it on a **~200 ms interval**: it re-parses the child session file, rebuilds the component tree when new messages/tool calls arrive, and re-renders, so new assistant text, tool calls, and results stream in like a live chat. When the run finishes, the `done` index record supersedes `running` and the viewer settles on the final state. The interval is stopped on `dispose()` (overlay removed / Esc / Tab). This works for **both foreground and background** runs: the parent `subagent` tool call is `await`-ing the child `session.prompt()` on its own async stack, which does not block the TUI or slash-command dispatch — and pi runs extension slash commands like `/view-subagents` **immediately even while the agent is streaming** (`_tryExecuteExtensionCommand` is checked before the streaming queue in `session.prompt`). So you can start a foreground subagent, then type `/view-subagents`, pick the `⏳` run, and watch it stream in real time. Inside the popup:
+
+- **↑/↓ (and PgUp/PgDn/Home/End)** scroll the transcript. **G** (or End) jumps to the latest line and (re-)enables **follow** mode.
+- **Follow mode (sticky-bottom, on by default):** when the view is at the bottom, new live content keeps the view pinned to the latest line — it auto-scrolls as the subagent streams. Any manual scroll up (↑/PgUp/Home) leaves follow mode; scrolling back down to the bottom (↓/PgDn/G) re-engages it. The footer hint shows `G following (live)` while active and `G jump to latest` otherwise. Switching runs (←/→) or toggling thinking/tools (t/e) re-pins to the bottom.
+- **←/→** switch to the previous / next subagent run without leaving the viewer.
+- **Tab** (or Shift+Tab) closes the viewer and reopens the run **picker**.
+- **t** toggles thinking-block visibility; **e** toggles tool-output expansion (collapsed tools show a one-line summary).
+- **Esc** dismisses and returns to the chat.
+
+Rendering reuses Pi’s own components (`AssistantMessageComponent`, `UserMessageComponent`, `ToolExecutionComponent` via `buildSessionContext`), so the output is identical to a native chat replay rather than a re-implementation. The viewer lives under `packages/subagents/viewer/`: `command.ts` (command + picker loop + `VIEWER_DEFAULTS`), `overlay.ts` (`SubagentViewerOverlay` Component — bordered 80%×80% window, scrolling, sticky-follow, prev/next run, picker toggle, thinking/tools toggles), `render.ts` (builds the component tree from a child session’s `AgentMessage[]`), `index.ts` (reads `by-parent` index + parses child session files via `buildSessionContext`).
+
 ## Agent definitions (Markdown catalog)
 
 At each `subagent` run, prompts are merged from layers in order (**later layers override** the same id):
@@ -116,6 +129,8 @@ Example:
 | `child-tools.ts`        | Built-in tool name list + filter excluding delegation tools.                                                                |
 | `abort-timeout.ts`      | Merges optional `AbortSignal.timeout` into run signals.                                                                     |
 | `settings.ts`           | Reads `settings.json`; concurrency, timeout, persona defaults.                                                              |
+| `agents-inspect.ts`     | `/subagents-agents` command: persona picker + read-only inspect editor.                                                     |
+| `viewer/`               | `/view-subagents` command + popup output viewer. See `viewer/README.md`-style notes above; files: `command.ts`, `overlay.ts`, `render.ts`, `index.ts` (+ tests). |
 
 ## Tool: `subagent_status`
 
