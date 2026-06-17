@@ -26,7 +26,11 @@ import { resolveModel } from "@htwang-contrib/common";
 import extraTools from "@htwang-contrib/extra-tools/index.ts";
 import protectSecrets from "@htwang-contrib/protect-secrets/index.ts";
 import webTools from "@htwang-contrib/web-tools/index.ts";
-import { appendSubagentLinkRecord, SUBAGENT_SESSION_DIR } from "./paths.ts";
+import {
+  appendSubagentLinkRecord,
+  recordSubagentStarted,
+  SUBAGENT_SESSION_DIR,
+} from "./paths.ts";
 import {
   buildSubagentAgentCatalog,
   resolveSubagentAgentId,
@@ -302,6 +306,11 @@ export async function runSubAgent(
       settingsManager,
     });
     session = created;
+
+    recordSubagentStarted(parentSessionId, {
+      parent_session_file: parentSessionFile,
+      sub_session_file: created.sessionManager.getSessionFile() ?? "",
+    });
 
     await created.bindExtensions({});
 
