@@ -174,3 +174,4 @@ Pi 刻意不把 subagents 做进核心：默认仅少量工具，通过 **Extens
 | 2026-06-01 | Phase 5：`settings.json` 的 `timeout_ms` 与 `defaults_by_agent_type`；子会话工具 denylist；`AbortSignal.timeout` 与父/工具 signal 合并 |
 | 2026-06-01 | Phase 6（部分）：子 session `extensionFactories` 注入 `protect-secrets`；未做 statusline / RPC |
 | 2026-06-01 | 子 agent persona：`*.md` 目录合并（`~/.config/pi/agents`、`.pi/agents`、`pi.agents` 与扩展 manifest） |
+| 2026-06-17 | **输出查看器**：新增 `/view-subagents` 命令——picker 选本次会话的某个 run，在带边框的 80%×80% popup 里复用 Pi 自带组件（`AssistantMessageComponent`/`UserMessageComponent`/`ToolExecutionComponent` + `buildSessionContext`）实时重放子会话（tool 默认折叠）；运行中的 run 也可见（`recordSubagentStarted` 写 `running` 索引，viewer 以 ~200ms 轮询子 session 文件流式刷新，完成时 `done` 记录覆盖）。←/→ 切 run、Tab 重开 picker、t/e 切 thinking/tools、G/End 跳底并跟随、Esc 退出。代码在 `packages/subagents/viewer/` 下（`command.ts`/`overlay.ts`/`render.ts`/`index.ts`）。 |
