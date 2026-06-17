@@ -1,5 +1,5 @@
 import { exec } from "node:child_process";
-import type { ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
+import type { Theme } from "@earendil-works/pi-coding-agent";
 import type { StatusLineComponent } from "./base.ts";
 
 export class GitComponent implements StatusLineComponent {
@@ -8,8 +8,9 @@ export class GitComponent implements StatusLineComponent {
   private refreshing = false;
   private requestRender: (() => void) | null = null;
   private refreshTimer: ReturnType<typeof setTimeout> | null = null;
+  private disposed = false;
 
-  constructor(private ctx: ExtensionContext) {}
+  constructor(private cwd: string) {}
 
   bindRender(fn: () => void) {
     this.requestRender = fn;
@@ -17,19 +18,25 @@ export class GitComponent implements StatusLineComponent {
   }
 
   dispose() {
+    this.disposed = true;
     if (this.refreshTimer) clearTimeout(this.refreshTimer);
+    this.refreshTimer = null;
   }
 
   private scheduleRefresh(delayMs: number) {
+    if (this.disposed) return;
     if (this.refreshTimer) clearTimeout(this.refreshTimer);
-    this.refreshTimer = setTimeout(() => this.refresh(), delayMs);
+    this.refreshTimer = setTimeout(() => {
+      this.refresh().catch(() => {});
+    }, delayMs);
   }
 
   private async refresh() {
+    if (this.disposed) return;
     if (this.refreshing) return;
     this.refreshing = true;
 
-    const cwd = this.ctx.cwd;
+    const cwd = this.cwd;
     try {
       const [branchOut, statusOut] = await Promise.all([
         this.exec("git rev-parse --abbrev-ref HEAD", cwd),
@@ -43,6 +50,7 @@ export class GitComponent implements StatusLineComponent {
     }
 
     this.refreshing = false;
+    if (this.disposed) return;
     this.requestRender?.();
     this.scheduleRefresh(5000);
   }

@@ -18,7 +18,7 @@ export function makeFooter(
   theme: Theme,
   _footerData: ReadonlyFooterDataProvider,
 ) => Component & { dispose?(): void } {
-  const git = new GitComponent(ctx);
+  const git = new GitComponent(ctx.cwd);
   const codingPlan = new CodingPlanUsageComponent(ctx, pi);
 
   const components: StatusLineComponent[] = [
