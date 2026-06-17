@@ -113,23 +113,23 @@ Example:
 
 ## Package layout (this extension)
 
-| File                    | Role                                                                                                                        |
-| ----------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `tool.ts`               | Registers `subagent` / `subagent_status`; `execute` routing only.                                                           |
-| `schemas.ts`            | TypeBox parameter schemas.                                                                                                  |
-| `validate.ts`           | Single vs batch argument validation.                                                                                        |
-| `details.ts`            | Normalizes `SubagentRunDetails` for tool results.                                                                           |
-| `parent-update.ts`      | Safe `onUpdate` + throttled interval flush helper.                                                                          |
-| `orchestrate-single.ts` | Single-task run + live `details` updates.                                                                                   |
-| `orchestrate-batch.ts`  | Parallel batch + per-task arrays + live updates.                                                                            |
-| `batch-text.ts`         | Markdown/text body for completed batch results.                                                                             |
-| `background-finish.ts`  | Job table updates, `pi.events`, `notify` after async runs.                                                                  |
-| `run-agent.ts`          | `createAgentSession` + `runSubAgent`; child loader uses `extensionFactories` for `protect-secrets` and `extra-tools`.       |
-| `agent-catalog.ts`      | Agent Markdown catalog, id normalization, system prompt + **`<subagents>`** XML for the parent prompt, `SubagentAgentType`. |
-| `child-tools.ts`        | Built-in tool name list + filter excluding delegation tools.                                                                |
-| `abort-timeout.ts`      | Merges optional `AbortSignal.timeout` into run signals.                                                                     |
-| `settings.ts`           | Reads `settings.json`; concurrency, timeout, persona defaults.                                                              |
-| `agents-inspect.ts`     | `/subagents-agents` command: persona picker + read-only inspect editor.                                                     |
+| File                    | Role                                                                                                                                                             |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tool.ts`               | Registers `subagent` / `subagent_status`; `execute` routing only.                                                                                                |
+| `schemas.ts`            | TypeBox parameter schemas.                                                                                                                                       |
+| `validate.ts`           | Single vs batch argument validation.                                                                                                                             |
+| `details.ts`            | Normalizes `SubagentRunDetails` for tool results.                                                                                                                |
+| `parent-update.ts`      | Safe `onUpdate` + throttled interval flush helper.                                                                                                               |
+| `orchestrate-single.ts` | Single-task run + live `details` updates.                                                                                                                        |
+| `orchestrate-batch.ts`  | Parallel batch + per-task arrays + live updates.                                                                                                                 |
+| `batch-text.ts`         | Markdown/text body for completed batch results.                                                                                                                  |
+| `background-finish.ts`  | Job table updates, `pi.events`, `notify` after async runs.                                                                                                       |
+| `run-agent.ts`          | `createAgentSession` + `runSubAgent`; child loader uses `extensionFactories` for `protect-secrets` and `extra-tools`.                                            |
+| `agent-catalog.ts`      | Agent Markdown catalog, id normalization, system prompt + **`<subagents>`** XML for the parent prompt, `SubagentAgentType`.                                      |
+| `child-tools.ts`        | Built-in tool name list + filter excluding delegation tools.                                                                                                     |
+| `abort-timeout.ts`      | Merges optional `AbortSignal.timeout` into run signals.                                                                                                          |
+| `settings.ts`           | Reads `settings.json`; concurrency, timeout, persona defaults.                                                                                                   |
+| `agents-inspect.ts`     | `/subagents-agents` command: persona picker + read-only inspect editor.                                                                                          |
 | `viewer/`               | `/view-subagents` command + popup output viewer. See `viewer/README.md`-style notes above; files: `command.ts`, `overlay.ts`, `render.ts`, `index.ts` (+ tests). |
 
 ## Tool: `subagent_status`
