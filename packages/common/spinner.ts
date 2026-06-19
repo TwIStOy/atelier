@@ -629,6 +629,13 @@ export const SPINNER_STYLES: Record<string, SpinnerStyle> = {
     ],
   },
 
+  // private codes
+  runcat: {
+    width: 2,
+    intervalMs: 167,
+    frames: [" ", " ", " ", " ", " "]
+  },
+
   // --- emoji ---
   hearts: {
     width: 1,
