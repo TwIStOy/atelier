@@ -41,6 +41,41 @@ export class FrameEstimator {
     );
   }
 
+  isCyclicRotation(other: readonly string[]): boolean {
+    const frames = this.frames;
+    if (!frames || frames.length === 0) return false;
+    if (frames.length !== other.length) return false;
+    if (frames === other) return true;
+    const first = frames[0]!;
+    const starts: number[] = [];
+    for (let i = 0; i < other.length; i++) {
+      if (other[i] === first) starts.push(i);
+    }
+    if (starts.length === 0) return false;
+    return starts.some((start) =>
+      frames!.every((f, j) => f === other[(start + j) % other.length]),
+    );
+  }
+
+  rotatedForReset(
+    nextFrames: readonly string[],
+    nextIntervalMs: number,
+  ): string[] {
+    const out = [...nextFrames];
+    const current = this.estimate();
+    if (
+      !current ||
+      nextFrames.length === 0 ||
+      nextIntervalMs <= 0 ||
+      !this.isCyclicRotation(nextFrames)
+    ) {
+      return out;
+    }
+    const rot = current.index % nextFrames.length;
+    if (rot === 0) return out;
+    return [...out.slice(rot), ...out.slice(0, rot)];
+  }
+
   estimate(now: number = this.now.now()): EstimatedFrame | null {
     const frames = this.frames;
     const intervalMs = this.intervalMs;

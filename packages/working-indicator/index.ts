@@ -75,8 +75,15 @@ export default function (pi: ExtensionAPI) {
       ctx.ui.setWorkingIndicator();
       return;
     }
-    frameEstimator.reset(options.frames, options.intervalMs);
-    ctx.ui.setWorkingIndicator(options);
+    const frames = frameEstimator.rotatedForReset(
+      options.frames,
+      options.intervalMs,
+    );
+    frameEstimator.reset(frames, options.intervalMs);
+    ctx.ui.setWorkingIndicator({
+      frames,
+      intervalMs: options.intervalMs,
+    });
   }
 
   function applySpinner(ctx: ExtensionContext): void {
