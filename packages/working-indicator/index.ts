@@ -6,6 +6,7 @@ import { loadConfig, registerWorkingIndicatorConfigItems } from "./config.ts";
 import { pickPhrase } from "./phrase.ts";
 import {
   DEFAULT_RUNCAT_SPEED_CONFIG,
+  quantizeInterval,
   runcatSpeedIntervalMs,
   RUNCAT_SPINNER_KEY,
   shouldUpdateInterval,
@@ -84,7 +85,10 @@ export default function (pi: ExtensionAPI) {
   function refreshRuncatInterval(ctx: ExtensionContext): void {
     if (currentSpinnerKey !== RUNCAT_SPINNER_KEY || !ctx.hasUI) return;
     const style = SPINNER_STYLES[RUNCAT_SPINNER_KEY]!;
-    const target = runcatSpeedIntervalMs(tracker.liveTokS(), runcatSpeedConfig);
+    const target = quantizeInterval(
+      runcatSpeedIntervalMs(tracker.liveTokS(), runcatSpeedConfig),
+      runcatSpeedConfig,
+    );
     const current = runcatIntervalMs ?? runcatSpeedConfig.defaultIntervalMs;
     if (!shouldUpdateInterval(current, target, runcatSpeedConfig)) return;
 
@@ -170,7 +174,6 @@ export default function (pi: ExtensionAPI) {
       tracker.recordDelta(delta.delta, delta.partial?.usage?.output);
     }
     pushMessage(ctx);
-    refreshRuncatInterval(ctx);
   });
 
   pi.on("message_end", (event, ctx) => {
