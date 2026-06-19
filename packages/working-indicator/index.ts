@@ -14,9 +14,19 @@ import {
 } from "./runcat.ts";
 import { SPINNER_STYLES } from "@htwang-contrib/common";
 import { SpeedTracker } from "./speed-tracker.ts";
+import { EstimatedFrame, FrameEstimator } from "./frame-estimator.ts";
+
+export { FrameEstimator } from "./frame-estimator.ts";
+export type { EstimatedFrame } from "./frame-estimator.ts";
 
 const TICK_MS = 250;
 const TOKS_LABEL = "tok/s";
+
+const frameEstimator = new FrameEstimator();
+
+export function currentEstimatedFrame(): EstimatedFrame | null {
+  return frameEstimator.estimate();
+}
 
 function formatSpeed(speed: number | null): string {
   const value = speed === null || speed <= 0 ? "--" : speed.toFixed(1);
@@ -56,6 +66,19 @@ export default function (pi: ExtensionAPI) {
     ctx.ui.setWorkingMessage(currentMessage());
   }
 
+  function setIndicator(
+    ctx: ExtensionContext,
+    options: { frames: string[]; intervalMs: number } | undefined,
+  ): void {
+    if (!options) {
+      frameEstimator.clear();
+      ctx.ui.setWorkingIndicator();
+      return;
+    }
+    frameEstimator.reset(options.frames, options.intervalMs);
+    ctx.ui.setWorkingIndicator(options);
+  }
+
   function applySpinner(ctx: ExtensionContext): void {
     const key = loadConfig().spinner;
     const style = SPINNER_STYLES[key];
@@ -63,7 +86,7 @@ export default function (pi: ExtensionAPI) {
 
     if (!style) {
       runcatIntervalMs = undefined;
-      ctx.ui.setWorkingIndicator();
+      setIndicator(ctx, undefined);
       return;
     }
 
@@ -74,12 +97,11 @@ export default function (pi: ExtensionAPI) {
     }
 
     const intervalMs =
-      key === RUNCAT_SPINNER_KEY ? runcatIntervalMs : style.intervalMs;
+      key === RUNCAT_SPINNER_KEY
+        ? runcatSpeedConfig.defaultIntervalMs
+        : style.intervalMs;
 
-    ctx.ui.setWorkingIndicator({
-      frames: style.frames,
-      intervalMs,
-    });
+    setIndicator(ctx, { frames: style.frames, intervalMs });
   }
 
   function refreshRuncatInterval(ctx: ExtensionContext): void {
@@ -93,10 +115,7 @@ export default function (pi: ExtensionAPI) {
     if (!shouldUpdateInterval(current, target, runcatSpeedConfig)) return;
 
     runcatIntervalMs = target;
-    ctx.ui.setWorkingIndicator({
-      frames: style.frames,
-      intervalMs: target,
-    });
+    setIndicator(ctx, { frames: style.frames, intervalMs: target });
   }
 
   function resetRuncatInterval(ctx: ExtensionContext): void {
@@ -105,10 +124,7 @@ export default function (pi: ExtensionAPI) {
     const target = runcatSpeedConfig.defaultIntervalMs;
     if (runcatIntervalMs === target) return;
     runcatIntervalMs = target;
-    ctx.ui.setWorkingIndicator({
-      frames: style.frames,
-      intervalMs: target,
-    });
+    setIndicator(ctx, { frames: style.frames, intervalMs: target });
   }
 
   function startTicking(ctx: ExtensionContext): void {
