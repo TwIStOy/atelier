@@ -52,6 +52,10 @@ export function shouldUpdateInterval(
   return Math.abs(nextMs - currentMs) >= config.intervalChangeThresholdMs;
 }
 
+export function shouldRefreshRuncatInterval(thinking: boolean): boolean {
+  return !thinking;
+}
+
 export function quantizeInterval(
   intervalMs: number,
   config: RuncatSpeedConfig = DEFAULT_RUNCAT_SPEED_CONFIG,

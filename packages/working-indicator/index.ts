@@ -9,6 +9,7 @@ import {
   quantizeInterval,
   runcatSpeedIntervalMs,
   RUNCAT_SPINNER_KEY,
+  shouldRefreshRuncatInterval,
   shouldUpdateInterval,
   type RuncatSpeedConfig,
 } from "./runcat.ts";
@@ -113,6 +114,7 @@ export default function (pi: ExtensionAPI) {
 
   function refreshRuncatInterval(ctx: ExtensionContext): void {
     if (currentSpinnerKey !== RUNCAT_SPINNER_KEY || !ctx.hasUI) return;
+    if (!shouldRefreshRuncatInterval(thinking)) return;
     const style = SPINNER_STYLES[RUNCAT_SPINNER_KEY]!;
     const target = quantizeInterval(
       runcatSpeedIntervalMs(tracker.liveTokS(), runcatSpeedConfig),
@@ -180,6 +182,7 @@ export default function (pi: ExtensionAPI) {
       if (!thinking) {
         thinking = true;
         thinkingStartMs = Date.now();
+        resetRuncatInterval(ctx);
       }
     } else if (
       delta.type === "text_start" ||

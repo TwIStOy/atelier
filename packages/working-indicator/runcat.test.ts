@@ -5,6 +5,7 @@ import {
   type RuncatSpeedConfig,
   quantizeInterval,
   runcatSpeedIntervalMs,
+  shouldRefreshRuncatInterval,
   shouldUpdateInterval,
 } from "./runcat.ts";
 
@@ -117,5 +118,15 @@ describe("quantizeInterval", () => {
   test("keeps small jitter inside one bucket stable", () => {
     expect(quantizeInterval(168, config)).toBe(quantizeInterval(172, config));
     expect(quantizeInterval(168, config)).toBe(170);
+  });
+});
+
+describe("shouldRefreshRuncatInterval", () => {
+  test("returns true while not thinking so the interval tracks live speed", () => {
+    expect(shouldRefreshRuncatInterval(false)).toBe(true);
+  });
+
+  test("returns false while thinking so the spinner freezes on default", () => {
+    expect(shouldRefreshRuncatInterval(true)).toBe(false);
   });
 });
