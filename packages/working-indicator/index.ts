@@ -15,24 +15,20 @@ import {
 } from "./runcat.ts";
 import { SPINNER_STYLES } from "@htwang-contrib/common";
 import { SpeedTracker } from "./speed-tracker.ts";
-import { EstimatedFrame, FrameEstimator } from "./frame-estimator.ts";
+import {
+  RuncatIndicatorEngine,
+  type RuncatIndicatorSink,
+} from "./runcat-engine.ts";
 
-export { FrameEstimator } from "./frame-estimator.ts";
-export type { EstimatedFrame } from "./frame-estimator.ts";
+export { RuncatIndicatorEngine } from "./runcat-engine.ts";
+export type {
+  RuncatIndicatorSink,
+  RuncatIndicatorOptions,
+  RuncatIndicatorSnapshot,
+} from "./runcat-engine.ts";
 
 const TICK_MS = 250;
 const TOKS_LABEL = "tok/s";
-
-const frameEstimator = new FrameEstimator();
-
-export function currentEstimatedFrame(): EstimatedFrame | null {
-  return frameEstimator.estimate();
-}
-
-function formatSpeed(speed: number | null): string {
-  const value = speed === null || speed <= 0 ? "--" : speed.toFixed(1);
-  return `${value} ${TOKS_LABEL}`;
-}
 
 export default function (pi: ExtensionAPI) {
   let thinking = false;
@@ -44,6 +40,12 @@ export default function (pi: ExtensionAPI) {
   let currentSpinnerKey: string | undefined;
   let runcatSpeedConfig: RuncatSpeedConfig = DEFAULT_RUNCAT_SPEED_CONFIG;
   let runcatIntervalMs: number | undefined;
+  let runcatEngine: RuncatIndicatorEngine | undefined;
+
+  function formatSpeed(speed: number | null): string {
+    const value = speed === null || speed <= 0 ? "--" : speed.toFixed(1);
+    return `${value} ${TOKS_LABEL}`;
+  }
 
   function currentMessage(): string {
     const base = currentPhrase;
@@ -67,24 +69,19 @@ export default function (pi: ExtensionAPI) {
     ctx.ui.setWorkingMessage(currentMessage());
   }
 
-  function setIndicator(
+  function makeRuncatSink(ctx: ExtensionContext): RuncatIndicatorSink {
+    return {
+      pushFrame(frame: string): void {
+        ctx.ui.setWorkingIndicator({ frames: [frame] });
+      },
+    };
+  }
+
+  function setPlainIndicator(
     ctx: ExtensionContext,
     options: { frames: string[]; intervalMs: number } | undefined,
   ): void {
-    if (!options) {
-      frameEstimator.clear();
-      ctx.ui.setWorkingIndicator();
-      return;
-    }
-    const frames = frameEstimator.rotatedForReset(
-      options.frames,
-      options.intervalMs,
-    );
-    frameEstimator.reset(frames, options.intervalMs);
-    ctx.ui.setWorkingIndicator({
-      frames,
-      intervalMs: options.intervalMs,
-    });
+    ctx.ui.setWorkingIndicator(options);
   }
 
   function applySpinner(ctx: ExtensionContext): void {
@@ -93,54 +90,77 @@ export default function (pi: ExtensionAPI) {
     currentSpinnerKey = key;
 
     if (!style) {
+      stopRuncatEngine();
       runcatIntervalMs = undefined;
-      setIndicator(ctx, undefined);
+      setPlainIndicator(ctx, undefined);
       return;
     }
 
     if (key === RUNCAT_SPINNER_KEY) {
       runcatIntervalMs = runcatSpeedConfig.defaultIntervalMs;
-    } else {
-      runcatIntervalMs = undefined;
+      if (!runcatEngine) {
+        runcatEngine = new RuncatIndicatorEngine(makeRuncatSink(ctx), {
+          frames: style.frames,
+          intervalMs: runcatSpeedConfig.defaultIntervalMs,
+        });
+      } else {
+        runcatEngine.setFrames(style.frames);
+        runcatEngine.setTargetInterval(runcatSpeedConfig.defaultIntervalMs);
+      }
+      // The engine is (re)started on message_start, not here, so an idle
+      // session does not burn a wake-up timer.
+      setPlainIndicator(ctx, {
+        frames: [style.frames[0] ?? ""],
+        intervalMs: 1,
+      });
+      return;
     }
 
-    const intervalMs =
-      key === RUNCAT_SPINNER_KEY
-        ? runcatSpeedConfig.defaultIntervalMs
-        : style.intervalMs;
-
-    setIndicator(ctx, { frames: style.frames, intervalMs });
+    stopRuncatEngine();
+    runcatIntervalMs = undefined;
+    setPlainIndicator(ctx, {
+      frames: style.frames,
+      intervalMs: style.intervalMs,
+    });
   }
 
-  function refreshRuncatInterval(ctx: ExtensionContext): void {
-    if (currentSpinnerKey !== RUNCAT_SPINNER_KEY || !ctx.hasUI) return;
+  function stopRuncatEngine(): void {
+    if (runcatEngine) {
+      runcatEngine.stop();
+      runcatEngine = undefined;
+    }
+  }
+
+  function refreshRuncatInterval(): void {
+    if (currentSpinnerKey !== RUNCAT_SPINNER_KEY) return;
+    const engine = runcatEngine;
+    if (!engine) return;
     if (!shouldRefreshRuncatInterval(thinking)) return;
-    const style = SPINNER_STYLES[RUNCAT_SPINNER_KEY]!;
     const target = quantizeInterval(
       runcatSpeedIntervalMs(tracker.liveTokS(), runcatSpeedConfig),
       runcatSpeedConfig,
     );
     const current = runcatIntervalMs ?? runcatSpeedConfig.defaultIntervalMs;
     if (!shouldUpdateInterval(current, target, runcatSpeedConfig)) return;
-
     runcatIntervalMs = target;
-    setIndicator(ctx, { frames: style.frames, intervalMs: target });
+    engine.setTargetInterval(target);
   }
 
-  function resetRuncatInterval(ctx: ExtensionContext): void {
-    if (currentSpinnerKey !== RUNCAT_SPINNER_KEY || !ctx.hasUI) return;
-    const style = SPINNER_STYLES[RUNCAT_SPINNER_KEY]!;
+  function resetRuncatInterval(): void {
+    if (currentSpinnerKey !== RUNCAT_SPINNER_KEY) return;
+    const engine = runcatEngine;
+    if (!engine) return;
     const target = runcatSpeedConfig.defaultIntervalMs;
     if (runcatIntervalMs === target) return;
     runcatIntervalMs = target;
-    setIndicator(ctx, { frames: style.frames, intervalMs: target });
+    engine.setTargetInterval(target);
   }
 
   function startTicking(ctx: ExtensionContext): void {
     if (tickTimer !== undefined) return;
     tickTimer = setInterval(() => {
       pushMessage(ctx);
-      refreshRuncatInterval(ctx);
+      refreshRuncatInterval();
     }, TICK_MS);
   }
 
@@ -171,6 +191,7 @@ export default function (pi: ExtensionAPI) {
     thinking = false;
     thinkingStartMs = 0;
     tracker.startMessage();
+    if (runcatEngine && !runcatEngine.isRunning()) runcatEngine.start();
     startTicking(ctx);
   });
 
@@ -182,7 +203,7 @@ export default function (pi: ExtensionAPI) {
       if (!thinking) {
         thinking = true;
         thinkingStartMs = Date.now();
-        resetRuncatInterval(ctx);
+        resetRuncatInterval();
       }
     } else if (
       delta.type === "text_start" ||
@@ -212,12 +233,15 @@ export default function (pi: ExtensionAPI) {
         event.message.stopReason,
       );
     }
-    resetRuncatInterval(ctx);
+    resetRuncatInterval();
     stopTicking();
+    // Streaming ended — park the engine. The next message_start re-arms it.
+    runcatEngine?.stop();
   });
 
   pi.on("session_shutdown", () => {
     stopTicking();
+    stopRuncatEngine();
   });
 
   registerWorkingIndicatorConfigItems();
