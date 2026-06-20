@@ -273,6 +273,51 @@ describe("RuncatIndicatorEngine — setFrames", () => {
   });
 });
 
+describe("RuncatIndicatorEngine — sink errors do not kill the loop", () => {
+  test("start arms the timer even if the first push throws", () => {
+    const clock = new FakeClock();
+    const sink: RuncatIndicatorSink = {
+      pushFrame: () => {
+        throw new Error("boom");
+      },
+    };
+    const engine = new RuncatIndicatorEngine(
+      sink,
+      { frames: ["a", "b"], intervalMs: 100 },
+      clock,
+    );
+    // start() arms the wake-up before pushing, so the throw must not strand
+    // the engine in a running-but-timerless state.
+    expect(() => engine.start()).toThrow();
+    expect(engine.isRunning()).toBe(true);
+    expect(clock.queue).toHaveLength(1); // timer armed despite the throw
+  });
+
+  test("a throwing sink on wake does not cancel subsequent wake-ups", () => {
+    const clock = new FakeClock();
+    let calls = 0;
+    const sink: RuncatIndicatorSink = {
+      pushFrame: () => {
+        calls++;
+        // throw on the 2nd push (the first wake after start)
+        if (calls === 2) throw new Error("mid-stream boom");
+      },
+    };
+    const engine = new RuncatIndicatorEngine(
+      sink,
+      { frames: ["a", "b"], intervalMs: 100 },
+      clock,
+    );
+    engine.start(); // push #1 (calls=1)
+    // wake 1: push #2 throws, but timer must still be armed
+    expect(() => clock.fireNext()).toThrow();
+    expect(clock.queue).toHaveLength(1);
+    // wake 2: still alive (push #3, calls=3)
+    expect(() => clock.fireNext()).not.toThrow();
+    expect(calls).toBe(3);
+  });
+});
+
 describe("RuncatIndicatorEngine — snapshot", () => {
   test("reports frame index modulo length and target interval", () => {
     const { engine, clock } = makeEngine(["a", "b", "c"], 100);

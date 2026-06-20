@@ -110,8 +110,10 @@ export class RuncatIndicatorEngine {
   start(): void {
     if (this.running) return;
     this.running = true;
-    this.pushCurrent();
+    // Arm the wake-up FIRST so a throwing sink cannot strand the engine in
+    // a half-started state (running but no timer ever fires).
     this.armNext(this.currentIntervalMs);
+    this.pushCurrent();
   }
 
   stop(): void {
@@ -239,11 +241,13 @@ export class RuncatIndicatorEngine {
     if (!this.running) return;
     const now = this.clock.now();
     this.currentIntervalMs = this.commitEffective(now);
+    // Arm the next wake-up before pushing so a throwing sink cannot kill
+    // the animation loop.
+    this.armNext(this.currentIntervalMs);
     if (this.frames.length > 0) {
       this.frameIndex = (this.frameIndex + 1) % this.frames.length;
     }
     this.pushCurrent();
-    this.armNext(this.currentIntervalMs);
   }
 }
 

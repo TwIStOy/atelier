@@ -107,11 +107,9 @@ export default function (pi: ExtensionAPI) {
         runcatEngine.setFrames(style.frames);
         runcatEngine.setTargetInterval(runcatSpeedConfig.defaultIntervalMs);
       }
-      // The engine is (re)started on message_start, not here, so an idle
-      // session does not burn a wake-up timer.
       setPlainIndicator(ctx, {
         frames: [style.frames[0] ?? ""],
-        intervalMs: 1,
+        intervalMs: runcatSpeedConfig.defaultIntervalMs,
       });
       return;
     }
@@ -182,6 +180,10 @@ export default function (pi: ExtensionAPI) {
     currentPhrase = pickPhrase();
     if (ctx.hasUI) {
       ctx.ui.setWorkingMessage(currentMessage());
+      // The engine spans the whole agent run (wait → thinking → text →
+      // tool calls), so the spinner keeps moving between messages too.
+      if (runcatEngine && !runcatEngine.isRunning()) runcatEngine.start();
+      startTicking(ctx);
     }
   });
 
@@ -191,8 +193,6 @@ export default function (pi: ExtensionAPI) {
     thinking = false;
     thinkingStartMs = 0;
     tracker.startMessage();
-    if (runcatEngine && !runcatEngine.isRunning()) runcatEngine.start();
-    startTicking(ctx);
   });
 
   pi.on("message_update", (event, ctx) => {
@@ -234,9 +234,21 @@ export default function (pi: ExtensionAPI) {
       );
     }
     resetRuncatInterval();
+  });
+
+  pi.on("agent_end", (_event, ctx) => {
     stopTicking();
-    // Streaming ended — park the engine. The next message_start re-arms it.
+    // Agent run finished — park the engine until the next agent_start.
     runcatEngine?.stop();
+    if (ctx.hasUI && currentSpinnerKey === RUNCAT_SPINNER_KEY) {
+      const style = SPINNER_STYLES[RUNCAT_SPINNER_KEY];
+      if (style) {
+        setPlainIndicator(ctx, {
+          frames: [style.frames[0] ?? ""],
+          intervalMs: runcatSpeedConfig.defaultIntervalMs,
+        });
+      }
+    }
   });
 
   pi.on("session_shutdown", () => {
