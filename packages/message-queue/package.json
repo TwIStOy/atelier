@@ -9,7 +9,9 @@
       "./index.ts"
     ]
   },
-  "dependencies": {},
+  "dependencies": {
+    "@htwang-contrib/common": "*"
+  },
   "devDependencies": {
     "@earendil-works/pi-ai": "latest",
     "@earendil-works/pi-coding-agent": "latest",

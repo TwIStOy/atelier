@@ -1,4 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { MODAL_ACTIVE_EVENT } from "@htwang-contrib/common";
 import { buildItemsForQuestion } from "./build-items.ts";
 import { emitAskUserPrompt } from "./events.ts";
 import { QuestionnaireSession } from "./state/questionnaire-session.ts";
@@ -78,20 +79,25 @@ export function registerAskUserQuestionTool(pi: ExtensionAPI): void {
 
       const itemsByTab = typed.questions.map((q) => buildItemsForQuestion(q));
 
-      const result = await ctx.ui.custom<QuestionnaireResult>(
-        (tui, theme, _keybindings, done) => {
-          const session = new QuestionnaireSession({
-            tui,
-            theme,
-            params: typed,
-            itemsByTab,
-            done,
-          });
-          return session.component;
-        },
-      );
+      pi.events.emit(MODAL_ACTIVE_EVENT, true);
+      try {
+        const result = await ctx.ui.custom<QuestionnaireResult>(
+          (tui, theme, _keybindings, done) => {
+            const session = new QuestionnaireSession({
+              tui,
+              theme,
+              params: typed,
+              itemsByTab,
+              done,
+            });
+            return session.component;
+          },
+        );
 
-      return buildQuestionnaireResponse(result, typed);
+        return buildQuestionnaireResponse(result, typed);
+      } finally {
+        pi.events.emit(MODAL_ACTIVE_EVENT, false);
+      }
     },
   });
 }

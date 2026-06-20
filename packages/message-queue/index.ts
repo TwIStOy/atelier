@@ -6,6 +6,7 @@ import type {
 import type { ImageContent, TextContent } from "@earendil-works/pi-ai";
 import type { TUI } from "@earendil-works/pi-tui";
 import { getKeybindings, Key, matchesKey } from "@earendil-works/pi-tui";
+import { MODAL_ACTIVE_EVENT } from "@htwang-contrib/common";
 import { MessageQueue } from "./queue.ts";
 import type { QueuedMessage } from "./queue.ts";
 import {
@@ -22,6 +23,7 @@ export default function messageQueueExtension(pi: ExtensionAPI): void {
   let widgetCtx: ExtensionContext | null = null;
   let unsubTerminal: (() => void) | null = null;
   let panelOpen = false;
+  let modalActive = false;
   let currentWidgetMessages: readonly QueuedMessage[] = [];
 
   function refreshWidget(): void {
@@ -92,6 +94,7 @@ export default function messageQueueExtension(pi: ExtensionAPI): void {
   }
 
   function handleEmptyEnter(data: string): { consume: boolean } | undefined {
+    if (modalActive) return undefined;
     if (panelOpen) return undefined;
     if (queue.isEmpty) return undefined;
     if (!isEmptyEditorSubmit(data)) return undefined;
@@ -114,8 +117,13 @@ export default function messageQueueExtension(pi: ExtensionAPI): void {
     }
   }
 
+  pi.events.on(MODAL_ACTIVE_EVENT, (active: unknown) => {
+    modalActive = Boolean(active);
+  });
+
   pi.on("session_start", () => {
     queue.clear();
+    modalActive = false;
     disableEmptyEnter();
     refreshWidget();
   });

@@ -27,7 +27,7 @@ export type {
   CodingPlanUsageLimit,
   CodingPlanUsageWindow,
 } from "./usage.ts";
-export { ZAI_CODING_PLAN_EVENTS } from "./events.ts";
+export { ZAI_CODING_PLAN_EVENTS, MODAL_ACTIVE_EVENT } from "./events.ts";
 export { resolveModel } from "./model-resolve.ts";
 export type { ResolvableModel } from "./model-resolve.ts";
 export { getAvailableSkillNames } from "./skills.ts";
