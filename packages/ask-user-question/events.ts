@@ -1,24 +1,16 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import {
+  ASK_USER_PROMPT_EVENT,
+  type AskUserPromptPayload,
+} from "@htwang-contrib/common";
 import type { QuestionParams } from "./tool/types.ts";
 
-export const ASK_USER_PROMPT_EVENT = "ask_user_question:prompt" as const;
-
-export type AskUserPromptOption = {
-  label: string;
-  description: string;
-  hasPreview: boolean;
-};
-
-export type AskUserPromptQuestion = {
-  question: string;
-  header: string;
-  multiSelect: boolean;
-  options: ReadonlyArray<AskUserPromptOption>;
-};
-
-export type AskUserPromptPayload = {
-  questions: ReadonlyArray<AskUserPromptQuestion>;
-};
+export { ASK_USER_PROMPT_EVENT };
+export type {
+  AskUserPromptOption,
+  AskUserPromptQuestion,
+  AskUserPromptPayload,
+} from "@htwang-contrib/common";
 
 export function buildAskUserPromptPayload(
   params: QuestionParams,

@@ -20,3 +20,35 @@ export const ZAI_CODING_PLAN_EVENTS = {
  * exceptions or user dismissal.
  */
 export const MODAL_ACTIVE_EVENT = "pi-extensions:ui:modal-active" as const;
+
+/**
+ * Cross-extension channel emitted by `ask_user_question` right before its
+ * editor-occupying modal mounts, carrying the full question/option payload.
+ *
+ * Producers (currently `packages/ask-user-question`) emit via
+ * `emitAskUserPrompt`. Consumers that want richer context than the bare
+ * `MODAL_ACTIVE_EVENT` boolean — e.g. `moshi-hooks-extra` forwarding a
+ * "needs input" notification with the actual question text — subscribe on
+ * this channel to capture the questions, then react to `MODAL_ACTIVE_EVENT`
+ * for the open/close edge.
+ *
+ * Payload: `AskUserPromptPayload` (structural — read-only consumer view).
+ */
+export const ASK_USER_PROMPT_EVENT = "ask_user_question:prompt" as const;
+
+export type AskUserPromptOption = {
+  label: string;
+  description: string;
+  hasPreview: boolean;
+};
+
+export type AskUserPromptQuestion = {
+  question: string;
+  header: string;
+  multiSelect: boolean;
+  options: ReadonlyArray<AskUserPromptOption>;
+};
+
+export type AskUserPromptPayload = {
+  questions: ReadonlyArray<AskUserPromptQuestion>;
+};
