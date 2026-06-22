@@ -17,3 +17,4 @@
      seconds
     ```
 - [ ] Bash tool 在展开状态下，如果一行太长，也应该换行，而不是截断
+- [ ] 动态的 working indicator。在窗口 resize 的时候，如果宽度太小的话，说明可能是手机，那就把 indicator 切换到 dots
