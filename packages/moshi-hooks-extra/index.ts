@@ -1,5 +1,10 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import {
+  ASK_USER_PROMPT_EVENT,
+  MODAL_ACTIVE_EVENT,
+  type AskUserPromptPayload,
+} from "@htwang-contrib/common";
+import {
   isMoshiHookAvailable,
   resolveTransportMode,
   sendEnvelope,
@@ -9,6 +14,8 @@ import {
   ActivityTracker,
   assistantTitleFromMessage,
   sessionKeyFor,
+  summarizeAskUserQuestion,
+  type AskUserQuestionSummary,
 } from "./activity.ts";
 
 const IDLE_TITLE_FALLBACK = "Pi idle";
@@ -22,6 +29,14 @@ export default function moshiHooksExtra(pi: ExtensionAPI): void {
   if (transport === "none") return;
 
   const activity = new ActivityTracker();
+  const pendingQuestion = new Map<string, AskUserQuestionSummary>();
+  let cachedSessionId = "";
+
+  pi.on("session_start", (_event, ctx) => {
+    cachedSessionId = sessionIdFromCtx(ctx);
+    activity.reset();
+    pendingQuestion.clear();
+  });
 
   pi.on("before_agent_start", (event, ctx) => {
     const cwd = ctx.cwd ?? "";
@@ -92,6 +107,51 @@ export default function moshiHooksExtra(pi: ExtensionAPI): void {
           title: idle.title || IDLE_TITLE_FALLBACK,
           message: idle.prompt,
         },
+      },
+      { preferSocket: true },
+    );
+    return;
+  });
+
+  pi.events.on(ASK_USER_PROMPT_EVENT, (data: unknown) => {
+    const payload = data as AskUserPromptPayload;
+    const summary = summarizeAskUserQuestion(payload);
+    const cwd = process.cwd();
+    pendingQuestion.set(sessionKeyFor(cachedSessionId, cwd), summary);
+  });
+
+  pi.events.on(MODAL_ACTIVE_EVENT, (active: unknown) => {
+    const cwd = process.cwd();
+    const key = sessionKeyFor(cachedSessionId, cwd);
+    const event = { active, session_id: cachedSessionId };
+    if (active === true) {
+      const summary =
+        pendingQuestion.get(key) ?? summarizeAskUserQuestion(null);
+      void sendEnvelope(
+        {
+          eventName: "question_asked",
+          event,
+          ctx: { cwd },
+          extra: {
+            phase: "waitingForApproval",
+            category: "approval_required",
+            title: summary.title,
+            subtitle: "Answer in terminal",
+            message: summary.message,
+          },
+        },
+        { preferSocket: true },
+      );
+      return;
+    }
+    pendingQuestion.delete(key);
+    activity.markActive(key);
+    void sendEnvelope(
+      {
+        eventName: "question_replied",
+        event,
+        ctx: { cwd },
+        extra: {},
       },
       { preferSocket: true },
     );

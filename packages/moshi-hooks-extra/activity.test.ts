@@ -5,6 +5,7 @@ import {
   clipText,
   formatUserPrompt,
   sessionKeyFor,
+  summarizeAskUserQuestion,
 } from "./activity.ts";
 
 describe("clipText", () => {
@@ -130,5 +131,87 @@ describe("ActivityTracker", () => {
     a.markActive("s1");
     a.reset();
     expect(a.shouldEmitIdle("s1").emit).toBe(false);
+  });
+});
+
+describe("summarizeAskUserQuestion", () => {
+  test("null/undefined payload yields fallback", () => {
+    expect(summarizeAskUserQuestion(null)).toEqual({
+      title: "Pi needs input",
+      message: "Input requested",
+      optionCount: 0,
+    });
+    expect(summarizeAskUserQuestion(undefined).message).toBe("Input requested");
+  });
+
+  test("uses first question text as message", () => {
+    const summary = summarizeAskUserQuestion({
+      questions: [
+        {
+          question: "Which library?",
+          header: "Library",
+          multiSelect: false,
+          options: [
+            { label: "A", description: "", hasPreview: false },
+            { label: "B", description: "", hasPreview: false },
+          ],
+        },
+      ],
+    });
+    expect(summary.message).toBe("Which library?");
+    expect(summary.optionCount).toBe(2);
+    expect(summary.title).toBe("Pi needs input");
+  });
+
+  test("falls back to header when question empty", () => {
+    const summary = summarizeAskUserQuestion({
+      questions: [
+        {
+          question: "",
+          header: "Auth method",
+          multiSelect: false,
+          options: [],
+        },
+      ],
+    });
+    expect(summary.message).toBe("Auth method");
+  });
+
+  test("clips long question text", () => {
+    const summary = summarizeAskUserQuestion({
+      questions: [
+        {
+          question: "x".repeat(300),
+          header: "",
+          multiSelect: false,
+          options: [],
+        },
+      ],
+    });
+    expect(summary.message.length).toBe(200);
+    expect(summary.message.endsWith("…"));
+  });
+
+  test("sums options across multiple questions", () => {
+    const summary = summarizeAskUserQuestion({
+      questions: [
+        {
+          question: "q1",
+          header: "",
+          multiSelect: false,
+          options: [{ label: "a", description: "", hasPreview: false }],
+        },
+        {
+          question: "q2",
+          header: "",
+          multiSelect: true,
+          options: [
+            { label: "b", description: "", hasPreview: false },
+            { label: "c", description: "", hasPreview: false },
+          ],
+        },
+      ],
+    });
+    expect(summary.optionCount).toBe(3);
   });
 });

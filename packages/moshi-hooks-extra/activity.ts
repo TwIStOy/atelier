@@ -1,4 +1,9 @@
-import { assistantMessageText, userMessageText } from "@htwang-contrib/common";
+import {
+  assistantMessageText,
+  userMessageText,
+  type AskUserPromptPayload,
+  type AskUserPromptQuestion,
+} from "@htwang-contrib/common";
 import type { AssistantMessage, UserMessage } from "@earendil-works/pi-ai";
 
 const MAX_PROMPT_CHARS = 200;
@@ -111,4 +116,40 @@ export function sessionKeyFor(
   cwd: string,
 ): string {
   return sessionID && sessionID.length > 0 ? sessionID : "cwd:" + cwd;
+}
+
+export interface AskUserQuestionSummary {
+  title: string;
+  message: string;
+  optionCount: number;
+}
+
+export function summarizeAskUserQuestion(
+  payload: AskUserPromptPayload | null | undefined,
+): AskUserQuestionSummary {
+  const first = payload?.questions?.[0];
+  if (!first) {
+    return {
+      title: "Pi needs input",
+      message: "Input requested",
+      optionCount: 0,
+    };
+  }
+  const message =
+    first.question?.trim() || first.header?.trim() || "Input requested";
+  return {
+    title: "Pi needs input",
+    message: clipText(message, MAX_PROMPT_CHARS),
+    optionCount: countOptions(payload),
+  };
+}
+
+function countOptions(
+  payload: AskUserPromptPayload | null | undefined,
+): number {
+  if (!payload?.questions) return 0;
+  return payload.questions.reduce(
+    (sum, q: AskUserPromptQuestion) => sum + (q.options?.length ?? 0),
+    0,
+  );
 }
