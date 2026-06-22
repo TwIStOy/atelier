@@ -2,39 +2,55 @@ import type {
   ExtensionAPI,
   ToolResultEvent,
 } from "@earendil-works/pi-coding-agent";
-import { isMoshiHookAvailable, sendToMoshi } from "./moshi-client.ts";
-import { textFromContent } from "./payload.ts";
+import {
+  isMoshiHookAvailable,
+  resolveTransportMode,
+  sendEnvelope,
+} from "./moshi-client.ts";
+import { previewContent } from "./envelope.ts";
 
 export default function moshiHooksExtra(pi: ExtensionAPI): void {
   if (!isMoshiHookAvailable()) {
     return;
   }
 
+  const transport = resolveTransportMode();
+  if (transport === "none") return;
+
   pi.on("tool_call", (event, ctx) => {
-    sendToMoshi("ToolCallStart", event, ctx, {
-      tool_call_id: event.toolCallId,
-      tool_name: event.toolName,
-      input: event.input,
-    });
+    void sendEnvelope(
+      {
+        eventName: "ToolCallStart",
+        event,
+        ctx,
+        extra: {
+          tool_call_id: event.toolCallId,
+          tool_name: event.toolName,
+          input: event.input,
+        },
+      },
+      { preferSocket: true },
+    );
     return;
   });
 
   pi.on("tool_result", (event: ToolResultEvent, ctx) => {
-    sendToMoshi("ToolCallEnd", event, ctx, {
-      tool_call_id: event.toolCallId,
-      tool_name: event.toolName,
-      is_error: event.isError,
-      content_preview: previewContent(event.content),
-    });
+    void sendEnvelope(
+      {
+        eventName: "ToolCallEnd",
+        event,
+        ctx,
+        extra: {
+          tool_call_id: event.toolCallId,
+          tool_name: event.toolName,
+          is_error: event.isError,
+          content_preview: previewContent(event.content),
+        },
+      },
+      { preferSocket: true },
+    );
     return;
   });
 }
 
-function previewContent(
-  content: ToolResultEvent["content"],
-  maxChars = 2000,
-): string {
-  const text = textFromContent(content);
-  if (text.length <= maxChars) return text;
-  return `${text.slice(0, maxChars)}…[truncated]`;
-}
+export { previewContent };
