@@ -30,7 +30,8 @@
       "packages/voice-input",
       "packages/read-tracker",
       "packages/working-indicator",
-      "packages/todo"
+      "packages/todo",
+      "packages/moshi-hooks-extra"
     ],
     "skills": [
       "skills/code-philosophy",
