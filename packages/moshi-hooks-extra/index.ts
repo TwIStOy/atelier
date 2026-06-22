@@ -18,7 +18,7 @@ import {
   type AskUserQuestionSummary,
 } from "./activity.ts";
 
-const IDLE_TITLE_FALLBACK = "Pi idle";
+const IDLE_TITLE_FALLBACK = "Thinking next step...";
 
 export default function moshiHooksExtra(pi: ExtensionAPI): void {
   if (!isMoshiHookAvailable()) {
