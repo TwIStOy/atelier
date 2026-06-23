@@ -1,3 +1,4 @@
+import { truncateToWidth } from "@earendil-works/pi-tui";
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import { formatTokens, formatTokenUsageArrows } from "@htwang-contrib/common";
@@ -6,7 +7,7 @@ import type { StatusLineComponent } from "./base.ts";
 export class TokensComponent implements StatusLineComponent {
   constructor(private ctx: ExtensionContext) {}
 
-  render(_width: number, theme: Theme): string[] {
+  render(width: number, theme: Theme): string[] {
     let input = 0;
     let output = 0;
     let cacheRead = 0;
@@ -28,6 +29,6 @@ export class TokensComponent implements StatusLineComponent {
       `W${formatTokens(cacheWrite)}`,
     ];
 
-    return [theme.fg("dim", parts.join(" "))];
+    return [truncateToWidth(theme.fg("dim", parts.join(" ")), width, "")];
   }
 }

@@ -1,3 +1,4 @@
+import { truncateToWidth } from "@earendil-works/pi-tui";
 import type { Component, TUI } from "@earendil-works/pi-tui";
 import type {
   ExtensionAPI,
@@ -47,7 +48,8 @@ export function makeFooter(
         }
 
         if (parts.length === 0) return [];
-        return [parts.join(theme.fg("dim", " | "))];
+        const line = parts.join(theme.fg("dim", " | "));
+        return [truncateToWidth(line, width, "")];
       },
       invalidate() {},
     };

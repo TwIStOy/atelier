@@ -1,3 +1,4 @@
+import { truncateToWidth } from "@earendil-works/pi-tui";
 import type {
   ExtensionAPI,
   ExtensionContext,
@@ -39,7 +40,7 @@ export class CodingPlanUsageComponent implements StatusLineComponent {
     this.unsubscribe?.();
   }
 
-  render(_width: number, theme: Theme): string[] {
+  render(width: number, theme: Theme): string[] {
     const model = this.ctx.model;
     if (!model || model.provider !== PROVIDER_ID) return [];
     if (!this.usage || this.usage.limits.length === 0) return [];
@@ -55,9 +56,13 @@ export class CodingPlanUsageComponent implements StatusLineComponent {
       stress === "high" ? "error" : stress === "medium" ? "warning" : "dim";
 
     return [
-      theme.fg(pctColor, `${used}%`) +
-        theme.fg("dim", ` ${bar} `) +
-        theme.fg("dim", "5h"),
+      truncateToWidth(
+        theme.fg(pctColor, `${used}%`) +
+          theme.fg("dim", ` ${bar} `) +
+          theme.fg("dim", "5h"),
+        width,
+        "",
+      ),
     ];
   }
 }
