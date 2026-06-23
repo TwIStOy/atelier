@@ -2,6 +2,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import {
   ASK_USER_PROMPT_EVENT,
   MODAL_ACTIVE_EVENT,
+  registerConfigItems,
   type AskUserPromptPayload,
 } from "@htwang-contrib/common";
 import {
@@ -17,8 +18,23 @@ import {
   summarizeAskUserQuestion,
   type AskUserQuestionSummary,
 } from "./activity.ts";
+import {
+  lastAssistantMessage,
+  loadSummaryConfig,
+  resolveSummaryModel,
+  summarizeAgentTurn,
+  SUMMARY_TITLE_FALLBACK,
+} from "./summarizer.ts";
 
 const IDLE_TITLE_FALLBACK = "Thinking next step...";
+
+let cachedModels: Array<{ label: string; value: string }> = [];
+
+export function setCachedModels(
+  models: Array<{ label: string; value: string }>,
+): void {
+  cachedModels = models;
+}
 
 export default function moshiHooksExtra(pi: ExtensionAPI): void {
   if (!isMoshiHookAvailable()) {
@@ -28,6 +44,33 @@ export default function moshiHooksExtra(pi: ExtensionAPI): void {
   const transport = resolveTransportMode();
   if (transport === "none") return;
 
+  registerConfigItems("moshi-hooks-extra", [
+    {
+      key: "enabled",
+      type: "boolean",
+      label: "Agent-end Summary",
+      value: () => loadSummaryConfig().enabled,
+      description:
+        "Summarize each completed agent turn with an LLM before forwarding it to Moshi. When off, the user prompt is sent as-is.",
+      extensionLabel: "Moshi Hooks Extra",
+      order: 0,
+    },
+    {
+      key: "model",
+      type: "select",
+      label: "Summary Model",
+      value: () => loadSummaryConfig().model,
+      description:
+        "Model used to summarize completed agent turns before sending to Moshi. Leave as (default) to use the current session model.",
+      extensionLabel: "Moshi Hooks Extra",
+      order: 1,
+      options: () => [
+        { label: "(session default)", value: "" },
+        ...cachedModels,
+      ],
+    },
+  ]);
+
   const activity = new ActivityTracker();
   const pendingQuestion = new Map<string, AskUserQuestionSummary>();
   let cachedSessionId = "";
@@ -36,6 +79,11 @@ export default function moshiHooksExtra(pi: ExtensionAPI): void {
     cachedSessionId = sessionIdFromCtx(ctx);
     activity.reset();
     pendingQuestion.clear();
+    const models = ctx.modelRegistry.getAvailable();
+    cachedModels = models.map((m) => ({
+      label: `${m.provider}/${m.id}`,
+      value: `${m.provider}/${m.id}`,
+    }));
   });
 
   pi.on("before_agent_start", (event, ctx) => {
@@ -87,20 +135,69 @@ export default function moshiHooksExtra(pi: ExtensionAPI): void {
     const userPrompt = activity.userPrompt(key);
     if (!userPrompt) return;
 
-    const title = lastAssistantTitleFromMessages(event.messages);
-    void sendEnvelope(
-      {
-        eventName: "agent_end",
-        event,
-        ctx,
-        extra: {
-          category: "task_complete",
-          title: title || IDLE_TITLE_FALLBACK,
-          message: userPrompt,
+    const fallbackTitle =
+      lastAssistantTitleFromMessages(event.messages) || IDLE_TITLE_FALLBACK;
+    const config = loadSummaryConfig();
+    const lastAssistant = lastAssistantMessage(event.messages);
+
+    if (!config.enabled || !lastAssistant) {
+      void sendEnvelope(
+        {
+          eventName: "agent_end",
+          event,
+          ctx,
+          extra: {
+            category: "task_complete",
+            title: fallbackTitle,
+            message: userPrompt,
+          },
         },
-      },
-      { preferSocket: true },
-    );
+        { preferSocket: true },
+      );
+      return;
+    }
+
+    const summaryModel =
+      resolveSummaryModel(ctx.modelRegistry, config) ?? ctx.model;
+
+    void summarizeAgentTurn({
+      userPrompt,
+      lastAssistant,
+      model: summaryModel,
+      modelRegistry: ctx.modelRegistry,
+      fallbackTitle,
+      fallbackMessage: userPrompt,
+    })
+      .then((outcome) => {
+        void sendEnvelope(
+          {
+            eventName: "agent_end",
+            event,
+            ctx,
+            extra: {
+              category: "task_complete",
+              title: outcome.title || SUMMARY_TITLE_FALLBACK,
+              message: outcome.message,
+            },
+          },
+          { preferSocket: true },
+        );
+      })
+      .catch(() => {
+        void sendEnvelope(
+          {
+            eventName: "agent_end",
+            event,
+            ctx,
+            extra: {
+              category: "task_complete",
+              title: fallbackTitle,
+              message: userPrompt,
+            },
+          },
+          { preferSocket: true },
+        );
+      });
     return;
   });
 
