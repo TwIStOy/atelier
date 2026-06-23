@@ -11,7 +11,6 @@ import {
 } from "@htwang-contrib/common";
 import {
   isInsideHerdr,
-  isActivePane,
   readHerdrEnv,
   renameTab,
   resolveTabId,
@@ -149,6 +148,10 @@ export default function herdrExtension(pi: ExtensionAPI): void {
         sessionTitle = outcome.title;
         titleGenerated = true;
         logDebug(`ensureSessionTitle: summary latched = ${outcome.title}`);
+        // The side-call is async (LLM latency). The render scheduled by the
+        // triggering event ran BEFORE we had the title — re-render now so the
+        // new title is pushed to the tab as soon as it lands.
+        scheduleRender(0);
       }
     } catch (e) {
       logDebug(`ensureSessionTitle: threw ${String(e).slice(0, 120)}`);
@@ -187,28 +190,16 @@ export default function herdrExtension(pi: ExtensionAPI): void {
         : sessionTitle
       : "";
     const title = buildTabTitle(currentState, body);
-    // Only touch the tab when our pane is the focused one — otherwise we'd
-    // overwrite the title the user is currently reading in another pane.
-    const active = await safeIsActivePane();
-    logDebug(
-      `renderNow: state=${currentState} tabId=${tabId} active=${active} title=${JSON.stringify(title)}`,
-    );
-    if (!active) return;
+    // Always rename: tabId is OUR tab (resolved from our own pane). The title
+    // must reflect our live session state even when our pane is not focused —
+    // otherwise a title change that lands while unfocused (e.g. an LLM
+    // side-call resolving after the user switched panes) is lost forever.
     try {
       await renameTab(pi, tabId, title);
       logDebug(`renderNow: rename OK -> ${title}`);
     } catch (e) {
       logDebug(`renderNow: rename threw ${String(e).slice(0, 120)}`);
       // Swallow herdr CLI failures — never break the agent turn.
-    }
-  }
-
-  async function safeIsActivePane(): Promise<boolean> {
-    try {
-      return await isActivePane(pi, paneId);
-    } catch {
-      // If herdr is unreachable, assume active so we still set an initial title.
-      return true;
     }
   }
 

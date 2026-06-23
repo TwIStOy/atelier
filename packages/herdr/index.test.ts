@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock the LLM side-call so the test focuses on the latch + event-retry
-// behavior in index.ts, not on model wiring.
+// behavior in index.ts, not on model wiring. Resolves after a short delay
+// so the triggering event's immediate scheduleRender() fires BEFORE the
+// title lands — mirroring real LLM latency and proving the latch must
+// re-render on its own.
+let sideCallDelayMs = 0;
 let sideCallAnswer: { fromModel: boolean; title?: string; throw?: boolean } = {
   fromModel: false,
 };
@@ -11,6 +15,8 @@ vi.mock("@htwang-contrib/common", async (importOriginal) => {
   return {
     ...actual,
     executeSideCall: vi.fn(async () => {
+      if (sideCallDelayMs > 0)
+        await new Promise((r) => setTimeout(r, sideCallDelayMs));
       if (sideCallAnswer.throw) throw new Error("boom");
       if (!sideCallAnswer.fromModel)
         return { ok: false, error: "no prompt yet" };
@@ -83,6 +89,7 @@ describe("herdr index.ts: title latch + event retry", () => {
     process.env.HERDR_PANE_ID = "w1:p1";
     process.env.HERDR_BIN_PATH = "/usr/bin/herdr";
     sideCallAnswer = { fromModel: false };
+    sideCallDelayMs = 0;
     paneGetResponse = JSON.stringify({
       id: "r",
       result: {
@@ -144,10 +151,17 @@ describe("herdr index.ts: title latch + event retry", () => {
     // Primary path: the first prompt arrives on the before_agent_start event
     // (synchronously, before it is persisted to the branch). The title must
     // be generated immediately — no need to wait for agent_end.
+    //
+    // The side-call is slowed past the 150ms render debounce so the event's
+    // immediate scheduleRender() fires BEFORE the title lands — mirroring real
+    // LLM latency. This proves ensureSessionTitle must re-render on its own
+    // once it latches (without that, the rename never happens until some
+    // unrelated later event).
     const { pi, ctx, handlers } = buildPi();
     const mod = await load();
     mod.default(pi);
 
+    sideCallDelayMs = 250;
     sideCallAnswer = { fromModel: true, title: "Instant title" };
     execCalls.length = 0;
     handlers.get("before_agent_start")!({ prompt: "do something cool" }, ctx);
@@ -156,6 +170,35 @@ describe("herdr index.ts: title latch + event retry", () => {
         execCalls
           .filter((c) => c.args[0] === "tab" && c.args[1] === "rename")
           .some((c) => /Instant title/.test(String(c.args[3]))),
+      ).toBe(true);
+    });
+  });
+
+  it("renames even when the pane is not focused when the title lands", async () => {
+    // Regression: the active-pane guard used to skip rename when our pane was
+    // unfocused at the moment the (async) side-call resolved — losing the
+    // title update entirely. The tab is OURS, so we must always rename it.
+    const { pi, ctx, handlers } = buildPi();
+    const mod = await load();
+    mod.default(pi);
+
+    // Make the pane report as NOT focused on every pane get.
+    paneGetResponse = JSON.stringify({
+      id: "r",
+      result: {
+        type: "pane_info",
+        pane: { pane_id: "w1:p1", focused: false, tab_id: "w1:t1" },
+      },
+    });
+    sideCallDelayMs = 250;
+    sideCallAnswer = { fromModel: true, title: "Unfocused title" };
+    execCalls.length = 0;
+    handlers.get("before_agent_start")!({ prompt: "hello there" }, ctx);
+    await vi.waitFor(() => {
+      expect(
+        execCalls
+          .filter((c) => c.args[0] === "tab" && c.args[1] === "rename")
+          .some((c) => /Unfocused title/.test(String(c.args[3]))),
       ).toBe(true);
     });
   });
@@ -270,6 +313,7 @@ describe("herdr index.ts: title latch + event retry", () => {
 
     // session_start: branch is empty -> fromModel:false, stays unlatched.
     sideCallAnswer = { fromModel: false };
+    sideCallDelayMs = 0;
     handlers.get("session_start")!({}, ctx);
     await new Promise((r) => setTimeout(r, 30));
 

@@ -30,10 +30,11 @@ builds do). `HERDR_BIN_PATH` (falling back to `herdr` on `PATH`) selects the
 CLI binary used to query/control herdr.
 
 Note: on current herdr releases `pane get` prints bare JSON and does **not**
-accept a `--json` flag, so the client does not pass it. The active-pane check
-reuses the same `pane get` response and inspects the `focused` field, so the
-title is only written when pi's pane is the one the user is looking at —
-another focused pane's title is never overwritten.
+accept a `--json` flag, so the client does not pass it. The tab being renamed
+is always **our own** tab (resolved from our pane), so its title is updated
+unconditionally — including when our pane is momentarily unfocused (e.g. an
+LLM side-call resolving after the user switched panes). Otherwise a title
+change landing while unfocused would be lost forever.
 
 ## Configuration
 
