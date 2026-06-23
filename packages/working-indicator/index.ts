@@ -3,6 +3,10 @@ import type {
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 import { loadConfig, registerWorkingIndicatorConfigItems } from "./config.ts";
+import {
+  resolveEffectiveSpinnerKey,
+  type NarrowWidthOptions,
+} from "./narrow-screen.ts";
 import { pickPhrase } from "./phrase.ts";
 import {
   DEFAULT_RUNCAT_SPEED_CONFIG,
@@ -41,6 +45,8 @@ export default function (pi: ExtensionAPI) {
   let runcatSpeedConfig: RuncatSpeedConfig = DEFAULT_RUNCAT_SPEED_CONFIG;
   let runcatIntervalMs: number | undefined;
   let runcatEngine: RuncatIndicatorEngine | undefined;
+  let sessionCtx: ExtensionContext | undefined;
+  let resizeListener: (() => void) | undefined;
 
   function formatSpeed(speed: number | null): string {
     const value = speed === null || speed <= 0 ? "--" : speed.toFixed(1);
@@ -84,8 +90,27 @@ export default function (pi: ExtensionAPI) {
     ctx.ui.setWorkingIndicator(options);
   }
 
+  function terminalWidth(): number {
+    const cols = process.stdout.columns;
+    return Number.isFinite(cols) && (cols ?? 0) > 0 ? (cols as number) : 80;
+  }
+
+  function narrowWidthOptions(): NarrowWidthOptions {
+    const cfg = loadConfig();
+    return {
+      enabled: cfg.narrowWidthEnabled,
+      threshold: cfg.narrowWidthThreshold,
+      spinner: cfg.narrowWidthSpinner,
+    };
+  }
+
   function applySpinner(ctx: ExtensionContext): void {
-    const key = loadConfig().spinner;
+    const width = terminalWidth();
+    const key = resolveEffectiveSpinnerKey(
+      loadConfig().spinner,
+      width,
+      narrowWidthOptions(),
+    );
     const style = SPINNER_STYLES[key];
     currentSpinnerKey = key;
 
@@ -169,11 +194,42 @@ export default function (pi: ExtensionAPI) {
     }
   }
 
+  function handleResize(): void {
+    const ctx = sessionCtx;
+    if (!ctx?.hasUI) return;
+    const width = terminalWidth();
+    // Only re-apply when the effective key actually flips (narrow ⇄ wide),
+    // so a routine resize that keeps us in the same band never tears the
+    // animation.
+    const effectiveKey = resolveEffectiveSpinnerKey(
+      loadConfig().spinner,
+      width,
+      narrowWidthOptions(),
+    );
+    if (effectiveKey === currentSpinnerKey) return;
+    applySpinner(ctx);
+  }
+
+  function enableResizeListener(): void {
+    if (resizeListener) return;
+    resizeListener = () => handleResize();
+    process.stdout.on("resize", resizeListener);
+  }
+
+  function disableResizeListener(): void {
+    if (resizeListener) {
+      process.stdout.off("resize", resizeListener);
+      resizeListener = undefined;
+    }
+  }
+
   pi.on("session_start", (_event, ctx) => {
     if (!ctx.hasUI) return;
+    sessionCtx = ctx;
     currentPhrase = pickPhrase();
     tracker.resetSession();
     applySpinner(ctx);
+    enableResizeListener();
   });
 
   pi.on("agent_start", (_event, ctx) => {
@@ -254,6 +310,8 @@ export default function (pi: ExtensionAPI) {
   pi.on("session_shutdown", () => {
     stopTicking();
     stopRuncatEngine();
+    disableResizeListener();
+    sessionCtx = undefined;
   });
 
   registerWorkingIndicatorConfigItems();
