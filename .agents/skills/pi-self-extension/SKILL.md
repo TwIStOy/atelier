@@ -458,6 +458,46 @@ const unsub = pi.events.on("my-extension:update", (data) => {
 
 This is the recommended pattern for cross-extension communication (e.g., goal extension emits `goal:update`, statusline subscribes to render).
 
+### Cross-package typed data contracts
+
+When package A produces structured data that package B consumes, put the event-name const + payload types in `packages/common` and re-export **both** values and types from its index:
+
+```typescript
+// packages/common/events.ts
+export const ZAI_CODING_PLAN_EVENTS = {
+  USAGE_UPDATE: "pi-extensions:zai-coding-plan:usage-update",
+  RAW_USAGE_UPDATE: "pi-extensions:zai-coding-plan:raw-usage-update",
+} as const;
+// packages/common/usage.ts
+export interface CodingPlanRawUsage {
+  level?: string;
+  windows: CodingPlanUsageWindowRaw[];
+  modelTotals?: CodingPlanModelTotals;
+  toolTotals?: CodingPlanToolTotals;
+}
+```
+
+Producer emits a typed payload; consumer narrows `unknown`:
+
+```typescript
+import {
+  ZAI_CODING_PLAN_EVENTS,
+  type CodingPlanRawUsage,
+} from "@htwang-contrib/common";
+
+// Producer
+pi.events.emit(ZAI_CODING_PLAN_EVENTS.RAW_USAGE_UPDATE, { usage });
+
+// Consumer
+pi.events.on(ZAI_CODING_PLAN_EVENTS.RAW_USAGE_UPDATE, (data: unknown) => {
+  const usage = (data as { usage?: CodingPlanRawUsage } | undefined)?.usage;
+  if (!usage) return;
+  // ...
+});
+```
+
+**Enriching an existing channel:** emit BOTH the legacy event and a new `RAW_*` event from one fetch (backward-compat). The consumer prefers raw, falls back to legacy — register the **raw listener first** so its guard (e.g. `lastRawUsage`) is set before the legacy listener fires (Node EventEmitter dispatches listeners in registration order).
+
 ### Hidden / Continuation Prompts
 
 Inject messages that the LLM sees but the user does not, useful for driving agent behavior:
