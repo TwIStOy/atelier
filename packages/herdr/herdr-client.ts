@@ -148,17 +148,17 @@ export async function runHerdrJson(
 /**
  * Fetch our own pane info. Uses an explicit pane id so the result reflects
  * *this* pane regardless of which pane herdr considers focused server-wide.
+ *
+ * Note: `pane get` prints bare JSON and does NOT accept a `--json` flag on
+ * current herdr releases — adding it makes the command fail with a usage
+ * error, so we don't.
  */
 export async function getOurPane(
   pi: ExtensionAPI,
   paneId: PaneId,
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<PaneInfo | null> {
-  const envelope = await runHerdrJson(
-    pi,
-    ["pane", "get", paneId, "--json"],
-    env,
-  );
+  const envelope = await runHerdrJson(pi, ["pane", "get", paneId], env);
   return parsePaneInfo(envelope);
 }
 
@@ -170,6 +170,24 @@ export async function isActivePane(
 ): Promise<boolean> {
   const pane = await getOurPane(pi, paneId, env);
   return paneIsActive(pane);
+}
+
+/**
+ * Resolve our tab id.
+ *
+ * Prefers the `HERDR_TAB_ID` env var (injected by newer herdr builds), but
+ * falls back to reading `tab_id` from `pane get` because the env var is not
+ * always present. Throws if both fail.
+ */
+export async function resolveTabId(
+  pi: ExtensionAPI,
+  paneId: PaneId,
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<TabId | undefined> {
+  const fromEnv = env.HERDR_TAB_ID?.trim();
+  if (fromEnv) return fromEnv;
+  const pane = await getOurPane(pi, paneId, env);
+  return pane?.tab_id;
 }
 
 /**

@@ -14,6 +14,7 @@ import {
   isActivePane,
   readHerdrEnv,
   renameTab,
+  resolveTabId,
   type PaneId,
   type TabId,
 } from "./herdr-client.ts";
@@ -41,16 +42,9 @@ export function setCachedModels(
 const DEFAULT_TITLE = "Pi";
 
 export default function herdrExtension(pi: ExtensionAPI): void {
-  // Only take effect inside herdr-managed panes.
-  if (!isInsideHerdr()) return;
-
-  const env = readHerdrEnv();
-  const paneId = env.paneId as PaneId;
-  const tabId = env.tabId as TabId | undefined;
-
-  // No tab to rename → nothing to do.
-  if (!tabId) return;
-
+  // Config items are registered unconditionally so users can pre-set the
+  // summary model from /config even when pi is not running inside herdr.
+  // The herdr-only *behavior* is gated below.
   registerConfigItems("herdr", [
     {
       key: "enabled",
@@ -78,6 +72,25 @@ export default function herdrExtension(pi: ExtensionAPI): void {
     },
   ]);
 
+  // Populate the model dropdown regardless of environment, so the option
+  // list is ready when the user opens /config.
+  pi.on("session_start", (_event, ctx) => {
+    const models = ctx.modelRegistry.getAvailable();
+    cachedModels = models.map((m) => ({
+      label: `${m.provider}/${m.id}`,
+      value: `${m.provider}/${m.id}`,
+    }));
+  });
+
+  // Only take effect inside herdr-managed panes.
+  if (!isInsideHerdr()) return;
+
+  const env = readHerdrEnv();
+  const paneId = env.paneId as PaneId;
+  // tab_id is resolved lazily: HERDR_TAB_ID is not injected by all herdr
+  // builds, so we fall back to reading it from `pane get`.
+  let tabId: TabId | undefined = env.tabId;
+
   let currentState: AgentState = "idle";
   let sessionTitle = DEFAULT_TITLE; // cached title from the first user prompt
   let titleGenerated = false; // one-shot guard: title only depends on the first prompt
@@ -85,18 +98,6 @@ export default function herdrExtension(pi: ExtensionAPI): void {
   let pendingQuestion: AskUserPromptPayload | null = null;
   let renderTimer: ReturnType<typeof setTimeout> | null = null;
   const renderAbort = new AbortController();
-
-  let cachedModelsBound = false;
-
-  function refreshModelCache(ctx: ExtensionContext): void {
-    if (cachedModelsBound) return;
-    const models = ctx.modelRegistry.getAvailable();
-    cachedModels = models.map((m) => ({
-      label: `${m.provider}/${m.id}`,
-      value: `${m.provider}/${m.id}`,
-    }));
-    cachedModelsBound = true;
-  }
 
   /**
    * Generate the session title once, from the first user prompt. No-op after
@@ -141,6 +142,11 @@ export default function herdrExtension(pi: ExtensionAPI): void {
   }
 
   async function renderNow(): Promise<void> {
+    // Resolve the tab id on demand if the env var was absent.
+    if (!tabId) {
+      tabId = await safeResolveTabId();
+      if (!tabId) return; // can't rename without a tab id
+    }
     const config = loadConfig();
     // While waiting on a question, show the question text instead of the
     // cached summary; the summary is preserved across the question cycle.
@@ -170,8 +176,15 @@ export default function herdrExtension(pi: ExtensionAPI): void {
     }
   }
 
+  async function safeResolveTabId(): Promise<TabId | undefined> {
+    try {
+      return await resolveTabId(pi, paneId);
+    } catch {
+      return undefined;
+    }
+  }
+
   pi.on("session_start", (_event, ctx) => {
-    refreshModelCache(ctx);
     currentState = "idle";
     sessionTitle = DEFAULT_TITLE;
     titleGenerated = false;
@@ -183,7 +196,6 @@ export default function herdrExtension(pi: ExtensionAPI): void {
   });
 
   pi.on("before_agent_start", (_event, ctx) => {
-    refreshModelCache(ctx);
     if (currentState === "waiting") return; // a question is still open
     currentState = "running";
     pendingQuestion = null;
