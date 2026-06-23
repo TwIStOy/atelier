@@ -27,6 +27,12 @@ export interface MoshiUsagePushOptions {
   signal?: AbortSignal;
 }
 
+// Moshi's usage API (POST /hosts/:hostId/usage) validates `agent` against a
+// server-side const union of only "claude-code" | "codex" | "opencode"; any
+// other value (including our real agent "pi") is rejected with HTTP 422 and
+// the whole snapshot is dropped. Until "pi" is added upstream we publish Z.AI
+// under "opencode" — the generic cross-provider agent (claude-code/codex imply
+// a specific vendor). When Moshi accepts "pi", flip this single constant.
 export const MOSHI_USAGE_AGENT = "opencode";
 export const ZAI_ACCOUNT_ID = "zai:coding_plan";
 export const ZAI_ACCOUNT_LABEL = "Z.AI Coding Plan";
