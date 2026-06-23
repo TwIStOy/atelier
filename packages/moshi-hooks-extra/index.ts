@@ -5,6 +5,7 @@ import {
   ZAI_CODING_PLAN_EVENTS,
   registerConfigItems,
   type AskUserPromptPayload,
+  type CodingPlanRawUsage,
   type CodingPlanUsage,
 } from "@htwang-contrib/common";
 import {
@@ -12,7 +13,11 @@ import {
   resolveTransportMode,
   sendEnvelope,
 } from "./moshi-client.ts";
-import { buildZaiSnapshot, pushUsageSnapshot } from "./usage-publisher.ts";
+import {
+  buildZaiRawSnapshot,
+  buildZaiSnapshot,
+  pushUsageSnapshot,
+} from "./usage-publisher.ts";
 import {
   readMoshiSecretsFromFile,
   type MoshiCredentials,
@@ -85,6 +90,7 @@ export default function moshiHooksExtra(pi: ExtensionAPI): void {
   let cachedCredentials: MoshiCredentials | null = null;
   let lastUsagePushAt = 0;
   let usagePushInFlight = false;
+  let lastRawUsage: CodingPlanRawUsage | null = null;
 
   pi.on("session_start", (_event, ctx) => {
     cachedSessionId = sessionIdFromCtx(ctx);
@@ -204,13 +210,38 @@ export default function moshiHooksExtra(pi: ExtensionAPI): void {
     pendingQuestion.set(sessionKeyFor(cachedSessionId, cwd), summary);
   });
 
+  pi.events.on(ZAI_CODING_PLAN_EVENTS.RAW_USAGE_UPDATE, (data: unknown) => {
+    const credentials = cachedCredentials ?? readMoshiSecretsFromFile();
+    if (!credentials) return;
+    const payload = data as { usage?: CodingPlanRawUsage } | undefined;
+    const usage = payload?.usage;
+    if (!usage || usage.windows.length === 0) return;
+    lastRawUsage = usage;
+    const now = Date.now();
+    if (
+      usagePushInFlight ||
+      now - lastUsagePushAt < USAGE_PUSH_MIN_INTERVAL_MS
+    ) {
+      return;
+    }
+    usagePushInFlight = true;
+    lastUsagePushAt = now;
+    const snapshot = buildZaiRawSnapshot(usage, credentials);
+    void pushUsageSnapshot(snapshot, credentials).finally(() => {
+      usagePushInFlight = false;
+    });
+  });
+
   pi.events.on(ZAI_CODING_PLAN_EVENTS.USAGE_UPDATE, (data: unknown) => {
+    // The raw event (fired alongside this one) carries the full window set
+    // including tool-call windows; only fall back to the legacy payload when
+    // it is the sole source.
+    if (lastRawUsage) return;
     const credentials = cachedCredentials ?? readMoshiSecretsFromFile();
     if (!credentials) return;
     const payload = data as { usage?: CodingPlanUsage } | undefined;
     const usage = payload?.usage;
     if (!usage || usage.limits.length === 0) return;
-
     const now = Date.now();
     if (
       usagePushInFlight ||

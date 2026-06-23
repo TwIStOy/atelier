@@ -1,6 +1,8 @@
 import type {
+  CodingPlanRawUsage,
   CodingPlanUsage,
   CodingPlanUsageWindow,
+  CodingPlanUsageWindowRaw,
 } from "@htwang-contrib/common";
 import type { MoshiCredentials } from "./moshi-secrets.ts";
 
@@ -40,6 +42,11 @@ export function windowLabelFor(window: CodingPlanUsageWindow): string {
   return WINDOW_LABELS[window] ?? window;
 }
 
+function labelForRawWindow(window: CodingPlanUsageWindowRaw): string {
+  const kindSuffix = window.kind === "tool_calls" ? " tools" : " tokens";
+  return `${window.period}${kindSuffix}`;
+}
+
 function resetIso(resetTime: number | undefined): string | undefined {
   if (typeof resetTime !== "number" || !Number.isFinite(resetTime)) {
     return undefined;
@@ -58,8 +65,31 @@ export function buildZaiSnapshot(
     resetsAt: resetIso(limit.nextResetTime),
   }));
 
-  const label = usage.level
-    ? `${ZAI_ACCOUNT_LABEL} (${capitalize(usage.level)})`
+  return finalizeSnapshot(windows, usage.level, credentials, now);
+}
+
+export function buildZaiRawSnapshot(
+  usage: CodingPlanRawUsage,
+  credentials: MoshiCredentials,
+  now: Date = new Date(),
+): MoshiUsageSnapshot {
+  const windows: MoshiUsageWindow[] = usage.windows.map((window) => ({
+    label: labelForRawWindow(window),
+    usedPercentage: clampPercent(window.usedPercentage),
+    resetsAt: resetIso(window.nextResetTime),
+  }));
+
+  return finalizeSnapshot(windows, usage.level, credentials, now);
+}
+
+function finalizeSnapshot(
+  windows: MoshiUsageWindow[],
+  level: string | undefined,
+  credentials: MoshiCredentials,
+  now: Date,
+): MoshiUsageSnapshot {
+  const label = level
+    ? `${ZAI_ACCOUNT_LABEL} (${capitalize(level)})`
     : ZAI_ACCOUNT_LABEL;
 
   return {

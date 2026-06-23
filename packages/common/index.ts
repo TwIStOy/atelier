@@ -26,6 +26,15 @@ export type {
   CodingPlanUsage,
   CodingPlanUsageLimit,
   CodingPlanUsageWindow,
+  CodingPlanRawUsage,
+  CodingPlanUsageWindowRaw,
+  CodingPlanWindowDetail,
+  CodingPlanLimitKind,
+  CodingPlanLimitPeriod,
+  CodingPlanModelTotals,
+  CodingPlanModelSummary,
+  CodingPlanToolTotals,
+  CodingPlanToolSummary,
 } from "./usage.ts";
 export {
   ZAI_CODING_PLAN_EVENTS,

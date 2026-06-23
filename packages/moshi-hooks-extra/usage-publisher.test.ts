@@ -1,9 +1,13 @@
 import { describe, expect, test, vi } from "vitest";
-import type { CodingPlanUsage } from "@htwang-contrib/common";
+import type {
+  CodingPlanRawUsage,
+  CodingPlanUsage,
+} from "@htwang-contrib/common";
 import type { MoshiCredentials } from "./moshi-secrets.ts";
 import {
   MOSHI_USAGE_AGENT,
   ZAI_ACCOUNT_ID,
+  buildZaiRawSnapshot,
   buildZaiSnapshot,
   pushUsageSnapshot,
   windowLabelFor,
@@ -70,6 +74,54 @@ describe("buildZaiSnapshot", () => {
       NOW,
     );
     expect(snap.accountLabel).toBe("Z.AI Coding Plan");
+  });
+});
+
+describe("buildZaiRawSnapshot", () => {
+  const RAW: CodingPlanRawUsage = {
+    level: "max",
+    windows: [
+      {
+        kind: "tool_calls",
+        period: "weekly",
+        usedPercentage: 6,
+        nextResetTime: 1782804496992,
+        usage: 4000,
+        details: [{ modelCode: "search-prime", usage: 98 }],
+      },
+      {
+        kind: "tokens",
+        period: "5h",
+        usedPercentage: 1,
+        nextResetTime: 1782222112875,
+      },
+      { kind: "tokens", period: "weekly", usedPercentage: 150 },
+    ],
+    modelTotals: { totalTokensUsage: 44984926 },
+  };
+
+  const snapshot = buildZaiRawSnapshot(RAW, CREDS, NOW);
+
+  test("keeps the canonical account id / agent / label", () => {
+    expect(snapshot.accountId).toBe(ZAI_ACCOUNT_ID);
+    expect(snapshot.agent).toBe(MOSHI_USAGE_AGENT);
+    expect(snapshot.accountLabel).toBe("Z.AI Coding Plan (Max)");
+  });
+
+  test("renders one window per raw window with kind-aware labels", () => {
+    expect(snapshot.windows.map((w) => w.label)).toEqual([
+      "weekly tools",
+      "5h tokens",
+      "weekly tokens",
+    ]);
+  });
+
+  test("passes through real resetsAt and clamps percentages", () => {
+    expect(snapshot.windows[0].resetsAt).toBe("2026-06-30T07:28:16.992Z");
+    expect(snapshot.windows[0].usedPercentage).toBe(6);
+    expect(snapshot.windows[1].resetsAt).toBe("2026-06-23T13:41:52.875Z");
+    expect(snapshot.windows[2].usedPercentage).toBe(100);
+    expect(snapshot.windows[2].resetsAt).toBeUndefined();
   });
 });
 
