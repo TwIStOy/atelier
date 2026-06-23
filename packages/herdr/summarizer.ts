@@ -18,6 +18,7 @@ import {
   type ExtensionConfigSchema,
   type SideCallResult,
 } from "@htwang-contrib/common";
+import { logDebug } from "./log.ts";
 
 type AnyModel = Model<any>;
 
@@ -104,12 +105,18 @@ export interface TitleOutcome {
  * Summarize the session's first user prompt into a short title via an LLM
  * side-call.
  *
+ * `firstPrompt` (captured directly from a `before_agent_start` event) is the
+ * preferred input — it is available synchronously, before the prompt is
+ * persisted to the session branch. The branch is only used as a fallback to
+ * cover resumed sessions where no event fires.
+ *
  * Falls back to `fallbackTitle` when the model is unavailable, there is no
  * first prompt yet, or the side-call fails — so callers always get *some*
  * label.
  */
 export async function summarizeSessionTitle(opts: {
-  branch: SessionEntry[];
+  firstPrompt?: string;
+  branch?: SessionEntry[];
   model: AnyModel | undefined;
   modelRegistry: ModelRegistry;
   fallbackTitle: string;
@@ -117,8 +124,17 @@ export async function summarizeSessionTitle(opts: {
 }): Promise<TitleOutcome> {
   const { branch, model, modelRegistry, fallbackTitle, signal } = opts;
 
-  const promptText = firstUserPrompt(branch);
-  if (!promptText || !model) return { title: fallbackTitle, fromModel: false };
+  const promptText =
+    (opts.firstPrompt ?? "").trim() || (branch ? firstUserPrompt(branch) : "");
+  if (!promptText || !model) {
+    logDebug(
+      `summarizeSessionTitle: skipping (promptLen=${promptText.length} hasModel=${!!model})`,
+    );
+    return { title: fallbackTitle, fromModel: false };
+  }
+  logDebug(
+    `summarizeSessionTitle: calling side-call model=${model.provider}/${model.id} promptLen=${promptText.length}`,
+  );
 
   const messages: Message[] = [
     {
@@ -141,13 +157,27 @@ export async function summarizeSessionTitle(opts: {
       signal: signal ?? new AbortController().signal,
       commandName: "herdr-title",
     });
-  } catch {
+  } catch (e) {
+    logDebug(
+      `summarizeSessionTitle: executeSideCall threw ${String(e).slice(0, 300)}`,
+    );
     return { title: fallbackTitle, fromModel: false };
   }
 
-  if (!result.ok) return { title: fallbackTitle, fromModel: false };
+  if (!result.ok) {
+    const reason = "aborted" in result ? "aborted" : result.error;
+    logDebug(
+      `summarizeSessionTitle: side-call failed: ${String(reason).slice(0, 300)}`,
+    );
+    return { title: fallbackTitle, fromModel: false };
+  }
 
   const parsed = parseSessionTitle(result.answer);
-  if (!parsed) return { title: fallbackTitle, fromModel: false };
+  if (!parsed) {
+    logDebug(
+      `summarizeSessionTitle: could not parse title from answer: ${JSON.stringify(result.answer).slice(0, 200)}`,
+    );
+    return { title: fallbackTitle, fromModel: false };
+  }
   return { title: parsed, fromModel: true };
 }
