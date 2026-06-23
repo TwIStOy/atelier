@@ -4,6 +4,7 @@ import {
   assistantTitleFromMessage,
   clipText,
   formatUserPrompt,
+  lastAssistantTitleFromMessages,
   sessionKeyFor,
   summarizeAskUserQuestion,
 } from "./activity.ts";
@@ -61,6 +62,30 @@ describe("assistantTitleFromMessage", () => {
   });
 });
 
+describe("lastAssistantTitleFromMessages", () => {
+  test("returns title from the last assistant message", () => {
+    const title = lastAssistantTitleFromMessages([
+      { role: "user", content: [{ type: "text", text: "hi" }] },
+      { role: "assistant", content: [{ type: "text", text: "First" }] },
+      { role: "assistant", content: [{ type: "text", text: "Final answer" }] },
+    ]);
+    expect(title).toBe("Final answer");
+  });
+
+  test("returns empty when no assistant message", () => {
+    expect(
+      lastAssistantTitleFromMessages([
+        { role: "user", content: [{ type: "text", text: "hi" }] },
+      ]),
+    ).toBe("");
+  });
+
+  test("returns empty for undefined/garbage input", () => {
+    expect(lastAssistantTitleFromMessages(undefined)).toBe("");
+    expect(lastAssistantTitleFromMessages([])).toBe("");
+  });
+});
+
 describe("sessionKeyFor", () => {
   test("uses sessionID when present", () => {
     expect(sessionKeyFor("abc", "/cwd")).toBe("abc");
@@ -72,65 +97,41 @@ describe("sessionKeyFor", () => {
 });
 
 describe("ActivityTracker", () => {
-  test("does not emit idle before any prompt is recorded", () => {
+  test("userPrompt is empty before any prompt is recorded", () => {
     const a = new ActivityTracker();
-    a.markActive("s1");
-    expect(a.shouldEmitIdle("s1").emit).toBe(false);
+    expect(a.userPrompt("s1")).toBe("");
   });
 
-  test("emits idle once after prompt recorded + markActive", () => {
+  test("rememberUserPrompt stores formatted prompt", () => {
     const a = new ActivityTracker();
     a.rememberUserPrompt("s1", "do the thing");
-    a.markActive("s1");
-    const first = a.shouldEmitIdle("s1");
-    expect(first.emit).toBe(true);
-    expect(first.prompt).toBe("do the thing");
-    expect(first.title).toBe("");
-
-    a.markIdlePublished("s1");
-    expect(a.shouldEmitIdle("s1").emit).toBe(false);
+    expect(a.userPrompt("s1")).toBe("do the thing");
   });
 
-  test("markActive after idle allows re-emitting", () => {
+  test("rememberUserPrompt replaces previous prompt", () => {
     const a = new ActivityTracker();
     a.rememberUserPrompt("s1", "first");
-    a.markActive("s1");
-    a.markIdlePublished("s1");
-    expect(a.shouldEmitIdle("s1").emit).toBe(false);
-
-    a.markActive("s1");
-    expect(a.shouldEmitIdle("s1").emit).toBe(true);
-  });
-
-  test("assistant title is surfaced in idle payload", () => {
-    const a = new ActivityTracker();
-    a.rememberUserPrompt("s1", "build it");
-    a.rememberAssistantTitle("s1", "Running build");
-    a.markActive("s1");
-    const idle = a.shouldEmitIdle("s1");
-    expect(idle.title).toBe("Running build");
+    a.rememberUserPrompt("s1", "second");
+    expect(a.userPrompt("s1")).toBe("second");
   });
 
   test("sessions are tracked independently", () => {
     const a = new ActivityTracker();
     a.rememberUserPrompt("s1", "one");
-    a.markActive("s1");
-    expect(a.shouldEmitIdle("s2").emit).toBe(false);
+    expect(a.userPrompt("s2")).toBe("");
   });
 
   test("empty prompt is ignored", () => {
     const a = new ActivityTracker();
     a.rememberUserPrompt("s1", "   ");
-    a.markActive("s1");
-    expect(a.shouldEmitIdle("s1").emit).toBe(false);
+    expect(a.userPrompt("s1")).toBe("");
   });
 
   test("reset clears all sessions", () => {
     const a = new ActivityTracker();
     a.rememberUserPrompt("s1", "x");
-    a.markActive("s1");
     a.reset();
-    expect(a.shouldEmitIdle("s1").emit).toBe(false);
+    expect(a.userPrompt("s1")).toBe("");
   });
 });
 

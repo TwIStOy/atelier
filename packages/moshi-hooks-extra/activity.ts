@@ -1,10 +1,9 @@
 import {
   assistantMessageText,
-  userMessageText,
   type AskUserPromptPayload,
   type AskUserPromptQuestion,
 } from "@htwang-contrib/common";
-import type { AssistantMessage, UserMessage } from "@earendil-works/pi-ai";
+import type { AssistantMessage } from "@earendil-works/pi-ai";
 
 const MAX_PROMPT_CHARS = 200;
 const MAX_TITLE_CHARS = 80;
@@ -33,21 +32,19 @@ export function assistantTitleFromMessage(message: unknown): string {
   }
 }
 
-export function userPromptFromMessage(message: unknown): string {
-  if (!message || typeof message !== "object") return "";
-  const msg = message as { role?: unknown; content?: unknown };
-  if (msg.role !== "user") return "";
-  try {
-    return userMessageText(msg as UserMessage);
-  } catch {
-    return "";
+export function lastAssistantTitleFromMessages(
+  messages: unknown[] | undefined,
+): string {
+  if (!Array.isArray(messages)) return "";
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const title = assistantTitleFromMessage(messages[i]);
+    if (title) return title;
   }
+  return "";
 }
 
 export interface SessionActivity {
   lastUserPrompt: string;
-  lastAssistantTitle: string;
-  idlePublished: boolean;
 }
 
 export class ActivityTracker {
@@ -56,11 +53,7 @@ export class ActivityTracker {
   private ensure(sessionKey: string): SessionActivity {
     let entry = this.bySession.get(sessionKey);
     if (!entry) {
-      entry = {
-        lastUserPrompt: "",
-        lastAssistantTitle: "",
-        idlePublished: false,
-      };
+      entry = { lastUserPrompt: "" };
       this.bySession.set(sessionKey, entry);
     }
     return entry;
@@ -73,37 +66,8 @@ export class ActivityTracker {
     return formatted;
   }
 
-  rememberAssistantTitle(sessionKey: string, title: string): void {
-    if (!title) return;
-    this.ensure(sessionKey).lastAssistantTitle = clipText(
-      title,
-      MAX_TITLE_CHARS,
-    );
-  }
-
-  markActive(sessionKey: string): void {
-    this.ensure(sessionKey).idlePublished = false;
-  }
-
-  shouldEmitIdle(sessionKey: string): {
-    emit: boolean;
-    prompt: string;
-    title: string;
-  } {
-    const entry = this.bySession.get(sessionKey);
-    if (!entry) return { emit: false, prompt: "", title: "" };
-    if (entry.idlePublished) return { emit: false, prompt: "", title: "" };
-    if (!entry.lastUserPrompt) return { emit: false, prompt: "", title: "" };
-    return {
-      emit: true,
-      prompt: entry.lastUserPrompt,
-      title: entry.lastAssistantTitle,
-    };
-  }
-
-  markIdlePublished(sessionKey: string): void {
-    const entry = this.bySession.get(sessionKey);
-    if (entry) entry.idlePublished = true;
+  userPrompt(sessionKey: string): string {
+    return this.bySession.get(sessionKey)?.lastUserPrompt ?? "";
   }
 
   reset(): void {

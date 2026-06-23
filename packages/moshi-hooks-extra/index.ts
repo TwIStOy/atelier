@@ -12,7 +12,7 @@ import {
 import { previewContent } from "./envelope.ts";
 import {
   ActivityTracker,
-  assistantTitleFromMessage,
+  lastAssistantTitleFromMessages,
   sessionKeyFor,
   summarizeAskUserQuestion,
   type AskUserQuestionSummary,
@@ -42,13 +42,10 @@ export default function moshiHooksExtra(pi: ExtensionAPI): void {
     const cwd = ctx.cwd ?? "";
     const key = sessionKeyFor(sessionIdFromCtx(ctx), cwd);
     activity.rememberUserPrompt(key, event.prompt ?? "");
-    activity.markActive(key);
     return;
   });
 
   pi.on("tool_execution_start", (event, ctx) => {
-    const key = sessionKeyFor(sessionIdFromCtx(ctx), ctx.cwd ?? "");
-    activity.markActive(key);
     void sendEnvelope(
       {
         eventName: "ToolExecutionStart",
@@ -66,8 +63,6 @@ export default function moshiHooksExtra(pi: ExtensionAPI): void {
   });
 
   pi.on("tool_execution_end", (event, ctx) => {
-    const key = sessionKeyFor(sessionIdFromCtx(ctx), ctx.cwd ?? "");
-    activity.markActive(key);
     void sendEnvelope(
       {
         eventName: "ToolExecutionEnd",
@@ -85,27 +80,23 @@ export default function moshiHooksExtra(pi: ExtensionAPI): void {
     return;
   });
 
-  pi.on("turn_end", (event, ctx) => {
+  pi.on("agent_end", (event, ctx) => {
     const cwd = ctx.cwd ?? "";
-    const sessionID = sessionIdFromCtx(ctx);
-    const key = sessionKeyFor(sessionID, cwd);
+    const key = sessionKeyFor(sessionIdFromCtx(ctx), cwd);
 
-    const title = assistantTitleFromMessage(event.message);
-    if (title) activity.rememberAssistantTitle(key, title);
+    const userPrompt = activity.userPrompt(key);
+    if (!userPrompt) return;
 
-    const idle = activity.shouldEmitIdle(key);
-    if (!idle.emit) return;
-
-    activity.markIdlePublished(key);
+    const title = lastAssistantTitleFromMessages(event.messages);
     void sendEnvelope(
       {
-        eventName: "turn_end",
+        eventName: "agent_end",
         event,
         ctx,
         extra: {
           category: "task_complete",
-          title: idle.title || IDLE_TITLE_FALLBACK,
-          message: idle.prompt,
+          title: title || IDLE_TITLE_FALLBACK,
+          message: userPrompt,
         },
       },
       { preferSocket: true },
@@ -145,7 +136,6 @@ export default function moshiHooksExtra(pi: ExtensionAPI): void {
       return;
     }
     pendingQuestion.delete(key);
-    activity.markActive(key);
     void sendEnvelope(
       {
         eventName: "question_replied",
