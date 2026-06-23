@@ -49,14 +49,24 @@ Surfaced via the `/config` command under the **Pi-Herdr** extension.
 State is derived from pi events, mirroring the pattern already used by
 `moshi-hooks-extra`:
 
-- `session_start` → generate the title from the first prompt (a resumed
-  session may already have one); then **idle**.
-- `before_agent_start` → **running**; on the first turn this is when a fresh
-  session's first prompt becomes available, so the title is generated then.
+- `session_start` → generate the title from the branch (a resumed session
+  may already have the first prompt); then **idle**.
+- `before_agent_start` → **running**; the first user prompt is captured
+  directly from `event.prompt` (synchronously, before it's persisted to the
+  branch) and the title is generated immediately — no need to wait for the
+  turn to finish.
 - `ask_user_question` payload (`ASK_USER_PROMPT_EVENT`) + modal-open
   (`MODAL_ACTIVE_EVENT`) → **waiting**; use the question text as the body.
 - Modal close → back to **running**.
-- `agent_end` → **idle**.
+- `agent_end` → **idle** (also a safety retry in case the prompt was missed
+  on earlier events).
+- `session_shutdown` → **restore** the user's original tab label (or its tab
+  number) so the tab title doesn't get stuck on our summary after pi exits.
+
+On session start the extension snapshots the tab's original label (via
+`herdr tab get`) before its first overwrite, and snaps it back on shutdown. If
+the tab already shows one of our own titles (a `⏺`/`❓`/`✓` prefix, e.g. left
+over from a previous run), it falls back to the tab's `number` instead.
 
 The title is produced by an LLM side-call (`@htwang-contrib/common`'s
 `executeSideCall`) over the session's **first user prompt** (extracted from the
@@ -66,7 +76,7 @@ back to the previous title so the tab is never blank.
 ## Files
 
 - `herdr-client.ts` — env detection + thin herdr CLI client (pane get / tab
-  rename). Pure JSON parsing is split out for unit tests.
+  get / tab rename). Pure JSON parsing is split out for unit tests.
 - `state.ts` — `AgentState`, icons, title builder, ask-question summarizer.
 - `summarizer.ts` — config, first-prompt title generation.
 - `index.ts` — entry point: gates on herdr env, registers config items, wires
