@@ -238,7 +238,11 @@ export default function moshiHooksExtra(pi: ExtensionAPI): void {
         eventName: "question_replied",
         event,
         ctx: { cwd },
-        extra: {},
+        extra: {
+          phase: "running",
+          category: "task_in_progress",
+          title: IDLE_TITLE_FALLBACK,
+        },
       },
       { preferSocket: true },
     );
