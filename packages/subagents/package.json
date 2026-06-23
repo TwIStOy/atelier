@@ -16,10 +16,10 @@
     "@htwang-contrib/web-tools": "*"
   },
   "devDependencies": {
-    "@earendil-works/pi-agent-core": "^0.76.0",
-    "@earendil-works/pi-ai": "^0.76.0",
+    "@earendil-works/pi-agent-core": "^0.79.10",
+    "@earendil-works/pi-ai": "^0.79.10",
     "@earendil-works/pi-coding-agent": "latest",
-    "@earendil-works/pi-tui": "^0.76.0",
+    "@earendil-works/pi-tui": "^0.79.10",
     "typebox": "1.1.38",
     "@types/node": "^25.9.1",
     "typescript": "^6.0.0"
