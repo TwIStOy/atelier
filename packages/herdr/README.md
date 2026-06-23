@@ -24,12 +24,16 @@ that herdr injects into managed panes are absent.
 ## Detection
 
 `HERDR_ENV=1` and `HERDR_PANE_ID` (both injected by herdr) gate activation.
-`HERDR_TAB_ID` identifies the tab to rename; `HERDR_BIN_PATH` (falling back to
-`herdr` on `PATH`) selects the CLI binary used to query/control herdr.
+The tab to rename is resolved via `herdr pane get <pane_id>`'s `tab_id` field,
+falling back to the `HERDR_TAB_ID` env var when herdr injects it (not all
+builds do). `HERDR_BIN_PATH` (falling back to `herdr` on `PATH`) selects the
+CLI binary used to query/control herdr.
 
-The active-pane check uses `herdr pane get <pane_id>` and inspects the `focused`
-field, so the title is only written when pi's pane is the one the user is
-looking at — another focused pane's title is never overwritten.
+Note: on current herdr releases `pane get` prints bare JSON and does **not**
+accept a `--json` flag, so the client does not pass it. The active-pane check
+reuses the same `pane get` response and inspects the `focused` field, so the
+title is only written when pi's pane is the one the user is looking at —
+another focused pane's title is never overwritten.
 
 ## Configuration
 
