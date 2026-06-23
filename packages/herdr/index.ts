@@ -15,6 +15,7 @@ import {
   readHerdrEnv,
   renameTab,
   resolveTabId,
+  getTabLabel,
   type PaneId,
   type TabId,
 } from "./herdr-client.ts";
@@ -28,6 +29,7 @@ import {
   resolveSummaryModel,
   summarizeSessionTitle,
 } from "./summarizer.ts";
+import { logDebug } from "./log.ts";
 
 type AnyModel = Model<any>;
 
@@ -93,20 +95,28 @@ export default function herdrExtension(pi: ExtensionAPI): void {
 
   let currentState: AgentState = "idle";
   let sessionTitle = DEFAULT_TITLE; // cached title from the first user prompt
-  let titleGenerated = false; // one-shot guard: title only depends on the first prompt
+  let titleGenerated = false; // latches true only after a real model-produced title
+  let firstPrompt = ""; // captured from before_agent_start event.prompt (sync, before branch persist)
   let waitingBody = ""; // transient question text shown only while waiting
   let pendingQuestion: AskUserPromptPayload | null = null;
   let renderTimer: ReturnType<typeof setTimeout> | null = null;
   const renderAbort = new AbortController();
+  // Snapshot of the user's original tab label (restored on shutdown). Captured
+  // once, before the first rename, so we never store one of our own titles.
+  let originalLabel: string | undefined;
+  let originalNumber: number | undefined;
+  let originalCaptured = false;
 
   /**
-   * Generate the session title once, from the first user prompt. No-op after
-   * the first success — the first prompt is stable for the whole session.
+   * Generate the session title once, from the first user prompt. Latches
+   * only on a real model-produced title; retries (no-op until the first user
+   * prompt lands, or after a transient failure) on every event otherwise.
    */
   async function ensureSessionTitle(ctx: ExtensionContext): Promise<void> {
     if (titleGenerated) return;
     const config = loadConfig();
     if (!config.enabled) {
+      logDebug("ensureSessionTitle: disabled, skipping");
       sessionTitle = DEFAULT_TITLE;
       titleGenerated = true;
       return;
@@ -116,21 +126,34 @@ export default function herdrExtension(pi: ExtensionAPI): void {
       resolveSummaryModel(ctx.modelRegistry, config) ??
       (ctx.model as AnyModel | undefined);
     const branch = ctx.sessionManager.getBranch();
+    logDebug(
+      `ensureSessionTitle: model=${model ? `${model.provider}/${model.id}` : "(none)"} branchLen=${branch.length} firstPromptLen=${firstPrompt.length} titleGenerated=${titleGenerated}`,
+    );
     try {
       const outcome = await summarizeSessionTitle({
+        firstPrompt,
         branch,
         model,
         modelRegistry: ctx.modelRegistry,
         fallbackTitle: sessionTitle,
         signal: renderAbort.signal,
       });
-      if (outcome.title) sessionTitle = outcome.title;
-    } catch {
-      // Keep the previous title on any failure.
+      logDebug(
+        `ensureSessionTitle: outcome fromModel=${outcome.fromModel} title=${JSON.stringify(outcome.title)}`,
+      );
+      // Only latch when the model actually produced a title. A missing first
+      // prompt (early session_start before the prompt is appended) or a failed
+      // side-call returns a fallback with fromModel:false — leave
+      // titleGenerated false so the next event retries.
+      if (outcome.fromModel && outcome.title) {
+        sessionTitle = outcome.title;
+        titleGenerated = true;
+        logDebug(`ensureSessionTitle: summary latched = ${outcome.title}`);
+      }
+    } catch (e) {
+      logDebug(`ensureSessionTitle: threw ${String(e).slice(0, 120)}`);
+      // Keep the previous title and leave unlatched; retry on the next event.
     }
-    // Mark generated once we have any result (even a fallback) so we don't
-    // retry every turn — the first prompt won't change.
-    titleGenerated = true;
   }
 
   function scheduleRender(delayMs = 150): void {
@@ -145,7 +168,15 @@ export default function herdrExtension(pi: ExtensionAPI): void {
     // Resolve the tab id on demand if the env var was absent.
     if (!tabId) {
       tabId = await safeResolveTabId();
-      if (!tabId) return; // can't rename without a tab id
+      if (!tabId) {
+        logDebug("renderNow: no tabId, aborting");
+        return; // can't rename without a tab id
+      }
+    }
+    // Snapshot the original label before our first overwrite, so we can
+    // restore it on shutdown. Done once per session.
+    if (!originalCaptured) {
+      await safeCaptureOriginal();
     }
     const config = loadConfig();
     // While waiting on a question, show the question text instead of the
@@ -159,10 +190,15 @@ export default function herdrExtension(pi: ExtensionAPI): void {
     // Only touch the tab when our pane is the focused one — otherwise we'd
     // overwrite the title the user is currently reading in another pane.
     const active = await safeIsActivePane();
+    logDebug(
+      `renderNow: state=${currentState} tabId=${tabId} active=${active} title=${JSON.stringify(title)}`,
+    );
     if (!active) return;
     try {
       await renameTab(pi, tabId, title);
-    } catch {
+      logDebug(`renderNow: rename OK -> ${title}`);
+    } catch (e) {
+      logDebug(`renderNow: rename threw ${String(e).slice(0, 120)}`);
       // Swallow herdr CLI failures — never break the agent turn.
     }
   }
@@ -184,30 +220,97 @@ export default function herdrExtension(pi: ExtensionAPI): void {
     }
   }
 
+  async function safeCaptureOriginal(): Promise<void> {
+    if (originalCaptured || !tabId) {
+      originalCaptured = true;
+      return;
+    }
+    try {
+      const info = await getTabLabel(pi, tabId);
+      const label = info?.label?.trim();
+      const num = info?.number;
+      originalNumber = typeof num === "number" ? num : undefined;
+      // If the tab already shows one of our titles (a state icon prefix), it's
+      // a leftover from a previous run — fall back to the tab number instead.
+      originalLabel =
+        label && !isOurTitle(label) ? label : originalNumber?.toString();
+    } catch {
+      originalLabel = originalNumber?.toString();
+    }
+    originalCaptured = true;
+  }
+
+  function isOurTitle(label: string): boolean {
+    // State icons we emit are ⏺ / ❓ / ✓; any tab label starting with one is ours.
+    return (
+      label.startsWith("⏺") || label.startsWith("❓") || label.startsWith("✓")
+    );
+  }
+
+  async function restoreOriginalLabel(): Promise<void> {
+    // Resolve the tab id on demand (mirrors renderNow).
+    if (!tabId) {
+      tabId = await safeResolveTabId();
+      if (!tabId) return;
+    }
+    // If we never captured the original (e.g. renderNow never ran because our
+    // pane was never focused), capture it now so we can still restore on exit.
+    if (!originalCaptured) {
+      await safeCaptureOriginal();
+    }
+    // Prefer the original label; fall back to the tab number when we never
+    // captured a user label (e.g. capture failed or it was already ours).
+    const target = originalLabel ?? originalNumber?.toString();
+    if (!target) return;
+    try {
+      await renameTab(pi, tabId, target);
+    } catch {
+      // Best-effort; don't throw during shutdown.
+    }
+  }
+
   pi.on("session_start", (_event, ctx) => {
     currentState = "idle";
     sessionTitle = DEFAULT_TITLE;
     titleGenerated = false;
+    firstPrompt = "";
     waitingBody = "";
     pendingQuestion = null;
-    // A resumed session may already have a first prompt — generate the title
-    // up front so the tab isn't stuck on the default.
+    // Re-snapshot the original tab label for this (possibly resumed) session.
+    originalLabel = undefined;
+    originalNumber = undefined;
+    originalCaptured = false;
+    // A resumed session may already have a first prompt on the branch — generate
+    // the title up front so the tab isn't stuck on the default.
     void ensureSessionTitle(ctx).then(() => scheduleRender(0));
   });
 
-  pi.on("before_agent_start", (_event, ctx) => {
+  pi.on("before_agent_start", (event, ctx) => {
     if (currentState === "waiting") return; // a question is still open
+    // Capture the first user prompt directly from the event — it is available
+    // synchronously, before the prompt is persisted to the session branch
+    // (which is why reading the branch at this point used to return "").
+    if (!firstPrompt && event.prompt) {
+      firstPrompt = event.prompt;
+      logDebug(
+        `before_agent_start: captured firstPrompt len=${firstPrompt.length}`,
+      );
+    }
     currentState = "running";
     pendingQuestion = null;
-    // The very first turn of a fresh session: the first prompt just landed.
+    // Generate the title now that we have the prompt — no need to wait for
+    // the turn to finish; the latch guard makes this cheap.
     void ensureSessionTitle(ctx);
     scheduleRender();
   });
 
-  pi.on("agent_end", () => {
+  pi.on("agent_end", (_event, ctx) => {
     currentState = "idle";
     pendingQuestion = null;
-    scheduleRender();
+    // The first prompt may only be readable from the branch *after* the turn
+    // completes (session_start/before_agent_start can fire before it is
+    // appended). Retry here; the latch guard makes this cheap.
+    void ensureSessionTitle(ctx).then(() => scheduleRender());
   });
 
   pi.events.on(ASK_USER_PROMPT_EVENT, (data: unknown) => {
@@ -233,5 +336,7 @@ export default function herdrExtension(pi: ExtensionAPI): void {
   pi.on("session_shutdown", () => {
     renderAbort.abort();
     if (renderTimer) clearTimeout(renderTimer);
+    // Restore the user's original tab label (or its number) on exit.
+    void restoreOriginalLabel();
   });
 }
