@@ -1,0 +1,17 @@
+{
+  "name": "@htwang-contrib/herdr",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "index.ts",
+  "types": "index.ts",
+  "dependencies": {
+    "@htwang-contrib/common": "*"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-ai": "latest",
+    "@earendil-works/pi-coding-agent": "latest",
+    "@types/node": "^26.0.0",
+    "typescript": "^6.0.0",
+    "vitest": "^4.1.9"
+  }
+}
