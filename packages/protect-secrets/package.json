@@ -5,7 +5,7 @@
   "main": "index.ts",
   "types": "index.ts",
   "dependencies": {
-    "unbash": "^3.0.0"
+    "unbash": "^4.0.1"
   },
   "devDependencies": {
     "@earendil-works/pi-coding-agent": "latest",
