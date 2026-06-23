@@ -31,7 +31,8 @@
       "packages/read-tracker",
       "packages/working-indicator",
       "packages/todo",
-      "packages/moshi-hooks-extra"
+      "packages/moshi-hooks-extra",
+      "packages/herdr"
     ],
     "skills": [
       "skills/code-philosophy",
