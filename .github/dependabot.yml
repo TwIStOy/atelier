@@ -1,0 +1,31 @@
+version: 2
+
+updates:
+  # Keep GitHub Actions in .github/workflows up to date.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "ci(deps)"
+      include: "scope"
+    open-pull-requests-limit: 10
+
+  # Keep npm dependencies (root package.json + all workspace packages).
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "deps(npm)"
+      include: "scope"
+    open-pull-requests-limit: 10
+    groups:
+      # Bundle all @types/* updates into a single PR.
+      types:
+        patterns:
+          - "@types/*"
+      # Bundle all @earendil-works/* pi packages into a single PR.
+      earendil:
+        patterns:
+          - "@earendil-works/*"
