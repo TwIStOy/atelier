@@ -11,6 +11,13 @@ import type {
   CodingPlanUsage,
   CodingPlanUsageLimit,
   CodingPlanUsageWindow,
+  CodingPlanRawUsage,
+  CodingPlanUsageWindowRaw,
+  CodingPlanLimitKind,
+  CodingPlanLimitPeriod,
+  CodingPlanWindowDetail,
+  CodingPlanModelTotals,
+  CodingPlanToolTotals,
 } from "@htwang-contrib/common";
 
 const MONITOR_ENDPOINTS = {
@@ -76,6 +83,172 @@ function buildUsage(
   return {
     level: typeof quota.level === "string" ? quota.level : undefined,
     limits,
+  };
+}
+
+interface RawLimitDescriptor {
+  kind: CodingPlanLimitKind;
+  period: CodingPlanLimitPeriod;
+}
+
+// Z.AI monitor encodes the quota window as (type, unit, number):
+//   TIME_LIMIT    -> tool-call window (carries usageDetails with model codes)
+//   TOKENS_LIMIT  -> token window
+// unit/number pin down the rolling period. Values below are taken from the
+// live api.z.ai responses (verified reset times: ~5h for 3_5, ~7d for the
+// rest on a Max plan).
+const RAW_LIMIT_DESCRIPTOR: Record<string, RawLimitDescriptor> = {
+  TIME_LIMIT_5_1: { kind: "tool_calls", period: "weekly" },
+  TOKENS_LIMIT_3_5: { kind: "tokens", period: "5h" },
+  TOKENS_LIMIT_6_1: { kind: "tokens", period: "weekly" },
+};
+
+export function describeRawLimit(
+  raw: Record<string, unknown>,
+): RawLimitDescriptor | null {
+  const type = raw.type;
+  if (typeof type !== "string") return null;
+  const unit = raw.unit;
+  const number = raw.number;
+  if (typeof unit !== "number" || typeof number !== "number") return null;
+  const key = `${type}_${unit}_${number}`;
+  const exact = RAW_LIMIT_DESCRIPTOR[key];
+  if (exact) return exact;
+  if (type === "TIME_LIMIT") return { kind: "tool_calls", period: "monthly" };
+  return null;
+}
+
+function parseRawWindowDetails(
+  raw: Record<string, unknown>,
+): CodingPlanWindowDetail[] | undefined {
+  if (!Array.isArray(raw.usageDetails)) return undefined;
+  const details: CodingPlanWindowDetail[] = [];
+  for (const item of raw.usageDetails as Array<Record<string, unknown>>) {
+    const modelCode = item.modelCode;
+    const usage = item.usage;
+    if (typeof modelCode !== "string" || typeof usage !== "number") continue;
+    details.push({ modelCode, usage });
+  }
+  return details.length > 0 ? details : undefined;
+}
+
+function parseRawWindows(
+  raw: Record<string, unknown> | null,
+): CodingPlanUsageWindowRaw[] {
+  if (!raw || !Array.isArray(raw.limits)) return [];
+  const windows: CodingPlanUsageWindowRaw[] = [];
+  for (const item of raw.limits as Array<Record<string, unknown>>) {
+    const descriptor = describeRawLimit(item);
+    if (!descriptor) continue;
+    const percentage =
+      typeof item.percentage === "number" ? item.percentage : 0;
+    const nextResetTime =
+      typeof item.nextResetTime === "number" ? item.nextResetTime : undefined;
+    const window: CodingPlanUsageWindowRaw = {
+      kind: descriptor.kind,
+      period: descriptor.period,
+      usedPercentage: percentage,
+      nextResetTime,
+    };
+    if (typeof item.usage === "number") window.usage = item.usage;
+    if (typeof item.currentValue === "number") window.limit = item.currentValue;
+    if (typeof item.remaining === "number") window.remaining = item.remaining;
+    const details = parseRawWindowDetails(item);
+    if (details) window.details = details;
+    windows.push(window);
+  }
+  return windows;
+}
+
+function parseModelTotals(
+  raw: Record<string, unknown> | null,
+): CodingPlanModelTotals | undefined {
+  const totals = raw?.totalUsage;
+  if (!totals || typeof totals !== "object") return undefined;
+  const u = totals as Record<string, unknown>;
+  const out: CodingPlanModelTotals = {};
+  if (typeof u.totalTokensUsage === "number")
+    out.totalTokensUsage = u.totalTokensUsage;
+  if (typeof u.totalModelCallCount === "number")
+    out.totalModelCallCount = u.totalModelCallCount;
+  if (Array.isArray(u.modelSummaryList)) {
+    out.modelSummaryList = (
+      u.modelSummaryList as Array<Record<string, unknown>>
+    )
+      .filter(
+        (m) =>
+          typeof m.modelName === "string" && typeof m.totalTokens === "number",
+      )
+      .map((m) => ({
+        modelName: m.modelName as string,
+        totalTokens: m.totalTokens as number,
+      }));
+  }
+  if (
+    out.totalTokensUsage === undefined &&
+    out.totalModelCallCount === undefined &&
+    (!out.modelSummaryList || out.modelSummaryList.length === 0)
+  ) {
+    return undefined;
+  }
+  return out;
+}
+
+function parseToolTotals(
+  raw: Record<string, unknown> | null,
+): CodingPlanToolTotals | undefined {
+  const totals = raw?.totalUsage;
+  if (!totals || typeof totals !== "object") return undefined;
+  const u = totals as Record<string, unknown>;
+  const out: CodingPlanToolTotals = {};
+  if (typeof u.totalNetworkSearchCount === "number")
+    out.totalNetworkSearchCount = u.totalNetworkSearchCount;
+  if (typeof u.totalWebReadMcpCount === "number")
+    out.totalWebReadMcpCount = u.totalWebReadMcpCount;
+  if (typeof u.totalZreadMcpCount === "number")
+    out.totalZreadMcpCount = u.totalZreadMcpCount;
+  if (Array.isArray(u.toolSummaryList)) {
+    out.toolSummaryList = (u.toolSummaryList as Array<Record<string, unknown>>)
+      .filter(
+        (t) =>
+          typeof t.toolCode === "string" &&
+          typeof t.totalUsageCount === "number",
+      )
+      .map((t) => ({
+        toolCode: t.toolCode as string,
+        toolName: typeof t.toolName === "string" ? t.toolName : undefined,
+        totalUsageCount: t.totalUsageCount as number,
+      }));
+  }
+  if (
+    out.totalNetworkSearchCount === undefined &&
+    out.totalWebReadMcpCount === undefined &&
+    out.totalZreadMcpCount === undefined &&
+    (!out.toolSummaryList || out.toolSummaryList.length === 0)
+  ) {
+    return undefined;
+  }
+  return out;
+}
+
+export function buildRawUsage(
+  quota: Record<string, unknown> | null,
+  model: Record<string, unknown> | null,
+  tool: Record<string, unknown> | null,
+): CodingPlanRawUsage | null {
+  const windows = parseRawWindows(quota);
+  const modelTotals = parseModelTotals(model);
+  const toolTotals = parseToolTotals(tool);
+  const level =
+    quota && typeof quota.level === "string" ? quota.level : undefined;
+  if (windows.length === 0 && !modelTotals && !toolTotals && !level) {
+    return null;
+  }
+  return {
+    level,
+    windows,
+    modelTotals,
+    toolTotals,
   };
 }
 
@@ -210,6 +383,22 @@ export async function fetchUsage(
   return buildUsage(quota);
 }
 
+export async function fetchRawUsage(
+  apiKey: string,
+): Promise<CodingPlanRawUsage | null> {
+  const queryParams = getTimeWindowQueryParams();
+  const [quota, model, tool] = await Promise.all([
+    fetchEndpoint(MONITOR_ENDPOINTS.quotaLimit, apiKey).catch(() => null),
+    fetchEndpoint(MONITOR_ENDPOINTS.modelUsage, apiKey, queryParams).catch(
+      () => null,
+    ),
+    fetchEndpoint(MONITOR_ENDPOINTS.toolUsage, apiKey, queryParams).catch(
+      () => null,
+    ),
+  ]);
+  return buildRawUsage(quota, model, tool);
+}
+
 export async function queryUsage(
   pi: ExtensionAPI,
   apiKey: string,
@@ -227,6 +416,12 @@ export async function queryUsage(
   ]);
 
   const usage = buildUsage(quota);
+  const rawUsage = buildRawUsage(quota, model, tool);
+  if (rawUsage) {
+    pi.events.emit(ZAI_CODING_PLAN_EVENTS.RAW_USAGE_UPDATE, {
+      usage: rawUsage,
+    });
+  }
   if (usage) {
     pi.events.emit(ZAI_CODING_PLAN_EVENTS.USAGE_UPDATE, {
       usage,
