@@ -103,6 +103,7 @@ export default function moshiHooksExtra(pi: ExtensionAPI): void {
           tool_call_id: event.toolCallId,
           tool_name: prettyToolName(event.toolName),
           input: previewInput(event.args),
+          contextPercent: contextPercentFromCtx(ctx),
         },
       },
       { preferSocket: true },
@@ -121,6 +122,7 @@ export default function moshiHooksExtra(pi: ExtensionAPI): void {
           tool_name: prettyToolName(event.toolName),
           is_error: event.isError,
           result_preview: previewContent(event.result),
+          contextPercent: contextPercentFromCtx(ctx),
         },
       },
       { preferSocket: true },
@@ -139,8 +141,9 @@ export default function moshiHooksExtra(pi: ExtensionAPI): void {
       lastAssistantTitleFromMessages(event.messages) || IDLE_TITLE_FALLBACK;
     const config = loadSummaryConfig();
     const lastAssistant = lastAssistantMessage(event.messages);
+    const contextPercent = contextPercentFromCtx(ctx);
 
-    if (!config.enabled || !lastAssistant) {
+    const sendEnd = (title: string, message: string): void => {
       void sendEnvelope(
         {
           eventName: "agent_end",
@@ -148,12 +151,17 @@ export default function moshiHooksExtra(pi: ExtensionAPI): void {
           ctx,
           extra: {
             category: "task_complete",
-            title: fallbackTitle,
-            message: userPrompt,
+            title,
+            message,
+            contextPercent,
           },
         },
         { preferSocket: true },
       );
+    };
+
+    if (!config.enabled || !lastAssistant) {
+      sendEnd(fallbackTitle, userPrompt);
       return;
     }
 
@@ -169,34 +177,10 @@ export default function moshiHooksExtra(pi: ExtensionAPI): void {
       fallbackMessage: userPrompt,
     })
       .then((outcome) => {
-        void sendEnvelope(
-          {
-            eventName: "agent_end",
-            event,
-            ctx,
-            extra: {
-              category: "task_complete",
-              title: outcome.title || SUMMARY_TITLE_FALLBACK,
-              message: outcome.message,
-            },
-          },
-          { preferSocket: true },
-        );
+        sendEnd(outcome.title || SUMMARY_TITLE_FALLBACK, outcome.message);
       })
       .catch(() => {
-        void sendEnvelope(
-          {
-            eventName: "agent_end",
-            event,
-            ctx,
-            extra: {
-              category: "task_complete",
-              title: fallbackTitle,
-              message: userPrompt,
-            },
-          },
-          { preferSocket: true },
-        );
+        sendEnd(fallbackTitle, userPrompt);
       });
     return;
   });
@@ -273,6 +257,14 @@ function previewInput(args: unknown, maxChars = 2000): string {
   } catch {
     return "";
   }
+}
+
+function contextPercentFromCtx(ctx: {
+  getContextUsage?: () => { percent?: number | null } | undefined | null;
+}): number | undefined {
+  const pct = ctx.getContextUsage?.()?.percent;
+  if (typeof pct !== "number" || !Number.isFinite(pct)) return undefined;
+  return Math.max(0, Math.min(100, Math.round(pct)));
 }
 
 function prettyToolName(toolName: string): string {
