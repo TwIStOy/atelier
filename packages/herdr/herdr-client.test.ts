@@ -218,3 +218,44 @@ describe("renameTab", () => {
     expect(calls).toHaveLength(0);
   });
 });
+
+describe("parseTabInfo / getTabLabel", () => {
+  it("parseTabInfo extracts the tab object from a tab.get response", async () => {
+    const { parseTabInfo } = await import("./herdr-client.ts");
+    const envelope = {
+      id: "r",
+      result: {
+        type: "tab_info",
+        tab: { tab_id: "w1:t1", label: "My Logs", number: 1 },
+      },
+    };
+    expect(parseTabInfo(envelope)).toEqual({
+      tab_id: "w1:t1",
+      label: "My Logs",
+      number: 1,
+    });
+  });
+
+  it("parseTabInfo returns null on malformed output", async () => {
+    const { parseTabInfo } = await import("./herdr-client.ts");
+    expect(parseTabInfo(null)).toBeNull();
+    expect(parseTabInfo({ id: "r", result: {} })).toBeNull();
+    expect(parseTabInfo({ id: "r", error: { code: "x" } })).toBeNull();
+  });
+
+  it("getTabLabel calls tab get without --json and returns the tab object", async () => {
+    const stdout = JSON.stringify({
+      id: "r",
+      result: {
+        type: "tab_info",
+        tab: { tab_id: "w1:t1", label: "My Logs", number: 1 },
+      },
+    });
+    const { pi, calls } = fakePi(stdout);
+    const info = await (
+      await import("./herdr-client.ts")
+    ).getTabLabel(pi, "w1:t1", {});
+    expect(calls[0]?.args).toEqual(["tab", "get", "w1:t1"]);
+    expect(info).toEqual({ tab_id: "w1:t1", label: "My Logs", number: 1 });
+  });
+});

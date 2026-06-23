@@ -204,3 +204,35 @@ export async function renameTab(
   if (!clipped) return;
   await runHerdrJson(pi, ["tab", "rename", tabId, clipped], env);
 }
+
+/** Shape of the `tab.get` JSON `result.tab` object we care about. */
+export interface TabInfo {
+  tab_id?: string;
+  label?: string;
+  number?: number;
+}
+
+/** Return the `result.tab` object from a `tab.get` response. */
+export function parseTabInfo(envelope: unknown): TabInfo | null {
+  const result = extractResult(envelope);
+  if (!result || typeof result !== "object") return null;
+  const tab = (result as { tab?: unknown }).tab;
+  if (!tab || typeof tab !== "object") return null;
+  return tab as TabInfo;
+}
+
+/**
+ * Fetch a tab's current label and number.
+ *
+ * Used to snapshot the user's original tab title before we overwrite it, so it
+ * can be restored on shutdown. `tab get` prints bare JSON and does not accept
+ * `--json`.
+ */
+export async function getTabLabel(
+  pi: ExtensionAPI,
+  tabId: TabId,
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<TabInfo | null> {
+  const envelope = await runHerdrJson(pi, ["tab", "get", tabId], env);
+  return parseTabInfo(envelope);
+}
