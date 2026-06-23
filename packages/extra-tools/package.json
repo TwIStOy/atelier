@@ -7,7 +7,7 @@
   "dependencies": {},
   "devDependencies": {
     "@earendil-works/pi-coding-agent": "latest",
-    "@types/node": "^25.9.1",
+    "@types/node": "^26.0.0",
     "typescript": "^6.0.0",
     "vitest": "^4.1.9"
   }
