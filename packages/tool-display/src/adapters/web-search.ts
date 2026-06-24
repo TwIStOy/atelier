@@ -21,8 +21,8 @@ export const webSearchAdapter: ToolDisplayAdapter<WebSearchArgs> = {
   formatCallHeader(args, theme, _details?: unknown) {
     const query = typeof args.query === "string" ? args.query : "";
     const backend = backendFromDetails(_details);
-    const tag = backend ? " " + theme.fg("dim", `(${backend})`) : "";
-    return theme.fg("toolTitle", theme.bold("WebSearch")) + tag + " " + theme.fg("accent", `"${query}"`);
+    const tag = backend ? ` ${theme.fg("dim", `(${backend})`)}` : "";
+    return `${theme.fg("toolTitle", theme.bold("WebSearch")) + tag} ${theme.fg("accent", `"${query}"`)}`;
   },
 
   formatCollapsedContent(_args, _output, theme, _width, details?: unknown, isPartial?: boolean, _spinAt?: number) {

@@ -11,7 +11,7 @@ interface JournalWriteArgs {
 export const journalWriteAdapter: ToolDisplayAdapter<JournalWriteArgs> = {
   formatCallHeader(args, theme) {
     const title = args?.title ?? "";
-    return theme.fg("toolTitle", theme.bold("Journal write")) + " " + theme.fg("accent", title);
+    return `${theme.fg("toolTitle", theme.bold("Journal write"))} ${theme.fg("accent", title)}`;
   },
 
   formatCollapsedContent(_args, _output, theme) {
@@ -36,7 +36,7 @@ interface JournalReadDetails {
 export const journalReadAdapter: ToolDisplayAdapter<JournalReadArgs> = {
   formatCallHeader(args, theme) {
     const id = args?.id ?? "";
-    return theme.fg("toolTitle", theme.bold("Journal read")) + " " + theme.fg("accent", id);
+    return `${theme.fg("toolTitle", theme.bold("Journal read"))} ${theme.fg("accent", id)}`;
   },
 
   formatCollapsedContent(_args, _output, theme, width, details) {
@@ -84,7 +84,7 @@ interface JournalSearchDetails {
 export const journalSearchAdapter: ToolDisplayAdapter<JournalSearchArgs> = {
   formatCallHeader(args, theme) {
     const query = args?.text ?? (args?.tags?.length ? args.tags.join(",") : "");
-    return theme.fg("toolTitle", theme.bold("Journal search")) + " " + theme.fg("accent", query || "(all)");
+    return `${theme.fg("toolTitle", theme.bold("Journal search"))} ${theme.fg("accent", query || "(all)")}`;
   },
 
   formatCollapsedContent(_args, _output, theme, width, details) {

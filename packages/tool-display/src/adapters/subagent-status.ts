@@ -83,7 +83,7 @@ export const subagentStatusAdapter: ToolDisplayAdapter<SubagentStatusArgs> = {
     const d = parseDetails(details);
     const rawId = typeof args.id === "string" ? args.id.trim() : "";
     const idShow = d ? shortJobId(d.job_id) : truncateDisplay(rawId, 36);
-    const base = theme.fg("toolTitle", theme.bold("Subagent status")) + " " + theme.fg("accent", idShow);
+    const base = `${theme.fg("toolTitle", theme.bold("Subagent status"))} ${theme.fg("accent", idShow)}`;
     if (!d) {
       return base;
     }

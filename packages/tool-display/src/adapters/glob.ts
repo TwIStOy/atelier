@@ -18,9 +18,9 @@ export const globAdapter: ToolDisplayAdapter<GlobArgs> = {
     const pattern = typeof args.pattern === "string" ? args.pattern : "";
     const pathRaw = typeof args.path === "string" ? args.path.trim() : "";
 
-    let header = theme.fg("toolTitle", theme.bold("Glob")) + " " + theme.fg("accent", `"${pattern}"`);
+    let header = `${theme.fg("toolTitle", theme.bold("Glob"))} ${theme.fg("accent", `"${pattern}"`)}`;
     if (pathRaw) {
-      header += " " + theme.fg("toolOutput", `in ${shortenPath(pathRaw)}`);
+      header += ` ${theme.fg("toolOutput", `in ${shortenPath(pathRaw)}`)}`;
     }
     return header;
   },

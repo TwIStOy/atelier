@@ -39,10 +39,10 @@ export const bashAdapter: ToolDisplayAdapter<BashArgs> = {
         theme.fg("dim", desc) +
         " " +
         theme.fg("muted", `(${cmdDisplay})`)
-      : theme.fg("toolTitle", theme.bold("Bash")) + " " + theme.fg("muted", cmdDisplay);
+      : `${theme.fg("toolTitle", theme.bold("Bash"))} ${theme.fg("muted", cmdDisplay)}`;
 
     if (cwd) {
-      return header + " " + theme.fg("dim", `in ${shortenPath(cwd)}`);
+      return `${header} ${theme.fg("dim", `in ${shortenPath(cwd)}`)}`;
     }
     return header;
   },

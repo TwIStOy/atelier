@@ -17,12 +17,12 @@ export function replaceTabs(text: string): string {
 function formatLineNumber(num: number, maxNum: number, theme: Theme): string {
   const width = String(maxNum).length;
   const numStr = String(num).padStart(width);
-  return theme.fg("dim", numStr) + " │ ";
+  return `${theme.fg("dim", numStr)} │ `;
 }
 
 function formatContinuationPrefix(maxNum: number, theme: Theme): string {
   const width = String(maxNum).length;
-  return theme.fg("dim", " ".repeat(width)) + " ╎ ";
+  return `${theme.fg("dim", " ".repeat(width))} ╎ `;
 }
 
 function gutterVisibleWidth(maxNum: number): number {

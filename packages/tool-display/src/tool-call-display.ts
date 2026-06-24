@@ -51,7 +51,7 @@ export function formatGenericToolHeader(
   const argStr = formatToolArgs(args);
   if (!argStr) return truncateToWidth(namePart, width, "…");
 
-  const prefix = namePart + " ";
+  const prefix = `${namePart} `;
   const argText = `(${argStr})`;
   const styledArg = theme.fg("dim", argText);
   const header = prefix + styledArg;

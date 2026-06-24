@@ -13,7 +13,7 @@ export const writeAdapter: ToolDisplayAdapter<WriteArgs> = {
     const rawPath = args?.file_path ?? args?.path ?? "";
     const path = shortenPath(rawPath);
     const pathDisplay = path ? theme.fg("accent", path) : theme.fg("toolOutput", "...");
-    return theme.fg("toolTitle", theme.bold("Write")) + " " + pathDisplay;
+    return `${theme.fg("toolTitle", theme.bold("Write"))} ${pathDisplay}`;
   },
 
   formatCollapsedContent(args, _output, theme, _width, _details?: unknown, _isPartial?: boolean, _spinAt?: number) {

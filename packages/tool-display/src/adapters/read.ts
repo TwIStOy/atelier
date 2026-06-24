@@ -22,7 +22,7 @@ export const readAdapter: ToolDisplayAdapter<ReadArgs> = {
     const rawPath = args?.file_path ?? args?.path ?? "";
     const path = shortenPath(rawPath);
     const pathDisplay = path ? theme.fg("accent", path) : theme.fg("toolOutput", "...");
-    return theme.fg("toolTitle", theme.bold("Read")) + " " + pathDisplay + formatLineRange(args, theme);
+    return `${theme.fg("toolTitle", theme.bold("Read"))} ${pathDisplay}${formatLineRange(args, theme)}`;
   },
 
   formatCollapsedContent(_args, output, theme, _width, _details?: unknown, _isPartial?: boolean, _spinAt?: number) {

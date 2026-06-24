@@ -72,7 +72,7 @@ interface MemoryReadDetails {
 export const memoryReadAdapter: ToolDisplayAdapter<MemoryReadArgs> = {
   formatCallHeader(args, theme) {
     const uri = args?.uri ?? "";
-    return theme.fg("toolTitle", theme.bold("Memory read")) + " " + theme.fg("accent", uri);
+    return `${theme.fg("toolTitle", theme.bold("Memory read"))} ${theme.fg("accent", uri)}`;
   },
 
   formatCollapsedContent(_args, _output, theme, width, details) {
@@ -127,7 +127,7 @@ interface MemoryUpdateDetails {
 export const memoryUpdateAdapter: ToolDisplayAdapter<MemoryUpdateArgs> = {
   formatCallHeader(args, theme) {
     const uri = args?.uri ?? "";
-    return theme.fg("toolTitle", theme.bold("Memory update")) + " " + theme.fg("accent", uri);
+    return `${theme.fg("toolTitle", theme.bold("Memory update"))} ${theme.fg("accent", uri)}`;
   },
 
   formatCollapsedContent(_args, _output, theme, width, details) {
@@ -182,7 +182,7 @@ interface MemoryDeleteArgs {
 export const memoryDeleteAdapter: ToolDisplayAdapter<MemoryDeleteArgs> = {
   formatCallHeader(args, theme) {
     const uri = args?.uri ?? "";
-    return theme.fg("toolTitle", theme.bold("Memory delete")) + " " + theme.fg("accent", uri);
+    return `${theme.fg("toolTitle", theme.bold("Memory delete"))} ${theme.fg("accent", uri)}`;
   },
 
   formatCollapsedContent(_args, _output, theme) {
@@ -208,7 +208,7 @@ interface MemorySearchDetails {
 export const memorySearchAdapter: ToolDisplayAdapter<MemorySearchArgs> = {
   formatCallHeader(args, theme) {
     const query = args?.query ?? "";
-    return theme.fg("toolTitle", theme.bold("Memory search")) + " " + theme.fg("accent", query);
+    return `${theme.fg("toolTitle", theme.bold("Memory search"))} ${theme.fg("accent", query)}`;
   },
 
   formatCollapsedContent(_args, _output, theme, width, details) {
@@ -263,7 +263,7 @@ interface MemoryListArgs {
 export const memoryListAdapter: ToolDisplayAdapter<MemoryListArgs> = {
   formatCallHeader(args, theme) {
     const domain = args?.domain ?? "";
-    return theme.fg("toolTitle", theme.bold("Memory list")) + " " + theme.fg("accent", domain || "(all)");
+    return `${theme.fg("toolTitle", theme.bold("Memory list"))} ${theme.fg("accent", domain || "(all)")}`;
   },
 
   formatCollapsedContent(_args, output, theme) {
@@ -378,7 +378,7 @@ interface MemoryHistoryDetails {
 export const memoryHistoryAdapter: ToolDisplayAdapter<MemoryHistoryArgs> = {
   formatCallHeader(args, theme) {
     const uri = args?.uri ?? "";
-    return theme.fg("toolTitle", theme.bold("Memory history")) + " " + theme.fg("accent", uri);
+    return `${theme.fg("toolTitle", theme.bold("Memory history"))} ${theme.fg("accent", uri)}`;
   },
 
   formatCollapsedContent(_args, _output, theme, width, details) {

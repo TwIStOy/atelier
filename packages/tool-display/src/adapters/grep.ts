@@ -23,12 +23,12 @@ export const grepAdapter: ToolDisplayAdapter<GrepArgs> = {
       (typeof args.include === "string" ? args.include.trim() : "") ||
       (typeof args.glob === "string" ? args.glob.trim() : "");
 
-    let header = theme.fg("toolTitle", theme.bold("Grep")) + " " + theme.fg("accent", `/${pattern}/`);
+    let header = `${theme.fg("toolTitle", theme.bold("Grep"))} ${theme.fg("accent", `/${pattern}/`)}`;
     if (pathRaw) {
-      header += " " + theme.fg("toolOutput", `in ${shortenPath(pathRaw)}`);
+      header += ` ${theme.fg("toolOutput", `in ${shortenPath(pathRaw)}`)}`;
     }
     if (filterRaw) {
-      header += " " + theme.fg("dim", `(${filterRaw})`);
+      header += ` ${theme.fg("dim", `(${filterRaw})`)}`;
     }
     return header;
   },

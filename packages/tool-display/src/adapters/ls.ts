@@ -18,7 +18,7 @@ export const lsAdapter: ToolDisplayAdapter<LsArgs> = {
     const rawPath = typeof args.path === "string" ? args.path.trim() : "";
     const displayPath = rawPath ? shortenPath(rawPath) : ".";
     const lim = args.limit;
-    let header = theme.fg("toolTitle", theme.bold("Ls")) + " " + theme.fg("accent", displayPath);
+    let header = `${theme.fg("toolTitle", theme.bold("Ls"))} ${theme.fg("accent", displayPath)}`;
     if (typeof lim === "number" && Number.isFinite(lim)) {
       header += theme.fg("toolOutput", ` (limit ${Math.floor(lim)})`);
     }

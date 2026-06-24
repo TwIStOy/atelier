@@ -164,7 +164,7 @@ function generateUnifiedDiff(filePath: string, oldText: string, newText: string)
         preContextCount = Math.min(CONTEXT, lines.length);
         const start = lines.length - preContextCount;
         for (let j = start; j < lines.length; j++) {
-          hunkBody.push(" " + lines[j]);
+          hunkBody.push(` ${lines[j]}`);
         }
       }
     }
@@ -192,7 +192,7 @@ function generateUnifiedDiff(filePath: string, oldText: string, newText: string)
       if (inHunk) {
         const postCtx = textLines.slice(0, CONTEXT);
         for (const line of postCtx) {
-          hunkBody.push(" " + line);
+          hunkBody.push(` ${line}`);
           hunkOldCount++;
           hunkNewCount++;
         }
@@ -215,11 +215,11 @@ function generateUnifiedDiff(filePath: string, oldText: string, newText: string)
 
       for (const line of textLines) {
         if (change.removed) {
-          hunkBody.push("-" + line);
+          hunkBody.push(`-${line}`);
           hunkOldCount++;
           oldLine++;
         } else {
-          hunkBody.push("+" + line);
+          hunkBody.push(`+${line}`);
           hunkNewCount++;
           newLine++;
         }
@@ -232,7 +232,7 @@ function generateUnifiedDiff(filePath: string, oldText: string, newText: string)
   if (hunks.length === 0) return "";
 
   const header = `diff --git a/${filePath} b/${filePath}\n--- a/${filePath}\n+++ b/${filePath}`;
-  return header + "\n" + hunks.join("\n") + "\n";
+  return `${header}\n${hunks.join("\n")}\n`;
 }
 
 function resolveIsSplit(innerWidth: number): boolean {
@@ -276,7 +276,7 @@ function renderChangeBar(added: number, removed: number, theme: Theme): string {
   if (total === 0) return "";
   const removedW = Math.round((BAR_WIDTH * removed) / total);
   const addedW = BAR_WIDTH - removedW;
-  return "[" + theme.fg("error", "-".repeat(removedW)) + theme.fg("success", "-".repeat(addedW)) + "]";
+  return `[${theme.fg("error", "-".repeat(removedW))}${theme.fg("success", "-".repeat(addedW))}]`;
 }
 
 export const editAdapter: ToolDisplayAdapter<EditArgs> = {
@@ -284,7 +284,7 @@ export const editAdapter: ToolDisplayAdapter<EditArgs> = {
     const rawPath = args?.file_path ?? args?.path ?? "";
     const path = shortenPath(rawPath);
     const pathDisplay = path ? theme.fg("accent", path) : theme.fg("toolOutput", "...");
-    return theme.fg("toolTitle", theme.bold("Edit")) + " " + pathDisplay;
+    return `${theme.fg("toolTitle", theme.bold("Edit"))} ${pathDisplay}`;
   },
 
   formatCollapsedContent(args, _output, theme, width, _details?: unknown, _isPartial?: boolean, _spinAt?: number) {

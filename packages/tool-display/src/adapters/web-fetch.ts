@@ -28,8 +28,8 @@ export const webFetchAdapter: ToolDisplayAdapter<WebFetchArgs> = {
   formatCallHeader(args, theme, _details?: unknown) {
     const url = typeof args.url === "string" ? args.url : "";
     const backend = backendFromDetails(_details);
-    const tag = backend ? " " + theme.fg("dim", `(${backend})`) : "";
-    return theme.fg("toolTitle", theme.bold("WebFetch")) + tag + " " + theme.fg("accent", url);
+    const tag = backend ? ` ${theme.fg("dim", `(${backend})`)}` : "";
+    return `${theme.fg("toolTitle", theme.bold("WebFetch")) + tag} ${theme.fg("accent", url)}`;
   },
 
   formatCollapsedContent(_args, _output, theme, _width, details?: unknown, isPartial?: boolean, _spinAt?: number) {
