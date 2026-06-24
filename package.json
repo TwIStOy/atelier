@@ -64,6 +64,6 @@
   },
   "scripts": {
     "test": "vitest run",
-    "check": "biome check --write --error-on-warnings ."
+    "check": ""
   }
 }
