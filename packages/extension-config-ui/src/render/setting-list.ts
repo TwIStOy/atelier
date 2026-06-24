@@ -76,8 +76,6 @@ export function formatSettingValue(item: ConfigItem, value: unknown, colorBlock?
       const block = colorBlock ?? "██";
       return `${block} ${String(value)}`;
     }
-    case "number":
-    case "string":
     default:
       return String(value);
   }
@@ -224,7 +222,7 @@ export function renderSelectPage(
         Array.isArray(selectedValues) && selectedValues.some((v) => JSON.stringify(v) === JSON.stringify(opt.value));
       const checkMarker = isChecked ? "\uDB80\uDD35" : "\uDB80\uDD31";
       const orderNum = reorderableOrder.get(JSON.stringify(opt.value)) ?? 0;
-      const numStr = orderNum > 0 ? `${orderNum}.`.padStart(3) + " " : "    ";
+      const numStr = orderNum > 0 ? `${`${orderNum}.`.padStart(3)} ` : "    ";
       const reorderGlyph = isSelected && isChecked ? " ↕" : "  ";
       const content = `  ${checkMarker} ${numStr}${opt.label}${reorderGlyph}`;
       lines.push(renderOptionLine(content, isSelected, safeWidth, theme));

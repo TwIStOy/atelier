@@ -191,7 +191,8 @@ function createConfigComponent(
         return;
       }
       if (matchesKey(data, Key.enter) || matchesKey(data, "return")) {
-        return saveInlineEdit();
+        saveInlineEdit();
+        return;
       }
       if (handleInlineEditInput(ui.editing, data)) {
         requestRender();
@@ -320,7 +321,10 @@ function createConfigComponent(
       return;
     }
 
-    if (matchesKey(data, Key.escape) || matchesKey(data, "ctrl+c")) return done();
+    if (matchesKey(data, Key.escape) || matchesKey(data, "ctrl+c")) {
+      done();
+      return;
+    }
 
     if (matchesKey(data, "tab") || matchesKey(data, "right")) {
       switchTab(1);
@@ -393,7 +397,8 @@ function createConfigComponent(
       return;
     }
     if (matchesKey(data, Key.enter) || matchesKey(data, "return")) {
-      return enterSelectPage();
+      enterSelectPage();
+      return;
     }
     if (data.length === 1 && data >= " " && data !== "\x7f") {
       ui.search += data;
