@@ -101,7 +101,7 @@ describe("transcribeWithMimoChat — success", () => {
     expect(Buffer.from(data, "base64")).toEqual(Buffer.from([0x52, 0x49, 0x46, 0x46]));
   });
 
-  it("posts to ${baseUrl}/chat/completions with Bearer auth header", async () => {
+  it(`posts to ${CONFIG.baseUrl}/chat/completions with Bearer auth header`, async () => {
     stubFetch(() => ({
       ok: true,
       body: { choices: [{ message: { content: "x" } }] },

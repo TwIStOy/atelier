@@ -20,7 +20,7 @@ function spawnExists(cmd: string, args: string[]): boolean {
 }
 
 function shellQuote(name: string): string {
-  return "'" + name.replace(/'/g, "'\\''") + "'";
+  return `'${name.replace(/'/g, "'\\''")}'`;
 }
 
 export function selectRecorder(
