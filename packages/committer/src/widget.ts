@@ -119,19 +119,17 @@ export class CommitterOverlayController implements Component {
 
     switch (this.progress.phase) {
       case "preparing":
-        content.push("  " + spinnerGlyph(this.theme) + " Staging changes...");
+        content.push(`  ${spinnerGlyph(this.theme)} Staging changes...`);
         break;
 
       case "generating":
-        content.push(
-          "  " + spinnerGlyph(this.theme) + " " + (this.progress.statusMessage || "Generating commit message..."),
-        );
+        content.push(`  ${spinnerGlyph(this.theme)} ${this.progress.statusMessage || "Generating commit message..."}`);
         break;
 
       case "committing": {
         const { commitsCompleted, commitsTotal } = this.progress;
         const prog = commitsTotal > 1 ? ` (${commitsCompleted}/${commitsTotal})` : "";
-        content.push("  " + spinnerGlyph(this.theme) + ` Creating commit${prog}...`);
+        content.push(`  ${spinnerGlyph(this.theme)} Creating commit${prog}...`);
         break;
       }
 
@@ -157,10 +155,10 @@ export class CommitterOverlayController implements Component {
 
     content.push("");
 
-    const footer: string[] = [this.theme.fg("dim", "Esc") + " dismiss"];
+    const footer: string[] = [`${this.theme.fg("dim", "Esc")} dismiss`];
     if (this.isTerminal) {
-      footer.push(this.theme.fg("dim", "Enter") + " close");
-      footer.push(this.theme.fg("dim", "↑↓") + " scroll");
+      footer.push(`${this.theme.fg("dim", "Enter")} close`);
+      footer.push(`${this.theme.fg("dim", "↑↓")} scroll`);
     }
     content.push(this.theme.fg("dim", truncateToWidth(footer.join("  "), innerW)));
 
@@ -203,7 +201,9 @@ export function showCommitterOverlay(
   ctrl: CommitterOverlayController;
 }> {
   let resolveCtrl!: (c: CommitterOverlayController) => void;
-  const ctrlReady = new Promise<CommitterOverlayController>((resolve) => (resolveCtrl = resolve));
+  const ctrlReady = new Promise<CommitterOverlayController>((resolve) => {
+    resolveCtrl = resolve;
+  });
 
   const overlayPromise = ctx.ui.custom<void>(
     (tui, theme, _keybindings, done) => {

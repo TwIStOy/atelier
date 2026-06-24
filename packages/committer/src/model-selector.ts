@@ -112,9 +112,9 @@ export class ModelSelectController implements Component {
 
     lines.push("");
     const footer: string[] = [
-      this.theme.fg("dim", "Enter") + " select",
-      this.theme.fg("dim", "Esc") + " cancel",
-      this.theme.fg("dim", "↑↓") + " navigate",
+      `${this.theme.fg("dim", "Enter")} select`,
+      `${this.theme.fg("dim", "Esc")} cancel`,
+      `${this.theme.fg("dim", "↑↓")} navigate`,
     ];
     lines.push(this.theme.fg("dim", footer.join("  ")));
 
