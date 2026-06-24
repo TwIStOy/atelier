@@ -272,7 +272,7 @@ function formatUsageOutput(
       const bar = formatProgressBar(pct, barWidth);
       const reset = formatResetClock(limit.nextResetTime);
       const resetSuffix = reset ? ` (resets ${reset})` : "";
-      const line = `${label}:`.padEnd(30) + `${bar} ${remaining}% left${resetSuffix}`;
+      const line = `${`${label}:`.padEnd(30)}${bar} ${remaining}% left${resetSuffix}`;
       parts.push(line.slice(0, tw));
     }
     parts.push("");
