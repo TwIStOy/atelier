@@ -9,30 +9,14 @@ interface WriteArgs {
 }
 
 export const writeAdapter: ToolDisplayAdapter<WriteArgs> = {
-  formatCallHeader(
-    args,
-    theme,
-    _details?: unknown,
-    _isPartial?: boolean,
-    _expanded?: boolean,
-  ) {
+  formatCallHeader(args, theme, _details?: unknown, _isPartial?: boolean, _expanded?: boolean) {
     const rawPath = args?.file_path ?? args?.path ?? "";
     const path = shortenPath(rawPath);
-    const pathDisplay = path
-      ? theme.fg("accent", path)
-      : theme.fg("toolOutput", "...");
+    const pathDisplay = path ? theme.fg("accent", path) : theme.fg("toolOutput", "...");
     return theme.fg("toolTitle", theme.bold("Write")) + " " + pathDisplay;
   },
 
-  formatCollapsedContent(
-    args,
-    _output,
-    theme,
-    _width,
-    _details?: unknown,
-    _isPartial?: boolean,
-    _spinAt?: number,
-  ) {
+  formatCollapsedContent(args, _output, theme, _width, _details?: unknown, _isPartial?: boolean, _spinAt?: number) {
     const content = args?.content ?? "";
     if (!content) return [theme.fg("muted", "└ empty file")];
     return formatLineCount(content, theme);

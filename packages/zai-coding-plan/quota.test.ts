@@ -40,9 +40,7 @@ const MODEL = {
   totalUsage: {
     totalModelCallCount: 732,
     totalTokensUsage: 44984926,
-    modelSummaryList: [
-      { modelName: "GLM-5.2", totalTokens: 51197713, sortOrder: 1 },
-    ],
+    modelSummaryList: [{ modelName: "GLM-5.2", totalTokens: 51197713, sortOrder: 1 }],
   },
 } as const;
 
@@ -71,33 +69,32 @@ const TOOL = {
 
 describe("describeRawLimit", () => {
   test("TIME_LIMIT unit=5 number=1 -> tool_calls / weekly", () => {
-    expect(
-      describeRawLimit({ type: "TIME_LIMIT", unit: 5, number: 1 }),
-    ).toEqual({ kind: "tool_calls", period: "weekly" });
+    expect(describeRawLimit({ type: "TIME_LIMIT", unit: 5, number: 1 })).toEqual({
+      kind: "tool_calls",
+      period: "weekly",
+    });
   });
 
   test("TOKENS_LIMIT unit=3 number=5 -> tokens / 5h", () => {
-    expect(
-      describeRawLimit({ type: "TOKENS_LIMIT", unit: 3, number: 5 }),
-    ).toEqual({ kind: "tokens", period: "5h" });
+    expect(describeRawLimit({ type: "TOKENS_LIMIT", unit: 3, number: 5 })).toEqual({ kind: "tokens", period: "5h" });
   });
 
   test("TOKENS_LIMIT unit=6 number=1 -> tokens / weekly", () => {
-    expect(
-      describeRawLimit({ type: "TOKENS_LIMIT", unit: 6, number: 1 }),
-    ).toEqual({ kind: "tokens", period: "weekly" });
+    expect(describeRawLimit({ type: "TOKENS_LIMIT", unit: 6, number: 1 })).toEqual({
+      kind: "tokens",
+      period: "weekly",
+    });
   });
 
   test("unknown TIME_LIMIT combination falls back to tool_calls / monthly", () => {
-    expect(
-      describeRawLimit({ type: "TIME_LIMIT", unit: 9, number: 9 }),
-    ).toEqual({ kind: "tool_calls", period: "monthly" });
+    expect(describeRawLimit({ type: "TIME_LIMIT", unit: 9, number: 9 })).toEqual({
+      kind: "tool_calls",
+      period: "monthly",
+    });
   });
 
   test("unknown TOKENS_LIMIT combination returns null", () => {
-    expect(
-      describeRawLimit({ type: "TOKENS_LIMIT", unit: 9, number: 9 }),
-    ).toBeNull();
+    expect(describeRawLimit({ type: "TOKENS_LIMIT", unit: 9, number: 9 })).toBeNull();
   });
 
   test("missing fields return null", () => {
@@ -147,9 +144,7 @@ describe("buildRawUsage", () => {
   test("aggregates model totals", () => {
     expect(raw?.modelTotals?.totalTokensUsage).toBe(44984926);
     expect(raw?.modelTotals?.totalModelCallCount).toBe(732);
-    expect(raw?.modelTotals?.modelSummaryList).toEqual([
-      { modelName: "GLM-5.2", totalTokens: 51197713 },
-    ]);
+    expect(raw?.modelTotals?.modelSummaryList).toEqual([{ modelName: "GLM-5.2", totalTokens: 51197713 }]);
   });
 
   test("aggregates tool totals", () => {
@@ -166,8 +161,6 @@ describe("buildRawUsage", () => {
 
   test("returns null when everything is empty", () => {
     expect(buildRawUsage(null, null, null)).toBeNull();
-    expect(
-      buildRawUsage({ limits: [] }, { totalUsage: {} }, { totalUsage: {} }),
-    ).toBeNull();
+    expect(buildRawUsage({ limits: [] }, { totalUsage: {} }, { totalUsage: {} })).toBeNull();
   });
 });

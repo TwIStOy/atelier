@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { BtwOverlayController } from "./btw-ui.ts";
 import type { BtwTurn } from "./btw-ui.ts";
+import { BtwOverlayController } from "./btw-ui.ts";
 
 function makeTurn(question: string, answer: string): BtwTurn {
   return {
@@ -16,13 +16,7 @@ function makeTurn(question: string, answer: string): BtwTurn {
   };
 }
 
-function makeController(
-  opts: {
-    question?: string;
-    history?: BtwTurn[];
-    termRows?: number;
-  } = {},
-) {
+function makeController(opts: { question?: string; history?: BtwTurn[]; termRows?: number } = {}) {
   let requestRenderCount = 0;
   const controller = new AbortController();
   const doneCalls: unknown[] = [];
@@ -67,9 +61,7 @@ describe("BtwOverlayController", () => {
       const { ctrl } = makeController();
       const lines = ctrl.render(80);
 
-      const banner = lines.find(
-        (l) => l.includes("/btw") && l.includes("what is 2+2?"),
-      );
+      const banner = lines.find((l) => l.includes("/btw") && l.includes("what is 2+2?"));
       expect(banner).toBeDefined();
 
       const echo = lines.find((l) => l.includes("accent"));
@@ -149,10 +141,7 @@ describe("BtwOverlayController", () => {
     });
 
     test("returns maxRows lines when content overflows", () => {
-      const longAnswer = Array.from(
-        { length: 100 },
-        (_, i) => `Line ${i + 1}`,
-      ).join("\n");
+      const longAnswer = Array.from({ length: 100 }, (_, i) => `Line ${i + 1}`).join("\n");
       const { ctrl } = makeController({ termRows: 20 });
       ctrl.setAnswer(longAnswer);
       const lines = ctrl.render(80);
@@ -161,10 +150,7 @@ describe("BtwOverlayController", () => {
     });
 
     test("scroll down shifts visible window", () => {
-      const longAnswer = Array.from(
-        { length: 100 },
-        (_, i) => `Line ${i + 1}`,
-      ).join("\n");
+      const longAnswer = Array.from({ length: 100 }, (_, i) => `Line ${i + 1}`).join("\n");
       const { ctrl } = makeController({ termRows: 20 });
       ctrl.setAnswer(longAnswer);
       const before = ctrl.render(80);

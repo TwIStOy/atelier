@@ -28,10 +28,7 @@ export interface TodoCounts {
 export function selectTodoCounts(state: TaskState): TodoCounts {
   const groups = selectTasksByStatus(state);
   return {
-    total:
-      groups.pending.length +
-      groups.inProgress.length +
-      groups.completed.length,
+    total: groups.pending.length + groups.inProgress.length + groups.completed.length,
     pending: groups.pending.length,
     inProgress: groups.inProgress.length,
     completed: groups.completed.length,
@@ -39,15 +36,10 @@ export function selectTodoCounts(state: TaskState): TodoCounts {
 }
 
 export function selectShowTaskIds(state: TaskState): boolean {
-  return selectVisibleTasks(state).some(
-    (t) => t.blockedBy && t.blockedBy.length > 0,
-  );
+  return selectVisibleTasks(state).some((t) => t.blockedBy && t.blockedBy.length > 0);
 }
 
-export function selectTaskSubjectById(
-  state: TaskState,
-  id: number,
-): string | undefined {
+export function selectTaskSubjectById(state: TaskState, id: number): string | undefined {
   return state.tasks.find((t) => t.id === id)?.subject;
 }
 
@@ -56,10 +48,7 @@ export interface OverlayLayout {
   hiddenCompleted: number;
   truncatedTail: number;
 }
-export function selectOverlayLayout(
-  state: TaskState,
-  budget: number,
-): OverlayLayout {
+export function selectOverlayLayout(state: TaskState, budget: number): OverlayLayout {
   const all = selectVisibleTasks(state);
   if (all.length <= budget) {
     return { visible: all, hiddenCompleted: 0, truncatedTail: 0 };
@@ -74,9 +63,7 @@ export function selectOverlayLayout(
       if (t.status === "completed") kept.add(t);
     }
     const visible = all.filter((t) => kept.has(t));
-    const shownCompleted = visible.filter(
-      (t) => t.status === "completed",
-    ).length;
+    const shownCompleted = visible.filter((t) => t.status === "completed").length;
     return {
       visible,
       hiddenCompleted: totalCompleted - shownCompleted,
@@ -89,12 +76,7 @@ export function selectOverlayLayout(
 }
 
 export function selectHasActive(state: TaskState): boolean {
-  return selectVisibleTasks(state).some(
-    (t) => t.status === "in_progress" || t.status === "pending",
-  );
+  return selectVisibleTasks(state).some((t) => t.status === "in_progress" || t.status === "pending");
 }
 
-export const ACTIVE_STATUSES: ReadonlySet<TaskStatus> = new Set([
-  "pending",
-  "in_progress",
-]);
+export const ACTIVE_STATUSES: ReadonlySet<TaskStatus> = new Set(["pending", "in_progress"]);

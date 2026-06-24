@@ -1,14 +1,10 @@
+import { randomUUID } from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { randomUUID } from "node:crypto";
-import type {
-  Goal,
-  GoalFile,
-  GoalStoreRef,
-  GoalUpdate,
-  TokenUsageSnapshot,
-} from "./types.ts";
+import type { Goal, GoalFile, GoalStoreRef, GoalUpdate, TokenUsageSnapshot } from "./types.ts";
+
 export type { GoalStoreRef } from "./types.ts";
+
 import {
   GoalAlreadyExistsError,
   GoalNotFoundError,
@@ -61,11 +57,7 @@ export function writeGoal(ref: GoalStoreRef, goal: Goal): void {
   writeFile(filePath, file);
 }
 
-export function createGoal(
-  ref: GoalStoreRef,
-  objective: string,
-  tokenBudget: number | null,
-): Goal {
+export function createGoal(ref: GoalStoreRef, objective: string, tokenBudget: number | null): Goal {
   const existing = readGoal(ref);
   if (existing) {
     throw new GoalAlreadyExistsError(existing.id);
@@ -130,11 +122,7 @@ function transitionStatus(goal: Goal, next: Goal["status"], now: string): void {
       }
       break;
     case "complete":
-      if (
-        current === "active" ||
-        current === "paused" ||
-        current === "budgetLimited"
-      ) {
+      if (current === "active" || current === "paused" || current === "budgetLimited") {
         goal.status = "complete";
         goal.completedAt = now;
         goal.lastStartedAt = null;
@@ -172,11 +160,7 @@ export function accountGoalUsage(
   goal.timeUsedSeconds += elapsedSeconds;
   goal.updatedAt = new Date().toISOString();
 
-  if (
-    goal.status === "active" &&
-    goal.tokenBudget !== null &&
-    goal.tokensUsed >= goal.tokenBudget
-  ) {
+  if (goal.status === "active" && goal.tokenBudget !== null && goal.tokensUsed >= goal.tokenBudget) {
     goal.status = "budgetLimited";
     goal.lastStartedAt = null;
   }

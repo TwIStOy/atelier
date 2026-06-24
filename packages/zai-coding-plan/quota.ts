@@ -1,23 +1,23 @@
-import { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import {
-  ZAI_CODING_PLAN_EVENTS,
-  formatProgressBar,
-  formatNumber,
-  terminalWidth,
-  fitColWidths,
-  makeTable,
-} from "@htwang-contrib/common";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type {
+  CodingPlanLimitKind,
+  CodingPlanLimitPeriod,
+  CodingPlanModelTotals,
+  CodingPlanRawUsage,
+  CodingPlanToolTotals,
   CodingPlanUsage,
   CodingPlanUsageLimit,
   CodingPlanUsageWindow,
-  CodingPlanRawUsage,
   CodingPlanUsageWindowRaw,
-  CodingPlanLimitKind,
-  CodingPlanLimitPeriod,
   CodingPlanWindowDetail,
-  CodingPlanModelTotals,
-  CodingPlanToolTotals,
+} from "@htwang-contrib/common";
+import {
+  fitColWidths,
+  formatNumber,
+  formatProgressBar,
+  makeTable,
+  terminalWidth,
+  ZAI_CODING_PLAN_EVENTS,
 } from "@htwang-contrib/common";
 
 const MONITOR_ENDPOINTS = {
@@ -45,9 +45,7 @@ const WINDOW_LABELS: Record<CodingPlanUsageWindow, string> = {
   monthly: "Monthly limit",
 };
 
-function classifyWindow(
-  raw: Record<string, unknown>,
-): CodingPlanUsageWindow | null {
+function classifyWindow(raw: Record<string, unknown>): CodingPlanUsageWindow | null {
   if (raw.type === "TIME_LIMIT") return "monthly";
   if (raw.type === "TOKENS_LIMIT") {
     const key = `${raw.unit}_${raw.number}`;
@@ -56,9 +54,7 @@ function classifyWindow(
   return null;
 }
 
-function parseUsageLimits(
-  raw: Record<string, unknown>,
-): CodingPlanUsageLimit[] {
+function parseUsageLimits(raw: Record<string, unknown>): CodingPlanUsageLimit[] {
   if (!Array.isArray(raw.limits)) return [];
   const limits: CodingPlanUsageLimit[] = [];
   for (const item of raw.limits as Array<Record<string, unknown>>) {
@@ -67,16 +63,13 @@ function parseUsageLimits(
     limits.push({
       window,
       percentage: typeof item.percentage === "number" ? item.percentage : 0,
-      nextResetTime:
-        typeof item.nextResetTime === "number" ? item.nextResetTime : undefined,
+      nextResetTime: typeof item.nextResetTime === "number" ? item.nextResetTime : undefined,
     });
   }
   return limits.sort((a, b) => WINDOW_ORDER[a.window] - WINDOW_ORDER[b.window]);
 }
 
-function buildUsage(
-  quota: Record<string, unknown> | null,
-): CodingPlanUsage | null {
+function buildUsage(quota: Record<string, unknown> | null): CodingPlanUsage | null {
   if (!quota) return null;
   const limits = parseUsageLimits(quota);
   if (limits.length === 0 && typeof quota.level !== "string") return null;
@@ -103,9 +96,7 @@ const RAW_LIMIT_DESCRIPTOR: Record<string, RawLimitDescriptor> = {
   TOKENS_LIMIT_6_1: { kind: "tokens", period: "weekly" },
 };
 
-export function describeRawLimit(
-  raw: Record<string, unknown>,
-): RawLimitDescriptor | null {
+export function describeRawLimit(raw: Record<string, unknown>): RawLimitDescriptor | null {
   const type = raw.type;
   if (typeof type !== "string") return null;
   const unit = raw.unit;
@@ -118,9 +109,7 @@ export function describeRawLimit(
   return null;
 }
 
-function parseRawWindowDetails(
-  raw: Record<string, unknown>,
-): CodingPlanWindowDetail[] | undefined {
+function parseRawWindowDetails(raw: Record<string, unknown>): CodingPlanWindowDetail[] | undefined {
   if (!Array.isArray(raw.usageDetails)) return undefined;
   const details: CodingPlanWindowDetail[] = [];
   for (const item of raw.usageDetails as Array<Record<string, unknown>>) {
@@ -132,18 +121,14 @@ function parseRawWindowDetails(
   return details.length > 0 ? details : undefined;
 }
 
-function parseRawWindows(
-  raw: Record<string, unknown> | null,
-): CodingPlanUsageWindowRaw[] {
+function parseRawWindows(raw: Record<string, unknown> | null): CodingPlanUsageWindowRaw[] {
   if (!raw || !Array.isArray(raw.limits)) return [];
   const windows: CodingPlanUsageWindowRaw[] = [];
   for (const item of raw.limits as Array<Record<string, unknown>>) {
     const descriptor = describeRawLimit(item);
     if (!descriptor) continue;
-    const percentage =
-      typeof item.percentage === "number" ? item.percentage : 0;
-    const nextResetTime =
-      typeof item.nextResetTime === "number" ? item.nextResetTime : undefined;
+    const percentage = typeof item.percentage === "number" ? item.percentage : 0;
+    const nextResetTime = typeof item.nextResetTime === "number" ? item.nextResetTime : undefined;
     const window: CodingPlanUsageWindowRaw = {
       kind: descriptor.kind,
       period: descriptor.period,
@@ -160,25 +145,16 @@ function parseRawWindows(
   return windows;
 }
 
-function parseModelTotals(
-  raw: Record<string, unknown> | null,
-): CodingPlanModelTotals | undefined {
+function parseModelTotals(raw: Record<string, unknown> | null): CodingPlanModelTotals | undefined {
   const totals = raw?.totalUsage;
   if (!totals || typeof totals !== "object") return undefined;
   const u = totals as Record<string, unknown>;
   const out: CodingPlanModelTotals = {};
-  if (typeof u.totalTokensUsage === "number")
-    out.totalTokensUsage = u.totalTokensUsage;
-  if (typeof u.totalModelCallCount === "number")
-    out.totalModelCallCount = u.totalModelCallCount;
+  if (typeof u.totalTokensUsage === "number") out.totalTokensUsage = u.totalTokensUsage;
+  if (typeof u.totalModelCallCount === "number") out.totalModelCallCount = u.totalModelCallCount;
   if (Array.isArray(u.modelSummaryList)) {
-    out.modelSummaryList = (
-      u.modelSummaryList as Array<Record<string, unknown>>
-    )
-      .filter(
-        (m) =>
-          typeof m.modelName === "string" && typeof m.totalTokens === "number",
-      )
+    out.modelSummaryList = (u.modelSummaryList as Array<Record<string, unknown>>)
+      .filter((m) => typeof m.modelName === "string" && typeof m.totalTokens === "number")
       .map((m) => ({
         modelName: m.modelName as string,
         totalTokens: m.totalTokens as number,
@@ -194,26 +170,17 @@ function parseModelTotals(
   return out;
 }
 
-function parseToolTotals(
-  raw: Record<string, unknown> | null,
-): CodingPlanToolTotals | undefined {
+function parseToolTotals(raw: Record<string, unknown> | null): CodingPlanToolTotals | undefined {
   const totals = raw?.totalUsage;
   if (!totals || typeof totals !== "object") return undefined;
   const u = totals as Record<string, unknown>;
   const out: CodingPlanToolTotals = {};
-  if (typeof u.totalNetworkSearchCount === "number")
-    out.totalNetworkSearchCount = u.totalNetworkSearchCount;
-  if (typeof u.totalWebReadMcpCount === "number")
-    out.totalWebReadMcpCount = u.totalWebReadMcpCount;
-  if (typeof u.totalZreadMcpCount === "number")
-    out.totalZreadMcpCount = u.totalZreadMcpCount;
+  if (typeof u.totalNetworkSearchCount === "number") out.totalNetworkSearchCount = u.totalNetworkSearchCount;
+  if (typeof u.totalWebReadMcpCount === "number") out.totalWebReadMcpCount = u.totalWebReadMcpCount;
+  if (typeof u.totalZreadMcpCount === "number") out.totalZreadMcpCount = u.totalZreadMcpCount;
   if (Array.isArray(u.toolSummaryList)) {
     out.toolSummaryList = (u.toolSummaryList as Array<Record<string, unknown>>)
-      .filter(
-        (t) =>
-          typeof t.toolCode === "string" &&
-          typeof t.totalUsageCount === "number",
-      )
+      .filter((t) => typeof t.toolCode === "string" && typeof t.totalUsageCount === "number")
       .map((t) => ({
         toolCode: t.toolCode as string,
         toolName: typeof t.toolName === "string" ? t.toolName : undefined,
@@ -239,8 +206,7 @@ export function buildRawUsage(
   const windows = parseRawWindows(quota);
   const modelTotals = parseModelTotals(model);
   const toolTotals = parseToolTotals(tool);
-  const level =
-    quota && typeof quota.level === "string" ? quota.level : undefined;
+  const level = quota && typeof quota.level === "string" ? quota.level : undefined;
   if (windows.length === 0 && !modelTotals && !toolTotals && !level) {
     return null;
   }
@@ -255,29 +221,12 @@ export function buildRawUsage(
 function getTimeWindowQueryParams(): string {
   const now = new Date();
   const fmt = (d: Date) => d.toISOString().replace("T", " ").slice(0, 19);
-  const start = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate() - 1,
-    now.getHours(),
-  );
-  const end = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate(),
-    now.getHours(),
-    59,
-    59,
-    999,
-  );
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, now.getHours());
+  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), 59, 59, 999);
   return `startTime=${encodeURIComponent(fmt(start))}&endTime=${encodeURIComponent(fmt(end))}`;
 }
 
-async function fetchEndpoint(
-  url: string,
-  apiKey: string,
-  queryParams?: string,
-): Promise<Record<string, unknown>> {
+async function fetchEndpoint(url: string, apiKey: string, queryParams?: string): Promise<Record<string, unknown>> {
   const fullUrl = queryParams ? `${url}?${queryParams}` : url;
   const resp = await fetch(fullUrl, {
     headers: {
@@ -310,9 +259,7 @@ function formatUsageOutput(
 ): string {
   const parts: string[] = [];
 
-  const level = usage?.level
-    ? ` (${usage.level.charAt(0).toUpperCase()}${usage.level.slice(1)})`
-    : "";
+  const level = usage?.level ? ` (${usage.level.charAt(0).toUpperCase()}${usage.level.slice(1)})` : "";
   parts.push(`Z.AI Coding Plan Usage${level}`, "");
 
   if (usage && usage.limits.length > 0) {
@@ -325,8 +272,7 @@ function formatUsageOutput(
       const bar = formatProgressBar(pct, barWidth);
       const reset = formatResetClock(limit.nextResetTime);
       const resetSuffix = reset ? ` (resets ${reset})` : "";
-      const line =
-        `${label}:`.padEnd(30) + `${bar} ${remaining}% left${resetSuffix}`;
+      const line = `${label}:`.padEnd(30) + `${bar} ${remaining}% left${resetSuffix}`;
       parts.push(line.slice(0, tw));
     }
     parts.push("");
@@ -344,10 +290,7 @@ function formatUsageOutput(
     }
     if (Array.isArray(u.modelSummaryList)) {
       for (const m of u.modelSummaryList as Array<Record<string, unknown>>) {
-        if (
-          typeof m.modelName === "string" &&
-          typeof m.totalTokens === "number"
-        ) {
+        if (typeof m.modelName === "string" && typeof m.totalTokens === "number") {
           t.push([`${m.modelName} Tokens`, formatNumber(m.totalTokens)]);
         }
       }
@@ -374,45 +317,28 @@ function formatUsageOutput(
   return parts.join("\n");
 }
 
-export async function fetchUsage(
-  apiKey: string,
-): Promise<CodingPlanUsage | null> {
-  const quota = await fetchEndpoint(MONITOR_ENDPOINTS.quotaLimit, apiKey).catch(
-    () => null,
-  );
+export async function fetchUsage(apiKey: string): Promise<CodingPlanUsage | null> {
+  const quota = await fetchEndpoint(MONITOR_ENDPOINTS.quotaLimit, apiKey).catch(() => null);
   return buildUsage(quota);
 }
 
-export async function fetchRawUsage(
-  apiKey: string,
-): Promise<CodingPlanRawUsage | null> {
+export async function fetchRawUsage(apiKey: string): Promise<CodingPlanRawUsage | null> {
   const queryParams = getTimeWindowQueryParams();
   const [quota, model, tool] = await Promise.all([
     fetchEndpoint(MONITOR_ENDPOINTS.quotaLimit, apiKey).catch(() => null),
-    fetchEndpoint(MONITOR_ENDPOINTS.modelUsage, apiKey, queryParams).catch(
-      () => null,
-    ),
-    fetchEndpoint(MONITOR_ENDPOINTS.toolUsage, apiKey, queryParams).catch(
-      () => null,
-    ),
+    fetchEndpoint(MONITOR_ENDPOINTS.modelUsage, apiKey, queryParams).catch(() => null),
+    fetchEndpoint(MONITOR_ENDPOINTS.toolUsage, apiKey, queryParams).catch(() => null),
   ]);
   return buildRawUsage(quota, model, tool);
 }
 
-export async function queryUsage(
-  pi: ExtensionAPI,
-  apiKey: string,
-): Promise<string> {
+export async function queryUsage(pi: ExtensionAPI, apiKey: string): Promise<string> {
   const queryParams = getTimeWindowQueryParams();
 
   const [quota, model, tool] = await Promise.all([
     fetchEndpoint(MONITOR_ENDPOINTS.quotaLimit, apiKey).catch(() => null),
-    fetchEndpoint(MONITOR_ENDPOINTS.modelUsage, apiKey, queryParams).catch(
-      () => null,
-    ),
-    fetchEndpoint(MONITOR_ENDPOINTS.toolUsage, apiKey, queryParams).catch(
-      () => null,
-    ),
+    fetchEndpoint(MONITOR_ENDPOINTS.modelUsage, apiKey, queryParams).catch(() => null),
+    fetchEndpoint(MONITOR_ENDPOINTS.toolUsage, apiKey, queryParams).catch(() => null),
   ]);
 
   const usage = buildUsage(quota);

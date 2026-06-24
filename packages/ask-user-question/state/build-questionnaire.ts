@@ -16,10 +16,7 @@ import type { PreviewPaneProps } from "../view/components/preview/preview-pane.t
 import { PreviewPane } from "../view/components/preview/preview-pane.ts";
 import { SubmitPicker } from "../view/components/submit-picker.ts";
 import { TabBar } from "../view/components/tab-bar.ts";
-import type {
-  WrappingSelectItem,
-  WrappingSelectTheme,
-} from "../view/components/wrapping-select.ts";
+import type { WrappingSelectItem, WrappingSelectTheme } from "../view/components/wrapping-select.ts";
 import { DialogView } from "../view/dialog-builder.ts";
 import { QuestionnairePropsAdapter } from "../view/props-adapter.ts";
 import type { StatefulView } from "../view/stateful-view.ts";
@@ -61,18 +58,14 @@ interface HeightComputers {
   current: (width: number) => number;
 }
 
-function previewBodyHeights(
-  pane: PreviewPane,
-): (width: number) => TabBodyHeights {
+function previewBodyHeights(pane: PreviewPane): (width: number) => TabBodyHeights {
   return (width) => ({
     current: pane.naturalHeight(width),
     max: pane.maxNaturalHeight(width),
   });
 }
 
-function multiSelectBodyHeights(
-  view: MultiSelectView,
-): (width: number) => TabBodyHeights {
+function multiSelectBodyHeights(view: MultiSelectView): (width: number) => TabBodyHeights {
   return (width) => {
     const h = view.naturalHeight(width);
     return { current: h, max: h };
@@ -89,9 +82,7 @@ const isActiveTab: PerTabSelector<boolean> = (s, ctx) =>
  * `adapter.apply(initialState)` (called by the session at construction-end);
  * no selector is invoked here.
  */
-export function buildQuestionnaire(
-  config: QuestionnaireBuildConfig,
-): QuestionnaireBuilt {
+export function buildQuestionnaire(config: QuestionnaireBuildConfig): QuestionnaireBuilt {
   return new QuestionnaireBuilder(config).build();
 }
 
@@ -140,11 +131,7 @@ class QuestionnaireBuilder {
     const tabBar = this.buildTabBar();
     const heights = this.buildHeightComputers(tabs);
     const dialog = this.buildDialog(tabs, submitPicker, tabBar, heights);
-    const globalBindings = this.buildGlobalBindings(
-      dialog,
-      submitPicker,
-      tabBar,
-    );
+    const globalBindings = this.buildGlobalBindings(dialog, submitPicker, tabBar);
     const perTabBindings = this.buildPerTabBindings();
     const adapter = this.buildAdapter(tabs, globalBindings, perTabBindings);
     return this.handle(adapter, dialog);
@@ -179,9 +166,7 @@ class QuestionnaireBuilder {
       optionListView: optionList,
       previewBlock,
     });
-    const multiSelect = question.multiSelect
-      ? new MultiSelectView(this.theme, question)
-      : undefined;
+    const multiSelect = question.multiSelect ? new MultiSelectView(this.theme, question) : undefined;
     const bodyHeights = this.buildBodyHeights(question, preview, multiSelect);
     return { optionList, preview, multiSelect, bodyHeights };
   }
@@ -191,9 +176,7 @@ class QuestionnaireBuilder {
     preview: PreviewPane,
     multiSelect: MultiSelectView | undefined,
   ): (width: number) => TabBodyHeights {
-    return question.multiSelect
-      ? multiSelectBodyHeights(multiSelect!)
-      : previewBodyHeights(preview);
+    return question.multiSelect ? multiSelectBodyHeights(multiSelect!) : previewBodyHeights(preview);
   }
 
   /**
@@ -209,12 +192,7 @@ class QuestionnaireBuilder {
       multiSelect: q.multiSelect,
     }));
     const globalLeftWidth = (paneWidth: number): number =>
-      crossTabLeftWidthWithDonation(
-        tabsDescriptor,
-        itemsByTab,
-        questions,
-        paneWidth,
-      );
+      crossTabLeftWidthWithDonation(tabsDescriptor, itemsByTab, questions, paneWidth);
     for (const tab of tabs) {
       tab.preview.setGlobalLeftWidth(globalLeftWidth);
     }
@@ -228,9 +206,7 @@ class QuestionnaireBuilder {
     return this.isMulti ? new TabBar(this.theme) : undefined;
   }
 
-  private buildHeightComputers(
-    tabs: ReadonlyArray<TabComponents>,
-  ): HeightComputers {
+  private buildHeightComputers(tabs: ReadonlyArray<TabComponents>): HeightComputers {
     const global = (width: number): number => {
       let max = 0;
       for (const tab of tabs) {
@@ -246,13 +222,8 @@ class QuestionnaireBuilder {
     return { global, current };
   }
 
-  private pickInitialActivePreview(
-    tabs: ReadonlyArray<TabComponents>,
-  ): StatefulView<PreviewPaneProps> {
-    const idx = selectActivePreviewPaneIndex(
-      this.initialState.currentTab,
-      this.questions.length,
-    );
+  private pickInitialActivePreview(tabs: ReadonlyArray<TabComponents>): StatefulView<PreviewPaneProps> {
+    const idx = selectActivePreviewPaneIndex(this.initialState.currentTab, this.questions.length);
     return tabs[idx]?.preview ?? tabs[0]!.preview;
   }
 
@@ -299,9 +270,7 @@ class QuestionnaireBuilder {
             }),
           ]
         : []),
-      ...(tabBar
-        ? [globalBinding({ component: tabBar, select: selectTabBarProps })]
-        : []),
+      ...(tabBar ? [globalBinding({ component: tabBar, select: selectTabBarProps })] : []),
     ];
   }
 
@@ -341,10 +310,7 @@ class QuestionnaireBuilder {
     });
   }
 
-  private handle(
-    adapter: QuestionnairePropsAdapter,
-    dialog: DialogView,
-  ): QuestionnaireBuilt {
+  private handle(adapter: QuestionnairePropsAdapter, dialog: DialogView): QuestionnaireBuilt {
     return {
       adapter,
       notesInput: this.notesInput,

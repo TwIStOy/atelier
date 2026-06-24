@@ -1,9 +1,5 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import {
-  truncateToWidth,
-  visibleWidth,
-  wrapTextWithAnsi,
-} from "@earendil-works/pi-tui";
+import { truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 import { glyphs } from "./glyphs.ts";
 
 export function divider(width: number, theme: Theme): string {

@@ -1,9 +1,4 @@
-import type {
-  Task,
-  TaskAction,
-  TaskMutationParams,
-  TaskStatus,
-} from "../tool/types.ts";
+import type { Task, TaskAction, TaskMutationParams, TaskStatus } from "../tool/types.ts";
 import { isTransitionValid } from "./invariants.ts";
 import type { TaskState } from "./state.ts";
 import { detectCycle } from "./task-graph.ts";
@@ -26,11 +21,7 @@ function errorResult(state: TaskState, message: string): ApplyResult {
   return { state, op: { kind: "error", message } };
 }
 
-export function applyTaskMutation(
-  state: TaskState,
-  action: TaskAction,
-  params: TaskMutationParams,
-): ApplyResult {
+export function applyTaskMutation(state: TaskState, action: TaskAction, params: TaskMutationParams): ApplyResult {
   switch (action) {
     case "create": {
       if (!params.subject?.trim()) {
@@ -39,10 +30,8 @@ export function applyTaskMutation(
       if (params.blockedBy?.length) {
         for (const dep of params.blockedBy) {
           const depTask = state.tasks.find((t) => t.id === dep);
-          if (!depTask)
-            return errorResult(state, `blockedBy: #${dep} not found`);
-          if (depTask.status === "deleted")
-            return errorResult(state, `blockedBy: #${dep} is deleted`);
+          if (!depTask) return errorResult(state, `blockedBy: #${dep} not found`);
+          if (depTask.status === "deleted") return errorResult(state, `blockedBy: #${dep} is deleted`);
         }
       }
       const newTask: Task = {
@@ -64,8 +53,7 @@ export function applyTaskMutation(
     }
 
     case "update": {
-      if (params.id === undefined)
-        return errorResult(state, "id required for update");
+      if (params.id === undefined) return errorResult(state, "id required for update");
       const idx = state.tasks.findIndex((t) => t.id === params.id);
       if (idx === -1) return errorResult(state, `#${params.id} not found`);
       const current = state.tasks[idx];
@@ -79,16 +67,12 @@ export function applyTaskMutation(
         params.metadata !== undefined ||
         (params.addBlockedBy && params.addBlockedBy.length > 0) ||
         (params.removeBlockedBy && params.removeBlockedBy.length > 0);
-      if (!hasMutation)
-        return errorResult(state, "update requires at least one mutable field");
+      if (!hasMutation) return errorResult(state, "update requires at least one mutable field");
 
       let newStatus = current.status;
       if (params.status !== undefined) {
         if (!isTransitionValid(current.status, params.status)) {
-          return errorResult(
-            state,
-            `illegal transition ${current.status} → ${params.status}`,
-          );
+          return errorResult(state, `illegal transition ${current.status} → ${params.status}`);
         }
         newStatus = params.status;
       }
@@ -100,20 +84,14 @@ export function applyTaskMutation(
       }
       if (params.addBlockedBy?.length) {
         for (const dep of params.addBlockedBy) {
-          if (dep === current.id)
-            return errorResult(state, `cannot block #${current.id} on itself`);
+          if (dep === current.id) return errorResult(state, `cannot block #${current.id} on itself`);
           const depTask = state.tasks.find((t) => t.id === dep);
-          if (!depTask)
-            return errorResult(state, `addBlockedBy: #${dep} not found`);
-          if (depTask.status === "deleted")
-            return errorResult(state, `addBlockedBy: #${dep} is deleted`);
+          if (!depTask) return errorResult(state, `addBlockedBy: #${dep} not found`);
+          if (depTask.status === "deleted") return errorResult(state, `addBlockedBy: #${dep} is deleted`);
           if (!newBlockedBy.includes(dep)) newBlockedBy.push(dep);
         }
         if (detectCycle(state.tasks, current.id, newBlockedBy)) {
-          return errorResult(
-            state,
-            "addBlockedBy would create a cycle in the blockedBy graph",
-          );
+          return errorResult(state, "addBlockedBy would create a cycle in the blockedBy graph");
         }
       }
 
@@ -129,10 +107,8 @@ export function applyTaskMutation(
 
       const updated: Task = { ...current, status: newStatus };
       if (params.subject !== undefined) updated.subject = params.subject;
-      if (params.description !== undefined)
-        updated.description = params.description;
-      if (params.activeForm !== undefined)
-        updated.activeForm = params.activeForm;
+      if (params.description !== undefined) updated.description = params.description;
+      if (params.activeForm !== undefined) updated.activeForm = params.activeForm;
       if (params.owner !== undefined) updated.owner = params.owner;
       if (newBlockedBy.length) updated.blockedBy = newBlockedBy;
       else delete updated.blockedBy;
@@ -158,29 +134,24 @@ export function applyTaskMutation(
         op: {
           kind: "list",
           includeDeleted: params.includeDeleted === true,
-          ...(params.status !== undefined
-            ? { statusFilter: params.status }
-            : {}),
+          ...(params.status !== undefined ? { statusFilter: params.status } : {}),
         },
       };
     }
 
     case "get": {
-      if (params.id === undefined)
-        return errorResult(state, "id required for get");
+      if (params.id === undefined) return errorResult(state, "id required for get");
       const task = state.tasks.find((t) => t.id === params.id);
       if (!task) return errorResult(state, `#${params.id} not found`);
       return { state, op: { kind: "get", task } };
     }
 
     case "delete": {
-      if (params.id === undefined)
-        return errorResult(state, "id required for delete");
+      if (params.id === undefined) return errorResult(state, "id required for delete");
       const idx = state.tasks.findIndex((t) => t.id === params.id);
       if (idx === -1) return errorResult(state, `#${params.id} not found`);
       const current = state.tasks[idx];
-      if (current.status === "deleted")
-        return errorResult(state, `#${current.id} is already deleted`);
+      if (current.status === "deleted") return errorResult(state, `#${current.id} is already deleted`);
       const updated: Task = { ...current, status: "deleted" };
       const newTasks = [...state.tasks];
       newTasks[idx] = updated;

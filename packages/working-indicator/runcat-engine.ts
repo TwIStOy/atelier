@@ -61,7 +61,7 @@ export const DEFAULT_TRANSITION_MS = 1000;
  * each interval change with no perceptible snap.
  */
 function easeInOutCubic(t: number): number {
-  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  return t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
 }
 
 function lerp(a: number, b: number, t: number): number {
@@ -205,10 +205,7 @@ export class RuncatIndicatorEngine {
   /** Peek + finalize the transition once wall-clock time has elapsed. */
   private commitEffective(now: number): number {
     const value = this.peekEffective(now);
-    if (
-      this.isTransitioning() &&
-      now - this.transitionStartMs! >= this.transitionMs
-    ) {
+    if (this.isTransitioning() && now - this.transitionStartMs! >= this.transitionMs) {
       this.currentIntervalMs = this.transitionToIntervalMs!;
       this.transitionStartMs = undefined;
       this.transitionFromIntervalMs = undefined;
@@ -224,9 +221,7 @@ export class RuncatIndicatorEngine {
   private armNext(delayMs: number): void {
     if (!this.running) return;
     this.cancelPending();
-    this.pending = this.clock.schedule(Math.max(1, delayMs), () =>
-      this.onWake(),
-    );
+    this.pending = this.clock.schedule(Math.max(1, delayMs), () => this.onWake());
   }
 
   private cancelPending(): void {
@@ -251,10 +246,7 @@ export class RuncatIndicatorEngine {
   }
 }
 
-function isCyclicRotation(
-  current: readonly string[],
-  next: readonly string[],
-): boolean {
+function isCyclicRotation(current: readonly string[], next: readonly string[]): boolean {
   if (current.length === 0 || next.length === 0) return false;
   if (current.length !== next.length) return false;
   if (current === next) return true;
@@ -264,7 +256,5 @@ function isCyclicRotation(
     if (next[i] === first) starts.push(i);
   }
   if (starts.length === 0) return false;
-  return starts.some((start) =>
-    current.every((f, j) => f === next[(start + j) % next.length]),
-  );
+  return starts.some((start) => current.every((f, j) => f === next[(start + j) % next.length]));
 }

@@ -10,19 +10,13 @@ export async function generateSystemPrompt(): Promise<string> {
   const parts: string[] = [];
 
   if (existsSync(memoryPath)) {
-    parts.push(
-      `<memory_instructions>\n${readFileSync(memoryPath, "utf8").trim()}\n</memory_instructions>`,
-    );
+    parts.push(`<memory_instructions>\n${readFileSync(memoryPath, "utf8").trim()}\n</memory_instructions>`);
   } else {
-    parts.push(
-      `<memory_instructions>\nError: Memory instructions not found at ${memoryPath}\n</memory_instructions>`,
-    );
+    parts.push(`<memory_instructions>\nError: Memory instructions not found at ${memoryPath}\n</memory_instructions>`);
   }
 
   if (existsSync(journalPath)) {
-    parts.push(
-      `<journal_instructions>\n${readFileSync(journalPath, "utf8").trim()}\n</journal_instructions>`,
-    );
+    parts.push(`<journal_instructions>\n${readFileSync(journalPath, "utf8").trim()}\n</journal_instructions>`);
   } else {
     parts.push(
       `<journal_instructions>\nError: Journal instructions not found at ${journalPath}\n</journal_instructions>`,

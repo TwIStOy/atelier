@@ -1,16 +1,12 @@
 import type { LocalAudioCapture } from "./audio/capture.ts";
 import type { VadPipeline } from "./audio/vad-pipeline.ts";
 import type { SttProvider } from "./providers/index.ts";
-import type { VoiceInputConfig } from "./types.ts";
 import { safeError } from "./secrets.ts";
+import type { VoiceInputConfig } from "./types.ts";
 
 const WIDGET_KEY = "voice-input";
-const RECORDING_WIDGET = [
-  "🎙 recording — /voice-toggle to stop, /voice-cancel to cancel",
-];
-const LISTENING_WIDGET = [
-  "🎙 listening (VAD) — /voice-toggle to stop, /voice-cancel to cancel",
-];
+const RECORDING_WIDGET = ["🎙 recording — /voice-toggle to stop, /voice-cancel to cancel"];
+const LISTENING_WIDGET = ["🎙 listening (VAD) — /voice-toggle to stop, /voice-cancel to cancel"];
 const TRANSCRIBING_WIDGET = ["… transcribing"];
 
 export interface FlowUi {
@@ -37,10 +33,7 @@ export interface InsertResult {
   text?: string;
 }
 
-export function mergeTranscript(
-  existing: string | undefined,
-  transcript: string,
-): string {
+export function mergeTranscript(existing: string | undefined, transcript: string): string {
   const text = String(transcript ?? "").trim();
   if (!text) return existing ?? "";
   const current = existing ?? "";
@@ -49,17 +42,10 @@ export function mergeTranscript(
   return `${current} ${text}`;
 }
 
-export function withTimeout<T>(
-  promise: Promise<T>,
-  timeoutMs: number,
-  label: string,
-): Promise<T> {
+export function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(
-      () => reject(new Error(`${label} timed out after ${timeoutMs}ms`)),
-      timeoutMs,
-    );
+    timer = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs);
   });
   return Promise.race([promise, timeout]).finally(() => {
     if (timer) clearTimeout(timer);
@@ -81,9 +67,7 @@ export class VoiceInputFlow {
     this.config = opts.config;
     this.pipeline = opts.pipeline;
     if (opts.pipeline) {
-      this.appender = new OrderedAppender((text) =>
-        this.appendTranscript(text),
-      );
+      this.appender = new OrderedAppender((text) => this.appendTranscript(text));
     }
   }
 
@@ -91,10 +75,7 @@ export class VoiceInputFlow {
     if (this.pipeline) {
       this.pipeline.setCallbacks({
         onTranscript: (text, index) => this.appender!.submit(index, text),
-        onState: (state) =>
-          this.setWidget(
-            state === "transcribing" ? TRANSCRIBING_WIDGET : LISTENING_WIDGET,
-          ),
+        onState: (state) => this.setWidget(state === "transcribing" ? TRANSCRIBING_WIDGET : LISTENING_WIDGET),
         onError: (err) => this.fail(err),
       });
       this.pipeline.start();

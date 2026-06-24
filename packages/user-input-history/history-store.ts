@@ -1,10 +1,4 @@
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  renameSync,
-  writeFileSync,
-} from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import lockfile from "proper-lockfile";
@@ -120,10 +114,7 @@ function readHistoryFromDisk(): HistoryEntry[] {
   }
 }
 
-function mergeDiskWithMemory(
-  disk: HistoryEntry[],
-  memory: string[],
-): HistoryEntry[] {
+function mergeDiskWithMemory(disk: HistoryEntry[], memory: string[]): HistoryEntry[] {
   const byText = new Map<string, number>();
   for (const e of disk) {
     const key = normalizeKey(e.text);
@@ -136,9 +127,7 @@ function mergeDiskWithMemory(
     if (!key) continue;
     byText.set(key, Math.max(byText.get(key) ?? 0, now - i));
   }
-  return normalizeEntries(
-    Array.from(byText.entries()).map(([text, at]) => ({ text, at })),
-  );
+  return normalizeEntries(Array.from(byText.entries()).map(([text, at]) => ({ text, at })));
 }
 
 function writeHistoryAtomic(path: string, entries: HistoryEntry[]): void {

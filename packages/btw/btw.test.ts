@@ -1,18 +1,11 @@
-import { describe, expect, test, vi } from "vitest";
 import { clearGlobalState } from "@htwang-contrib/common";
-import { registerBtw, clearSessionHistory } from "./btw.ts";
+import { describe, expect, test, vi } from "vitest";
+import { clearSessionHistory, registerBtw } from "./btw.ts";
 import type { BtwTurn } from "./btw-ui.ts";
 
 const BTW_STATE_KEY = "htwang-contrib-btw";
 
-function mockCtx(
-  opts: {
-    sessionFile?: string | null;
-    sessionId?: string;
-    hasUI?: boolean;
-    model?: unknown;
-  } = {},
-) {
+function mockCtx(opts: { sessionFile?: string | null; sessionId?: string; hasUI?: boolean; model?: unknown } = {}) {
   return {
     hasUI: opts.hasUI ?? true,
     sessionManager: {
@@ -33,26 +26,19 @@ interface MockPi {
   onHandlers: Record<string, Function>;
   commands: Record<string, { handler: Function; description?: string }>;
   on: (event: string, handler: Function) => void;
-  registerCommand: (
-    name: string,
-    options: { handler: Function; description?: string },
-  ) => void;
+  registerCommand: (name: string, options: { handler: Function; description?: string }) => void;
 }
 
 function mockPi(): MockPi {
   const onHandlers: Record<string, Function> = {};
-  const commands: Record<string, { handler: Function; description?: string }> =
-    {};
+  const commands: Record<string, { handler: Function; description?: string }> = {};
   return {
     onHandlers,
     commands,
     on(event: string, handler: Function) {
       onHandlers[event] = handler;
     },
-    registerCommand(
-      name: string,
-      options: { handler: Function; description?: string },
-    ) {
+    registerCommand(name: string, options: { handler: Function; description?: string }) {
       commands[name] = options;
     },
   } as unknown as MockPi;
@@ -76,9 +62,7 @@ describe("registerBtw", () => {
   test("registers the /btw command", () => {
     clearGlobalState(BTW_STATE_KEY);
     const pi = mockPi();
-    registerBtw(
-      pi as unknown as import("@earendil-works/pi-coding-agent").ExtensionAPI,
-    );
+    registerBtw(pi as unknown as import("@earendil-works/pi-coding-agent").ExtensionAPI);
     expect(pi.commands["btw"]).toBeDefined();
     expect(pi.commands["btw"].handler).toBeInstanceOf(Function);
   });
@@ -86,18 +70,14 @@ describe("registerBtw", () => {
   test("registers message_end hook", () => {
     clearGlobalState(BTW_STATE_KEY);
     const pi = mockPi();
-    registerBtw(
-      pi as unknown as import("@earendil-works/pi-coding-agent").ExtensionAPI,
-    );
+    registerBtw(pi as unknown as import("@earendil-works/pi-coding-agent").ExtensionAPI);
     expect(pi.onHandlers["message_end"]).toBeDefined();
   });
 
   test("registers session_compact and session_tree hooks", () => {
     clearGlobalState(BTW_STATE_KEY);
     const pi = mockPi();
-    registerBtw(
-      pi as unknown as import("@earendil-works/pi-coding-agent").ExtensionAPI,
-    );
+    registerBtw(pi as unknown as import("@earendil-works/pi-coding-agent").ExtensionAPI);
     expect(pi.onHandlers["session_compact"]).toBeDefined();
     expect(pi.onHandlers["session_tree"]).toBeDefined();
   });
@@ -107,43 +87,28 @@ describe("command handler guards", () => {
   test("notifies when hasUI is false", async () => {
     clearGlobalState(BTW_STATE_KEY);
     const pi = mockPi();
-    registerBtw(
-      pi as unknown as import("@earendil-works/pi-coding-agent").ExtensionAPI,
-    );
+    registerBtw(pi as unknown as import("@earendil-works/pi-coding-agent").ExtensionAPI);
     const ctx = mockCtx({ hasUI: false });
     await pi.commands["btw"].handler("what?", ctx);
-    expect(ctx.ui.notify).toHaveBeenCalledWith(
-      expect.stringContaining("interactive terminal"),
-      "warning",
-    );
+    expect(ctx.ui.notify).toHaveBeenCalledWith(expect.stringContaining("interactive terminal"), "warning");
   });
 
   test("notifies when args are empty", async () => {
     clearGlobalState(BTW_STATE_KEY);
     const pi = mockPi();
-    registerBtw(
-      pi as unknown as import("@earendil-works/pi-coding-agent").ExtensionAPI,
-    );
+    registerBtw(pi as unknown as import("@earendil-works/pi-coding-agent").ExtensionAPI);
     const ctx = mockCtx();
     await pi.commands["btw"].handler("  ", ctx);
-    expect(ctx.ui.notify).toHaveBeenCalledWith(
-      expect.stringContaining("requires a question"),
-      "warning",
-    );
+    expect(ctx.ui.notify).toHaveBeenCalledWith(expect.stringContaining("requires a question"), "warning");
   });
 
   test("notifies when no model is set", async () => {
     clearGlobalState(BTW_STATE_KEY);
     const pi = mockPi();
-    registerBtw(
-      pi as unknown as import("@earendil-works/pi-coding-agent").ExtensionAPI,
-    );
+    registerBtw(pi as unknown as import("@earendil-works/pi-coding-agent").ExtensionAPI);
     const ctx = mockCtx({ model: undefined });
     await pi.commands["btw"].handler("what?", ctx);
-    expect(ctx.ui.notify).toHaveBeenCalledWith(
-      expect.stringContaining("active model"),
-      "warning",
-    );
+    expect(ctx.ui.notify).toHaveBeenCalledWith(expect.stringContaining("active model"), "warning");
   });
 });
 

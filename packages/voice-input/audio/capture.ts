@@ -1,30 +1,20 @@
 import { spawn } from "node:child_process";
-import { mkdtempSync, rmSync, type PathLike } from "node:fs";
+import { mkdtempSync, type PathLike, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { buildRecorderArgs, type ResolvedRecorder } from "./recorder.ts";
 
 export interface RecorderChildProcess {
   on(event: "error", listener: (err: Error) => void): this;
-  on(
-    event: "exit",
-    listener: (code: number | null, signal: NodeJS.Signals | null) => void,
-  ): this;
+  on(event: "exit", listener: (code: number | null, signal: NodeJS.Signals | null) => void): this;
   kill(signal?: NodeJS.Signals): boolean;
   readonly pid?: number;
 }
 
-export type SpawnFn = (
-  cmd: string,
-  args: readonly string[],
-  options: { stdio: "ignore" },
-) => RecorderChildProcess;
+export type SpawnFn = (cmd: string, args: readonly string[], options: { stdio: "ignore" }) => RecorderChildProcess;
 
 export type MkdtempFn = (prefix: string) => string;
-export type RmSyncFn = (
-  path: PathLike,
-  options: { recursive: true; force: true },
-) => void;
+export type RmSyncFn = (path: PathLike, options: { recursive: true; force: true }) => void;
 export type TmpdirFn = () => string;
 
 export interface LocalAudioCaptureOptions {
@@ -136,10 +126,7 @@ export class LocalAudioCapture {
 
   private assertAcceptableExit(code: number | null): void {
     if (code === null) return;
-    const ok =
-      this._recorder === "ffmpeg"
-        ? FFMPEG_OK_EXIT_CODES
-        : GENERIC_OK_EXIT_CODES;
+    const ok = this._recorder === "ffmpeg" ? FFMPEG_OK_EXIT_CODES : GENERIC_OK_EXIT_CODES;
     if (!ok.has(code)) {
       throw new Error(`Recorder ${this._recorder} exited with code ${code}.`);
     }
@@ -150,10 +137,7 @@ export class LocalAudioCapture {
   }
 }
 
-function waitForExit(
-  child: RecorderChildProcess,
-  timeoutMs: number,
-): Promise<number | null> {
+function waitForExit(child: RecorderChildProcess, timeoutMs: number): Promise<number | null> {
   return new Promise((resolve, reject) => {
     let settled = false;
     const timer = setTimeout(() => {

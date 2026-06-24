@@ -1,11 +1,8 @@
-import type {
-  ExtensionAPI,
-  ExtensionContext,
-} from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { truncateDisplay } from "@htwang-contrib/common";
 import { updateBackgroundJob } from "./background-jobs.ts";
-import { SUBAGENT_EVENTS } from "./events.ts";
 import { subagentDetails } from "./details.ts";
+import { SUBAGENT_EVENTS } from "./events.ts";
 import type { SubagentRunDetails } from "./run-agent.ts";
 
 export function finalizeBackgroundSuccess(
@@ -19,10 +16,7 @@ export function finalizeBackgroundSuccess(
     details: SubagentRunDetails;
   },
 ) {
-  const text =
-    r.content[0]?.type === "text" && typeof r.content[0].text === "string"
-      ? r.content[0].text
-      : "";
+  const text = r.content[0]?.type === "text" && typeof r.content[0].text === "string" ? r.content[0].text : "";
   const summary = text.length > 12_000 ? `${text.slice(0, 12_000)}\n…` : text;
   const ok = r.details.ok !== false;
   const batchCounts =
@@ -84,10 +78,7 @@ export function finalizeBackgroundThrown(
     label,
     error: msg,
   });
-  ctx.ui.notify(
-    `Subagent crashed (${truncateDisplay(label, 48)}): ${truncateDisplay(msg, 160)}`,
-    "error",
-  );
+  ctx.ui.notify(`Subagent crashed (${truncateDisplay(label, 48)}): ${truncateDisplay(msg, 160)}`, "error");
 }
 
 export function backgroundStartedReply(

@@ -1,26 +1,18 @@
 import { spawn, spawnSync } from "node:child_process";
-import { buildMoshiPayload, type MoshiPayload } from "./payload.ts";
-import {
-  socketFileExists,
-  sendEnvelopeToSocket,
-  type SocketSendStatus,
-} from "./socket.ts";
-import {
-  getCachedTerminalContext,
-  EMPTY_TERMINAL_CONTEXT,
-  type TerminalContext,
-} from "./terminal-context.ts";
 import {
   buildSessionUpdateEnvelope,
+  type EnvelopeParts,
   emptyExpiresAt,
+  type MoshiHookCtx,
+  type MoshiHookEvent,
   modelNameFromCtx,
   nowIso,
   projectNameForCwd,
   sessionIdFromEventCtx,
-  type EnvelopeParts,
-  type MoshiHookCtx,
-  type MoshiHookEvent,
 } from "./envelope.ts";
+import { buildMoshiPayload, type MoshiPayload } from "./payload.ts";
+import { type SocketSendStatus, sendEnvelopeToSocket, socketFileExists } from "./socket.ts";
+import { EMPTY_TERMINAL_CONTEXT, getCachedTerminalContext, type TerminalContext } from "./terminal-context.ts";
 
 export const DEFAULT_HOOK_BINARY = "moshi-hook";
 export const PI_HOOK_SUBCOMMAND = "pi-hook";
@@ -46,9 +38,7 @@ export interface AvailabilityOptions {
   spawnSync?: typeof import("node:child_process").spawnSync;
 }
 
-export function isMoshiHookAvailable(
-  options: AvailabilityOptions = {},
-): boolean {
+export function isMoshiHookAvailable(options: AvailabilityOptions = {}): boolean {
   const binary = options.binary ?? resolveMoshiHookBinary({ env: options.env });
   const spawnSyncFn = options.spawnSync ?? spawnSync;
   try {
@@ -67,13 +57,10 @@ export interface ResolveTransportOptions {
   spawnSync?: typeof import("node:child_process").spawnSync;
 }
 
-export function resolveTransportMode(
-  options: ResolveTransportOptions = {},
-): TransportMode {
+export function resolveTransportMode(options: ResolveTransportOptions = {}): TransportMode {
   const env = options.env ?? process.env;
   if (socketFileExists({ statSync: options.statSync, env })) return "socket";
-  if (isMoshiHookAvailable({ env, spawnSync: options.spawnSync }))
-    return "spawn";
+  if (isMoshiHookAvailable({ env, spawnSync: options.spawnSync })) return "spawn";
   return "none";
 }
 
@@ -120,15 +107,10 @@ export function buildEnvelope(
   args: BuildEnvelopeArgs,
   options: Pick<DispatchOptions, "env"> = {},
 ): Record<string, unknown> {
-  const eventObj =
-    args.event && typeof args.event === "object"
-      ? (args.event as MoshiHookEvent)
-      : {};
-  const ctxObj =
-    args.ctx && typeof args.ctx === "object" ? (args.ctx as MoshiHookCtx) : {};
+  const eventObj = args.event && typeof args.event === "object" ? (args.event as MoshiHookEvent) : {};
+  const ctxObj = args.ctx && typeof args.ctx === "object" ? (args.ctx as MoshiHookCtx) : {};
   const env = options.env ?? process.env;
-  const terminalContext =
-    args.terminalContext ?? getCachedTerminalContext({ env });
+  const terminalContext = args.terminalContext ?? getCachedTerminalContext({ env });
   const sessionId = sessionIdFromEventCtx(eventObj, ctxObj);
   const cwd = firstNonEmpty(ctxObj.cwd as string, process.cwd());
   const modelName = modelNameFromCtx(ctxObj);
@@ -145,10 +127,7 @@ export function buildEnvelope(
   return buildSessionUpdateEnvelope(parts, terminalContext, args.extra ?? {});
 }
 
-export async function sendEnvelope(
-  args: BuildEnvelopeArgs,
-  options: DispatchOptions = {},
-): Promise<DispatchResult> {
+export async function sendEnvelope(args: BuildEnvelopeArgs, options: DispatchOptions = {}): Promise<DispatchResult> {
   const preferSocket = options.preferSocket ?? true;
   const env = options.env ?? process.env;
 
@@ -170,32 +149,18 @@ export async function sendEnvelope(
   return { outcome: dispatchViaSpawn(args, options) };
 }
 
-function dispatchViaSpawn(
-  args: BuildEnvelopeArgs,
-  options: DispatchOptions,
-): DispatchOutcome {
-  if (
-    !isMoshiHookAvailable({ env: options.env, spawnSync: options.spawnSync })
-  ) {
+function dispatchViaSpawn(args: BuildEnvelopeArgs, options: DispatchOptions): DispatchOutcome {
+  if (!isMoshiHookAvailable({ env: options.env, spawnSync: options.spawnSync })) {
     return { transport: "none" };
   }
   const binary = options.binary ?? resolveMoshiHookBinary({ env: options.env });
   const spawnFn = options.spawn ?? spawn;
-  const payload = buildMoshiPayload(
-    args.eventName,
-    args.event,
-    args.ctx,
-    args.extra ?? {},
-  );
+  const payload = buildMoshiPayload(args.eventName, args.event, args.ctx, args.extra ?? {});
   spawnPayload(binary, payload, spawnFn);
   return { transport: "spawn" };
 }
 
-function spawnPayload(
-  binary: string,
-  payload: MoshiPayload,
-  spawnFn: NonNullable<DispatchOptions["spawn"]>,
-): void {
+function spawnPayload(binary: string, payload: MoshiPayload, spawnFn: NonNullable<DispatchOptions["spawn"]>): void {
   try {
     const child = spawnFn(binary, [PI_HOOK_SUBCOMMAND], {
       stdio: ["pipe", "ignore", "ignore"],
@@ -231,10 +196,7 @@ export function sendToMoshi(
   );
 }
 
-export function sendPayload(
-  payload: MoshiPayload,
-  options: SendOptions = {},
-): void {
+export function sendPayload(payload: MoshiPayload, options: SendOptions = {}): void {
   const binary = options.binary ?? resolveMoshiHookBinary({ env: options.env });
   const spawnFn = options.spawn ?? spawn;
   spawnPayload(binary, payload, spawnFn);

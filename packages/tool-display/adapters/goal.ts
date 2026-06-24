@@ -9,11 +9,7 @@ interface GoalArgs {
   token_budget?: number;
 }
 
-function objectivePreview(
-  args: GoalArgs,
-  theme: Theme,
-  maxLen: number,
-): string {
+function objectivePreview(args: GoalArgs, theme: Theme, maxLen: number): string {
   const obj = args.objective?.trim();
   if (!obj) return "";
   return theme.fg("dim", truncateDisplay(obj, maxLen));
@@ -38,13 +34,7 @@ export const createGoalAdapter: ToolDisplayAdapter<GoalArgs> = {
 
   formatExpandedContent(_args, output, theme, width) {
     if (!output) return [];
-    return output
-      .split("\n")
-      .map(
-        (line) =>
-          INDENT +
-          truncateToWidth(theme.fg("toolOutput", line), width - 4, "…"),
-      );
+    return output.split("\n").map((line) => INDENT + truncateToWidth(theme.fg("toolOutput", line), width - 4, "…"));
   },
 };
 
@@ -67,13 +57,7 @@ export const updateGoalAdapter: ToolDisplayAdapter<GoalArgs> = {
 
   formatExpandedContent(_args, output, theme, width) {
     if (!output) return [];
-    return output
-      .split("\n")
-      .map(
-        (line) =>
-          INDENT +
-          truncateToWidth(theme.fg("toolOutput", line), width - 4, "…"),
-      );
+    return output.split("\n").map((line) => INDENT + truncateToWidth(theme.fg("toolOutput", line), width - 4, "…"));
   },
 };
 
@@ -90,21 +74,14 @@ export const getGoalAdapter: ToolDisplayAdapter<GoalArgs> = {
     }
     const status = typeof d?.status === "string" ? d.status : "unknown";
     const objective = typeof d?.objective === "string" ? d.objective : "";
-    const statusGlyph =
-      status === "active" ? "●" : status === "complete" ? "✓" : "○";
+    const statusGlyph = status === "active" ? "●" : status === "complete" ? "✓" : "○";
     const preview = truncateDisplay(objective, width - 10);
     return [theme.fg("muted", `└ ${statusGlyph} ${status} — ${preview}`)];
   },
 
   formatExpandedContent(_args, output, theme, width) {
     if (!output) return [];
-    return output
-      .split("\n")
-      .map(
-        (line) =>
-          INDENT +
-          truncateToWidth(theme.fg("toolOutput", line), width - 4, "…"),
-      );
+    return output.split("\n").map((line) => INDENT + truncateToWidth(theme.fg("toolOutput", line), width - 4, "…"));
   },
 };
 

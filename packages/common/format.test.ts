@@ -1,8 +1,8 @@
 import { describe, expect, test } from "vitest";
 import {
-  truncateDisplay,
   formatTokenUsageArrows,
   formatTokenUsageSummaryLine,
+  truncateDisplay,
   usagePercentStressLevel,
 } from "./format.ts";
 
@@ -39,9 +39,7 @@ describe("usagePercentStressLevel", () => {
 describe("formatTokenUsageSummaryLine", () => {
   test("includes optional context", () => {
     expect(formatTokenUsageSummaryLine(1, 2)).toBe("Tokens: ↑1 ↓2");
-    expect(formatTokenUsageSummaryLine(1, 2, 33.7)).toBe(
-      "Tokens: ↑1 ↓2 · context 34%",
-    );
+    expect(formatTokenUsageSummaryLine(1, 2, 33.7)).toBe("Tokens: ↑1 ↓2 · context 34%");
     expect(formatTokenUsageSummaryLine(1, 2, null)).toBe("Tokens: ↑1 ↓2");
   });
 });

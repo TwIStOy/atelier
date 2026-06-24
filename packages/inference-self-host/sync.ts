@@ -152,9 +152,7 @@ const MODEL_SOURCES: Record<string, ModelSource> = {
   "claude-sonnet-4-6": {
     provider: "anthropic",
     modelId: "claude-sonnet-4-6",
-    fallbacks: [
-      { provider: "amazon-bedrock", modelId: "anthropic.claude-sonnet-4-6" },
-    ],
+    fallbacks: [{ provider: "amazon-bedrock", modelId: "anthropic.claude-sonnet-4-6" }],
     compatFamily: "anthropic",
   },
   "claude-opus-4-7": {
@@ -185,14 +183,8 @@ type ProviderModelConfig = {
   compatFamily?: "zai" | "deepseek" | "moonshot" | "qwen" | "anthropic";
 };
 
-function toModelConfig(
-  localId: string,
-  raw: ModelsDevModel,
-  source: ModelSource,
-): ProviderModelConfig {
-  const input = raw.modalities?.input?.includes("image")
-    ? ["text", "image"]
-    : ["text"];
+function toModelConfig(localId: string, raw: ModelsDevModel, source: ModelSource): ProviderModelConfig {
+  const input = raw.modalities?.input?.includes("image") ? ["text", "image"] : ["text"];
   return {
     id: localId,
     name: raw.name,
@@ -229,9 +221,7 @@ export async function fetchModels(): Promise<ProviderModelConfig[]> {
       }
     }
     if (!raw) {
-      console.warn(
-        `Model "${source.modelId}" not found in provider "${source.provider}"`,
-      );
+      console.warn(`Model "${source.modelId}" not found in provider "${source.provider}"`);
       continue;
     }
     models.push(toModelConfig(localId, raw, source));

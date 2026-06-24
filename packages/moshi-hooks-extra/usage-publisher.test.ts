@@ -1,16 +1,13 @@
+import type { CodingPlanRawUsage, CodingPlanUsage } from "@htwang-contrib/common";
 import { describe, expect, test, vi } from "vitest";
-import type {
-  CodingPlanRawUsage,
-  CodingPlanUsage,
-} from "@htwang-contrib/common";
 import type { MoshiCredentials } from "./moshi-secrets.ts";
 import {
-  MOSHI_USAGE_AGENT,
-  ZAI_ACCOUNT_ID,
   buildZaiRawSnapshot,
   buildZaiSnapshot,
+  MOSHI_USAGE_AGENT,
   pushUsageSnapshot,
   windowLabelFor,
+  ZAI_ACCOUNT_ID,
 } from "./usage-publisher.ts";
 
 const CREDS: MoshiCredentials = {
@@ -68,11 +65,7 @@ describe("buildZaiSnapshot", () => {
   });
 
   test("omits level suffix when level is absent", () => {
-    const snap = buildZaiSnapshot(
-      { limits: [{ window: "weekly", percentage: 1 }] },
-      CREDS,
-      NOW,
-    );
+    const snap = buildZaiSnapshot({ limits: [{ window: "weekly", percentage: 1 }] }, CREDS, NOW);
     expect(snap.accountLabel).toBe("Z.AI Coding Plan");
   });
 });
@@ -109,11 +102,7 @@ describe("buildZaiRawSnapshot", () => {
   });
 
   test("renders one window per raw window with kind-aware labels", () => {
-    expect(snapshot.windows.map((w) => w.label)).toEqual([
-      "weekly tools",
-      "5h tokens",
-      "weekly tokens",
-    ]);
+    expect(snapshot.windows.map((w) => w.label)).toEqual(["weekly tools", "5h tokens", "weekly tokens"]);
   });
 
   test("passes through real resetsAt and clamps percentages", () => {
@@ -127,11 +116,7 @@ describe("buildZaiRawSnapshot", () => {
 
 describe("pushUsageSnapshot", () => {
   test("POSTs snapshot with bearer + UA and reports ok on 200", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue(
-        new Response('{"success":true,"count":1}', { status: 200 }),
-      );
+    const fetchMock = vi.fn().mockResolvedValue(new Response('{"success":true,"count":1}', { status: 200 }));
     const snapshot = buildZaiSnapshot(USAGE, CREDS, NOW);
     const result = await pushUsageSnapshot(snapshot, CREDS, {
       fetch: fetchMock,
@@ -151,9 +136,7 @@ describe("pushUsageSnapshot", () => {
   });
 
   test("reports failure on non-ok response", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue(new Response("nope", { status: 422 }));
+    const fetchMock = vi.fn().mockResolvedValue(new Response("nope", { status: 422 }));
     const snapshot = buildZaiSnapshot(USAGE, CREDS, NOW);
     const result = await pushUsageSnapshot(snapshot, CREDS, {
       fetch: fetchMock,

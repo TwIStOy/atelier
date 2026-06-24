@@ -35,14 +35,8 @@ export function createSpinnerPreview(): ConfigItemPreview {
         const style = resolveSpinner(activeKey ?? "");
         const frame = style.frames[frameIndex] ?? style.frames[0] ?? "";
         const glyph = theme.fg("accent", theme.bold(frame));
-        const meta = theme.fg(
-          "muted",
-          `  width ${style.width} · interval ${style.intervalMs}ms`,
-        );
-        const detail = theme.fg(
-          "dim",
-          `  ${activeKey ?? ""} · ${style.frames.length} frames`,
-        );
+        const meta = theme.fg("muted", `  width ${style.width} · interval ${style.intervalMs}ms`);
+        const detail = theme.fg("dim", `  ${activeKey ?? ""} · ${style.frames.length} frames`);
         const line1 = `${glyph}${meta}`;
         return [
           line1.length > width ? line1.slice(0, width) : line1,

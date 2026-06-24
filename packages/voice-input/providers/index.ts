@@ -5,12 +5,10 @@ export interface SttProvider {
   transcribe(file: string, signal?: AbortSignal): Promise<string>;
 }
 
+export type { MimoSttConfig, SttErrorCode } from "./mimo-stt.ts";
 export { SttError } from "./mimo-stt.ts";
-export type { SttErrorCode, MimoSttConfig } from "./mimo-stt.ts";
 
-export async function createSttProvider(
-  providerName: string,
-): Promise<SttProvider> {
+export async function createSttProvider(providerName: string): Promise<SttProvider> {
   const config = resolveProviderConfig(providerName);
   const apiKey = resolveApiKey(providerName);
   if (!apiKey) {
@@ -20,7 +18,6 @@ export async function createSttProvider(
     );
   }
   return {
-    transcribe: (file, signal) =>
-      transcribeWithMimoChat(file, config, apiKey, signal),
+    transcribe: (file, signal) => transcribeWithMimoChat(file, config, apiKey, signal),
   };
 }

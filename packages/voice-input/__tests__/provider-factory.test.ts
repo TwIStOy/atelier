@@ -27,9 +27,7 @@ afterEach(() => {
 
 describe("createSttProvider — missing API key", () => {
   it("throws missing_api_key when neither config nor env provides a key", async () => {
-    await expect(
-      createSttProvider("inference-self-host"),
-    ).rejects.toMatchObject({
+    await expect(createSttProvider("inference-self-host")).rejects.toMatchObject({
       code: "missing_api_key",
     });
   });
@@ -63,9 +61,7 @@ describe("createSttProvider — happy path", () => {
     const provider = await createSttProvider("inference-self-host");
     const text = await provider.transcribe(wavFile);
     expect(text).toBe("transcribed text");
-    expect(calls[0].url).toBe(
-      "https://inference.twistoy.cn/v1/chat/completions",
-    );
+    expect(calls[0].url).toBe("https://inference.twistoy.cn/v1/chat/completions");
     expect(calls[0].auth).toBe("Bearer sk-from-env");
   });
 

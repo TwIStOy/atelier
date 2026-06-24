@@ -1,5 +1,5 @@
-import { diffLines } from "diff";
 import { truncateToWidth } from "@earendil-works/pi-tui";
+import { diffLines } from "diff";
 import type { ToolDisplayAdapter } from "../types.ts";
 import { INDENT } from "./shared.ts";
 
@@ -50,19 +50,10 @@ export const memoryCreateAdapter: ToolDisplayAdapter<MemoryCreateArgs> = {
       .slice(0, limit)
       .map(
         (line) =>
-          INDENT +
-          theme.fg("muted", "│ ") +
-          truncateToWidth(
-            theme.fg("dim", line),
-            width - INDENT.length - 4,
-            "…",
-          ),
+          INDENT + theme.fg("muted", "│ ") + truncateToWidth(theme.fg("dim", line), width - INDENT.length - 4, "…"),
       );
     if (allLines.length > limit) {
-      lines.push(
-        INDENT +
-          theme.fg("muted", `│ … ${allLines.length - limit} more line(s)`),
-      );
+      lines.push(INDENT + theme.fg("muted", `│ … ${allLines.length - limit} more line(s)`));
     }
     return lines;
   },
@@ -81,19 +72,14 @@ interface MemoryReadDetails {
 export const memoryReadAdapter: ToolDisplayAdapter<MemoryReadArgs> = {
   formatCallHeader(args, theme) {
     const uri = args?.uri ?? "";
-    return (
-      theme.fg("toolTitle", theme.bold("Memory read")) +
-      " " +
-      theme.fg("accent", uri)
-    );
+    return theme.fg("toolTitle", theme.bold("Memory read")) + " " + theme.fg("accent", uri);
   },
 
   formatCollapsedContent(_args, _output, theme, width, details) {
     const d = details as MemoryReadDetails | undefined;
     const count = d?.content_lines ?? 0;
     const preview = d?.content_preview?.split("\n")[0] ?? "";
-    const truncated =
-      preview.length > 100 ? `${preview.slice(0, 99)}…` : preview;
+    const truncated = preview.length > 100 ? `${preview.slice(0, 99)}…` : preview;
     if (count === 0) {
       return [theme.fg("muted", "└ empty")];
     }
@@ -111,19 +97,10 @@ export const memoryReadAdapter: ToolDisplayAdapter<MemoryReadArgs> = {
       .slice(0, limit)
       .map(
         (line) =>
-          INDENT +
-          theme.fg("muted", "│ ") +
-          truncateToWidth(
-            theme.fg("dim", line),
-            width - INDENT.length - 4,
-            "…",
-          ),
+          INDENT + theme.fg("muted", "│ ") + truncateToWidth(theme.fg("dim", line), width - INDENT.length - 4, "…"),
       );
     if (allLines.length > limit) {
-      lines.push(
-        INDENT +
-          theme.fg("muted", `│ … ${allLines.length - limit} more line(s)`),
-      );
+      lines.push(INDENT + theme.fg("muted", `│ … ${allLines.length - limit} more line(s)`));
     }
     return lines;
   },
@@ -150,29 +127,22 @@ interface MemoryUpdateDetails {
 export const memoryUpdateAdapter: ToolDisplayAdapter<MemoryUpdateArgs> = {
   formatCallHeader(args, theme) {
     const uri = args?.uri ?? "";
-    return (
-      theme.fg("toolTitle", theme.bold("Memory update")) +
-      " " +
-      theme.fg("accent", uri)
-    );
+    return theme.fg("toolTitle", theme.bold("Memory update")) + " " + theme.fg("accent", uri);
   },
 
   formatCollapsedContent(_args, _output, theme, width, details) {
     const d = details as MemoryUpdateDetails | undefined;
     const parts: string[] = [];
     if (d?.mode === "patch") {
-      if ((d?.diff_adds ?? 0) > 0)
-        parts.push(theme.fg("success", `+${d!.diff_adds}`));
-      if ((d?.diff_removes ?? 0) > 0)
-        parts.push(theme.fg("error", `-${d!.diff_removes}`));
+      if ((d?.diff_adds ?? 0) > 0) parts.push(theme.fg("success", `+${d!.diff_adds}`));
+      if ((d?.diff_removes ?? 0) > 0) parts.push(theme.fg("error", `-${d!.diff_removes}`));
     } else if (d?.mode === "append") {
       parts.push(theme.fg("success", "appended"));
     }
     const meta: string[] = [];
     if (d?.priority !== undefined) meta.push(`p${d.priority}`);
     if (d?.disclosure !== undefined) meta.push("disclosure");
-    const diffSummary =
-      parts.length > 0 ? parts.join(" ") : theme.fg("success", "updated");
+    const diffSummary = parts.length > 0 ? parts.join(" ") : theme.fg("success", "updated");
     const metaStr = meta.length > 0 ? ` · ${meta.join(", ")}` : "";
     const line = `└ ${diffSummary}${theme.fg("dim", metaStr)}`;
     return [truncateToWidth(line, width, "…")];
@@ -198,11 +168,7 @@ export const memoryUpdateAdapter: ToolDisplayAdapter<MemoryUpdateArgs> = {
           : change.removed
             ? theme.fg("error", line)
             : theme.fg("dim", line);
-        lines.push(
-          INDENT +
-            prefix +
-            truncateToWidth(content, width - INDENT.length - 4, "…"),
-        );
+        lines.push(INDENT + prefix + truncateToWidth(content, width - INDENT.length - 4, "…"));
       }
     }
     return lines;
@@ -216,11 +182,7 @@ interface MemoryDeleteArgs {
 export const memoryDeleteAdapter: ToolDisplayAdapter<MemoryDeleteArgs> = {
   formatCallHeader(args, theme) {
     const uri = args?.uri ?? "";
-    return (
-      theme.fg("toolTitle", theme.bold("Memory delete")) +
-      " " +
-      theme.fg("accent", uri)
-    );
+    return theme.fg("toolTitle", theme.bold("Memory delete")) + " " + theme.fg("accent", uri);
   },
 
   formatCollapsedContent(_args, _output, theme) {
@@ -246,11 +208,7 @@ interface MemorySearchDetails {
 export const memorySearchAdapter: ToolDisplayAdapter<MemorySearchArgs> = {
   formatCallHeader(args, theme) {
     const query = args?.query ?? "";
-    return (
-      theme.fg("toolTitle", theme.bold("Memory search")) +
-      " " +
-      theme.fg("accent", query)
-    );
+    return theme.fg("toolTitle", theme.bold("Memory search")) + " " + theme.fg("accent", query);
   },
 
   formatCollapsedContent(_args, _output, theme, width, details) {
@@ -260,18 +218,12 @@ export const memorySearchAdapter: ToolDisplayAdapter<MemorySearchArgs> = {
       return [theme.fg("muted", "└ no results")];
     }
     const first = d?.items?.[0];
-    const parts: string[] = [
-      "└ ",
-      theme.fg("success", `${total} result${total === 1 ? "" : "s"}`),
-    ];
+    const parts: string[] = ["└ ", theme.fg("success", `${total} result${total === 1 ? "" : "s"}`)];
     if (first) {
       parts.push(" ");
       parts.push(theme.fg("accent", first.uri));
       if (first.snippet) {
-        const snip =
-          first.snippet.length > 80
-            ? `${first.snippet.slice(0, 79)}…`
-            : first.snippet;
+        const snip = first.snippet.length > 80 ? `${first.snippet.slice(0, 79)}…` : first.snippet;
         parts.push(` ${theme.fg("dim", snip)}`);
       }
     }
@@ -289,19 +241,10 @@ export const memorySearchAdapter: ToolDisplayAdapter<MemorySearchArgs> = {
       const item = items[i]!;
       const isLast = i === Math.min(limit, items.length) - 1 && total <= limit;
       const connector = isLast ? "  └ " : "  │ ";
-      lines.push(
-        INDENT +
-          theme.fg("muted", connector.replace(/^\s{2}/, "")) +
-          theme.fg("accent", item.uri),
-      );
+      lines.push(INDENT + theme.fg("muted", connector.replace(/^\s{2}/, "")) + theme.fg("accent", item.uri));
       if (item.snippet) {
-        const snip =
-          item.snippet.length > 100
-            ? `${item.snippet.slice(0, 99)}…`
-            : item.snippet;
-        lines.push(
-          `${INDENT}${theme.fg("muted", "    │ ")}${theme.fg("dim", snip)}`,
-        );
+        const snip = item.snippet.length > 100 ? `${item.snippet.slice(0, 99)}…` : item.snippet;
+        lines.push(`${INDENT}${theme.fg("muted", "    │ ")}${theme.fg("dim", snip)}`);
       }
     }
     if (total > limit) {
@@ -320,11 +263,7 @@ interface MemoryListArgs {
 export const memoryListAdapter: ToolDisplayAdapter<MemoryListArgs> = {
   formatCallHeader(args, theme) {
     const domain = args?.domain ?? "";
-    return (
-      theme.fg("toolTitle", theme.bold("Memory list")) +
-      " " +
-      theme.fg("accent", domain || "(all)")
-    );
+    return theme.fg("toolTitle", theme.bold("Memory list")) + " " + theme.fg("accent", domain || "(all)");
   },
 
   formatCollapsedContent(_args, output, theme) {
@@ -337,15 +276,7 @@ export const memoryListAdapter: ToolDisplayAdapter<MemoryListArgs> = {
     if (!output) return [];
     return output
       .split("\n")
-      .map(
-        (line) =>
-          INDENT +
-          truncateToWidth(
-            theme.fg("toolOutput", line),
-            width - INDENT.length,
-            "…",
-          ),
-      );
+      .map((line) => INDENT + truncateToWidth(theme.fg("toolOutput", line), width - INDENT.length, "…"));
   },
 };
 
@@ -422,19 +353,9 @@ export const memoryTriggersAdapter: ToolDisplayAdapter<MemoryTriggersArgs> = {
   formatCollapsedContent(_args, _output, theme, _width, details) {
     const d = details as MemoryTriggersDetails | undefined;
     const parts: string[] = [];
-    if ((d?.added ?? 0) > 0)
-      parts.push(
-        theme.fg("success", `+${d!.added} keyword${d!.added === 1 ? "" : "s"}`),
-      );
-    if ((d?.removed ?? 0) > 0)
-      parts.push(
-        theme.fg(
-          "error",
-          `-${d!.removed} keyword${d!.removed === 1 ? "" : "s"}`,
-        ),
-      );
-    const detail =
-      parts.length > 0 ? parts.join(", ") : theme.fg("success", "updated");
+    if ((d?.added ?? 0) > 0) parts.push(theme.fg("success", `+${d!.added} keyword${d!.added === 1 ? "" : "s"}`));
+    if ((d?.removed ?? 0) > 0) parts.push(theme.fg("error", `-${d!.removed} keyword${d!.removed === 1 ? "" : "s"}`));
+    const detail = parts.length > 0 ? parts.join(", ") : theme.fg("success", "updated");
     return [`└ ${detail}`];
   },
 
@@ -457,11 +378,7 @@ interface MemoryHistoryDetails {
 export const memoryHistoryAdapter: ToolDisplayAdapter<MemoryHistoryArgs> = {
   formatCallHeader(args, theme) {
     const uri = args?.uri ?? "";
-    return (
-      theme.fg("toolTitle", theme.bold("Memory history")) +
-      " " +
-      theme.fg("accent", uri)
-    );
+    return theme.fg("toolTitle", theme.bold("Memory history")) + " " + theme.fg("accent", uri);
   },
 
   formatCollapsedContent(_args, _output, theme, width, details) {
@@ -481,13 +398,9 @@ export const memoryHistoryAdapter: ToolDisplayAdapter<MemoryHistoryArgs> = {
     const versions = d?.versions ?? [];
     const total = d?.total ?? 0;
     const limit = 15;
-    const lines = versions
-      .slice(0, limit)
-      .map((v) => `${INDENT}${theme.fg("muted", "│ ")}${theme.fg("dim", v)}`);
+    const lines = versions.slice(0, limit).map((v) => `${INDENT}${theme.fg("muted", "│ ")}${theme.fg("dim", v)}`);
     if (total > limit) {
-      lines.push(
-        `${INDENT}${theme.fg("muted", `│ … ${total - limit} more version${total - limit === 1 ? "" : "s"}`)}`,
-      );
+      lines.push(`${INDENT}${theme.fg("muted", `│ … ${total - limit} more version${total - limit === 1 ? "" : "s"}`)}`);
     }
     return lines;
   },
@@ -498,29 +411,26 @@ interface MemoryDomainsDetails {
   domains?: string[];
 }
 
-export const memoryDomainsAdapter: ToolDisplayAdapter<Record<string, unknown>> =
-  {
-    formatCallHeader(_args, theme) {
-      return theme.fg("toolTitle", theme.bold("Memory domains"));
-    },
+export const memoryDomainsAdapter: ToolDisplayAdapter<Record<string, unknown>> = {
+  formatCallHeader(_args, theme) {
+    return theme.fg("toolTitle", theme.bold("Memory domains"));
+  },
 
-    formatCollapsedContent(_args, _output, theme, width, details) {
-      const d = details as MemoryDomainsDetails | undefined;
-      const total = d?.total ?? 0;
-      if (total === 0) {
-        return [theme.fg("muted", "└ none")];
-      }
-      const first = d?.domains?.[0] ?? "";
-      const more = total > 1 ? theme.fg("dim", ` · ${total - 1} more`) : "";
-      const line = `└ ${theme.fg("success", `${total} domain${total === 1 ? "" : "s"}`)} ${theme.fg("dim", first)}${more}`;
-      return [truncateToWidth(line, width, "…")];
-    },
+  formatCollapsedContent(_args, _output, theme, width, details) {
+    const d = details as MemoryDomainsDetails | undefined;
+    const total = d?.total ?? 0;
+    if (total === 0) {
+      return [theme.fg("muted", "└ none")];
+    }
+    const first = d?.domains?.[0] ?? "";
+    const more = total > 1 ? theme.fg("dim", ` · ${total - 1} more`) : "";
+    const line = `└ ${theme.fg("success", `${total} domain${total === 1 ? "" : "s"}`)} ${theme.fg("dim", first)}${more}`;
+    return [truncateToWidth(line, width, "…")];
+  },
 
-    formatExpandedContent(_args, _output, theme, _width, details) {
-      const d = details as MemoryDomainsDetails | undefined;
-      const items = d?.domains ?? [];
-      return items.map(
-        (item) => `${INDENT}${theme.fg("muted", "│ ")}${theme.fg("dim", item)}`,
-      );
-    },
-  };
+  formatExpandedContent(_args, _output, theme, _width, details) {
+    const d = details as MemoryDomainsDetails | undefined;
+    const items = d?.domains ?? [];
+    return items.map((item) => `${INDENT}${theme.fg("muted", "│ ")}${theme.fg("dim", item)}`);
+  },
+};

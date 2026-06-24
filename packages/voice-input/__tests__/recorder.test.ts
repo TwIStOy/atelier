@@ -36,9 +36,7 @@ describe("selectRecorder", () => {
 
   it("on non-linux: skips parecord and prefers ffmpeg", () => {
     vi.stubGlobal("process", { ...process, platform: "darwin" });
-    const exists = vi.fn(
-      (name: string) => name === "ffmpeg" || name === "parecord",
-    );
+    const exists = vi.fn((name: string) => name === "ffmpeg" || name === "parecord");
     expect(selectRecorder({ recorder: "auto" }, exists)).toBe("ffmpeg");
     expect(exists).not.toHaveBeenCalledWith("parecord");
   });
@@ -51,9 +49,7 @@ describe("selectRecorder", () => {
 
   it("throws a guiding error when no recorder is available", () => {
     vi.stubGlobal("process", { ...process, platform: "darwin" });
-    expect(() => selectRecorder({ recorder: "auto" }, () => false)).toThrow(
-      /No recorder found/,
-    );
+    expect(() => selectRecorder({ recorder: "auto" }, () => false)).toThrow(/No recorder found/);
   });
 });
 
@@ -124,13 +120,7 @@ describe("buildRecorderArgs — ffmpeg", () => {
 describe("buildRecorderArgs — parecord", () => {
   it("emits wav/s16le/16k/mono to the file", () => {
     const args = buildRecorderArgs("parecord", "/tmp/out.wav");
-    expect(args).toEqual([
-      "--file-format=wav",
-      "--channels=1",
-      "--rate=16000",
-      "--format=s16le",
-      "/tmp/out.wav",
-    ]);
+    expect(args).toEqual(["--file-format=wav", "--channels=1", "--rate=16000", "--format=s16le", "/tmp/out.wav"]);
   });
 
   it("ignores device override (parecord reads PulseAudio default source)", () => {
@@ -142,14 +132,7 @@ describe("buildRecorderArgs — parecord", () => {
 
 describe("buildRecorderArgs — sox", () => {
   it("records from -d at 16k mono to the file", () => {
-    expect(buildRecorderArgs("sox", "/tmp/out.wav")).toEqual([
-      "-d",
-      "-r",
-      "16000",
-      "-c",
-      "1",
-      "/tmp/out.wav",
-    ]);
+    expect(buildRecorderArgs("sox", "/tmp/out.wav")).toEqual(["-d", "-r", "16000", "-c", "1", "/tmp/out.wav"]);
   });
 });
 
@@ -159,9 +142,7 @@ describe("commandExists", () => {
   });
 
   it("returns true for a known-present command", () => {
-    expect(
-      commandExists("ls") || commandExists("node") || commandExists("true"),
-    ).toBe(true);
+    expect(commandExists("ls") || commandExists("node") || commandExists("true")).toBe(true);
   });
 
   it("returns true for the always-present `true` builtin wrapper", () => {
@@ -195,9 +176,7 @@ describe("selectStreamRecorder", () => {
   it("falls through auto and parecord to probe ffmpeg/sox", () => {
     const exists = vi.fn((name: string) => name === "ffmpeg");
     expect(selectStreamRecorder({ recorder: "auto" }, exists)).toBe("ffmpeg");
-    expect(selectStreamRecorder({ recorder: "parecord" }, exists)).toBe(
-      "ffmpeg",
-    );
+    expect(selectStreamRecorder({ recorder: "parecord" }, exists)).toBe("ffmpeg");
   });
 
   it("prefers ffmpeg when both ffmpeg and sox are present", () => {
@@ -212,9 +191,7 @@ describe("selectStreamRecorder", () => {
 
   it("throws when neither ffmpeg nor sox is available", () => {
     const exists = vi.fn(() => false);
-    expect(() => selectStreamRecorder({ recorder: "auto" }, exists)).toThrow(
-      /requires ffmpeg or sox/,
-    );
+    expect(() => selectStreamRecorder({ recorder: "auto" }, exists)).toThrow(/requires ffmpeg or sox/);
   });
 });
 
@@ -242,8 +219,6 @@ describe("buildStreamRecorderArgs", () => {
   });
 
   it("throws for parecord (cannot pipe to stdout)", () => {
-    expect(() => buildStreamRecorderArgs("parecord")).toThrow(
-      /cannot stream raw PCM to stdout/,
-    );
+    expect(() => buildStreamRecorderArgs("parecord")).toThrow(/cannot stream raw PCM to stdout/);
   });
 });

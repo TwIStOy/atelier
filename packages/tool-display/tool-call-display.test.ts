@@ -1,12 +1,12 @@
-import { describe, expect, it } from "vitest";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { visibleWidth } from "@earendil-works/pi-tui";
-import { renderToolCall } from "./tool-call-display.ts";
-import { globalToolDisplayRegistry } from "./registry.ts";
-import { editAdapter } from "./adapters/edit.ts";
-import { writeAdapter } from "./adapters/write.ts";
-import { todoAdapter } from "./adapters/todo.ts";
+import { describe, expect, it } from "vitest";
 import { bashAdapter } from "./adapters/bash.ts";
+import { editAdapter } from "./adapters/edit.ts";
+import { todoAdapter } from "./adapters/todo.ts";
+import { writeAdapter } from "./adapters/write.ts";
+import { globalToolDisplayRegistry } from "./registry.ts";
+import { renderToolCall } from "./tool-call-display.ts";
 
 const PLAIN_THEME: Theme = {
   fg: (_c: string, text: string) => text,
@@ -14,12 +14,7 @@ const PLAIN_THEME: Theme = {
   bold: (text: string) => text,
 } as Theme;
 
-function renderCollapsed(
-  toolName: string,
-  args: Record<string, unknown>,
-  output: string,
-  isError: boolean,
-): string[] {
+function renderCollapsed(toolName: string, args: Record<string, unknown>, output: string, isError: boolean): string[] {
   return renderToolCall(
     {
       toolName,
@@ -108,11 +103,9 @@ describe("todo adapter collapsed-content width safety", () => {
         toolName: "todo",
         args: {
           action: "create",
-          subject:
-            "Fix todo adapter collapsed-content overflow crash in narrow terminals",
+          subject: "Fix todo adapter collapsed-content overflow crash in narrow terminals",
         },
-        output:
-          "Created #1: Fix todo adapter collapsed-content overflow crash in narrow terminals (pending)",
+        output: "Created #1: Fix todo adapter collapsed-content overflow crash in narrow terminals (pending)",
         expanded: false,
         isPartial: false,
         isError: false,

@@ -1,42 +1,19 @@
-export {
-  ToolCallDisplayComponent,
-  ToolDisplayRegistry,
-  type ToolCallDisplayOpts,
-  formatToolArgs,
-  formatGenericToolHeader,
-  renderToolCall,
-  defaultCollapsedRenderer,
-  defaultExpandedRenderer,
-  defaultGenericCollapsedRenderer,
-  defaultGenericExpandedRenderer,
-} from "./tool-call-display.ts";
-export type { ContentRenderer, ToolDisplayAdapter } from "./types.ts";
-export {
-  prefixLine,
-  wrapTextWithAnsi,
-  spinnerGlyph,
-  SpinnerTimer,
-} from "./format.ts";
 export { askUserQuestionAdapter } from "./adapters/ask-user-question.ts";
 export { bashAdapter } from "./adapters/bash.ts";
 export { editAdapter } from "./adapters/edit.ts";
 export { globAdapter } from "./adapters/glob.ts";
-export { grepAdapter } from "./adapters/grep.ts";
-export { lsAdapter } from "./adapters/ls.ts";
-export { readAdapter } from "./adapters/read.ts";
-export { todoAdapter } from "./adapters/todo.ts";
-export { writeAdapter } from "./adapters/write.ts";
-export { globalToolDisplayRegistry } from "./registry.ts";
 export {
   createGoalAdapter,
   getGoalAdapter,
   updateGoalAdapter,
 } from "./adapters/goal.ts";
+export { grepAdapter } from "./adapters/grep.ts";
 export {
   journalReadAdapter,
   journalSearchAdapter,
   journalWriteAdapter,
 } from "./adapters/journal.ts";
+export { lsAdapter } from "./adapters/ls.ts";
 export {
   memoryAliasAdapter,
   memoryCreateAdapter,
@@ -49,13 +26,36 @@ export {
   memoryTriggersAdapter,
   memoryUpdateAdapter,
 } from "./adapters/memory.ts";
+export { readAdapter } from "./adapters/read.ts";
+export { todoAdapter } from "./adapters/todo.ts";
+export { writeAdapter } from "./adapters/write.ts";
+export {
+  prefixLine,
+  SpinnerTimer,
+  spinnerGlyph,
+  wrapTextWithAnsi,
+} from "./format.ts";
+export { globalToolDisplayRegistry } from "./registry.ts";
+export {
+  defaultCollapsedRenderer,
+  defaultExpandedRenderer,
+  defaultGenericCollapsedRenderer,
+  defaultGenericExpandedRenderer,
+  formatGenericToolHeader,
+  formatToolArgs,
+  renderToolCall,
+  ToolCallDisplayComponent,
+  type ToolCallDisplayOpts,
+  ToolDisplayRegistry,
+} from "./tool-call-display.ts";
+export type { ContentRenderer, ToolDisplayAdapter } from "./types.ts";
 
 import type { ExtensionAPI, Theme } from "@earendil-works/pi-coding-agent";
 import { ToolExecutionComponent } from "@earendil-works/pi-coding-agent";
+import { registerToolDisplayConfigItems } from "./config.ts";
 import { globalToolDisplayRegistry } from "./registry.ts";
 import { renderToolCall } from "./tool-call-display.ts";
 import type { ToolDisplayAdapter } from "./types.ts";
-import { registerToolDisplayConfigItems } from "./config.ts";
 
 type ToolExecutionPatchThis = {
   hideComponent?: boolean;
@@ -88,33 +88,21 @@ const FALLBACK_THEME: Theme = {
   bold: (text: string) => text,
 } as Theme;
 
-function patchToolExecutionRender(
-  getTheme: () => Theme,
-  registry: typeof globalToolDisplayRegistry,
-) {
+function patchToolExecutionRender(getTheme: () => Theme, registry: typeof globalToolDisplayRegistry) {
   const proto: any = ToolExecutionComponent.prototype;
   proto.__tdGetTheme = getTheme;
   proto.__tdRegistry = registry;
 
   if (proto.__tdPatched) return;
 
-  const originalSetExpanded = proto.setExpanded as (
-    this: ToolExecutionPatchThis,
-    expanded: boolean,
-  ) => void;
-  proto.setExpanded = function (
-    this: ToolExecutionPatchThis,
-    expanded: boolean,
-  ) {
+  const originalSetExpanded = proto.setExpanded as (this: ToolExecutionPatchThis, expanded: boolean) => void;
+  proto.setExpanded = function (this: ToolExecutionPatchThis, expanded: boolean) {
     originalSetExpanded.call(this, expanded);
     this.invalidate();
   };
 
   const originalRender = proto.render;
-  proto.render = function (
-    this: ToolExecutionPatchThis,
-    width: number,
-  ): string[] {
+  proto.render = function (this: ToolExecutionPatchThis, width: number): string[] {
     if (this.hideComponent) return [];
 
     const reg = proto.__tdRegistry;

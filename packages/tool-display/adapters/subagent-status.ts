@@ -1,10 +1,6 @@
 import { truncateDisplay } from "@htwang-contrib/common";
 import type { ToolDisplayAdapter } from "../types.ts";
-import {
-  formatExpandedToolOutputLines,
-  formatLineCount,
-  INDENT,
-} from "./shared.ts";
+import { formatExpandedToolOutputLines, formatLineCount, INDENT } from "./shared.ts";
 
 interface SubagentStatusArgs {
   id?: string;
@@ -87,26 +83,17 @@ export const subagentStatusAdapter: ToolDisplayAdapter<SubagentStatusArgs> = {
     const d = parseDetails(details);
     const rawId = typeof args.id === "string" ? args.id.trim() : "";
     const idShow = d ? shortJobId(d.job_id) : truncateDisplay(rawId, 36);
-    const base =
-      theme.fg("toolTitle", theme.bold("Subagent status")) +
-      " " +
-      theme.fg("accent", idShow);
+    const base = theme.fg("toolTitle", theme.bold("Subagent status")) + " " + theme.fg("accent", idShow);
     if (!d) {
       return base;
     }
     const sw = statusWord(d);
-    let rest =
-      theme.fg("muted", " · ") +
-      theme.fg(sw.role, truncateDisplay(sw.text, 24));
+    let rest = theme.fg("muted", " · ") + theme.fg(sw.role, truncateDisplay(sw.text, 24));
     if (d.mode) {
-      rest +=
-        theme.fg("muted", " · ") +
-        theme.fg("syntaxType", truncateDisplay(d.mode, 12));
+      rest += theme.fg("muted", " · ") + theme.fg("syntaxType", truncateDisplay(d.mode, 12));
     }
     if (d.label && d.status === "running") {
-      rest +=
-        theme.fg("muted", " · ") +
-        theme.fg("muted", truncateDisplay(d.label, 48));
+      rest += theme.fg("muted", " · ") + theme.fg("muted", truncateDisplay(d.label, 48));
     }
     if (typeof d.tool_calls === "number" && d.status !== "running") {
       const w = d.tool_calls === 1 ? "tool" : "tools";
@@ -119,26 +106,12 @@ export const subagentStatusAdapter: ToolDisplayAdapter<SubagentStatusArgs> = {
     if (d.batch_counts && d.status === "done") {
       rest +=
         theme.fg("muted", " · ") +
-        theme.fg(
-          "muted",
-          truncateDisplay(
-            `${d.batch_counts.ok} ok, ${d.batch_counts.err} err`,
-            28,
-          ),
-        );
+        theme.fg("muted", truncateDisplay(`${d.batch_counts.ok} ok, ${d.batch_counts.err} err`, 28));
     }
     return base + rest;
   },
 
-  formatCollapsedContent(
-    _args,
-    output,
-    theme,
-    _width,
-    details,
-    _isPartial,
-    _spinAt,
-  ) {
+  formatCollapsedContent(_args, output, theme, _width, details, _isPartial, _spinAt) {
     const d = parseDetails(details);
     if (d) {
       const parts: string[] = [];

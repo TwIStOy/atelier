@@ -1,18 +1,12 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { registerConfigItems } from "@htwang-contrib/common";
 import { handleCommit } from "./commit.ts";
-import { selectModel, loadConfig } from "./model-select.ts";
-import {
-  MAX_DIFF_LENGTH,
-  MAX_DIFF_LENGTH_SINGLE,
-  MAX_GROUPING_RETRIES,
-} from "./prompt.ts";
+import { loadConfig, selectModel } from "./model-select.ts";
+import { MAX_DIFF_LENGTH, MAX_DIFF_LENGTH_SINGLE, MAX_GROUPING_RETRIES } from "./prompt.ts";
 
 let cachedModels: Array<{ label: string; value: string }> = [];
 
-export function setCachedModels(
-  models: Array<{ label: string; value: string }>,
-): void {
+export function setCachedModels(models: Array<{ label: string; value: string }>): void {
   cachedModels = models;
 }
 
@@ -23,8 +17,7 @@ export default function (pi: ExtensionAPI): void {
       type: "select",
       label: "Commit Model",
       value: () => loadConfig().model,
-      description:
-        "Model used for commit message generation. Use /commit-model for quick switching.",
+      description: "Model used for commit message generation. Use /commit-model for quick switching.",
       extensionLabel: "Committer",
       order: 0,
       options: () => [{ label: "(default)", value: "" }, ...cachedModels],
@@ -34,8 +27,7 @@ export default function (pi: ExtensionAPI): void {
       type: "number",
       label: "Grouping Threshold",
       value: () => loadConfig().groupingThreshold,
-      description:
-        "Minimum number of changed files to trigger grouped commit mode",
+      description: "Minimum number of changed files to trigger grouped commit mode",
       extensionLabel: "Committer",
       order: 1,
     },
@@ -77,8 +69,7 @@ export default function (pi: ExtensionAPI): void {
   });
 
   pi.registerCommand("commit", {
-    description:
-      "Generate a conventional commit from staged/unstaged changes using a side-call to an LLM.",
+    description: "Generate a conventional commit from staged/unstaged changes using a side-call to an LLM.",
     async handler(args, ctx) {
       await handleCommit(args, ctx);
     },
@@ -88,10 +79,7 @@ export default function (pi: ExtensionAPI): void {
     description: "Select which model to use for commit message generation.",
     async handler(_args, ctx) {
       if (!ctx.hasUI) {
-        ctx.ui.notify(
-          "/commit-model requires an interactive terminal.",
-          "warning",
-        );
+        ctx.ui.notify("/commit-model requires an interactive terminal.", "warning");
         return;
       }
       await selectModel(ctx);

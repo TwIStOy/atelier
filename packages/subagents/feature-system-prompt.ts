@@ -10,17 +10,12 @@ let cachedPrompt: string | undefined;
 
 export function subagentsFeatureSystemPrompt(): string {
   if (cachedPrompt === undefined) {
-    cachedPrompt = readFileSync(
-      path.join(promptDir, "feature-system-prompt.txt"),
-      "utf-8",
-    ).trim();
+    cachedPrompt = readFileSync(path.join(promptDir, "feature-system-prompt.txt"), "utf-8").trim();
   }
   return cachedPrompt;
 }
 
-export function shouldInjectSubagentsParentSystemPrompt(
-  ctx: Pick<ExtensionContext, "sessionManager">,
-): boolean {
+export function shouldInjectSubagentsParentSystemPrompt(ctx: Pick<ExtensionContext, "sessionManager">): boolean {
   const sessionFile = ctx.sessionManager.getSessionFile();
   if (!sessionFile) return true;
   const sessionDir = path.resolve(path.dirname(sessionFile));

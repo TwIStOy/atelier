@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { isTransitionValid } from "../state/invariants.ts";
-import { applyTaskMutation } from "../state/state-reducer.ts";
 import type { TaskState } from "../state/state.ts";
+import { applyTaskMutation } from "../state/state-reducer.ts";
 import type { Task } from "../tool/types.ts";
 
 const emptyState = (): TaskState => ({ tasks: [], nextId: 1 });
@@ -11,9 +11,7 @@ const stateWith = (...tasks: Task[]): TaskState => ({
   nextId: Math.max(0, ...tasks.map((t) => t.id)) + 1,
 });
 
-const task = (
-  overrides: Partial<Task> & { id: number; subject: string },
-): Task => ({
+const task = (overrides: Partial<Task> & { id: number; subject: string }): Task => ({
   status: "pending",
   ...overrides,
 });
@@ -42,9 +40,7 @@ describe("applyTaskMutation — create", () => {
   });
 
   it("rejects deleted blockedBy", () => {
-    const state = stateWith(
-      task({ id: 1, subject: "done", status: "deleted" }),
-    );
+    const state = stateWith(task({ id: 1, subject: "done", status: "deleted" }));
     const result = applyTaskMutation(state, "create", {
       subject: "new",
       blockedBy: [1],
@@ -122,10 +118,7 @@ describe("applyTaskMutation — update", () => {
   });
 
   it("rejects cycle in blockedBy graph", () => {
-    const state = stateWith(
-      task({ id: 1, subject: "a", blockedBy: [2] }),
-      task({ id: 2, subject: "b" }),
-    );
+    const state = stateWith(task({ id: 1, subject: "a", blockedBy: [2] }), task({ id: 2, subject: "b" }));
     const result = applyTaskMutation(state, "update", {
       id: 2,
       addBlockedBy: [1],
@@ -137,10 +130,7 @@ describe("applyTaskMutation — update", () => {
   });
 
   it("drops blockedBy field when merged set becomes empty", () => {
-    const state = stateWith(
-      task({ id: 1, subject: "a", blockedBy: [2] }),
-      task({ id: 2, subject: "b" }),
-    );
+    const state = stateWith(task({ id: 1, subject: "a", blockedBy: [2] }), task({ id: 2, subject: "b" }));
     const result = applyTaskMutation(state, "update", {
       id: 1,
       removeBlockedBy: [2],
@@ -150,9 +140,7 @@ describe("applyTaskMutation — update", () => {
   });
 
   it("drops metadata key when value is null", () => {
-    const state = stateWith(
-      task({ id: 1, subject: "x", metadata: { a: 1, b: 2 } }),
-    );
+    const state = stateWith(task({ id: 1, subject: "x", metadata: { a: 1, b: 2 } }));
     const result = applyTaskMutation(state, "update", {
       id: 1,
       metadata: { a: null },
@@ -161,9 +149,7 @@ describe("applyTaskMutation — update", () => {
   });
 
   it("sets and overwrites metadata keys when value is non-null", () => {
-    const state = stateWith(
-      task({ id: 1, subject: "x", metadata: { a: 1, b: 2 } }),
-    );
+    const state = stateWith(task({ id: 1, subject: "x", metadata: { a: 1, b: 2 } }));
     const result = applyTaskMutation(state, "update", {
       id: 1,
       metadata: { a: 99, c: 3 },

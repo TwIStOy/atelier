@@ -1,14 +1,11 @@
-import { describe, expect, it, vi } from "vitest";
-import { Readable } from "node:stream";
 import { existsSync } from "node:fs";
-import { VadPipeline } from "../audio/vad-pipeline.ts";
-import type { VadPipelineCallbacks } from "../audio/vad-pipeline.ts";
+import { Readable } from "node:stream";
+import { describe, expect, it, vi } from "vitest";
 import type { StreamCapture } from "../audio/stream-capture.ts";
+import type { SegmenterCallbacks, VadSegmenter } from "../audio/vad/segmenter.ts";
 import type { SileroVad } from "../audio/vad/silero.ts";
-import type {
-  SegmenterCallbacks,
-  VadSegmenter,
-} from "../audio/vad/segmenter.ts";
+import type { VadPipelineCallbacks } from "../audio/vad-pipeline.ts";
+import { VadPipeline } from "../audio/vad-pipeline.ts";
 import type { VadConfig } from "../types.ts";
 
 const VAD_CONFIG: VadConfig = {
@@ -30,7 +27,7 @@ function fakeVad(prob: number): SileroVad {
 function fakeSegmenter(): VadSegmenter & {
   fireSegment(samples: Float32Array[]): void;
 } {
-  let cb: SegmenterCallbacks = {};
+  const cb: SegmenterCallbacks = {};
   return {
     push: vi.fn(),
     close: vi.fn(() => null),
@@ -76,10 +73,7 @@ function makePipeline(
   const segmenter = overrides.segmenter ?? fakeSegmenter();
   const transcribe =
     overrides.transcribe ??
-    (vi.fn(async () => "hello") as unknown as (
-      file: string,
-      signal?: AbortSignal,
-    ) => Promise<string>);
+    (vi.fn(async () => "hello") as unknown as (file: string, signal?: AbortSignal) => Promise<string>);
   const transcripts: Array<{ text: string; index: number }> = [];
   const states: string[] = [];
   const errors: unknown[] = [];
@@ -182,9 +176,7 @@ describe("VadPipeline — cancel", () => {
     const transcribe = vi.fn(
       (_file: string, signal?: AbortSignal) =>
         new Promise<string>((_resolve, reject) => {
-          signal?.addEventListener("abort", () =>
-            reject(new DOMException("aborted", "AbortError")),
-          );
+          signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
         }),
     );
     const { pipeline, fire, capture } = makePipeline({ transcribe });

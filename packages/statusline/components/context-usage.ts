@@ -1,9 +1,5 @@
 import type { ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
-import {
-  formatTokens,
-  formatProgressBar,
-  usagePercentStressLevel,
-} from "@htwang-contrib/common";
+import { formatProgressBar, formatTokens, usagePercentStressLevel } from "@htwang-contrib/common";
 import type { StatusLineComponent } from "./base.ts";
 
 export class ContextUsageComponent implements StatusLineComponent {
@@ -24,11 +20,7 @@ export class ContextUsageComponent implements StatusLineComponent {
     const bar = formatProgressBar(pct, 10);
 
     const stress = usagePercentStressLevel(pct);
-    const pctColor =
-      stress === "high" ? "error" : stress === "medium" ? "warning" : "dim";
-    return [
-      theme.fg(pctColor, pctStr) +
-        theme.fg("text", ` ${currentStr}${bar}${maxStr}`),
-    ];
+    const pctColor = stress === "high" ? "error" : stress === "medium" ? "warning" : "dim";
+    return [theme.fg(pctColor, pctStr) + theme.fg("text", ` ${currentStr}${bar}${maxStr}`)];
   }
 }

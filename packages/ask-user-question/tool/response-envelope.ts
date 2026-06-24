@@ -1,24 +1,16 @@
 import { formatAnswerScalar } from "./format-answer.ts";
-import type {
-  QuestionAnswer,
-  QuestionnaireResult,
-  QuestionParams,
-} from "./types.ts";
+import type { QuestionAnswer, QuestionnaireResult, QuestionParams } from "./types.ts";
 
 export const DECLINE_MESSAGE = "User declined to answer questions";
 export const ENVELOPE_PREFIX = "User has answered your questions:";
-export const ENVELOPE_SUFFIX =
-  "You can now continue with the user's answers in mind.";
+export const ENVELOPE_SUFFIX = "You can now continue with the user's answers in mind.";
 
 /**
  * Map a `QuestionnaireResult` (or null/cancelled) to the LLM-facing tool envelope.
  * Pure of `(result, params)`; cancelled and "no segments" both fall to `DECLINE_MESSAGE`
  * so the model sees a single canonical "didn't answer" signal regardless of why.
  */
-export function buildQuestionnaireResponse(
-  result: QuestionnaireResult | null | undefined,
-  params: QuestionParams,
-) {
+export function buildQuestionnaireResponse(result: QuestionnaireResult | null | undefined, params: QuestionParams) {
   if (!result || result.cancelled) {
     return buildToolResult(DECLINE_MESSAGE, {
       answers: result?.answers ?? [],
@@ -36,10 +28,7 @@ export function buildQuestionnaireResponse(
       cancelled: true,
     });
   }
-  return buildToolResult(
-    `${ENVELOPE_PREFIX} ${segments.join(" ")} ${ENVELOPE_SUFFIX}`,
-    result,
-  );
+  return buildToolResult(`${ENVELOPE_PREFIX} ${segments.join(" ")} ${ENVELOPE_SUFFIX}`, result);
 }
 
 /**
@@ -47,11 +36,8 @@ export function buildQuestionnaireResponse(
  * the optional `selected preview:` / `user notes:` suffixes are pinned by envelope tests.
  */
 export function buildAnswerSegment(a: QuestionAnswer): string {
-  const parts: string[] = [
-    `"${a.question}"="${formatAnswerScalar(a, "envelope")}"`,
-  ];
-  if (a.preview && a.preview.length > 0)
-    parts.push(`selected preview: ${a.preview}`);
+  const parts: string[] = [`"${a.question}"="${formatAnswerScalar(a, "envelope")}"`];
+  if (a.preview && a.preview.length > 0) parts.push(`selected preview: ${a.preview}`);
   if (a.notes && a.notes.length > 0) parts.push(`user notes: ${a.notes}`);
   return `${parts.join(". ")}.`;
 }

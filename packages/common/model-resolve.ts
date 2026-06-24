@@ -10,23 +10,18 @@ const TIER_ID_CONTAINS = 2;
 const TIER_NAME_CONTAINS = 1;
 const TIER_PROVIDER_ID_CONTAINS = 0;
 
-function matchTier(
-  model: ResolvableModel,
-  pattern: string,
-): { tier: number; target: string } | null {
+function matchTier(model: ResolvableModel, pattern: string): { tier: number; target: string } | null {
   const p = pattern.toLowerCase();
   const id = model.id.toLowerCase();
   const name = model.name.toLowerCase();
   const provider = (model.provider ?? "").toLowerCase();
   const providerSlashId = provider ? `${provider}/${id}` : "";
 
-  if (providerSlashId && p === providerSlashId)
-    return { tier: TIER_EXACT_PROVIDER_MODEL, target: providerSlashId };
+  if (providerSlashId && p === providerSlashId) return { tier: TIER_EXACT_PROVIDER_MODEL, target: providerSlashId };
   if (id === p) return { tier: TIER_EXACT_ID, target: id };
   if (id.includes(p)) return { tier: TIER_ID_CONTAINS, target: id };
   if (name.includes(p)) return { tier: TIER_NAME_CONTAINS, target: name };
-  if (providerSlashId.includes(p))
-    return { tier: TIER_PROVIDER_ID_CONTAINS, target: providerSlashId };
+  if (providerSlashId.includes(p)) return { tier: TIER_PROVIDER_ID_CONTAINS, target: providerSlashId };
 
   return null;
 }
@@ -126,10 +121,7 @@ function compareRanked(a: RankedMatch, b: RankedMatch): number {
   return a.ratio - b.ratio;
 }
 
-export function resolveModel<T extends ResolvableModel>(
-  models: T[],
-  pattern: string,
-): T | undefined {
+export function resolveModel<T extends ResolvableModel>(models: T[], pattern: string): T | undefined {
   if (models.length === 0 || !pattern) return undefined;
 
   let best: RankedMatch | undefined;

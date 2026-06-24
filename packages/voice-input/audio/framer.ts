@@ -21,10 +21,7 @@ export function s16leBytesToFloat32(bytes: Uint8Array): Float32Array {
   return out;
 }
 
-export function pushChunk(
-  chunk: Uint8Array,
-  state: FramerState,
-): Float32Array[] {
+export function pushChunk(chunk: Uint8Array, state: FramerState): Float32Array[] {
   const combined = concatBytes(state.buffer, chunk);
   const frameCount = Math.floor(combined.length / FRAME_BYTES);
   const consumed = frameCount * FRAME_BYTES;

@@ -2,16 +2,16 @@ import type { Theme } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import type {
   ConfigItem,
+  ConfigItemPreviewHandle,
+  MultiSelectConfigItem,
   ReorderableConfigItem,
   SelectConfigItem,
-  MultiSelectConfigItem,
-  ConfigItemPreviewHandle,
 } from "@htwang-contrib/common";
-import { glyphs } from "./glyphs.ts";
-import { SELECT_PAGE_SIZE } from "../types.ts";
 import { buildSelectDisplayOptions } from "../config-registry.ts";
-import { divider, pad, wrapLine } from "./frame.ts";
 import type { InlineEditState, SelectingState, SettingRow } from "../types.ts";
+import { SELECT_PAGE_SIZE } from "../types.ts";
+import { divider, pad, wrapLine } from "./frame.ts";
+import { glyphs } from "./glyphs.ts";
 
 const HEX_COLOR_RE = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 
@@ -34,11 +34,7 @@ export function colorFg(hex: string, text: string): string {
   return `\x1b[38;2;${r};${g};${b}m${text}\x1b[39m`;
 }
 
-export function formatSettingValue(
-  item: ConfigItem,
-  value: unknown,
-  colorBlock?: string,
-): string {
+export function formatSettingValue(item: ConfigItem, value: unknown, colorBlock?: string): string {
   if (value === undefined || value === null) return "(unset)";
   if (item.secret) return "••••••";
   switch (item.type) {
@@ -46,28 +42,18 @@ export function formatSettingValue(
       return value ? "true" : "false";
     case "select": {
       const selectItem = item as SelectConfigItem;
-      const opts =
-        typeof selectItem.options === "function"
-          ? selectItem.options()
-          : selectItem.options;
-      const matched = opts.find(
-        (o) => JSON.stringify(o.value) === JSON.stringify(value),
-      );
+      const opts = typeof selectItem.options === "function" ? selectItem.options() : selectItem.options;
+      const matched = opts.find((o) => JSON.stringify(o.value) === JSON.stringify(value));
       return matched?.label ?? String(value);
     }
     case "multiselect": {
       const msItem = item as MultiSelectConfigItem;
-      const opts =
-        typeof msItem.options === "function"
-          ? msItem.options()
-          : msItem.options;
+      const opts = typeof msItem.options === "function" ? msItem.options() : msItem.options;
       const vals = value as unknown[];
       if (!Array.isArray(vals) || vals.length === 0) return "(none)";
       const labels = vals
         .map((v) => {
-          const opt = opts.find(
-            (o) => JSON.stringify(o.value) === JSON.stringify(v),
-          );
+          const opt = opts.find((o) => JSON.stringify(o.value) === JSON.stringify(v));
           return opt?.label ?? String(v);
         })
         .join(", ");
@@ -75,17 +61,12 @@ export function formatSettingValue(
     }
     case "reorderable": {
       const roItem = item as ReorderableConfigItem;
-      const opts =
-        typeof roItem.options === "function"
-          ? roItem.options()
-          : roItem.options;
+      const opts = typeof roItem.options === "function" ? roItem.options() : roItem.options;
       const vals = value as unknown[];
       if (!Array.isArray(vals) || vals.length === 0) return "(none)";
       const labels = vals
         .map((v, i) => {
-          const opt = opts.find(
-            (o) => JSON.stringify(o.value) === JSON.stringify(v),
-          );
+          const opt = opts.find((o) => JSON.stringify(o.value) === JSON.stringify(v));
           return `${i + 1}. ${opt?.label ?? String(v)}`;
         })
         .join(", ");
@@ -158,24 +139,13 @@ export function renderSettingList(
         ? renderInlineEditValue(editing)
         : formatSettingValue(row.item, row.currentValue, colorBlock);
 
-    const valueText = valueColor(
-      theme,
-      isEditing,
-      row.isExplicit,
-      isSelected,
-    )(displayValue);
+    const valueText = valueColor(theme, isEditing, row.isExplicit, isSelected)(displayValue);
 
     const itemPad = " ";
     const gap = Math.max(1, 36 - visibleWidth(labelText));
-    const rowText = truncateToWidth(
-      `${itemPad}${label}${" ".repeat(gap)}${valueText}`,
-      width,
-      "…",
-    );
+    const rowText = truncateToWidth(`${itemPad}${label}${" ".repeat(gap)}${valueText}`, width, "…");
 
-    lines.push(
-      isSelected ? theme.bg("selectedBg", pad(rowText, width)) : rowText,
-    );
+    lines.push(isSelected ? theme.bg("selectedBg", pad(rowText, width)) : rowText);
 
     if (isSelected && !isEditing && row.item.description) {
       const descLines = wrapLine(row.item.description, Math.max(1, width - 4));
@@ -186,18 +156,10 @@ export function renderSettingList(
   }
 
   const moreBefore = scroll > 0 ? `↑ ${scroll}` : "";
-  const moreAfter =
-    scroll + listRows < rows.length
-      ? `↓ ${rows.length - scroll - listRows}`
-      : "";
+  const moreAfter = scroll + listRows < rows.length ? `↓ ${rows.length - scroll - listRows}` : "";
   if (moreBefore || moreAfter) {
     lines.push("");
-    lines.push(
-      theme.fg(
-        "dim",
-        [moreBefore, moreAfter].filter(Boolean).join(glyphs().dot),
-      ),
-    );
+    lines.push(theme.fg("dim", [moreBefore, moreAfter].filter(Boolean).join(glyphs().dot)));
   }
 
   return lines;
@@ -212,13 +174,7 @@ export function renderSelectPage(
 ): string[] {
   const safeWidth = Math.max(1, width);
   const lines: string[] = [];
-  lines.push(
-    truncateToWidth(
-      theme.fg("accent", theme.bold(`  ${row.item.label ?? row.item.key}`)),
-      safeWidth,
-      "…",
-    ),
-  );
+  lines.push(truncateToWidth(theme.fg("accent", theme.bold(`  ${row.item.label ?? row.item.key}`)), safeWidth, "…"));
 
   const desc = row.item.description;
   if (desc) {
@@ -228,11 +184,7 @@ export function renderSelectPage(
   }
   lines.push("");
 
-  const {
-    options: displayOpts,
-    reorderableOrder,
-    canFilter,
-  } = buildSelectDisplayOptions(row, selecting.filter);
+  const { options: displayOpts, reorderableOrder, canFilter } = buildSelectDisplayOptions(row, selecting.filter);
 
   if (canFilter) {
     lines.push(renderSelectSearchBar(selecting.filter, safeWidth, theme));
@@ -242,14 +194,9 @@ export function renderSelectPage(
   let selectedValues: unknown[] | undefined;
 
   if (row.item.type === "reorderable") {
-    selectedValues = Array.isArray(row.currentValue)
-      ? (row.currentValue as unknown[])
-      : [];
+    selectedValues = Array.isArray(row.currentValue) ? (row.currentValue as unknown[]) : [];
   } else {
-    selectedValues =
-      row.item.type === "multiselect"
-        ? (row.currentValue as unknown[])
-        : undefined;
+    selectedValues = row.item.type === "multiselect" ? (row.currentValue as unknown[]) : undefined;
   }
 
   const pageSize = SELECT_PAGE_SIZE;
@@ -257,13 +204,7 @@ export function renderSelectPage(
   const scrollEnd = Math.min(scrollStart + pageSize, displayOpts.length);
 
   if (scrollStart > 0) {
-    lines.push(
-      truncateToWidth(
-        theme.fg("dim", `  ↑ ${scrollStart} more above`),
-        safeWidth,
-        "",
-      ),
-    );
+    lines.push(truncateToWidth(theme.fg("dim", `  ↑ ${scrollStart} more above`), safeWidth, ""));
   }
 
   if (displayOpts.length === 0) {
@@ -274,17 +215,13 @@ export function renderSelectPage(
     const opt = displayOpts[i]!;
     const isSelected = i === selecting.selectedOptionIndex;
     if (row.item.type === "select") {
-      const isCurrent =
-        JSON.stringify(opt.value) === JSON.stringify(row.currentValue);
+      const isCurrent = JSON.stringify(opt.value) === JSON.stringify(row.currentValue);
       const marker = isCurrent ? "●" : "○";
       const content = `  ${marker} ${opt.label}`;
       lines.push(renderOptionLine(content, isSelected, safeWidth, theme));
     } else if (row.item.type === "reorderable") {
       const isChecked =
-        Array.isArray(selectedValues) &&
-        selectedValues.some(
-          (v) => JSON.stringify(v) === JSON.stringify(opt.value),
-        );
+        Array.isArray(selectedValues) && selectedValues.some((v) => JSON.stringify(v) === JSON.stringify(opt.value));
       const checkMarker = isChecked ? "\uDB80\uDD35" : "\uDB80\uDD31";
       const orderNum = reorderableOrder.get(JSON.stringify(opt.value)) ?? 0;
       const numStr = orderNum > 0 ? `${orderNum}.`.padStart(3) + " " : "    ";
@@ -293,10 +230,7 @@ export function renderSelectPage(
       lines.push(renderOptionLine(content, isSelected, safeWidth, theme));
     } else {
       const isChecked =
-        Array.isArray(selectedValues) &&
-        selectedValues.some(
-          (v) => JSON.stringify(v) === JSON.stringify(opt.value),
-        );
+        Array.isArray(selectedValues) && selectedValues.some((v) => JSON.stringify(v) === JSON.stringify(opt.value));
       const marker = isChecked ? "\uDB80\uDD35" : "\uDB80\uDD31";
       const content = `  ${marker} ${opt.label}`;
       lines.push(renderOptionLine(content, isSelected, safeWidth, theme));
@@ -304,13 +238,7 @@ export function renderSelectPage(
   }
 
   if (scrollEnd < displayOpts.length) {
-    lines.push(
-      truncateToWidth(
-        theme.fg("dim", `  ↓ ${displayOpts.length - scrollEnd} more below`),
-        safeWidth,
-        "",
-      ),
-    );
+    lines.push(truncateToWidth(theme.fg("dim", `  ↓ ${displayOpts.length - scrollEnd} more below`), safeWidth, ""));
   }
 
   if (preview) {
@@ -325,12 +253,7 @@ export function renderSelectPage(
   return lines;
 }
 
-function renderOptionLine(
-  content: string,
-  isSelected: boolean,
-  width: number,
-  theme: Theme,
-): string {
+function renderOptionLine(content: string, isSelected: boolean, width: number, theme: Theme): string {
   const safeWidth = Math.max(1, width);
   const body = isSelected ? theme.fg("text", content) : content;
   const truncated = truncateToWidth(body, safeWidth, "…");
@@ -338,11 +261,7 @@ function renderOptionLine(
   return truncated;
 }
 
-function renderSelectSearchBar(
-  search: string,
-  width: number,
-  theme: Theme,
-): string {
+function renderSelectSearchBar(search: string, width: number, theme: Theme): string {
   const cursor = theme.inverse(" ");
   const text = ` ${theme.fg("dim", ">")} ${search}${cursor}`;
   return theme.bg("toolPendingBg", pad(text, width));

@@ -2,10 +2,10 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import {
-  parseSessionEntries,
-  type SessionHeader,
   buildSessionContext,
+  parseSessionEntries,
   type SessionEntry,
+  type SessionHeader,
 } from "@earendil-works/pi-coding-agent";
 import { subagentParentIndexPath } from "../paths.ts";
 
@@ -38,27 +38,18 @@ function readLinkRecords(parentSessionId: string): SubagentLinkRecord[] {
     } catch {
       continue;
     }
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
-      continue;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) continue;
     const r = parsed as Record<string, unknown>;
-    const sub =
-      typeof r.sub_session_file === "string" ? r.sub_session_file : "";
+    const sub = typeof r.sub_session_file === "string" ? r.sub_session_file : "";
     if (!sub) continue;
     records.push({
-      parent_session_id:
-        typeof r.parent_session_id === "string"
-          ? r.parent_session_id
-          : parentSessionId,
-      parent_session_file:
-        typeof r.parent_session_file === "string" ? r.parent_session_file : "",
+      parent_session_id: typeof r.parent_session_id === "string" ? r.parent_session_id : parentSessionId,
+      parent_session_file: typeof r.parent_session_file === "string" ? r.parent_session_file : "",
       sub_session_file: sub,
       tool_calls: typeof r.tool_calls === "number" ? r.tool_calls : 0,
       ended_at: typeof r.ended_at === "string" ? r.ended_at : "",
       started_at: typeof r.started_at === "string" ? r.started_at : "",
-      status:
-        r.status === "running" || r.status === "done" || r.status === "error"
-          ? r.status
-          : undefined,
+      status: r.status === "running" || r.status === "done" || r.status === "error" ? r.status : undefined,
     });
   }
   return records;
@@ -96,9 +87,7 @@ function parseChildSession(subSessionFile: string): {
     return { entries: [], messages: [] };
   }
   const header = entries.find((e): e is SessionHeader => e.type === "session");
-  const sessionEntries = entries.filter(
-    (e): e is SessionEntry => e.type !== "session",
-  );
+  const sessionEntries = entries.filter((e): e is SessionEntry => e.type !== "session");
   const messages = buildSessionContext(sessionEntries).messages;
   return { header, entries: sessionEntries, messages };
 }
@@ -126,9 +115,7 @@ function trimLabel(text: string, max: number): string {
   return clean.slice(0, Math.max(0, max - 1)) + "…";
 }
 
-export function loadSubagentRuns(
-  parentSessionId: string,
-): SubagentRunSummary[] {
+export function loadSubagentRuns(parentSessionId: string): SubagentRunSummary[] {
   const records = readLinkRecords(parentSessionId);
   const latestByFile = new Map<string, SubagentLinkRecord>();
   for (const rec of records) {
@@ -181,10 +168,7 @@ export function loadSubagentMessages(subSessionFile: string): AgentMessage[] {
 
 /** Re-read the by-parent index and return the latest status for a child session
  * file. Used by the live viewer to detect when a running subagent finishes. */
-export function refreshRunRunning(
-  parentSessionId: string,
-  subSessionFile: string,
-): { running: boolean } {
+export function refreshRunRunning(parentSessionId: string, subSessionFile: string): { running: boolean } {
   const records = readLinkRecords(parentSessionId);
   let latest: SubagentLinkRecord | undefined;
   for (const rec of records) {

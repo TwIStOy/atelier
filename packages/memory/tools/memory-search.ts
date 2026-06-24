@@ -20,23 +20,19 @@ export const memorySearch = {
     query: Type.String({
       description: "Search keywords (tokenized, multi-term supported).",
     }),
-    limit: Type.Optional(
-      Type.Number({ description: "Max results (default 10)." }),
-    ),
+    limit: Type.Optional(Type.Number({ description: "Max results (default 10)." })),
   }),
   execute: async (_id: string, args: Record<string, unknown>) => {
     try {
       const cliArgs = ["memory", "search", args.query as string];
       if (args.limit !== undefined) cliArgs.push("--limit", String(args.limit));
       const result = await runHat(cliArgs);
-      const items = parseListResult(result).map(
-        (r: Record<string, unknown>) => ({
-          uri: r.uri ?? r.path ?? "",
-          snippet: String(r.snippet ?? r.content ?? "")
-            .split(/\r?\n/)[0]
-            ?.slice(0, 120),
-        }),
-      );
+      const items = parseListResult(result).map((r: Record<string, unknown>) => ({
+        uri: r.uri ?? r.path ?? "",
+        snippet: String(r.snippet ?? r.content ?? "")
+          .split(/\r?\n/)[0]
+          ?.slice(0, 120),
+      }));
       return jsonResult(result, {
         query: args.query,
         total: items.length,

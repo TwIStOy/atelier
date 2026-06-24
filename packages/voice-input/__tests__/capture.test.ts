@@ -1,7 +1,7 @@
 import { EventEmitter } from "node:events";
 import { describe, expect, it, vi } from "vitest";
-import { LocalAudioCapture } from "../audio/capture.ts";
 import type { RecorderChildProcess, SpawnFn } from "../audio/capture.ts";
+import { LocalAudioCapture } from "../audio/capture.ts";
 import type { ResolvedRecorder } from "../audio/recorder.ts";
 
 interface FakeChild extends RecorderChildProcess {

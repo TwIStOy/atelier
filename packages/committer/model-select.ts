@@ -1,11 +1,8 @@
-import type {
-  ExtensionContext,
-  ExtensionCommandContext,
-} from "@earendil-works/pi-coding-agent";
 import type { Model } from "@earendil-works/pi-ai";
-import { resolveModel, readConfig, updateConfig } from "@htwang-contrib/common";
+import type { ExtensionCommandContext, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { ExtensionConfigSchema } from "@htwang-contrib/common";
-import { ModelSelectController, buildModelEntries } from "./model-selector.ts";
+import { readConfig, resolveModel, updateConfig } from "@htwang-contrib/common";
+import { buildModelEntries, ModelSelectController } from "./model-selector.ts";
 
 export interface CommitterConfig {
   model: string;
@@ -37,20 +34,14 @@ function saveConfig(patch: Partial<CommitterConfig>): CommitterConfig {
   return updateConfig(CONFIG_NAME, CONFIG_SCHEMA, patch);
 }
 
-export function getConfiguredModel(
-  ctx: ExtensionContext,
-): AnyModel | undefined {
+export function getConfiguredModel(ctx: ExtensionContext): AnyModel | undefined {
   const config = loadConfig();
   if (!config.model) return undefined;
   const models = ctx.modelRegistry.getAvailable();
-  return (
-    (resolveModel(models, config.model) as AnyModel | undefined) ?? undefined
-  );
+  return (resolveModel(models, config.model) as AnyModel | undefined) ?? undefined;
 }
 
-export async function selectModel(
-  ctx: ExtensionCommandContext,
-): Promise<AnyModel | undefined> {
+export async function selectModel(ctx: ExtensionCommandContext): Promise<AnyModel | undefined> {
   const models = ctx.modelRegistry.getAvailable();
   if (models.length === 0) {
     ctx.ui.notify("No models available.", "warning");
@@ -59,9 +50,7 @@ export async function selectModel(
 
   const sessionModel = ctx.model as AnyModel | undefined;
   const config = loadConfig();
-  const configuredModel = config.model
-    ? (resolveModel(models, config.model) as AnyModel | undefined)
-    : undefined;
+  const configuredModel = config.model ? (resolveModel(models, config.model) as AnyModel | undefined) : undefined;
   const effectiveDefault = configuredModel ?? sessionModel;
 
   const modelEntries = buildModelEntries(models as AnyModel[]);
@@ -69,19 +58,12 @@ export async function selectModel(
   let defaultIdx = 0;
   if (effectiveDefault) {
     const idx = modelEntries.findIndex(
-      (e) =>
-        e.model.provider === effectiveDefault.provider &&
-        e.model.id === effectiveDefault.id,
+      (e) => e.model.provider === effectiveDefault.provider && e.model.id === effectiveDefault.id,
     );
     if (idx >= 0) defaultIdx = idx;
   }
 
-  const result = await ModelSelectController.show(
-    ctx,
-    modelEntries,
-    sessionModel,
-    defaultIdx,
-  );
+  const result = await ModelSelectController.show(ctx, modelEntries, sessionModel, defaultIdx);
 
   if (result === undefined) return undefined;
 
@@ -92,9 +74,7 @@ export async function selectModel(
   return result;
 }
 
-export function resolveCommitModel(
-  ctx: ExtensionContext,
-): AnyModel | undefined {
+export function resolveCommitModel(ctx: ExtensionContext): AnyModel | undefined {
   const selected = getConfiguredModel(ctx);
   return selected ?? (ctx.model as AnyModel | undefined);
 }

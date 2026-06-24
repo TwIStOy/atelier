@@ -1,13 +1,9 @@
-import { join } from "node:path";
 import { tmpdir } from "node:os";
-import {
-  readConfig,
-  registerConfigItems,
-  type ExtensionConfigSchema,
-} from "@htwang-contrib/common";
-import { PROVIDERS } from "./providers/index.ts";
-import { createSearchProvider } from "./providers/factory.ts";
+import { join } from "node:path";
+import { type ExtensionConfigSchema, readConfig, registerConfigItems } from "@htwang-contrib/common";
 import { ProviderError } from "./providers/errors.ts";
+import { createSearchProvider } from "./providers/factory.ts";
+import { PROVIDERS } from "./providers/index.ts";
 import type { FullProvider, SearchProvider } from "./providers/types.ts";
 
 export interface WebToolsConfig {
@@ -66,8 +62,7 @@ export function registerWebToolsConfigItems(): void {
       type: "reorderable",
       label: "Search Providers",
       value: () => loadConfig().providers,
-      description:
-        "Ordered provider chain. On rate limit, falls through to the next provider.",
+      description: "Ordered provider chain. On rate limit, falls through to the next provider.",
       extensionLabel: "Web Tools",
       order: 0,
       options: () =>
@@ -102,8 +97,7 @@ export function registerWebToolsConfigItems(): void {
       type: "number",
       label: "GitHub Max Repo Size (MB)",
       value: () => loadConfig().githubMaxRepoSizeMB,
-      description:
-        "Repos above this threshold use the API view instead of cloning",
+      description: "Repos above this threshold use the API view instead of cloning",
       extensionLabel: "Web Tools",
       order: 101,
       min: 10,

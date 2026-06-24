@@ -84,9 +84,7 @@ describe("pushChunk framing", () => {
 
   it("emits 2 frames and keeps remainder for 2.5 frames of bytes", () => {
     const state = createFramerState();
-    const twoAndHalf = encodeS16le(
-      new Array(FRAME_SAMPLES * 2 + FRAME_SAMPLES / 2).fill(0),
-    );
+    const twoAndHalf = encodeS16le(new Array(FRAME_SAMPLES * 2 + FRAME_SAMPLES / 2).fill(0));
     const frames = pushChunk(twoAndHalf, state);
     expect(frames).toHaveLength(2);
     expect(remainingBytes(state)).toBe(FRAME_BYTES / 2);

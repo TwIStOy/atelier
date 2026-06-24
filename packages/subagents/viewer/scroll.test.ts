@@ -1,13 +1,13 @@
-import { describe, it, expect, vi } from "vitest";
+import * as crypto from "node:crypto";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import * as crypto from "node:crypto";
 import { initTheme, type Theme } from "@earendil-works/pi-coding-agent";
 import type { TUI } from "@earendil-works/pi-tui";
-import { SubagentViewerOverlay } from "./overlay.ts";
-import type { SubagentRunSummary } from "./index.ts";
+import { describe, expect, it, vi } from "vitest";
 import { recordSubagentStarted, subagentParentIndexPath } from "../paths.ts";
+import type { SubagentRunSummary } from "./index.ts";
+import { SubagentViewerOverlay } from "./overlay.ts";
 
 initTheme(undefined, false);
 
@@ -148,16 +148,12 @@ describe("SubagentViewerOverlay scroll + sticky-bottom", () => {
       });
       for (let i = 0; i < 20; i++) overlay.handleInput(ARROW_UP); // away from bottom
       overlay.handleInput("G"); // re-pin via G to reset baseline
-      expect(overlay.render(80).join("\n")).toContain(
-        "line 39 of the transcript",
-      );
+      expect(overlay.render(80).join("\n")).toContain("line 39 of the transcript");
       // unpin again, then scroll down to bottom -> follow re-enables
       for (let i = 0; i < 15; i++) overlay.handleInput(ARROW_UP);
       // now hammer down arrow past the end
       for (let i = 0; i < 60; i++) overlay.handleInput(ARROW_DOWN);
-      expect(overlay.render(80).join("\n")).toContain(
-        "line 39 of the transcript",
-      );
+      expect(overlay.render(80).join("\n")).toContain("line 39 of the transcript");
       overlay.dispose();
     } finally {
       fs.rmSync(path.dirname(file), { recursive: true, force: true });
@@ -166,8 +162,7 @@ describe("SubagentViewerOverlay scroll + sticky-bottom", () => {
 
   it("when sticky, appending to the child file keeps the view at the latest line", () => {
     const file = makeChildSession(5);
-    const sessionId =
-      "test-scroll-live-" + crypto.randomBytes(4).toString("hex");
+    const sessionId = "test-scroll-live-" + crypto.randomBytes(4).toString("hex");
     recordSubagentStarted(sessionId, {
       parent_session_file: "",
       sub_session_file: file,
@@ -183,16 +178,13 @@ describe("SubagentViewerOverlay scroll + sticky-bottom", () => {
         onAction: () => {},
       });
       // baseline: last visible line is line 4
-      expect(overlay.render(80).join("\n")).toContain(
-        "line 4 of the transcript",
-      );
+      expect(overlay.render(80).join("\n")).toContain("line 4 of the transcript");
       // simulate live growth: append many more assistant messages to disk,
       // chained off the current leaf so buildSessionContext still resolves the
       // full transcript (not just the new leaf).
       const lines = fs.readFileSync(file, "utf8").trim().split("\n");
       const lastEntry = JSON.parse(lines[lines.length - 1]!);
-      let prev: string | null =
-        typeof lastEntry.id === "string" ? lastEntry.id : null;
+      let prev: string | null = typeof lastEntry.id === "string" ? lastEntry.id : null;
       for (let i = 5; i < 40; i++) {
         prev = appendMsg(file, prev, {
           role: "assistant",
@@ -202,9 +194,7 @@ describe("SubagentViewerOverlay scroll + sticky-bottom", () => {
       // force a live tick (normally driven by the interval)
       overlay.tickNow();
       // because we never scrolled up, view should follow the newest line
-      expect(overlay.render(80).join("\n")).toContain(
-        "line 39 of the transcript",
-      );
+      expect(overlay.render(80).join("\n")).toContain("line 39 of the transcript");
       overlay.dispose();
     } finally {
       fs.rmSync(path.dirname(file), { recursive: true, force: true });

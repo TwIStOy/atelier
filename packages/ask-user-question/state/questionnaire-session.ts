@@ -1,10 +1,6 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { getKeybindings, type Input } from "@earendil-works/pi-tui";
-import type {
-  QuestionData,
-  QuestionnaireResult,
-  QuestionParams,
-} from "../tool/types.ts";
+import type { QuestionData, QuestionnaireResult, QuestionParams } from "../tool/types.ts";
 import type { WrappingSelectItem } from "../view/components/wrapping-select.ts";
 import type { QuestionnairePropsAdapter } from "../view/props-adapter.ts";
 import { buildQuestionnaire } from "./build-questionnaire.ts";
@@ -79,11 +75,7 @@ export class QuestionnaireSession {
     // Seed from the focused option at start; the reducer keeps it in sync via withFocusedOptionHasPreview.
     this.state = {
       ...this.state,
-      focusedOptionHasPreview: computeFocusedOptionHasPreview(
-        this.questions,
-        0,
-        0,
-      ),
+      focusedOptionHasPreview: computeFocusedOptionHasPreview(this.questions, 0, 0),
     };
 
     const built = buildQuestionnaire({
@@ -193,8 +185,7 @@ export class QuestionnaireSession {
   }
 
   private currentItem(): WrappingSelectItem | undefined {
-    if (this.state.chatFocused)
-      return { kind: "chat", label: ROW_INTENT_META.chat.label };
+    if (this.state.chatFocused) return { kind: "chat", label: ROW_INTENT_META.chat.label };
     const arr = this.itemsByTab[this.state.currentTab] ?? [];
     if (this.state.optionIndex < arr.length) return arr[this.state.optionIndex];
     return { kind: "chat", label: ROW_INTENT_META.chat.label };

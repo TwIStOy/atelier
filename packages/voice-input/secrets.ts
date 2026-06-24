@@ -20,10 +20,7 @@ const SECRET_PATTERNS: readonly SecretPattern[] = [
   },
 ];
 
-export function redactSecrets(
-  value: unknown,
-  additionalSecrets: ReadonlyArray<unknown> = [],
-): string {
+export function redactSecrets(value: unknown, additionalSecrets: ReadonlyArray<unknown> = []): string {
   let text = value == null ? "" : String(value);
   for (const { re, replacement } of SECRET_PATTERNS) {
     text = text.replace(re, replacement);
@@ -49,9 +46,6 @@ function extractMessage(error: unknown): string {
   return String(error);
 }
 
-export function safeError(
-  error: unknown,
-  additionalSecrets: ReadonlyArray<unknown> = [],
-): string {
+export function safeError(error: unknown, additionalSecrets: ReadonlyArray<unknown> = []): string {
   return redactSecrets(extractMessage(error), additionalSecrets);
 }

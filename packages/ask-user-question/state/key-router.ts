@@ -40,10 +40,7 @@ export function wrapTab(index: number, total: number): number {
   return ((index % total) + total) % total;
 }
 
-export function allAnswered(
-  state: QuestionnaireState,
-  runtime: QuestionnaireRuntime,
-): boolean {
+export function allAnswered(state: QuestionnaireState, runtime: QuestionnaireRuntime): boolean {
   if (runtime.questions.length === 0) return false;
   for (let i = 0; i < runtime.questions.length; i++) {
     if (!state.answers.has(i)) return false;
@@ -55,20 +52,13 @@ function totalTabs(runtime: QuestionnaireRuntime): number {
   return runtime.isMulti ? runtime.questions.length + 1 : 1;
 }
 
-function computeAutoAdvanceTab(
-  state: QuestionnaireState,
-  runtime: QuestionnaireRuntime,
-): number | undefined {
+function computeAutoAdvanceTab(state: QuestionnaireState, runtime: QuestionnaireRuntime): number | undefined {
   if (!runtime.isMulti) return undefined;
-  if (state.currentTab < runtime.questions.length - 1)
-    return state.currentTab + 1;
+  if (state.currentTab < runtime.questions.length - 1) return state.currentTab + 1;
   return runtime.questions.length;
 }
 
-function buildSingleSelectAnswer(
-  state: QuestionnaireState,
-  runtime: QuestionnaireRuntime,
-): QuestionAnswer | null {
+function buildSingleSelectAnswer(state: QuestionnaireState, runtime: QuestionnaireRuntime): QuestionAnswer | null {
   const q = runtime.questions[state.currentTab];
   if (!q) return null;
 
@@ -109,10 +99,7 @@ function buildSingleSelectAnswer(
   };
 }
 
-function buildMultiSelected(
-  state: QuestionnaireState,
-  runtime: QuestionnaireRuntime,
-): string[] {
+function buildMultiSelected(state: QuestionnaireState, runtime: QuestionnaireRuntime): string[] {
   const q = runtime.questions[state.currentTab];
   if (!q) return [];
   const out: string[] = [];
@@ -148,47 +135,28 @@ function tabSwitchAction(
 }
 
 // DOWN at the last item emits focus_chat so the cycle [chat, option0, …, optionLast] wraps.
-function nextNavOnDown(
-  state: QuestionnaireState,
-  runtime: QuestionnaireRuntime,
-): QuestionnaireAction {
-  if (
-    runtime.items.length > 0 &&
-    state.optionIndex === runtime.items.length - 1
-  ) {
+function nextNavOnDown(state: QuestionnaireState, runtime: QuestionnaireRuntime): QuestionnaireAction {
+  if (runtime.items.length > 0 && state.optionIndex === runtime.items.length - 1) {
     return { kind: "focus_chat" };
   }
   return {
     kind: "nav",
-    nextIndex: wrapTab(
-      state.optionIndex + 1,
-      Math.max(1, runtime.items.length),
-    ),
+    nextIndex: wrapTab(state.optionIndex + 1, Math.max(1, runtime.items.length)),
   };
 }
 
 // UP at the top item emits focus_chat (symmetric with nextNavOnDown).
-function prevNavOnUp(
-  state: QuestionnaireState,
-  runtime: QuestionnaireRuntime,
-): QuestionnaireAction {
+function prevNavOnUp(state: QuestionnaireState, runtime: QuestionnaireRuntime): QuestionnaireAction {
   if (runtime.items.length > 0 && state.optionIndex === 0) {
     return { kind: "focus_chat" };
   }
   return {
     kind: "nav",
-    nextIndex: wrapTab(
-      state.optionIndex - 1,
-      Math.max(1, runtime.items.length),
-    ),
+    nextIndex: wrapTab(state.optionIndex - 1, Math.max(1, runtime.items.length)),
   };
 }
 
-export function routeKey(
-  data: string,
-  state: QuestionnaireState,
-  runtime: QuestionnaireRuntime,
-): QuestionnaireAction {
+export function routeKey(data: string, state: QuestionnaireState, runtime: QuestionnaireRuntime): QuestionnaireAction {
   const kb = runtime.keybindings;
 
   if (state.notesVisible) {
@@ -257,9 +225,7 @@ export function routeKey(
       // D1 (revised): Submit always submits; Cancel always cancels. The warning header
       // is informational only — `allAnswered(state)` no longer gates submission. Partial
       // answers flow through `orderedAnswers()` in the host.
-      return state.submitChoiceIndex === 1
-        ? { kind: "cancel" }
-        : { kind: "submit" };
+      return state.submitChoiceIndex === 1 ? { kind: "cancel" } : { kind: "submit" };
     }
     return { kind: "ignore" };
   }
@@ -270,11 +236,7 @@ export function routeKey(
   const q = runtime.questions[state.currentTab];
   if (!q) return { kind: "ignore" };
 
-  if (
-    data === NOTES_ACTIVATE_KEY &&
-    !q.multiSelect &&
-    state.focusedOptionHasPreview
-  ) {
+  if (data === NOTES_ACTIVATE_KEY && !q.multiSelect && state.focusedOptionHasPreview) {
     return { kind: "notes_enter" };
   }
 
@@ -300,8 +262,7 @@ export function routeKey(
       // gated behind explicit focus on a row whose META declares `autoSubmitsInMulti`
       // (the Next sentinel), so Enter on options is a no-cost way to flip checkboxes
       // without leaving the keyboard home row.
-      if (!focusedMeta?.autoSubmitsInMulti)
-        return { kind: "toggle", index: state.optionIndex };
+      if (!focusedMeta?.autoSubmitsInMulti) return { kind: "toggle", index: state.optionIndex };
       // Enter on Next: carry autoAdvanceTab so the host can advance to the next tab in
       // multi-question mode, OR submit the dialog in single-question mode
       // (autoAdvanceTab === undefined when !isMulti). Without this, a single multi-select

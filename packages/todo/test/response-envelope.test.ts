@@ -17,9 +17,7 @@ const t = (over: Partial<Task> & { id: number; subject: string }): Task => ({
 describe("formatContent", () => {
   it("create — 'Created #id: subject (pending)'", () => {
     const state = stateWith(t({ id: 1, subject: "alpha" }));
-    expect(formatContent({ kind: "create", taskId: 1 }, state)).toBe(
-      "Created #1: alpha (pending)",
-    );
+    expect(formatContent({ kind: "create", taskId: 1 }, state)).toBe("Created #1: alpha (pending)");
   });
 
   it("update — emits transition tuple when statuses differ", () => {
@@ -46,22 +44,16 @@ describe("formatContent", () => {
 
   it("delete — 'Deleted #id: subject'", () => {
     const state = stateWith(t({ id: 1, subject: "ship", status: "deleted" }));
-    expect(
-      formatContent({ kind: "delete", id: 1, subject: "ship" }, state),
-    ).toBe("Deleted #1: ship");
+    expect(formatContent({ kind: "delete", id: 1, subject: "ship" }, state)).toBe("Deleted #1: ship");
   });
 
   it("clear — emits prior count", () => {
-    expect(formatContent({ kind: "clear", count: 4 }, stateWith())).toBe(
-      "Cleared 4 tasks",
-    );
+    expect(formatContent({ kind: "clear", count: 4 }, stateWith())).toBe("Cleared 4 tasks");
   });
 
   it("list — 'No tasks' when filtered view is empty", () => {
     const state = stateWith(t({ id: 1, subject: "x", status: "deleted" }));
-    expect(formatContent({ kind: "list", includeDeleted: false }, state)).toBe(
-      "No tasks",
-    );
+    expect(formatContent({ kind: "list", includeDeleted: false }, state)).toBe("No tasks");
   });
 
   it("list — joins per-task '[status] #id subject' lines", () => {
@@ -111,9 +103,7 @@ describe("formatContent", () => {
       }),
     );
     const op: Op = { kind: "get", task: state.tasks[0]! };
-    expect(formatContent(op, state)).toBe(
-      "#1 [in_progress] build\n  activeForm: Building",
-    );
+    expect(formatContent(op, state)).toBe("#1 [in_progress] build\n  activeForm: Building");
   });
 
   it("list — statusFilter narrows to a single status", () => {
@@ -122,44 +112,31 @@ describe("formatContent", () => {
       t({ id: 2, subject: "b", status: "in_progress", activeForm: "Working" }),
       t({ id: 3, subject: "c", status: "completed" }),
     );
-    expect(
-      formatContent(
-        { kind: "list", includeDeleted: false, statusFilter: "in_progress" },
-        state,
-      ),
-    ).toBe("[in_progress] #2 b (Working)");
+    expect(formatContent({ kind: "list", includeDeleted: false, statusFilter: "in_progress" }, state)).toBe(
+      "[in_progress] #2 b (Working)",
+    );
   });
 
   it("list — includeDeleted=true surfaces tombstoned rows", () => {
     const state = stateWith(t({ id: 1, subject: "x", status: "deleted" }));
-    expect(formatContent({ kind: "list", includeDeleted: true }, state)).toBe(
-      "[deleted] #1 x",
-    );
+    expect(formatContent({ kind: "list", includeDeleted: true }, state)).toBe("[deleted] #1 x");
   });
 
   it("list — '⛓ #id,…' suffix appears when task has blockedBy", () => {
-    const state = stateWith(
-      t({ id: 1, subject: "leaf" }),
-      t({ id: 2, subject: "task", blockedBy: [1] }),
-    );
+    const state = stateWith(t({ id: 1, subject: "leaf" }), t({ id: 2, subject: "task", blockedBy: [1] }));
     expect(formatContent({ kind: "list", includeDeleted: false }, state)).toBe(
       "[pending] #1 leaf\n[pending] #2 task ⛓ #1",
     );
   });
 
   it("create — defensive fallback when op.taskId is unknown to state", () => {
-    expect(formatContent({ kind: "create", taskId: 999 }, stateWith())).toBe(
-      "Created #999",
-    );
+    expect(formatContent({ kind: "create", taskId: 999 }, stateWith())).toBe("Created #999");
   });
 
   it("error — 'Error: <message>'", () => {
-    expect(
-      formatContent(
-        { kind: "error", message: "subject required for create" },
-        stateWith(),
-      ),
-    ).toBe("Error: subject required for create");
+    expect(formatContent({ kind: "error", message: "subject required for create" }, stateWith())).toBe(
+      "Error: subject required for create",
+    );
   });
 });
 

@@ -1,15 +1,6 @@
-import {
-  keyText,
-  Theme,
-  truncateToVisualLines,
-} from "@earendil-works/pi-coding-agent";
-import { truncateDisplay, trimTrailingEmpty } from "@htwang-contrib/common";
-import {
-  Container,
-  truncateToWidth,
-  visibleWidth,
-  wrapTextWithAnsi,
-} from "@earendil-works/pi-tui";
+import { keyText, type Theme, truncateToVisualLines } from "@earendil-works/pi-coding-agent";
+import { Container, truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
+import { trimTrailingEmpty, truncateDisplay } from "@htwang-contrib/common";
 import { formatExpandedToolOutputLines } from "./adapters/shared.ts";
 import { loadConfig } from "./config.ts";
 import { spinnerGlyph } from "./format.ts";
@@ -67,30 +58,17 @@ export function formatGenericToolHeader(
 
   if (visibleWidth(header) <= width) return header;
 
-  const wrapped = wrapTextWithAnsi(
-    styledArg,
-    Math.max(1, width - INDENT.length),
-  );
+  const wrapped = wrapTextWithAnsi(styledArg, Math.max(1, width - INDENT.length));
   const firstLine = truncateToWidth(prefix + wrapped[0], width, "…");
-  const contLines = wrapped
-    .slice(1)
-    .map((line) => INDENT + truncateToWidth(line, width - INDENT.length, "…"));
+  const contLines = wrapped.slice(1).map((line) => INDENT + truncateToWidth(line, width - INDENT.length, "…"));
   return [firstLine, ...contLines].join("\n");
 }
 
-export function defaultGenericCollapsedRenderer(
-  output: string,
-  theme: Theme,
-  width: number,
-): string[] {
+export function defaultGenericCollapsedRenderer(output: string, theme: Theme, width: number): string[] {
   if (!output.trim()) return [];
   const n = trimTrailingEmpty(output.split("\n")).length;
   const line =
-    INDENT +
-    theme.fg(
-      "muted",
-      `└ ${n} line${n !== 1 ? "s" : ""} — ${keyText("app.tools.expand")} to expand`,
-    );
+    INDENT + theme.fg("muted", `└ ${n} line${n !== 1 ? "s" : ""} — ${keyText("app.tools.expand")} to expand`);
   return [truncateToWidth(line, width, "…")];
 }
 
@@ -140,10 +118,7 @@ function makeHeader(
     else if (isError) statusIcon = theme.fg("error", "◆");
     else statusIcon = theme.fg("success", "◆");
   } else if (toolName === "subagent_status") {
-    const d =
-      details && typeof details === "object"
-        ? (details as Record<string, unknown>)
-        : undefined;
+    const d = details && typeof details === "object" ? (details as Record<string, unknown>) : undefined;
     const st = typeof d?.status === "string" ? d.status : "";
     if (st === "running") statusIcon = spinnerGlyph(theme, spinAt);
     else if (st === "unknown" || st === "error") {
@@ -156,11 +131,7 @@ function makeHeader(
       statusIcon = theme.fg("success", "◆");
     }
   } else {
-    statusIcon = isPartial
-      ? spinnerGlyph(theme, spinAt)
-      : isError
-        ? theme.fg("error", "◆")
-        : theme.fg("success", "◆");
+    statusIcon = isPartial ? spinnerGlyph(theme, spinAt) : isError ? theme.fg("error", "◆") : theme.fg("success", "◆");
   }
 
   const headerText = adapter
@@ -174,11 +145,7 @@ function makeHeader(
   });
 }
 
-export function defaultCollapsedRenderer(
-  content: string,
-  theme: Theme,
-  width: number,
-): string[] {
+export function defaultCollapsedRenderer(content: string, theme: Theme, width: number): string[] {
   if (!content) return [];
   const previewLines = loadConfig().previewLines;
   const styledOutput = content
@@ -187,12 +154,7 @@ export function defaultCollapsedRenderer(
     .join("\n");
 
   const innerWidth = Math.max(1, width - INDENT.length);
-  const result = truncateToVisualLines(
-    styledOutput,
-    previewLines,
-    innerWidth,
-    0,
-  );
+  const result = truncateToVisualLines(styledOutput, previewLines, innerWidth, 0);
 
   const lines: string[] = [];
   if (result.skippedCount > 0) {
@@ -206,26 +168,15 @@ export function defaultCollapsedRenderer(
   return lines;
 }
 
-export function defaultExpandedRenderer(
-  content: string,
-  theme: Theme,
-  width: number,
-): string[] {
+export function defaultExpandedRenderer(content: string, theme: Theme, width: number): string[] {
   if (!content) return [];
   const lines = formatExpandedToolOutputLines(content, theme, width);
-  const hint = theme.fg(
-    "muted",
-    `${INDENT}${keyText("app.tools.expand")} to collapse`,
-  );
+  const hint = theme.fg("muted", `${INDENT}${keyText("app.tools.expand")} to collapse`);
   lines.push(truncateToWidth(hint, width, "…"));
   return lines;
 }
 
-export function defaultGenericExpandedRenderer(
-  output: string,
-  theme: Theme,
-  width: number,
-): string[] {
+export function defaultGenericExpandedRenderer(output: string, theme: Theme, width: number): string[] {
   return defaultExpandedRenderer(output, theme, width);
 }
 
@@ -268,22 +219,15 @@ export function renderToolCall(
       const out = opts.output ?? "";
       const hasTextOutput = Boolean(out);
       const detailsOnlyCollapsed =
-        opts.toolName === "subagent" &&
-        !opts.expanded &&
-        !opts.isPartial &&
-        opts.details !== undefined;
+        opts.toolName === "subagent" && !opts.expanded && !opts.isPartial && opts.details !== undefined;
 
-      const grepCollapsedPartial =
-        opts.toolName === "grep" && !opts.expanded && opts.isPartial;
+      const grepCollapsedPartial = opts.toolName === "grep" && !opts.expanded && opts.isPartial;
 
-      const globCollapsedPartial =
-        opts.toolName === "glob" && !opts.expanded && opts.isPartial;
+      const globCollapsedPartial = opts.toolName === "glob" && !opts.expanded && opts.isPartial;
 
-      const lsCollapsedPartial =
-        opts.toolName === "ls" && !opts.expanded && opts.isPartial;
+      const lsCollapsedPartial = opts.toolName === "ls" && !opts.expanded && opts.isPartial;
 
-      const askUserQuestionCollapsed =
-        opts.toolName === "ask_user_question" && !opts.expanded && adapter;
+      const askUserQuestionCollapsed = opts.toolName === "ask_user_question" && !opts.expanded && adapter;
 
       const useAdapter =
         adapter &&
@@ -296,8 +240,7 @@ export function renderToolCall(
           lsCollapsedPartial ||
           (opts.toolName === "subagent" && !opts.expanded));
 
-      const erroredReason =
-        opts.isError && !opts.isPartial && out.trim().length > 0;
+      const erroredReason = opts.isError && !opts.isPartial && out.trim().length > 0;
 
       if (erroredReason) {
         const reason = out.replace(/\n+/g, " ").trim();
@@ -305,47 +248,23 @@ export function renderToolCall(
         if (opts.expanded) {
           const wrapped = wrapTextWithAnsi(reason, innerWidth);
           for (const wl of wrapped) {
-            lines.push(
-              INDENT +
-                theme.fg("error", " ") +
-                theme.fg("muted", truncateToWidth(wl, innerWidth, "\u2026")),
-            );
+            lines.push(INDENT + theme.fg("error", " ") + theme.fg("muted", truncateToWidth(wl, innerWidth, "\u2026")));
           }
         } else {
           lines.push(
-            INDENT +
-              theme.fg("error", " ") +
-              theme.fg("muted", truncateToWidth(reason, innerWidth, "\u2026")),
+            INDENT + theme.fg("error", " ") + theme.fg("muted", truncateToWidth(reason, innerWidth, "\u2026")),
           );
         }
       } else if (useAdapter) {
         const contentLines = opts.expanded
-          ? adapter.formatExpandedContent(
-              opts.args,
-              out,
-              theme,
-              width,
-              opts.details,
-            )
-          : adapter.formatCollapsedContent(
-              opts.args,
-              out,
-              theme,
-              width,
-              opts.details,
-              opts.isPartial,
-              spinAt,
-            );
+          ? adapter.formatExpandedContent(opts.args, out, theme, width, opts.details)
+          : adapter.formatCollapsedContent(opts.args, out, theme, width, opts.details, opts.isPartial, spinAt);
         lines.push(...contentLines);
       } else if (opts.output) {
         const collapsedRenderer =
-          opts.renderCollapsed ??
-          (adapter
-            ? defaultCollapsedRenderer
-            : defaultGenericCollapsedRenderer);
+          opts.renderCollapsed ?? (adapter ? defaultCollapsedRenderer : defaultGenericCollapsedRenderer);
         const expandedRenderer =
-          opts.renderExpanded ??
-          (adapter ? defaultExpandedRenderer : defaultGenericExpandedRenderer);
+          opts.renderExpanded ?? (adapter ? defaultExpandedRenderer : defaultGenericExpandedRenderer);
         const contentLines = opts.expanded
           ? expandedRenderer(opts.output, theme, width)
           : collapsedRenderer(opts.output, theme, width);

@@ -1,19 +1,9 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import {
-  type Component,
-  Container,
-  type Input,
-  Spacer,
-  Text,
-  truncateToWidth,
-} from "@earendil-works/pi-tui";
+import { type Component, Container, type Input, Spacer, Text, truncateToWidth } from "@earendil-works/pi-tui";
 import { formatAnswerScalar } from "../tool/format-answer.ts";
 import type { QuestionData } from "../tool/types.ts";
 import type { ChatRowView } from "./components/chat-row-view.ts";
-import type {
-  PreviewPane,
-  PreviewPaneProps,
-} from "./components/preview/preview-pane.ts";
+import type { PreviewPane, PreviewPaneProps } from "./components/preview/preview-pane.ts";
 import {
   type DialogState,
   HINT_PART_CANCEL,
@@ -82,10 +72,7 @@ export interface TabContentStrategy {
   footerRows(state: DialogState): Component[];
 
   /** Row range of the focused item within the body's rendered output, or undefined if no interactive focus. */
-  focusedItemRowRange(
-    width: number,
-    state: DialogState,
-  ): [number, number] | undefined;
+  focusedItemRowRange(width: number, state: DialogState): [number, number] | undefined;
 }
 
 export interface QuestionTabStrategyConfig {
@@ -109,18 +96,8 @@ export class QuestionTabStrategy implements TabContentStrategy {
     const out: Component[] = [];
     const question = this.config.questions[state.currentTab];
     // In multi-question mode the tab bar already shows the header; suppress the inline badge.
-    if (
-      !this.config.isMulti &&
-      question?.header &&
-      question.header.length > 0
-    ) {
-      out.push(
-        new Text(
-          this.config.theme.bg("selectedBg", ` ${question.header} `),
-          1,
-          0,
-        ),
-      );
+    if (!this.config.isMulti && question?.header && question.header.length > 0) {
+      out.push(new Text(this.config.theme.bg("selectedBg", ` ${question.header} `), 1, 0));
       out.push(new Spacer(1));
     }
     if (question) {
@@ -143,11 +120,7 @@ export class QuestionTabStrategy implements TabContentStrategy {
 
   midRows(state: DialogState): Component[] {
     if (!state.notesVisible) return [];
-    return [
-      new Text(this.config.theme.fg("muted", NOTES_HEADER), 1, 0),
-      this.config.notesInput,
-      new Spacer(1),
-    ];
+    return [new Text(this.config.theme.fg("muted", NOTES_HEADER), 1, 0), this.config.notesInput, new Spacer(1)];
   }
 
   footerRows(state: DialogState): Component[] {
@@ -159,27 +132,15 @@ export class QuestionTabStrategy implements TabContentStrategy {
       new Spacer(1),
       this.config.chatRow,
       new Spacer(1),
-      new OneLineClippedText(
-        this.config.theme.fg(
-          "dim",
-          buildHintText(question, this.config.isMulti, state),
-        ),
-        1,
-      ),
+      new OneLineClippedText(this.config.theme.fg("dim", buildHintText(question, this.config.isMulti, state)), 1),
     ];
   }
 
-  focusedItemRowRange(
-    width: number,
-    state: DialogState,
-  ): [number, number] | undefined {
+  focusedItemRowRange(width: number, state: DialogState): [number, number] | undefined {
     const question = this.config.questions[state.currentTab];
     const mso = this.config.tabsByIndex[state.currentTab]?.multiSelect;
-    if (question?.multiSelect === true && mso)
-      return mso.focusedItemRowRange(width);
-    return (
-      this.config.getPreviewPane() as unknown as PreviewPane
-    ).focusedItemRowRange(width);
+    if (question?.multiSelect === true && mso) return mso.focusedItemRowRange(width);
+    return (this.config.getPreviewPane() as unknown as PreviewPane).focusedItemRowRange(width);
   }
 }
 
@@ -196,14 +157,7 @@ export class SubmitTabStrategy implements TabContentStrategy {
   constructor(private readonly config: SubmitTabStrategyConfig) {}
 
   headingRows(_state: DialogState): Component[] {
-    return [
-      new Text(
-        this.config.theme.bold(this.config.theme.fg("accent", REVIEW_HEADING)),
-        1,
-        0,
-      ),
-      new Spacer(1),
-    ];
+    return [new Text(this.config.theme.bold(this.config.theme.fg("accent", REVIEW_HEADING)), 1, 0), new Spacer(1)];
   }
 
   bodyComponent(state: DialogState): Component {
@@ -216,16 +170,10 @@ export class SubmitTabStrategy implements TabContentStrategy {
       const answerText = formatAnswerScalar(a, "summary");
       c.addChild(new Text(this.config.theme.fg("muted", ` ● ${label}`), 1, 0));
       c.addChild(
-        new Text(
-          `   ${this.config.theme.fg("muted", "→")} ${this.config.theme.fg("text", answerText)}`,
-          1,
-          0,
-        ),
+        new Text(`   ${this.config.theme.fg("muted", "→")} ${this.config.theme.fg("text", answerText)}`, 1, 0),
       );
       if (a.notes && a.notes.length > 0) {
-        c.addChild(
-          new Text(this.config.theme.fg("dim", `     notes: ${a.notes}`), 1, 0),
-        );
+        c.addChild(new Text(this.config.theme.fg("dim", `     notes: ${a.notes}`), 1, 0));
       }
     }
     return c;
@@ -250,15 +198,8 @@ export class SubmitTabStrategy implements TabContentStrategy {
     const promptText =
       missing.length === 0
         ? this.config.theme.fg("muted", READY_PROMPT)
-        : this.config.theme.fg(
-            "warning",
-            `${INCOMPLETE_WARNING_PREFIX} ${missing.join(", ")}`,
-          );
-    const out: Component[] = [
-      new Spacer(1),
-      new Text(promptText, 1, 0),
-      new Spacer(1),
-    ];
+        : this.config.theme.fg("warning", `${INCOMPLETE_WARNING_PREFIX} ${missing.join(", ")}`);
+    const out: Component[] = [new Spacer(1), new Text(promptText, 1, 0), new Spacer(1)];
     if (this.config.submitPicker) {
       out.push(this.config.submitPicker);
     } else {
@@ -269,10 +210,7 @@ export class SubmitTabStrategy implements TabContentStrategy {
     return out;
   }
 
-  focusedItemRowRange(
-    _width: number,
-    _state: DialogState,
-  ): [number, number] | undefined {
+  focusedItemRowRange(_width: number, _state: DialogState): [number, number] | undefined {
     return undefined;
   }
 }
@@ -284,19 +222,10 @@ export class SubmitTabStrategy implements TabContentStrategy {
  * `HINT_SINGLE` / `HINT_MULTI` are the CORE prefix that must always render; trailing
  * parts may be clipped by `OneLineClippedText` on narrow terminals.
  */
-export function buildHintText(
-  question: QuestionData | undefined,
-  isMulti: boolean,
-  state: DialogState,
-): string {
+export function buildHintText(question: QuestionData | undefined, isMulti: boolean, state: DialogState): string {
   const parts: string[] = [HINT_PART_ENTER, HINT_PART_NAV];
   if (question?.multiSelect === true) parts.push(HINT_PART_TOGGLE);
-  if (
-    question &&
-    question.multiSelect !== true &&
-    state.focusedOptionHasPreview &&
-    !state.notesVisible
-  ) {
+  if (question && question.multiSelect !== true && state.focusedOptionHasPreview && !state.notesVisible) {
     parts.push(HINT_PART_NOTES);
   }
   if (isMulti) parts.push(HINT_PART_TAB);

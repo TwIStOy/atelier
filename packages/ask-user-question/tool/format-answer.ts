@@ -32,19 +32,12 @@ export type FormatAnswerVariant = "summary" | "envelope";
  * on `NO_INPUT_PLACEHOLDER`. Switch is exhaustive — non-`void` return enforces every
  * variant is handled.
  */
-export function formatAnswerScalar(
-  a: QuestionAnswer,
-  variant: FormatAnswerVariant,
-): string {
+export function formatAnswerScalar(a: QuestionAnswer, variant: FormatAnswerVariant): string {
   switch (a.kind) {
     case "chat":
-      return variant === "envelope"
-        ? CHAT_CONTINUATION_MESSAGE
-        : CHAT_SUMMARY_MESSAGE;
+      return variant === "envelope" ? CHAT_CONTINUATION_MESSAGE : CHAT_SUMMARY_MESSAGE;
     case "multi":
-      return a.selected && a.selected.length > 0
-        ? a.selected.join(", ")
-        : NO_INPUT_PLACEHOLDER;
+      return a.selected && a.selected.length > 0 ? a.selected.join(", ") : NO_INPUT_PLACEHOLDER;
     case "custom":
       return a.answer && a.answer.length > 0 ? a.answer : NO_INPUT_PLACEHOLDER;
     case "option":

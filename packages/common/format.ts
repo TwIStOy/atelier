@@ -1,8 +1,4 @@
-export function truncateDisplay(
-  text: string,
-  maxLen: number,
-  ellipsis = "…",
-): string {
+export function truncateDisplay(text: string, maxLen: number, ellipsis = "…"): string {
   if (typeof text !== "string") return "";
   if (text.length <= maxLen) return text;
   const e = ellipsis.length;
@@ -35,11 +31,7 @@ export function usagePercentStressLevel(percent: number): UsageStressLevel {
   return "low";
 }
 
-export function formatTokenUsageSummaryLine(
-  input: number,
-  output: number,
-  contextPercent?: number | null,
-): string {
+export function formatTokenUsageSummaryLine(input: number, output: number, contextPercent?: number | null): string {
   let line = `Tokens: ${formatTokenUsageArrows(input, output)}`;
   if (contextPercent != null) {
     line += ` · context ${Math.round(contextPercent)}%`;

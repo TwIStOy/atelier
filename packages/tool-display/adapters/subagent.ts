@@ -1,11 +1,7 @@
-import {
-  truncateDisplay,
-  formatTokenUsageArrows,
-  usagePercentStressLevel,
-} from "@htwang-contrib/common";
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import type { ToolDisplayAdapter } from "../types.ts";
+import { formatTokenUsageArrows, truncateDisplay, usagePercentStressLevel } from "@htwang-contrib/common";
 import { spinnerGlyph } from "../format.ts";
+import type { ToolDisplayAdapter } from "../types.ts";
 import { formatExpandedToolOutputLines, formatLineCount } from "./shared.ts";
 
 interface SubagentTaskArg {
@@ -67,21 +63,14 @@ function capitalizeType(type: string): string {
   return t.charAt(0).toUpperCase() + t.slice(1).toLowerCase();
 }
 
-function typeForBatchRow(
-  item: SubagentBatchRow,
-  fallback: string | undefined,
-  args: SubagentArgs,
-): string {
+function typeForBatchRow(item: SubagentBatchRow, fallback: string | undefined, args: SubagentArgs): string {
   if (item.agent_type) return normalizeAgentType(item.agent_type);
   if (fallback) return normalizeAgentType(fallback);
   const fromArgs = args.tasks?.[item.index]?.agent_type ?? args.agent_type;
   return normalizeAgentType(fromArgs);
 }
 
-function descriptionForBatchRow(
-  item: SubagentBatchRow,
-  args: SubagentArgs,
-): string {
+function descriptionForBatchRow(item: SubagentBatchRow, args: SubagentArgs): string {
   const fromItem = item.description?.trim();
   if (fromItem) return fromItem;
   return args.tasks?.[item.index]?.description?.trim() ?? "";
@@ -103,15 +92,8 @@ function statusGlyph(
   return theme.fg("muted", "○");
 }
 
-function formatUsageSuffix(
-  theme: Theme,
-  inp?: number,
-  out?: number,
-  pct?: number | null,
-): string {
-  const hasTok =
-    (typeof inp === "number" && inp > 0) ||
-    (typeof out === "number" && out > 0);
+function formatUsageSuffix(theme: Theme, inp?: number, out?: number, pct?: number | null): string {
+  const hasTok = (typeof inp === "number" && inp > 0) || (typeof out === "number" && out > 0);
   if (!hasTok && (pct === undefined || pct === null)) return "";
   const parts: string[] = [];
   if (hasTok) {
@@ -141,9 +123,7 @@ function callsLineStyled(
   const w = count === 1 ? "tool" : "tools";
   const desc = lineDescription.trim();
   const betweenTypeAndCalls =
-    desc === ""
-      ? " "
-      : ` ${theme.fg("muted", truncateDisplay(desc, 56))} ${theme.fg("muted", "·")} `;
+    desc === "" ? " " : ` ${theme.fg("muted", truncateDisplay(desc, 56))} ${theme.fg("muted", "·")} `;
   let line =
     statusGlyph(theme, ok, waiting, spinning, spinAt) +
     " " +
@@ -160,19 +140,14 @@ function callsLineStyled(
 }
 
 function formatCallSubtitle(args: SubagentArgs, theme: Theme): string {
-  const desc =
-    typeof args.description === "string" ? args.description.trim() : "";
+  const desc = typeof args.description === "string" ? args.description.trim() : "";
   if (desc) return theme.fg("muted", truncateDisplay(desc, 72));
   const t = typeof args.task === "string" ? args.task.trim() : "";
   if (!t) return theme.fg("muted", "…");
   return theme.fg("muted", truncateDisplay(t, 72));
 }
 
-function formatMultiSubagentSubtitle(
-  args: SubagentArgs,
-  d: SubagentDetails | undefined,
-  theme: Theme,
-): string {
+function formatMultiSubagentSubtitle(args: SubagentArgs, d: SubagentDetails | undefined, theme: Theme): string {
   const n = args.tasks!.length;
   const doneArr = d?.per_task_done;
   const startArr = d?.per_task_started;
@@ -181,18 +156,14 @@ function formatMultiSubagentSubtitle(
   if (Array.isArray(doneArr) && doneArr.length === n) {
     for (let i = 0; i < n; i++) {
       if (doneArr[i]) completed++;
-      else if (Array.isArray(startArr) && startArr.length === n && startArr[i])
-        running++;
+      else if (Array.isArray(startArr) && startArr.length === n && startArr[i]) running++;
     }
   } else if (Array.isArray(startArr) && startArr.length === n) {
     for (let i = 0; i < n; i++) {
       if (startArr[i]) running++;
     }
   }
-  const base = theme.fg(
-    "accent",
-    truncateDisplay(`${running} running · ${completed} done`, 72),
-  );
+  const base = theme.fg("accent", truncateDisplay(`${running} running · ${completed} done`, 72));
   let sumIn = 0;
   let sumOut = 0;
   for (const v of d?.per_task_usage_input ?? []) {
@@ -201,10 +172,7 @@ function formatMultiSubagentSubtitle(
   for (const v of d?.per_task_usage_output ?? []) {
     if (typeof v === "number") sumOut += v;
   }
-  const tok =
-    sumIn > 0 || sumOut > 0
-      ? formatUsageSuffix(theme, sumIn, sumOut, null)
-      : "";
+  const tok = sumIn > 0 || sumOut > 0 ? formatUsageSuffix(theme, sumIn, sumOut, null) : "";
   return base + tok;
 }
 
@@ -212,11 +180,7 @@ function singleSubagentArgs(args: SubagentArgs): boolean {
   return !args.tasks || args.tasks.length <= 1;
 }
 
-function formatSingleSubagentInlineStats(
-  args: SubagentArgs,
-  d: SubagentDetails | undefined,
-  theme: Theme,
-): string {
+function formatSingleSubagentInlineStats(args: SubagentArgs, d: SubagentDetails | undefined, theme: Theme): string {
   let rawType: string | undefined;
   let tc = 0;
   let usageIn: number | undefined;
@@ -273,13 +237,7 @@ function taskStartedAt(
   const ps = d?.per_task_started;
   if (Array.isArray(ps) && ps.length === n && ps[i]) return true;
   if (havePerTask && per && (per[i] ?? 0) > 0) return true;
-  if (
-    legacyOk &&
-    d &&
-    typeof d.task_index === "number" &&
-    d.task_index === i &&
-    typeof d.tool_calls === "number"
-  ) {
+  if (legacyOk && d && typeof d.task_index === "number" && d.task_index === i && typeof d.tool_calls === "number") {
     return true;
   }
   return false;
@@ -292,10 +250,7 @@ function formatCollapsedSubagentSummary(
   isPartial: boolean,
   spinAt: number,
 ): string[] | null {
-  const d =
-    details && typeof details === "object"
-      ? (details as SubagentDetails)
-      : undefined;
+  const d = details && typeof details === "object" ? (details as SubagentDetails) : undefined;
 
   if (d?.mode === "batch" && Array.isArray(d.batch) && d.batch.length > 0) {
     if (d.batch.length === 1) return null;
@@ -311,47 +266,23 @@ function formatCollapsedSubagentSummary(
       const rowDesc = descriptionForBatchRow(item, args);
       const waiting = false;
       const spinning = isPartial && item.ok === undefined;
-      const uExtra = formatUsageSuffix(
-        theme,
-        item.usage_input,
-        item.usage_output,
-        item.context_percent,
-      );
+      const uExtra = formatUsageSuffix(theme, item.usage_input, item.usage_output, item.context_percent);
       lines.push(
         theme.fg("muted", `${branch} `) +
-          callsLineStyled(
-            theme,
-            typ,
-            rowDesc,
-            tc,
-            item.ok,
-            item.error,
-            waiting,
-            spinning,
-            spinAt,
-            uExtra,
-          ),
+          callsLineStyled(theme, typ, rowDesc, tc, item.ok, item.error, waiting, spinning, spinAt, uExtra),
       );
     }
     return lines;
   }
 
   const tasks = args.tasks;
-  if (
-    Array.isArray(tasks) &&
-    tasks.length > 1 &&
-    isPartial &&
-    (!d || !d.batch?.length)
-  ) {
+  if (Array.isArray(tasks) && tasks.length > 1 && isPartial && (!d || !d.batch?.length)) {
     const n = tasks.length;
     if (d?.task_total !== undefined && d.task_total !== n) return null;
     const per = d?.per_task_tool_calls;
     const havePerTask = Array.isArray(per) && per.length === n;
     const legacyOk =
-      Boolean(d) &&
-      !havePerTask &&
-      typeof d!.task_index === "number" &&
-      typeof d!.tool_calls === "number";
+      Boolean(d) && !havePerTask && typeof d!.task_index === "number" && typeof d!.tool_calls === "number";
     const pin = d?.per_task_usage_input;
     const pout = d?.per_task_usage_output;
     const ppct = d?.per_task_context_percent;
@@ -363,8 +294,7 @@ function formatCollapsedSubagentSummary(
       const rowDesc = tasks[i]?.description?.trim() ?? "";
       const started = taskStartedAt(d, n, i, havePerTask, per, legacyOk);
       const pDone = d?.per_task_done;
-      const done =
-        Array.isArray(pDone) && pDone.length === n && pDone[i] === true;
+      const done = Array.isArray(pDone) && pDone.length === n && pDone[i] === true;
       let rowOk: boolean | undefined;
       const pOk = d?.per_task_ok;
       if (done && Array.isArray(pOk) && pOk.length === n) {
@@ -387,18 +317,7 @@ function formatCollapsedSubagentSummary(
       );
       lines.push(
         theme.fg("muted", `${branch} `) +
-          callsLineStyled(
-            theme,
-            typ,
-            rowDesc,
-            tc,
-            rowOk,
-            undefined,
-            waiting,
-            spinning,
-            spinAt,
-            uExtra,
-          ),
+          callsLineStyled(theme, typ, rowDesc, tc, rowOk, undefined, waiting, spinning, spinAt, uExtra),
       );
     }
     return lines;
@@ -410,44 +329,17 @@ function formatCollapsedSubagentSummary(
 }
 
 export const subagentAdapter: ToolDisplayAdapter<SubagentArgs> = {
-  formatCallHeader(
-    args,
-    theme,
-    details,
-    _isPartial?: boolean,
-    _expanded?: boolean,
-  ) {
+  formatCallHeader(args, theme, details, _isPartial?: boolean, _expanded?: boolean) {
     const base = theme.fg("toolTitle", theme.bold("Subagent")) + " ";
-    const d =
-      details && typeof details === "object"
-        ? (details as SubagentDetails)
-        : undefined;
+    const d = details && typeof details === "object" ? (details as SubagentDetails) : undefined;
     if (!singleSubagentArgs(args)) {
       return base + formatMultiSubagentSubtitle(args, d, theme);
     }
-    return (
-      base +
-      formatCallSubtitle(args, theme) +
-      formatSingleSubagentInlineStats(args, d, theme)
-    );
+    return base + formatCallSubtitle(args, theme) + formatSingleSubagentInlineStats(args, d, theme);
   },
 
-  formatCollapsedContent(
-    args,
-    output,
-    theme,
-    _width,
-    details,
-    isPartial,
-    spinAt = Date.now(),
-  ) {
-    const fromDetails = formatCollapsedSubagentSummary(
-      args,
-      details,
-      theme,
-      isPartial === true,
-      spinAt,
-    );
+  formatCollapsedContent(args, output, theme, _width, details, isPartial, spinAt = Date.now()) {
+    const fromDetails = formatCollapsedSubagentSummary(args, details, theme, isPartial === true, spinAt);
     if (fromDetails !== null) return fromDetails;
     if (singleSubagentArgs(args)) return [];
     if (isPartial) return [];

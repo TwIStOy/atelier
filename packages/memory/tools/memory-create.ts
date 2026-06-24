@@ -5,12 +5,10 @@ import { jsonError, jsonResult } from "../tool-result.js";
 export const memoryCreate = {
   name: "memory-create",
   label: "Memory create",
-  description:
-    "Create a new child memory node under a parent URI. URI format: domain://path (e.g. 'core://agent').",
+  description: "Create a new child memory node under a parent URI. URI format: domain://path (e.g. 'core://agent').",
   parameters: Type.Object({
     parent_uri: Type.String({
-      description:
-        "Parent URI (e.g. 'core://agent'). Use 'core://' for domain root.",
+      description: "Parent URI (e.g. 'core://agent'). Use 'core://' for domain root.",
     }),
     content: Type.String({
       description: "Memory content (supports Markdown).",
@@ -22,8 +20,7 @@ export const memoryCreate = {
     ),
     title: Type.Optional(
       Type.String({
-        description:
-          "Path segment name (a-z, 0-9, _, -). Auto-assigned if omitted.",
+        description: "Path segment name (a-z, 0-9, _, -). Auto-assigned if omitted.",
       }),
     ),
     disclosure: Type.Optional(
@@ -34,17 +31,10 @@ export const memoryCreate = {
   }),
   execute: async (_id: string, args: Record<string, unknown>) => {
     try {
-      const cliArgs = [
-        "memory",
-        "create",
-        args.parent_uri as string,
-        args.content as string,
-      ];
-      if (args.priority !== undefined)
-        cliArgs.push("--priority", String(args.priority));
+      const cliArgs = ["memory", "create", args.parent_uri as string, args.content as string];
+      if (args.priority !== undefined) cliArgs.push("--priority", String(args.priority));
       if (args.title) cliArgs.push("--title", args.title as string);
-      if (args.disclosure)
-        cliArgs.push("--disclosure", args.disclosure as string);
+      if (args.disclosure) cliArgs.push("--disclosure", args.disclosure as string);
       const result = await runHat(cliArgs);
       return jsonResult(result, {
         parent_uri: args.parent_uri,

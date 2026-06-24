@@ -40,23 +40,17 @@ export class SileroVad {
     if (opts.expectedSha256) {
       const actual = createHash("sha256").update(buf).digest("hex");
       if (actual !== opts.expectedSha256) {
-        throw new Error(
-          `silero_vad.onnx checksum mismatch: expected ${opts.expectedSha256}, got ${actual}`,
-        );
+        throw new Error(`silero_vad.onnx checksum mismatch: expected ${opts.expectedSha256}, got ${actual}`);
       }
     }
     const backend =
-      typeof opts.backend === "function"
-        ? await opts.backend(buf)
-        : (opts.backend ?? (await defaultBackend(buf)));
+      typeof opts.backend === "function" ? await opts.backend(buf) : (opts.backend ?? (await defaultBackend(buf)));
     return new SileroVad(backend);
   }
 
   async processFrame(samples: Float32Array): Promise<number> {
     if (samples.length !== INPUT_SAMPLES) {
-      throw new Error(
-        `Silero VAD expects ${INPUT_SAMPLES} samples, got ${samples.length}`,
-      );
+      throw new Error(`Silero VAD expects ${INPUT_SAMPLES} samples, got ${samples.length}`);
     }
     const out = await this.backend.run({
       input: { samples },
@@ -81,10 +75,7 @@ async function defaultBackend(model: Uint8Array): Promise<VadModelBackend> {
   return {
     async run(feeds: VadFeeds): Promise<VadOutputs> {
       const out = await session.run({
-        input: new ort.Tensor("float32", feeds.input.samples, [
-          1,
-          INPUT_SAMPLES,
-        ]),
+        input: new ort.Tensor("float32", feeds.input.samples, [1, INPUT_SAMPLES]),
         state: new ort.Tensor("float32", feeds.state, [...STATE_DIMS]),
         sr: new ort.Tensor("int64", new BigInt64Array([BigInt(16000)]), []),
       });

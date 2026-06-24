@@ -1,10 +1,7 @@
 import { visibleWidth } from "@earendil-works/pi-tui";
 import type { QuestionData } from "../../../tool/types.ts";
 import type { WrappingSelectItem } from "../wrapping-select.ts";
-import {
-  BORDER_HORIZONTAL_OVERHEAD,
-  BORDER_INNER_PADDING_HORIZONTAL,
-} from "./preview-box-renderer.ts";
+import { BORDER_HORIZONTAL_OVERHEAD, BORDER_INNER_PADDING_HORIZONTAL } from "./preview-box-renderer.ts";
 
 /** Min terminal/pane width for the side-by-side layout to engage. */
 export const PREVIEW_MIN_WIDTH = 100;
@@ -36,13 +33,8 @@ export type PreviewLayoutMode = "side-by-side" | "stacked";
  * re-derived `sideBySide` from a column width (already < pane width post-split),
  * capping height too short.
  */
-export function decideLayout(
-  terminalWidth: number,
-  paneWidth: number,
-): PreviewLayoutMode {
-  return terminalWidth >= PREVIEW_MIN_WIDTH && paneWidth >= PREVIEW_MIN_WIDTH
-    ? "side-by-side"
-    : "stacked";
+export function decideLayout(terminalWidth: number, paneWidth: number): PreviewLayoutMode {
+  return terminalWidth >= PREVIEW_MIN_WIDTH && paneWidth >= PREVIEW_MIN_WIDTH ? "side-by-side" : "stacked";
 }
 
 /**
@@ -88,9 +80,7 @@ export function crossTabMaxLeftWidth(
   let max = MIN_LEFT;
   for (let i = 0; i < tabs.length; i++) {
     const items = itemsByTab[i] ?? [];
-    const totalForNumbering = tabs[i]?.multiSelect
-      ? items.length
-      : items.length + 1;
+    const totalForNumbering = tabs[i]?.multiSelect ? items.length : items.length + 1;
     const tabWidth = adaptiveLeftWidth(items, totalForNumbering, paneWidth);
     if (tabWidth > max) max = tabWidth;
   }
@@ -129,22 +119,12 @@ export function previewSourceWidth(question: QuestionData): number {
  *
  * Pure function — same cross-tab max pattern as `crossTabMaxLeftWidth`.
  */
-export function crossTabPreviewBudget(
-  questions: readonly QuestionData[],
-  paneWidth: number,
-): number {
+export function crossTabPreviewBudget(questions: readonly QuestionData[], paneWidth: number): number {
   let max = MIN_PREVIEW_WIDTH;
   for (const question of questions) {
     const rawWidth = previewSourceWidth(question);
-    const capped = Math.min(
-      rawWidth,
-      paneWidth - PREVIEW_COLUMN_GAP - MIN_LEFT,
-    );
-    const budget =
-      capped +
-      BORDER_HORIZONTAL_OVERHEAD +
-      2 * BORDER_INNER_PADDING_HORIZONTAL +
-      PREVIEW_PADDING_LEFT;
+    const capped = Math.min(rawWidth, paneWidth - PREVIEW_COLUMN_GAP - MIN_LEFT);
+    const budget = capped + BORDER_HORIZONTAL_OVERHEAD + 2 * BORDER_INNER_PADDING_HORIZONTAL + PREVIEW_PADDING_LEFT;
     if (budget > max) max = budget;
   }
   return max;
@@ -213,8 +193,7 @@ export function bodyWidths(
   mode: PreviewLayoutMode,
   adaptiveLeft: number,
 ): { optionsWidth: number; previewWidth: number } {
-  if (mode === "stacked")
-    return { optionsWidth: paneWidth, previewWidth: paneWidth };
+  if (mode === "stacked") return { optionsWidth: paneWidth, previewWidth: paneWidth };
   const { leftWidth, rightWidth } = columnWidths(paneWidth, adaptiveLeft);
   return {
     optionsWidth: leftWidth,

@@ -1,29 +1,14 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import {
-  createBackgroundJob,
-  backgroundJobStatusPayload,
-  subagentStatusToolDetails,
-} from "./background-jobs.ts";
-import {
-  backgroundStartedReply,
-  finalizeBackgroundSuccess,
-  finalizeBackgroundThrown,
-} from "./background-finish.ts";
+import { mergeAbortWithTimeoutMs } from "./abort-timeout.ts";
+import { buildSubagentAgentCatalog, resolveSubagentAgentId, type SubagentAgentCatalog } from "./agent-catalog.ts";
+import { backgroundStartedReply, finalizeBackgroundSuccess, finalizeBackgroundThrown } from "./background-finish.ts";
+import { backgroundJobStatusPayload, createBackgroundJob, subagentStatusToolDetails } from "./background-jobs.ts";
 import { subagentDetails } from "./details.ts";
-import {
-  runParallelBatchSubagent,
-  type ParallelTaskRow,
-} from "./orchestrate-batch.ts";
+import { type ParallelTaskRow, runParallelBatchSubagent } from "./orchestrate-batch.ts";
 import { runSingleSubagent } from "./orchestrate-single.ts";
 import { subagentParams, subagentStatusParams } from "./schemas.ts";
-import { validateTaskShape } from "./validate.ts";
-import { mergeAbortWithTimeoutMs } from "./abort-timeout.ts";
-import {
-  buildSubagentAgentCatalog,
-  resolveSubagentAgentId,
-  type SubagentAgentCatalog,
-} from "./agent-catalog.ts";
 import { readSubagentSettings, type SubagentSettings } from "./settings.ts";
+import { validateTaskShape } from "./validate.ts";
 
 function fillBatchTaskDescriptions(
   tasks: ParallelTaskRow[],
@@ -31,14 +16,8 @@ function fillBatchTaskDescriptions(
   globalAgentType: string | undefined,
 ): ParallelTaskRow[] {
   return tasks.map((t) => {
-    const aid = resolveSubagentAgentId(
-      t.agent_type ?? globalAgentType,
-      catalog,
-    );
-    const description =
-      t.description?.trim() ||
-      catalog.agents.get(aid)?.fileOptions.description?.trim() ||
-      "";
+    const aid = resolveSubagentAgentId(t.agent_type ?? globalAgentType, catalog);
+    const description = t.description?.trim() || catalog.agents.get(aid)?.fileOptions.description?.trim() || "";
     return { ...t, description };
   });
 }
@@ -69,8 +48,7 @@ export function registerSubagentTool(pi: ExtensionAPI) {
   pi.registerTool({
     name: "subagent",
     label: "Subagent",
-    description:
-      "Run a child agent in-process; returns its reply or starts a background job.",
+    description: "Run a child agent in-process; returns its reply or starts a background job.",
     parameters: subagentParams,
     async execute(_toolCallId, params, signal, onUpdate, ctx) {
       const parentSessionId = ctx.sessionManager.getHeader()?.id ?? "unknown";
@@ -107,11 +85,7 @@ export function registerSubagentTool(pi: ExtensionAPI) {
         };
       }
 
-      const merged = signal
-        ? ctx.signal
-          ? AbortSignal.any([signal, ctx.signal])
-          : signal
-        : ctx.signal;
+      const merged = signal ? (ctx.signal ? AbortSignal.any([signal, ctx.signal]) : signal) : ctx.signal;
 
       const bgSignal = ctx.signal;
       const isBackground = params.background === true;
@@ -122,10 +96,7 @@ export function registerSubagentTool(pi: ExtensionAPI) {
         max_total: params.max_total,
         timeout_ms: params.timeout_ms,
       });
-      const runSignal = mergeAbortWithTimeoutMs(
-        baseRunSignal,
-        subagentSettings.timeoutMs,
-      );
+      const runSignal = mergeAbortWithTimeoutMs(baseRunSignal, subagentSettings.timeoutMs);
 
       const globalModel = params.model;
       const globalThinking = params.thinking;
@@ -139,11 +110,7 @@ export function registerSubagentTool(pi: ExtensionAPI) {
           maxConcurrent: subagentSettings.maxConcurrent,
           maxTotal: subagentSettings.maxTotal,
         };
-        const tasks = fillBatchTaskDescriptions(
-          params.tasks as ParallelTaskRow[],
-          catalog,
-          params.agent_type,
-        );
+        const tasks = fillBatchTaskDescriptions(params.tasks as ParallelTaskRow[], catalog, params.agent_type);
         if (tasks.length > limits.maxTotal) {
           return {
             content: [
@@ -180,12 +147,8 @@ export function registerSubagentTool(pi: ExtensionAPI) {
             globalAgentType,
             limits,
           })
-            .then((r) =>
-              finalizeBackgroundSuccess(pi, ctx, jobId, label, "batch", r),
-            )
-            .catch((e) =>
-              finalizeBackgroundThrown(pi, ctx, jobId, label, "batch", e),
-            );
+            .then((r) => finalizeBackgroundSuccess(pi, ctx, jobId, label, "batch", r))
+            .catch((e) => finalizeBackgroundThrown(pi, ctx, jobId, label, "batch", e));
           return backgroundStartedReply(parentBase, shape, jobId);
         }
 
@@ -207,9 +170,7 @@ export function registerSubagentTool(pi: ExtensionAPI) {
 
       const singleAgentId = resolveSubagentAgentId(params.agent_type, catalog);
       const singleDescription =
-        params.description?.trim() ||
-        catalog.agents.get(singleAgentId)?.fileOptions.description?.trim() ||
-        "";
+        params.description?.trim() || catalog.agents.get(singleAgentId)?.fileOptions.description?.trim() || "";
       if (isBackground) {
         const jobId = createBackgroundJob({
           mode: "single",
@@ -228,26 +189,8 @@ export function registerSubagentTool(pi: ExtensionAPI) {
           globalMaxTurns,
           globalAgentType,
         })
-          .then((r) =>
-            finalizeBackgroundSuccess(
-              pi,
-              ctx,
-              jobId,
-              singleDescription,
-              "single",
-              r,
-            ),
-          )
-          .catch((e) =>
-            finalizeBackgroundThrown(
-              pi,
-              ctx,
-              jobId,
-              singleDescription,
-              "single",
-              e,
-            ),
-          );
+          .then((r) => finalizeBackgroundSuccess(pi, ctx, jobId, singleDescription, "single", r))
+          .catch((e) => finalizeBackgroundThrown(pi, ctx, jobId, singleDescription, "single", e));
         return backgroundStartedReply(parentBase, shape, jobId);
       }
 

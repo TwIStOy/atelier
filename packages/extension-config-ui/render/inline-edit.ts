@@ -22,11 +22,7 @@ function codeUnitToCharIndex(chars: InlineEditChar[], cursor: number): number {
   return index;
 }
 
-function charIndexToCodeUnit(
-  chars: InlineEditChar[],
-  index: number,
-  textLength: number,
-): number {
+function charIndexToCodeUnit(chars: InlineEditChar[], index: number, textLength: number): number {
   if (index <= 0) return 0;
   if (index >= chars.length) return textLength;
   return chars[index]!.start;
@@ -41,11 +37,7 @@ function charKind(ch: string): "space" | "word" | "punct" {
 function moveByChars(editing: InlineEditState, delta: number): void {
   const chars = inlineEditChars(editing.buffer);
   const index = codeUnitToCharIndex(chars, editing.cursor);
-  editing.cursor = charIndexToCodeUnit(
-    chars,
-    index + delta,
-    editing.buffer.length,
-  );
+  editing.cursor = charIndexToCodeUnit(chars, index + delta, editing.buffer.length);
 }
 
 function moveWordLeft(editing: InlineEditState): void {
@@ -64,15 +56,13 @@ function moveWordLeft(editing: InlineEditState): void {
 function moveWordRight(editing: InlineEditState): void {
   const chars = inlineEditChars(editing.buffer);
   let index = codeUnitToCharIndex(chars, editing.cursor);
-  while (index < chars.length && charKind(chars[index]!.ch) === "space")
-    index += 1;
+  while (index < chars.length && charKind(chars[index]!.ch) === "space") index += 1;
   if (index >= chars.length) {
     editing.cursor = editing.buffer.length;
     return;
   }
   const kind = charKind(chars[index]!.ch);
-  while (index < chars.length && charKind(chars[index]!.ch) === kind)
-    index += 1;
+  while (index < chars.length && charKind(chars[index]!.ch) === kind) index += 1;
   editing.cursor = charIndexToCodeUnit(chars, index, editing.buffer.length);
 }
 
@@ -82,11 +72,7 @@ function insertText(editing: InlineEditState, text: string): void {
   editing.cursor += text.length;
 }
 
-function deleteRange(
-  editing: InlineEditState,
-  start: number,
-  end: number,
-): void {
+function deleteRange(editing: InlineEditState, start: number, end: number): void {
   const safeStart = Math.max(0, Math.min(start, editing.buffer.length));
   const safeEnd = Math.max(safeStart, Math.min(end, editing.buffer.length));
   editing.buffer = `${editing.buffer.slice(0, safeStart)}${editing.buffer.slice(safeEnd)}`;
@@ -97,10 +83,7 @@ function isPlainInput(data: string): boolean {
   return data.length === 1 && data >= " " && data !== "\x7f";
 }
 
-export function handleInlineEditInput(
-  editing: InlineEditState,
-  data: string,
-): boolean {
+export function handleInlineEditInput(editing: InlineEditState, data: string): boolean {
   clampCursor(editing);
   if (matchesKey(data, "left") || matchesKey(data, "ctrl+b")) {
     moveByChars(editing, -1);
@@ -110,19 +93,11 @@ export function handleInlineEditInput(
     moveByChars(editing, 1);
     return true;
   }
-  if (
-    matchesKey(data, "alt+left") ||
-    matchesKey(data, "ctrl+left") ||
-    matchesKey(data, "alt+b")
-  ) {
+  if (matchesKey(data, "alt+left") || matchesKey(data, "ctrl+left") || matchesKey(data, "alt+b")) {
     moveWordLeft(editing);
     return true;
   }
-  if (
-    matchesKey(data, "alt+right") ||
-    matchesKey(data, "ctrl+right") ||
-    matchesKey(data, "alt+f")
-  ) {
+  if (matchesKey(data, "alt+right") || matchesKey(data, "ctrl+right") || matchesKey(data, "alt+f")) {
     moveWordRight(editing);
     return true;
   }
@@ -158,10 +133,7 @@ export function handleInlineEditInput(
   return false;
 }
 
-export function parseSettingInput(
-  item: import("@htwang-contrib/common").ConfigItem,
-  input: string,
-): unknown {
+export function parseSettingInput(item: import("@htwang-contrib/common").ConfigItem, input: string): unknown {
   switch (item.type) {
     case "boolean": {
       const lower = input.trim().toLowerCase();
@@ -176,21 +148,13 @@ export function parseSettingInput(
     }
     case "select": {
       const value = input.trim();
-      const rawOpts = (
-        item as import("@htwang-contrib/common").SelectConfigItem
-      ).options;
+      const rawOpts = (item as import("@htwang-contrib/common").SelectConfigItem).options;
       const opts = typeof rawOpts === "function" ? rawOpts() : rawOpts;
-      const matched = opts.find(
-        (o) => o.label.toLowerCase() === value.toLowerCase(),
-      );
+      const matched = opts.find((o) => o.label.toLowerCase() === value.toLowerCase());
       if (matched) return matched.value;
-      const byValue = opts.find(
-        (o) => String(o.value).toLowerCase() === value.toLowerCase(),
-      );
+      const byValue = opts.find((o) => String(o.value).toLowerCase() === value.toLowerCase());
       if (byValue) return byValue.value;
-      throw new Error(
-        `Expected one of: ${opts.map((o) => o.label).join(", ")}`,
-      );
+      throw new Error(`Expected one of: ${opts.map((o) => o.label).join(", ")}`);
     }
     case "multiselect":
     case "reorderable":

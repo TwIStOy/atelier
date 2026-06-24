@@ -10,29 +10,21 @@ describe("redactSecrets — Authorization header", () => {
   });
 
   it("preserves the Authorization prefix for diagnostics", () => {
-    expect(redactSecrets("Authorization: Bearer sk-secret")).toBe(
-      "Authorization: Bearer <redacted>",
-    );
+    expect(redactSecrets("Authorization: Bearer sk-secret")).toBe("Authorization: Bearer <redacted>");
   });
 
   it("handles mixed case 'authorization: bearer'", () => {
-    expect(redactSecrets("authorization: bearer sk-x")).toBe(
-      "authorization: bearer <redacted>",
-    );
+    expect(redactSecrets("authorization: bearer sk-x")).toBe("authorization: bearer <redacted>");
   });
 
   it("handles extra whitespace between words", () => {
-    expect(redactSecrets("Authorization:    Bearer   sk-y")).toBe(
-      "Authorization:    Bearer   <redacted>",
-    );
+    expect(redactSecrets("Authorization:    Bearer   sk-y")).toBe("Authorization:    Bearer   <redacted>");
   });
 });
 
 describe("redactSecrets — bare Bearer", () => {
   it("redacts bare 'Bearer <token>' outside an Authorization header", () => {
-    expect(redactSecrets("failed: Bearer sk-zzz")).toBe(
-      "failed: Bearer <redacted>",
-    );
+    expect(redactSecrets("failed: Bearer sk-zzz")).toBe("failed: Bearer <redacted>");
   });
 });
 
@@ -43,38 +35,26 @@ describe("redactSecrets — API_KEY env assignment", () => {
   });
 
   it("stops at common delimiters (quote, comma, semicolon)", () => {
-    expect(redactSecrets('env OPENAI_API_KEY="sk-abc123"')).toBe(
-      'env OPENAI_API_KEY="<redacted>"',
-    );
-    expect(redactSecrets("keys: OPENAI_API_KEY=sk-a, OTHER=x")).toBe(
-      "keys: OPENAI_API_KEY=<redacted>, OTHER=x",
-    );
+    expect(redactSecrets('env OPENAI_API_KEY="sk-abc123"')).toBe('env OPENAI_API_KEY="<redacted>"');
+    expect(redactSecrets("keys: OPENAI_API_KEY=sk-a, OTHER=x")).toBe("keys: OPENAI_API_KEY=<redacted>, OTHER=x");
   });
 
   it("does not match lowercase 'api_key=' assignment", () => {
-    expect(redactSecrets("config api_key=sk-abc123")).toBe(
-      "config api_key=sk-abc123",
-    );
+    expect(redactSecrets("config api_key=sk-abc123")).toBe("config api_key=sk-abc123");
   });
 });
 
 describe("redactSecrets — additionalSecrets literals", () => {
   it("replaces an additional literal anywhere in the text", () => {
-    expect(redactSecrets("echo sk-secret-key && curl", ["sk-secret-key"])).toBe(
-      "echo <redacted> && curl",
-    );
+    expect(redactSecrets("echo sk-secret-key && curl", ["sk-secret-key"])).toBe("echo <redacted> && curl");
   });
 
   it("handles multiple occurrences of the same literal", () => {
-    expect(redactSecrets("a sk-x b sk-x c", ["sk-x"])).toBe(
-      "a <redacted> b <redacted> c",
-    );
+    expect(redactSecrets("a sk-x b sk-x c", ["sk-x"])).toBe("a <redacted> b <redacted> c");
   });
 
   it("does not throw on additionalSecrets containing regex metacharacters", () => {
-    expect(redactSecrets("path (.*) end", ["(.*)"])).toBe(
-      "path <redacted> end",
-    );
+    expect(redactSecrets("path (.*) end", ["(.*)"])).toBe("path <redacted> end");
   });
 
   it("ignores empty / whitespace-only additionalSecrets entries", () => {
@@ -111,15 +91,11 @@ describe("safeError", () => {
   });
 
   it("handles a plain string error", () => {
-    expect(safeError("Authorization: Bearer sk-abc")).toBe(
-      "Authorization: Bearer <redacted>",
-    );
+    expect(safeError("Authorization: Bearer sk-abc")).toBe("Authorization: Bearer <redacted>");
   });
 
   it("handles an object with a message property", () => {
-    expect(safeError({ message: "Bearer sk-abc123 leaked" })).toBe(
-      "Bearer <redacted> leaked",
-    );
+    expect(safeError({ message: "Bearer sk-abc123 leaked" })).toBe("Bearer <redacted> leaked");
   });
 
   it("returns '' for null/undefined", () => {

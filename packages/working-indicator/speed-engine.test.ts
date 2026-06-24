@@ -1,10 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
-import {
-  DEFAULT_SPEED_CONFIG,
-  estimateTokensFromDelta,
-  TokenSpeedEngine,
-  type SpeedConfig,
-} from "./speed-engine.ts";
+import { DEFAULT_SPEED_CONFIG, estimateTokensFromDelta, type SpeedConfig, TokenSpeedEngine } from "./speed-engine.ts";
 
 const CONFIG: SpeedConfig = {
   ...DEFAULT_SPEED_CONFIG,

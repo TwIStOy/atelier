@@ -12,9 +12,7 @@ vi.mock("@earendil-works/pi-ai", async (importOriginal) => {
 import { completeSimple } from "@earendil-works/pi-ai";
 import { executeSideCall } from "./side-call.ts";
 
-const model = { provider: "test", id: "m1" } as unknown as Parameters<
-  typeof executeSideCall
->[0]["model"];
+const model = { provider: "test", id: "m1" } as unknown as Parameters<typeof executeSideCall>[0]["model"];
 
 function makeAuthResponse(
   overrides: Partial<{
@@ -32,11 +30,7 @@ function makeAuthResponse(
   }));
 }
 
-function makeResponse(input: {
-  text?: string;
-  stopReason?: string;
-  errorMessage?: string;
-}): AssistantMessage {
+function makeResponse(input: { text?: string; stopReason?: string; errorMessage?: string }): AssistantMessage {
   return {
     role: "assistant",
     content: input.text ? [{ type: "text", text: input.text }] : [],
@@ -48,9 +42,7 @@ function makeResponse(input: {
 
 describe("executeSideCall", () => {
   test("returns ok with answer text on success", async () => {
-    vi.mocked(completeSimple).mockResolvedValueOnce(
-      makeResponse({ text: "forty-two" }) as never,
-    );
+    vi.mocked(completeSimple).mockResolvedValueOnce(makeResponse({ text: "forty-two" }) as never);
     const result = await executeSideCall({
       model,
       modelRegistry: {
@@ -103,9 +95,7 @@ describe("executeSideCall", () => {
   });
 
   test("returns aborted when stopReason is aborted", async () => {
-    vi.mocked(completeSimple).mockResolvedValueOnce(
-      makeResponse({ stopReason: "aborted" }) as never,
-    );
+    vi.mocked(completeSimple).mockResolvedValueOnce(makeResponse({ stopReason: "aborted" }) as never);
     const result = await executeSideCall({
       model,
       modelRegistry: {
@@ -142,9 +132,7 @@ describe("executeSideCall", () => {
   });
 
   test("returns error when response has no text content", async () => {
-    vi.mocked(completeSimple).mockResolvedValueOnce(
-      makeResponse({ stopReason: "done" }) as never,
-    );
+    vi.mocked(completeSimple).mockResolvedValueOnce(makeResponse({ stopReason: "done" }) as never);
     const result = await executeSideCall({
       model,
       modelRegistry: {

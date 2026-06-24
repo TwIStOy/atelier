@@ -1,11 +1,5 @@
 import { formatSize } from "@earendil-works/pi-coding-agent";
-import {
-  fitColWidths,
-  formatElapsedSeconds,
-  makeTable,
-  shortenPath,
-  terminalWidth,
-} from "@htwang-contrib/common";
+import { fitColWidths, formatElapsedSeconds, makeTable, shortenPath, terminalWidth } from "@htwang-contrib/common";
 import type { ReadEntry } from "./read-tracker.ts";
 
 export interface ReadDisplayRow {
@@ -20,9 +14,7 @@ function isStale(entry: ReadEntry): boolean {
   return elapsed > 60 * 60 * 1000;
 }
 
-export function buildReadRows(
-  entries: ReadonlyArray<readonly [string, ReadEntry]>,
-): ReadDisplayRow[] {
+export function buildReadRows(entries: ReadonlyArray<readonly [string, ReadEntry]>): ReadDisplayRow[] {
   return entries.map(([canonical, entry]) => ({
     path: canonical,
     entry,
@@ -40,19 +32,10 @@ export function renderReadTrackerTable(rows: ReadDisplayRow[]): string {
   const table = makeTable(["Path", "Read", "Size", "Mtime age"], colWidths);
   for (const row of sorted) {
     const { entry } = row;
-    const readAge = formatElapsedSeconds(
-      Math.max(0, (now - entry.readAt) / 1000),
-    );
-    const mtimeAge = formatElapsedSeconds(
-      Math.max(0, (now - entry.modifiedAt) / 1000),
-    );
+    const readAge = formatElapsedSeconds(Math.max(0, (now - entry.readAt) / 1000));
+    const mtimeAge = formatElapsedSeconds(Math.max(0, (now - entry.modifiedAt) / 1000));
     const marker = row.stale ? " ⚠" : "";
-    table.push([
-      `${shortenPath(row.path)}${marker}`,
-      `${readAge} ago`,
-      formatSize(entry.size),
-      `${mtimeAge} ago`,
-    ]);
+    table.push([`${shortenPath(row.path)}${marker}`, `${readAge} ago`, formatSize(entry.size), `${mtimeAge} ago`]);
   }
   return table.toString();
 }

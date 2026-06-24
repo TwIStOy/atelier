@@ -1,13 +1,8 @@
-import { describe, expect, it, vi } from "vitest";
-import { writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import {
-  SileroVad,
-  type VadModelBackend,
-  type VadOutputs,
-} from "../audio/vad/silero.ts";
+import { join } from "node:path";
+import { describe, expect, it, vi } from "vitest";
+import { SileroVad, type VadModelBackend, type VadOutputs } from "../audio/vad/silero.ts";
 
 function makeTmpModel(payload = "not-real-onnx"): string {
   const dir = mkdtempSync(join(tmpdir(), "silero-test-"));
@@ -81,7 +76,7 @@ describe("SileroVad.processFrame", () => {
   });
 
   it("threads state between consecutive frames", async () => {
-    let seen: Float32Array[] = [];
+    const seen: Float32Array[] = [];
     const backend: VadModelBackend = {
       async run(feeds): Promise<VadOutputs> {
         seen.push(feeds.state);
@@ -106,9 +101,7 @@ describe("SileroVad.processFrame", () => {
       modelPath: makeTmpModel(),
       backend: fakeBackend(0.5),
     });
-    await expect(vad.processFrame(new Float32Array(100))).rejects.toThrow(
-      /expects 512 samples/,
-    );
+    await expect(vad.processFrame(new Float32Array(100))).rejects.toThrow(/expects 512 samples/);
   });
 });
 

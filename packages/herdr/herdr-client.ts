@@ -6,11 +6,7 @@
  * unit-testable. The orchestration layer passes the actual `exec` function so
  * tests can stub it.
  */
-import type {
-  ExecOptions,
-  ExecResult,
-  ExtensionAPI,
-} from "@earendil-works/pi-coding-agent";
+import type { ExecOptions, ExecResult, ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 /** Public pane id such as `w1:p1`, read from the herdr-injected env. */
 export type PaneId = string;
@@ -46,9 +42,7 @@ export function isInsideHerdr(env: NodeJS.ProcessEnv = process.env): boolean {
 }
 
 /** Resolve the herdr binary path, preferring the injected `HERDR_BIN_PATH`. */
-export function resolveHerdrBinary(
-  env: NodeJS.ProcessEnv = process.env,
-): string {
+export function resolveHerdrBinary(env: NodeJS.ProcessEnv = process.env): string {
   return env.HERDR_BIN_PATH?.trim() || "herdr";
 }
 
@@ -106,16 +100,9 @@ export function paneIsActive(pane: PaneInfo | null): boolean {
   return !!pane?.focused;
 }
 
-export type ExecFn = (
-  command: string,
-  args: string[],
-  options?: ExecOptions,
-) => Promise<ExecResult>;
+export type ExecFn = (command: string, args: string[], options?: ExecOptions) => Promise<ExecResult>;
 
-function binaryFor(
-  pi: ExtensionAPI | undefined,
-  env: NodeJS.ProcessEnv,
-): string {
+function binaryFor(pi: ExtensionAPI | undefined, env: NodeJS.ProcessEnv): string {
   if (pi && typeof pi.exec === "function") {
     // The caller controls the binary; default resolution still happens here.
   }

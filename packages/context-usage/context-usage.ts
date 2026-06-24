@@ -1,21 +1,9 @@
 import { existsSync, readFileSync } from "node:fs";
 import { isAbsolute } from "node:path";
-import type {
-  ExtensionAPI,
-  ExtensionContext,
-  Theme,
-} from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 
-type ContextUsageColor =
-  | "accent"
-  | "success"
-  | "warning"
-  | "error"
-  | "muted"
-  | "dim"
-  | "borderMuted"
-  | "text";
+type ContextUsageColor = "accent" | "success" | "warning" | "error" | "muted" | "dim" | "borderMuted" | "text";
 
 interface ContextUsageDetailItem {
   label: string;
@@ -96,8 +84,7 @@ function qcuEstimateTokens(value: unknown): number {
 
 function qcuFormatTokens(value: number | undefined): string {
   const n = Math.max(0, Math.round(Number(value) || 0));
-  const trim = (input: number) =>
-    input.toFixed(input >= 10 ? 0 : 1).replace(/\.0$/, "");
+  const trim = (input: number) => input.toFixed(input >= 10 ? 0 : 1).replace(/\.0$/, "");
   if (n >= 1_000_000) return `${trim(n / 1_000_000)}M`;
   if (n >= 1_000) return `${trim(n / 1_000)}K`;
   return n.toLocaleString();
@@ -148,20 +135,10 @@ function qcuDetailText(item: unknown): string {
   if (!item || typeof item !== "object") return qcuSafeString(item);
   const obj = item as Record<string, unknown>;
   const direct =
-    obj.content ??
-    obj.text ??
-    obj.markdown ??
-    obj.body ??
-    obj.instructions ??
-    obj.description ??
-    obj.prompt;
+    obj.content ?? obj.text ?? obj.markdown ?? obj.body ?? obj.instructions ?? obj.description ?? obj.prompt;
   if (typeof direct === "string") return direct;
   const pathValue = obj.path ?? obj.file ?? obj.filePath ?? obj.sourcePath;
-  if (
-    typeof pathValue === "string" &&
-    isAbsolute(pathValue) &&
-    existsSync(pathValue)
-  ) {
+  if (typeof pathValue === "string" && isAbsolute(pathValue) && existsSync(pathValue)) {
     try {
       return readFileSync(pathValue, "utf8");
     } catch {
@@ -171,20 +148,12 @@ function qcuDetailText(item: unknown): string {
   return qcuSafeString(item);
 }
 
-function qcuDetailsFromItems(
-  items: unknown[],
-  fallbackGroup?: string,
-): ContextUsageDetailItem[] {
+function qcuDetailsFromItems(items: unknown[], fallbackGroup?: string): ContextUsageDetailItem[] {
   return items
     .map((item, index) => {
-      const obj =
-        item && typeof item === "object"
-          ? (item as Record<string, unknown>)
-          : undefined;
+      const obj = item && typeof item === "object" ? (item as Record<string, unknown>) : undefined;
       const sourceInfo =
-        obj?.sourceInfo && typeof obj.sourceInfo === "object"
-          ? (obj.sourceInfo as Record<string, unknown>)
-          : undefined;
+        obj?.sourceInfo && typeof obj.sourceInfo === "object" ? (obj.sourceInfo as Record<string, unknown>) : undefined;
       const group =
         typeof obj?.scope === "string"
           ? obj.scope
@@ -193,8 +162,7 @@ function qcuDetailsFromItems(
             : typeof sourceInfo?.source === "string"
               ? sourceInfo.source
               : fallbackGroup;
-      const description =
-        typeof obj?.description === "string" ? obj.description : undefined;
+      const description = typeof obj?.description === "string" ? obj.description : undefined;
       return {
         description: description ? qcuOneLine(description, 120) : undefined,
         group,
@@ -215,18 +183,14 @@ function qcuPromptOptionArray(options: unknown, keys: string[]): unknown[] {
   return [];
 }
 
-function qcuUniqDetails(
-  items: ContextUsageDetailItem[],
-): ContextUsageDetailItem[] {
+function qcuUniqDetails(items: ContextUsageDetailItem[]): ContextUsageDetailItem[] {
   const byLabel = new Map<string, ContextUsageDetailItem>();
   for (const item of items) {
     const key = `${item.group ?? ""}:${item.label}`;
     const existing = byLabel.get(key);
     if (!existing || item.tokens > existing.tokens) byLabel.set(key, item);
   }
-  return Array.from(byLabel.values()).sort(
-    (a, b) => b.tokens - a.tokens || a.label.localeCompare(b.label),
-  );
+  return Array.from(byLabel.values()).sort((a, b) => b.tokens - a.tokens || a.label.localeCompare(b.label));
 }
 
 function qcuTokenSum(items: ContextUsageDetailItem[]): number {
@@ -235,21 +199,16 @@ function qcuTokenSum(items: ContextUsageDetailItem[]): number {
 
 function qcuMessageTokens(message: any): number {
   if (!message || typeof message !== "object") return 0;
-  if (message.role === "bashExecution" && message.excludeFromContext === true)
-    return 0;
-  if (message.role === "compactionSummary")
-    return qcuEstimateTokens(message.summary ?? "");
-  if (message.role === "branchSummary")
-    return qcuEstimateTokens(message.summary ?? "");
-  if (message.role === "custom")
-    return qcuEstimateTokens(message.content ?? "");
+  if (message.role === "bashExecution" && message.excludeFromContext === true) return 0;
+  if (message.role === "compactionSummary") return qcuEstimateTokens(message.summary ?? "");
+  if (message.role === "branchSummary") return qcuEstimateTokens(message.summary ?? "");
+  if (message.role === "custom") return qcuEstimateTokens(message.content ?? "");
   const content = message.content;
   if (typeof content === "string") return qcuEstimateTokens(content);
   if (!Array.isArray(content)) return qcuEstimateTokens(content);
   return content.reduce((sum: number, part: any) => {
     if (part?.type === "text") return sum + qcuEstimateTokens(part.text ?? "");
-    if (part?.type === "thinking")
-      return sum + qcuEstimateTokens(part.thinking ?? "");
+    if (part?.type === "thinking") return sum + qcuEstimateTokens(part.thinking ?? "");
     if (part?.type === "toolCall") return sum + qcuEstimateTokens(part);
     if (part?.type === "image") return sum + 85;
     return sum + qcuEstimateTokens(part);
@@ -264,15 +223,10 @@ function qcuBuildMessageStats(ctx: ExtensionContext): {
 } {
   const sm = ctx.sessionManager as any;
   const branch = Array.isArray(sm.getBranch?.()) ? sm.getBranch() : [];
-  const built =
-    typeof sm.buildSessionContext === "function"
-      ? sm.buildSessionContext()
-      : undefined;
+  const built = typeof sm.buildSessionContext === "function" ? sm.buildSessionContext() : undefined;
   const messages = Array.isArray(built?.messages)
     ? built.messages
-    : branch
-        .filter((entry: any) => entry?.type === "message")
-        .map((entry: any) => entry.message);
+    : branch.filter((entry: any) => entry?.type === "message").map((entry: any) => entry.message);
   const stats = {
     assistant: 0,
     bash: 0,
@@ -318,10 +272,7 @@ function qcuBuildMessageStats(ctx: ExtensionContext): {
     }
   }
   const compactSummaries = branch
-    .filter(
-      (entry: any) =>
-        entry?.type === "compaction" || entry?.type === "branch_summary",
-    )
+    .filter((entry: any) => entry?.type === "compaction" || entry?.type === "branch_summary")
     .map((entry: any) => ({
       group: entry.type === "compaction" ? "compaction" : "branch",
       label:
@@ -343,27 +294,16 @@ function qcuToolDetails(pi: ExtensionAPI): {
   rawMcpToolTokens: number;
 } {
   const api = pi as any;
-  const activeNames = new Set<string>(
-    Array.isArray(api.getActiveTools?.()) ? api.getActiveTools() : [],
-  );
+  const activeNames = new Set<string>(Array.isArray(api.getActiveTools?.()) ? api.getActiveTools() : []);
   const allTools = Array.isArray(api.getAllTools?.()) ? api.getAllTools() : [];
   const activeTools = allTools.filter(
-    (tool: any) =>
-      typeof tool?.name === "string" &&
-      (activeNames.size === 0 || activeNames.has(tool.name)),
+    (tool: any) => typeof tool?.name === "string" && (activeNames.size === 0 || activeNames.has(tool.name)),
   );
   const details = activeTools.map((tool: any) => {
-    const sourceInfo =
-      tool.sourceInfo && typeof tool.sourceInfo === "object"
-        ? tool.sourceInfo
-        : undefined;
-    const source =
-      typeof sourceInfo?.source === "string" ? sourceInfo.source : undefined;
+    const sourceInfo = tool.sourceInfo && typeof tool.sourceInfo === "object" ? tool.sourceInfo : undefined;
+    const source = typeof sourceInfo?.source === "string" ? sourceInfo.source : undefined;
     return {
-      description:
-        typeof tool.description === "string"
-          ? qcuOneLine(tool.description, 120)
-          : undefined,
+      description: typeof tool.description === "string" ? qcuOneLine(tool.description, 120) : undefined,
       group: source,
       label: tool.name,
       tokens: qcuEstimateTokens({
@@ -375,16 +315,13 @@ function qcuToolDetails(pi: ExtensionAPI): {
       }),
     };
   });
-  const isMcpTool = (tool: ContextUsageDetailItem) =>
-    /^mcp_{1,2}/i.test(tool.label) || /mcp/i.test(tool.group ?? "");
+  const isMcpTool = (tool: ContextUsageDetailItem) => /^mcp_{1,2}/i.test(tool.label) || /mcp/i.test(tool.group ?? "");
   const mcpTools = details.filter(isMcpTool);
   const builtinTools = details.filter(
-    (tool: ContextUsageDetailItem) =>
-      !isMcpTool(tool) && (tool.group === "builtin" || tool.group === "sdk"),
+    (tool: ContextUsageDetailItem) => !isMcpTool(tool) && (tool.group === "builtin" || tool.group === "sdk"),
   );
   const extensionTools = details.filter(
-    (tool: ContextUsageDetailItem) =>
-      !isMcpTool(tool) && tool.group !== "builtin" && tool.group !== "sdk",
+    (tool: ContextUsageDetailItem) => !isMcpTool(tool) && tool.group !== "builtin" && tool.group !== "sdk",
   );
   return {
     builtinTools: qcuUniqDetails(builtinTools),
@@ -396,33 +333,18 @@ function qcuToolDetails(pi: ExtensionAPI): {
   };
 }
 
-function qcuSkillDetails(
-  pi: ExtensionAPI,
-  promptOptions: unknown,
-): ContextUsageDetailItem[] {
+function qcuSkillDetails(pi: ExtensionAPI, promptOptions: unknown): ContextUsageDetailItem[] {
   const fromOptions = qcuDetailsFromItems(
-    qcuPromptOptionArray(promptOptions, [
-      "skills",
-      "loadedSkills",
-      "availableSkills",
-    ]),
+    qcuPromptOptionArray(promptOptions, ["skills", "loadedSkills", "availableSkills"]),
     "loaded",
   );
-  const commands = Array.isArray((pi as any).getCommands?.())
-    ? (pi as any).getCommands()
-    : [];
+  const commands = Array.isArray((pi as any).getCommands?.()) ? (pi as any).getCommands() : [];
   const fromCommands = commands
     .filter((command: any) => command?.source === "skill")
     .map((command: any) => {
-      const sourceInfo =
-        command.sourceInfo && typeof command.sourceInfo === "object"
-          ? command.sourceInfo
-          : undefined;
+      const sourceInfo = command.sourceInfo && typeof command.sourceInfo === "object" ? command.sourceInfo : undefined;
       return {
-        description:
-          typeof command.description === "string"
-            ? qcuOneLine(command.description, 120)
-            : undefined,
+        description: typeof command.description === "string" ? qcuOneLine(command.description, 120) : undefined,
         group:
           typeof sourceInfo?.scope === "string"
             ? sourceInfo.scope
@@ -430,9 +352,7 @@ function qcuSkillDetails(
               ? sourceInfo.source
               : "skill",
         label: String(command.name ?? "skill").replace(/^skill:/, ""),
-        tokens: qcuEstimateTokens(
-          `${command.name ?? ""}\n${command.description ?? ""}`,
-        ),
+        tokens: qcuEstimateTokens(`${command.name ?? ""}\n${command.description ?? ""}`),
       };
     });
   return qcuUniqDetails([...fromOptions, ...fromCommands]);
@@ -443,10 +363,7 @@ function qcuScaleCategories(
   totalTokens: number,
   contextWindow?: number,
 ): ContextUsageCategory[] {
-  const rawTotal = rawCategories.reduce(
-    (sum, category) => sum + Math.max(0, category.rawTokens),
-    0,
-  );
+  const rawTotal = rawCategories.reduce((sum, category) => sum + Math.max(0, category.rawTokens), 0);
   if (rawTotal <= 0) {
     return [
       {
@@ -466,16 +383,10 @@ function qcuScaleCategories(
       tokens: Math.max(0, Math.round(category.rawTokens * ratio)),
     }))
     .filter((category) => category.tokens > 0 || category.rawTokens > 0);
-  const scaledTotal = categories.reduce(
-    (sum, category) => sum + category.tokens,
-    0,
-  );
+  const scaledTotal = categories.reduce((sum, category) => sum + category.tokens, 0);
   const delta = totalTokens - scaledTotal;
-  const messages =
-    categories.find((category) => category.key === "messages") ??
-    categories[categories.length - 1];
-  if (messages && delta !== 0)
-    messages.tokens = Math.max(0, messages.tokens + delta);
+  const messages = categories.find((category) => category.key === "messages") ?? categories[categories.length - 1];
+  if (messages && delta !== 0) messages.tokens = Math.max(0, messages.tokens + delta);
   const used = categories.reduce((sum, category) => sum + category.tokens, 0);
   if (contextWindow && used < totalTokens) {
     const other = totalTokens - used;
@@ -496,9 +407,7 @@ function qcuExtractProjectAgents(systemPrompt: string): {
   agents: ContextUsageDetailItem[];
   tokens: number;
 } {
-  const marker = systemPrompt.includes("## Project Agents")
-    ? "## Project Agents"
-    : "## Project Subagents";
+  const marker = systemPrompt.includes("## Project Agents") ? "## Project Agents" : "## Project Subagents";
   const start = systemPrompt.indexOf(marker);
   if (start < 0) return { agents: [], tokens: 0 };
   const rest = systemPrompt.slice(start);
@@ -511,11 +420,7 @@ function qcuExtractProjectAgents(systemPrompt: string): {
       const match = line.match(/^-\s*([^:]+):\s*(.*?)(?:\s*\(([^)]*)\))?$/);
       return {
         description: match?.[2] ? qcuOneLine(match[2], 120) : undefined,
-        group: match?.[3]?.includes("project")
-          ? "project"
-          : match?.[3]?.includes("user")
-            ? "user"
-            : "agent",
+        group: match?.[3]?.includes("project") ? "project" : match?.[3]?.includes("user") ? "user" : "agent",
         label: qcuOneLine(match?.[1] ?? line.replace(/^[-\s]+/, ""), 90),
         tokens: qcuEstimateTokens(line),
       };
@@ -528,65 +433,32 @@ export function buildContextUsageDetails(
   ctx: ExtensionContext,
   promptOptions: unknown,
 ): ContextUsageMessageDetails | undefined {
-  const usage = ctx.getContextUsage?.() as
-    | { contextWindow?: unknown; percent?: unknown; tokens?: unknown }
-    | undefined;
+  const usage = ctx.getContextUsage?.() as { contextWindow?: unknown; percent?: unknown; tokens?: unknown } | undefined;
   const tokens = Number(usage?.tokens);
   if (!Number.isFinite(tokens) || tokens <= 0) return undefined;
   const model = (ctx as any).model ?? {};
   const contextWindow = Number(usage?.contextWindow ?? model.contextWindow);
-  const safeContextWindow =
-    Number.isFinite(contextWindow) && contextWindow > 0
-      ? contextWindow
-      : undefined;
+  const safeContextWindow = Number.isFinite(contextWindow) && contextWindow > 0 ? contextWindow : undefined;
   const percent = Number(usage?.percent);
   const systemPrompt = ctx.getSystemPrompt?.() ?? "";
   const contextFiles = qcuUniqDetails(
-    qcuDetailsFromItems(
-      qcuPromptOptionArray(promptOptions, [
-        "contextFiles",
-        "agentsFiles",
-        "memoryFiles",
-      ]),
-      "context",
-    ),
+    qcuDetailsFromItems(qcuPromptOptionArray(promptOptions, ["contextFiles", "agentsFiles", "memoryFiles"]), "context"),
   );
   const skills = qcuSkillDetails(pi, promptOptions);
   const extractedAgents = qcuExtractProjectAgents(systemPrompt);
   const customAgents = qcuUniqDetails([
-    ...qcuDetailsFromItems(
-      qcuPromptOptionArray(promptOptions, [
-        "customAgents",
-        "agents",
-        "agentSnippets",
-      ]),
-      "agent",
-    ),
+    ...qcuDetailsFromItems(qcuPromptOptionArray(promptOptions, ["customAgents", "agents", "agentSnippets"]), "agent"),
     ...extractedAgents.agents,
   ]);
-  const {
-    builtinTools,
-    extensionTools,
-    mcpTools,
-    rawBuiltinToolTokens,
-    rawExtensionToolTokens,
-    rawMcpToolTokens,
-  } = qcuToolDetails(pi);
-  const { compactSummaries, rawCompactTokens, rawMessageTokens, stats } =
-    qcuBuildMessageStats(ctx);
-  const rawCompactSummaryTokens =
-    rawCompactTokens > 0 ? rawCompactTokens : qcuTokenSum(compactSummaries);
+  const { builtinTools, extensionTools, mcpTools, rawBuiltinToolTokens, rawExtensionToolTokens, rawMcpToolTokens } =
+    qcuToolDetails(pi);
+  const { compactSummaries, rawCompactTokens, rawMessageTokens, stats } = qcuBuildMessageStats(ctx);
+  const rawCompactSummaryTokens = rawCompactTokens > 0 ? rawCompactTokens : qcuTokenSum(compactSummaries);
   const rawContextFiles = qcuTokenSum(contextFiles);
   const rawSkills = qcuTokenSum(skills);
-  const rawCustomAgents = Math.max(
-    qcuTokenSum(customAgents),
-    extractedAgents.tokens,
-  );
+  const rawCustomAgents = Math.max(qcuTokenSum(customAgents), extractedAgents.tokens);
   const rawSystemPromptTotal = qcuEstimateTokens(systemPrompt);
-  const rawSystemPrompt = Math.max(
-    0,
-    rawSystemPromptTotal - rawContextFiles - rawSkills - rawCustomAgents,
-  );
+  const rawSystemPrompt = Math.max(0, rawSystemPromptTotal - rawContextFiles - rawSkills - rawCustomAgents);
   const categories = qcuScaleCategories(
     [
       {
@@ -656,19 +528,10 @@ export function buildContextUsageDetails(
     tokens,
     safeContextWindow,
   );
-  const modelProvider =
-    typeof model.provider === "string" ? model.provider : "unknown";
-  const modelId =
-    typeof model.id === "string"
-      ? model.id
-      : typeof model.model === "string"
-        ? model.model
-        : "unknown";
+  const modelProvider = typeof model.provider === "string" ? model.provider : "unknown";
+  const modelId = typeof model.id === "string" ? model.id : typeof model.model === "string" ? model.model : "unknown";
   const modelName = typeof model.name === "string" ? model.name : modelId;
-  const thinking =
-    typeof (pi as any).getThinkingLevel === "function"
-      ? (pi as any).getThinkingLevel()
-      : undefined;
+  const thinking = typeof (pi as any).getThinkingLevel === "function" ? (pi as any).getThinkingLevel() : undefined;
   return {
     builtinTools,
     categories,
@@ -676,9 +539,7 @@ export function buildContextUsageDetails(
     contextFiles,
     customAgents,
     extensionTools,
-    freeTokens: safeContextWindow
-      ? Math.max(0, safeContextWindow - tokens)
-      : undefined,
+    freeTokens: safeContextWindow ? Math.max(0, safeContextWindow - tokens) : undefined,
     mcpTools,
     messageStats: stats,
     model: {
@@ -686,10 +547,7 @@ export function buildContextUsageDetails(
       id: modelId,
       label: modelName,
       provider: modelProvider,
-      thinking:
-        typeof thinking === "string" && thinking !== "off"
-          ? thinking
-          : undefined,
+      thinking: typeof thinking === "string" && thinking !== "off" ? thinking : undefined,
     },
     note: promptOptions
       ? undefined
@@ -697,20 +555,13 @@ export function buildContextUsageDetails(
     skills,
     usage: {
       contextWindow: safeContextWindow,
-      percent: Number.isFinite(percent)
-        ? percent
-        : safeContextWindow
-          ? (tokens / safeContextWindow) * 100
-          : undefined,
+      percent: Number.isFinite(percent) ? percent : safeContextWindow ? (tokens / safeContextWindow) * 100 : undefined,
       tokens,
     },
   };
 }
 
-function qcuLimitDetails(
-  items: ContextUsageDetailItem[],
-  limit: number,
-): ContextUsageDetailItem[] {
+function qcuLimitDetails(items: ContextUsageDetailItem[], limit: number): ContextUsageDetailItem[] {
   return items.slice(0, Math.max(0, limit));
 }
 
@@ -742,22 +593,17 @@ function qcuRenderDetailSection(
   lines.push("");
   lines.push(`${theme.fg("customMessageLabel", theme.bold(title))}`);
   visible.forEach((item, index) => {
-    const isLast =
-      index === visible.length - 1 && visible.length === items.length;
+    const isLast = index === visible.length - 1 && visible.length === items.length;
     const branch = isLast ? "└" : "├";
     const group = item.group ? theme.fg("dim", ` ${item.group}`) : "";
     lines.push(
       `${qcuBranch(theme, branch)}${theme.fg("text", qcuOneLine(item.label, 72))}: ${theme.fg("accent", qcuFormatTokens(item.tokens))} tokens${group}`,
     );
     if (options.showDescriptions && item.description)
-      lines.push(
-        `${qcuStem(theme, isLast)}${theme.fg("dim", qcuOneLine(item.description, 100))}`,
-      );
+      lines.push(`${qcuStem(theme, isLast)}${theme.fg("dim", qcuOneLine(item.description, 100))}`);
   });
   if (items.length > visible.length)
-    lines.push(
-      `${qcuBranch(theme, "└")}${theme.fg("dim", `… ${items.length - visible.length} more`)}`,
-    );
+    lines.push(`${qcuBranch(theme, "└")}${theme.fg("dim", `… ${items.length - visible.length} more`)}`);
 }
 
 export function renderContextUsageMessage(
@@ -769,13 +615,10 @@ export function renderContextUsageMessage(
   return {
     invalidate() {},
     render(width: number): string[] {
-      if (!details)
-        return [theme.fg("warning", "Context usage details unavailable.")];
+      if (!details) return [theme.fg("warning", "Context usage details unavailable.")];
       const safeWidth = Math.max(48, width);
       const lines: string[] = [];
-      lines.push(
-        `${theme.fg("customMessageLabel", theme.bold("Context Usage"))}`,
-      );
+      lines.push(`${theme.fg("customMessageLabel", theme.bold("Context Usage"))}`);
       const gridCols = safeWidth >= 112 ? 28 : safeWidth >= 88 ? 22 : 16;
       const gridRows = safeWidth >= 88 ? 7 : 6;
       const totalBlocks = gridCols * gridRows;
@@ -784,15 +627,9 @@ export function renderContextUsageMessage(
       const blockCategories: ContextUsageCategory[] = [];
       for (const category of details.categories) {
         if (!gridDenominator || category.tokens <= 0) continue;
-        let count = Math.round(
-          (category.tokens / gridDenominator) * totalBlocks,
-        );
+        let count = Math.round((category.tokens / gridDenominator) * totalBlocks);
         if (count === 0 && category.tokens > 0) count = 1;
-        for (
-          let index = 0;
-          index < count && blockCategories.length < totalBlocks;
-          index += 1
-        )
+        for (let index = 0; index < count && blockCategories.length < totalBlocks; index += 1)
           blockCategories.push(category);
       }
       const gridLines: string[] = [];
@@ -800,16 +637,13 @@ export function renderContextUsageMessage(
         let line = "";
         for (let col = 0; col < gridCols; col += 1) {
           const category = blockCategories[row * gridCols + col];
-          line += category
-            ? theme.fg(category.color as any, category.icon)
-            : theme.fg("borderMuted", "□");
+          line += category ? theme.fg(category.color as any, category.icon) : theme.fg("borderMuted", "□");
           if (col !== gridCols - 1) line += " ";
         }
         gridLines.push(line);
       }
       const modelBits = [`${details.model.provider}/${details.model.id}`];
-      if (details.model.thinking)
-        modelBits.push(`thinking ${details.model.thinking}`);
+      if (details.model.thinking) modelBits.push(`thinking ${details.model.thinking}`);
       const summaryLines = [
         `${theme.fg("text", theme.bold(details.model.label))}${contextWindow ? theme.fg("muted", ` (${qcuFormatTokens(contextWindow)} context)`) : ""}`,
         theme.fg("muted", modelBits.join(" · ")),
@@ -830,9 +664,7 @@ export function renderContextUsageMessage(
         const leftWidth = visibleWidth(gridLines[0] ?? "");
         const maxRows = Math.max(gridLines.length, summaryLines.length);
         for (let index = 0; index < maxRows; index += 1) {
-          lines.push(
-            `  ${qcuPadAnsi(gridLines[index] ?? "", leftWidth)}    ${summaryLines[index] ?? ""}`.trimEnd(),
-          );
+          lines.push(`  ${qcuPadAnsi(gridLines[index] ?? "", leftWidth)}    ${summaryLines[index] ?? ""}`.trimEnd());
         }
       } else {
         lines.push(...gridLines.map((line) => `  ${line}`));
@@ -842,9 +674,7 @@ export function renderContextUsageMessage(
       if (details.note) lines.push("", theme.fg("dim", details.note));
       const messageStats = details.messageStats;
       lines.push("");
-      lines.push(
-        `${theme.fg("customMessageLabel", theme.bold("Conversation"))}`,
-      );
+      lines.push(`${theme.fg("customMessageLabel", theme.bold("Conversation"))}`);
       lines.push(
         `${qcuBranch(theme, "├")}context messages: ${theme.fg("accent", String(messageStats.contextMessages))} ${theme.fg("dim", `(${messageStats.branchEntries} branch entries)`)}`,
       );
@@ -859,49 +689,31 @@ export function renderContextUsageMessage(
         limit: 12,
         showDescriptions: false,
       });
-      qcuRenderDetailSection(
-        lines,
-        "Built-in tools",
-        details.builtinTools,
-        theme,
-        {
-          limit: details.mcpTools.length > 0 ? 8 : 12,
-          showDescriptions: false,
-        },
-      );
-      qcuRenderDetailSection(
-        lines,
-        "Extension tools",
-        details.extensionTools,
-        theme,
-        { limit: 12, showDescriptions: false },
-      );
-      qcuRenderDetailSection(
-        lines,
-        "Custom agents · /agents",
-        details.customAgents,
-        theme,
-        { limit: 12, showDescriptions: false },
-      );
-      qcuRenderDetailSection(
-        lines,
-        "Context / memory files",
-        details.contextFiles,
-        theme,
-        { limit: 12, showDescriptions: false },
-      );
+      qcuRenderDetailSection(lines, "Built-in tools", details.builtinTools, theme, {
+        limit: details.mcpTools.length > 0 ? 8 : 12,
+        showDescriptions: false,
+      });
+      qcuRenderDetailSection(lines, "Extension tools", details.extensionTools, theme, {
+        limit: 12,
+        showDescriptions: false,
+      });
+      qcuRenderDetailSection(lines, "Custom agents · /agents", details.customAgents, theme, {
+        limit: 12,
+        showDescriptions: false,
+      });
+      qcuRenderDetailSection(lines, "Context / memory files", details.contextFiles, theme, {
+        limit: 12,
+        showDescriptions: false,
+      });
       qcuRenderDetailSection(lines, "Skills · /skills", details.skills, theme, {
         empty: "No skill commands discovered.",
         limit: 14,
         showDescriptions: false,
       });
-      qcuRenderDetailSection(
-        lines,
-        "Compact buffer",
-        details.compactSummaries,
-        theme,
-        { limit: 6, showDescriptions: false },
-      );
+      qcuRenderDetailSection(lines, "Compact buffer", details.compactSummaries, theme, {
+        limit: 6,
+        showDescriptions: false,
+      });
       return lines.map((line) => truncateToWidth(line, safeWidth, ""));
     },
   };

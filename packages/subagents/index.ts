@@ -1,16 +1,7 @@
-import type {
-  ExtensionAPI,
-  ExtensionContext,
-} from "@earendil-works/pi-coding-agent";
-import {
-  buildSubagentAgentCatalog,
-  subagentsPersonasSystemPromptXml,
-} from "./agent-catalog.ts";
-import {
-  shouldInjectSubagentsParentSystemPrompt,
-  subagentsFeatureSystemPrompt,
-} from "./feature-system-prompt.ts";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { buildSubagentAgentCatalog, subagentsPersonasSystemPromptXml } from "./agent-catalog.ts";
 import { runSubagentsAgentsCommand } from "./agents-inspect.ts";
+import { shouldInjectSubagentsParentSystemPrompt, subagentsFeatureSystemPrompt } from "./feature-system-prompt.ts";
 import { registerSubagentStatusTool, registerSubagentTool } from "./tool.ts";
 import { runSubagentViewerCommand } from "./viewer/command.ts";
 
@@ -19,8 +10,7 @@ export default function (pi: ExtensionAPI) {
   registerSubagentStatusTool(pi);
 
   pi.registerCommand("subagents-agents", {
-    description:
-      "Browse subagent personas (TUI): pick an id, inspect source path, tools, and resolved model defaults",
+    description: "Browse subagent personas (TUI): pick an id, inspect source path, tools, and resolved model defaults",
     async handler(_args, ctx) {
       await runSubagentsAgentsCommand(ctx as ExtensionContext);
     },
@@ -41,11 +31,7 @@ export default function (pi: ExtensionAPI) {
     const catalog = buildSubagentAgentCatalog(ctx.cwd);
     const block = subagentsPersonasSystemPromptXml(catalog);
     return {
-      systemPrompt: [
-        event.systemPrompt,
-        subagentsFeatureSystemPrompt(),
-        block,
-      ].join("\n\n"),
+      systemPrompt: [event.systemPrompt, subagentsFeatureSystemPrompt(), block].join("\n\n"),
     };
   });
 }

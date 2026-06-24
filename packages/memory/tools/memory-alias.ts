@@ -10,14 +10,12 @@ export const memoryAlias = {
   parameters: Type.Object({
     new_uri: Type.Optional(
       Type.String({
-        description:
-          "The alias URI to create, in domain://path format (e.g. 'notes://shortcuts/my-alias').",
+        description: "The alias URI to create, in domain://path format (e.g. 'notes://shortcuts/my-alias').",
       }),
     ),
     target_uri: Type.Optional(
       Type.String({
-        description:
-          "The existing node URI to point to, in domain://path format (e.g. 'core://agent/identity').",
+        description: "The existing node URI to point to, in domain://path format (e.g. 'core://agent/identity').",
       }),
     ),
     remove_uri: Type.Optional(
@@ -39,12 +37,7 @@ export const memoryAlias = {
   execute: async (_id: string, args: Record<string, unknown>) => {
     try {
       if (args.remove_uri) {
-        const result = await runHat([
-          "memory",
-          "alias",
-          "--remove-uri",
-          args.remove_uri as string,
-        ]);
+        const result = await runHat(["memory", "alias", "--remove-uri", args.remove_uri as string]);
         return jsonResult(result, {
           is_remove: true,
           uri: args.remove_uri,
@@ -52,8 +45,7 @@ export const memoryAlias = {
       }
       if (!args.new_uri || !args.target_uri) {
         return jsonResult({
-          error:
-            "Provide new_uri + target_uri to create, or remove_uri to delete.",
+          error: "Provide new_uri + target_uri to create, or remove_uri to delete.",
         });
       }
       const cliArgs = [
@@ -64,10 +56,8 @@ export const memoryAlias = {
         "--target-uri",
         args.target_uri as string,
       ];
-      if (args.priority !== undefined)
-        cliArgs.push("--priority", String(args.priority));
-      if (args.disclosure)
-        cliArgs.push("--disclosure", args.disclosure as string);
+      if (args.priority !== undefined) cliArgs.push("--priority", String(args.priority));
+      if (args.disclosure) cliArgs.push("--disclosure", args.disclosure as string);
       const result = await runHat(cliArgs);
       return jsonResult(result, {
         is_remove: false,

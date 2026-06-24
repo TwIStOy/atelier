@@ -1,5 +1,5 @@
-import type { SearchProvider, SearchResponse, SearchResult } from "./types.ts";
 import { throwIfApiError } from "./errors.ts";
+import type { SearchProvider, SearchResponse, SearchResult } from "./types.ts";
 
 const PERPLEXITY_API_URL = "https://api.perplexity.ai/search";
 
@@ -17,9 +17,7 @@ interface PerplexityRawResponse {
   server_time?: string | null;
 }
 
-function normalizePerplexityResults(
-  results: PerplexityRawResult[],
-): SearchResult[] {
+function normalizePerplexityResults(results: PerplexityRawResult[]): SearchResult[] {
   return results.map((r) => ({
     title: r.title ?? "",
     url: r.url ?? "",
@@ -34,15 +32,9 @@ export class PerplexityProvider implements SearchProvider {
 
   constructor(private readonly apiKey: string) {}
 
-  async search(
-    query: string,
-    maxResults: number,
-    signal?: AbortSignal,
-  ): Promise<SearchResponse> {
+  async search(query: string, maxResults: number, signal?: AbortSignal): Promise<SearchResponse> {
     if (!this.apiKey) {
-      throw new Error(
-        `${this.envVar} is not set. Use /config to set the API key, or export the env var.`,
-      );
+      throw new Error(`${this.envVar} is not set. Use /config to set the API key, or export the env var.`);
     }
 
     const res = await fetch(PERPLEXITY_API_URL, {

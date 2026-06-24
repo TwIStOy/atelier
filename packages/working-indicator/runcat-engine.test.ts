@@ -1,8 +1,8 @@
 import { describe, expect, test } from "vitest";
 import {
   DEFAULT_TRANSITION_MS,
-  RuncatIndicatorEngine,
   type RuncatIndicatorClock,
+  RuncatIndicatorEngine,
   type RuncatIndicatorScheduleHandle,
   type RuncatIndicatorSink,
 } from "./runcat-engine.ts";
@@ -63,12 +63,7 @@ function makeEngine(
 ): { engine: RuncatIndicatorEngine; clock: FakeClock; sink: CapturingSink } {
   const clock = new FakeClock();
   const sink = new CapturingSink();
-  const engine = new RuncatIndicatorEngine(
-    sink,
-    { frames, intervalMs },
-    clock,
-    transitionMs,
-  );
+  const engine = new RuncatIndicatorEngine(sink, { frames, intervalMs }, clock, transitionMs);
   return { engine, clock, sink };
 }
 
@@ -210,10 +205,7 @@ describe("RuncatIndicatorEngine — interval smoothing", () => {
 
     // At the new transition start (t=400), effective should equal the chased
     // value, i.e. the transition restarts cleanly from where we were.
-    expect(engine.snapshot().effectiveIntervalMs).toBeCloseTo(
-      beforeRetarget,
-      5,
-    );
+    expect(engine.snapshot().effectiveIntervalMs).toBeCloseTo(beforeRetarget, 5);
 
     // It then eases toward 150 over the next transitionMs.
     clock.nowMs = 400 + 1000;
@@ -281,11 +273,7 @@ describe("RuncatIndicatorEngine — sink errors do not kill the loop", () => {
         throw new Error("boom");
       },
     };
-    const engine = new RuncatIndicatorEngine(
-      sink,
-      { frames: ["a", "b"], intervalMs: 100 },
-      clock,
-    );
+    const engine = new RuncatIndicatorEngine(sink, { frames: ["a", "b"], intervalMs: 100 }, clock);
     // start() arms the wake-up before pushing, so the throw must not strand
     // the engine in a running-but-timerless state.
     expect(() => engine.start()).toThrow();
@@ -303,11 +291,7 @@ describe("RuncatIndicatorEngine — sink errors do not kill the loop", () => {
         if (calls === 2) throw new Error("mid-stream boom");
       },
     };
-    const engine = new RuncatIndicatorEngine(
-      sink,
-      { frames: ["a", "b"], intervalMs: 100 },
-      clock,
-    );
+    const engine = new RuncatIndicatorEngine(sink, { frames: ["a", "b"], intervalMs: 100 }, clock);
     engine.start(); // push #1 (calls=1)
     // wake 1: push #2 throws, but timer must still be armed
     expect(() => clock.fireNext()).toThrow();

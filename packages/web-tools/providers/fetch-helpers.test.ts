@@ -1,17 +1,16 @@
 import { describe, expect, test } from "vitest";
 import {
-  htmlToText,
-  extractTitle,
-  isHtmlContentType,
   assertTextContentType,
+  extractTitle,
+  htmlToText,
+  isHtmlContentType,
   isPrivateOrLoopbackHostname,
   parseAndAssertHttpUrl,
 } from "./fetch-helpers.ts";
 
 describe("htmlToText", () => {
   test("strips script/style/noscript blocks", () => {
-    const html =
-      '<p>Hello</p><script>alert("x")</script><style>.x{}</style><noscript>no</noscript><p>World</p>';
+    const html = '<p>Hello</p><script>alert("x")</script><style>.x{}</style><noscript>no</noscript><p>World</p>';
     expect(htmlToText(html)).toBe("Hello\n World");
   });
 
@@ -82,9 +81,7 @@ describe("htmlToText", () => {
 
 describe("extractTitle", () => {
   test("extracts title from HTML", () => {
-    expect(
-      extractTitle("<html><head><title>My Page</title></head></html>"),
-    ).toBe("My Page");
+    expect(extractTitle("<html><head><title>My Page</title></head></html>")).toBe("My Page");
   });
 
   test("returns undefined when no title tag", () => {
@@ -97,9 +94,7 @@ describe("extractTitle", () => {
   });
 
   test("strips inner HTML tags from title", () => {
-    expect(extractTitle("<title>Hello <b>World</b></title>")).toBe(
-      "Hello World",
-    );
+    expect(extractTitle("<title>Hello <b>World</b></title>")).toBe("Hello World");
   });
 
   test("is case-insensitive", () => {
@@ -128,24 +123,16 @@ describe("assertTextContentType", () => {
   });
 
   test("throws for image types", () => {
-    expect(() => assertTextContentType("image/png")).toThrow(
-      "Unsupported content type",
-    );
-    expect(() => assertTextContentType("image/jpeg")).toThrow(
-      "Unsupported content type",
-    );
+    expect(() => assertTextContentType("image/png")).toThrow("Unsupported content type");
+    expect(() => assertTextContentType("image/jpeg")).toThrow("Unsupported content type");
   });
 
   test("throws for video types", () => {
-    expect(() => assertTextContentType("video/mp4")).toThrow(
-      "Unsupported content type",
-    );
+    expect(() => assertTextContentType("video/mp4")).toThrow("Unsupported content type");
   });
 
   test("throws for audio types", () => {
-    expect(() => assertTextContentType("audio/mpeg")).toThrow(
-      "Unsupported content type",
-    );
+    expect(() => assertTextContentType("audio/mpeg")).toThrow("Unsupported content type");
   });
 });
 
@@ -233,49 +220,29 @@ describe("parseAndAssertHttpUrl", () => {
   });
 
   test("throws for non-http protocols", () => {
-    expect(() => parseAndAssertHttpUrl("ftp://example.com")).toThrow(
-      "Unsupported URL protocol",
-    );
-    expect(() => parseAndAssertHttpUrl("file:///etc/passwd")).toThrow(
-      "Unsupported URL protocol",
-    );
-    expect(() => parseAndAssertHttpUrl("javascript:alert(1)")).toThrow(
-      "Unsupported URL protocol",
-    );
+    expect(() => parseAndAssertHttpUrl("ftp://example.com")).toThrow("Unsupported URL protocol");
+    expect(() => parseAndAssertHttpUrl("file:///etc/passwd")).toThrow("Unsupported URL protocol");
+    expect(() => parseAndAssertHttpUrl("javascript:alert(1)")).toThrow("Unsupported URL protocol");
   });
 
   test("throws for loopback addresses", () => {
-    expect(() => parseAndAssertHttpUrl("http://localhost/secret")).toThrow(
-      "Refusing to fetch",
-    );
-    expect(() => parseAndAssertHttpUrl("http://127.0.0.1/secret")).toThrow(
-      "Refusing to fetch",
-    );
+    expect(() => parseAndAssertHttpUrl("http://localhost/secret")).toThrow("Refusing to fetch");
+    expect(() => parseAndAssertHttpUrl("http://127.0.0.1/secret")).toThrow("Refusing to fetch");
   });
 
   test("throws for RFC 1918 addresses", () => {
-    expect(() => parseAndAssertHttpUrl("http://192.168.1.1/")).toThrow(
-      "Refusing to fetch",
-    );
-    expect(() => parseAndAssertHttpUrl("http://10.0.0.1/")).toThrow(
-      "Refusing to fetch",
-    );
-    expect(() => parseAndAssertHttpUrl("http://172.16.0.1/")).toThrow(
-      "Refusing to fetch",
-    );
+    expect(() => parseAndAssertHttpUrl("http://192.168.1.1/")).toThrow("Refusing to fetch");
+    expect(() => parseAndAssertHttpUrl("http://10.0.0.1/")).toThrow("Refusing to fetch");
+    expect(() => parseAndAssertHttpUrl("http://172.16.0.1/")).toThrow("Refusing to fetch");
   });
 
   test("throws for link-local and cloud metadata", () => {
-    expect(() => parseAndAssertHttpUrl("http://169.254.169.254/")).toThrow(
-      "Refusing to fetch",
-    );
+    expect(() => parseAndAssertHttpUrl("http://169.254.169.254/")).toThrow("Refusing to fetch");
   });
 
   test("allows public URLs", () => {
     expect(() => parseAndAssertHttpUrl("https://example.com")).not.toThrow();
-    expect(() =>
-      parseAndAssertHttpUrl("https://github.com/user/repo"),
-    ).not.toThrow();
+    expect(() => parseAndAssertHttpUrl("https://github.com/user/repo")).not.toThrow();
     expect(() => parseAndAssertHttpUrl("http://8.8.8.8/dns")).not.toThrow();
   });
 });

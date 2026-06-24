@@ -1,14 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { Task } from "../tool/types.ts";
 import { EMPTY_STATE, type TaskState } from "../state/state.ts";
-import {
-  __resetState,
-  commitState,
-  getNextId,
-  getState,
-  getTodos,
-  replaceState,
-} from "../state/store.ts";
+import { __resetState, commitState, getNextId, getState, getTodos, replaceState } from "../state/store.ts";
+import type { Task } from "../tool/types.ts";
 
 function makeTask(id: number, subject = `t${id}`): Task {
   return { id, subject, status: "pending" };

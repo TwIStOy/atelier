@@ -1,20 +1,10 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { resolveModel } from "@htwang-contrib/common";
-import {
-  buildSubagentAgentCatalog,
-  type SubagentAgentCatalog,
-} from "./agent-catalog.ts";
+import { buildSubagentAgentCatalog, type SubagentAgentCatalog } from "./agent-catalog.ts";
 import { resolveChildToolNames } from "./child-tools.ts";
-import {
-  defaultsForAgentType,
-  readSubagentSettings,
-  type SubagentSettings,
-} from "./settings.ts";
+import { defaultsForAgentType, readSubagentSettings, type SubagentSettings } from "./settings.ts";
 
-function formatResolvedModel(
-  rawPattern: string | undefined,
-  ctx: ExtensionContext,
-): string {
+function formatResolvedModel(rawPattern: string | undefined, ctx: ExtensionContext): string {
   const pattern = rawPattern?.trim();
   if (!pattern) {
     const m = ctx.model;
@@ -28,8 +18,7 @@ function formatResolvedModel(
     return `${found.name} (${prov}/${found.id}) — resolved pattern "${pattern}"`;
   }
   const m = ctx.model;
-  if (!m)
-    return `pattern "${pattern}" did not match registry; parent has no model`;
+  if (!m) return `pattern "${pattern}" did not match registry; parent has no model`;
   const prov = m.provider ?? "?";
   return `${m.name} (${prov}/${m.id}) — pattern "${pattern}" unresolved, parent fallback`;
 }
@@ -53,21 +42,15 @@ export function formatSubagentAgentInspect(
 
   const fmTools = file.tools;
   const fmToolsDisplay =
-    fmTools && fmTools.length > 0
-      ? fmTools.join(", ")
-      : "(omit → default list for isolation mode)";
+    fmTools && fmTools.length > 0 ? fmTools.join(", ") : "(omit → default list for isolation mode)";
   const toolsEffective = resolveChildToolNames(isolated, fmTools).join(", ");
 
   const lines: string[] = [
     `id: ${agentId}`,
     `source file: ${entry?.sourcePath ?? "(unknown)"}`,
     "",
-    `frontmatter description (truncated in catalog to 72 chars): ${
-      desc || "(none)"
-    }`,
-    `frontmatter whenToUse (truncated in catalog to 2000 chars): ${
-      whenToUse || "(none)"
-    }`,
+    `frontmatter description (truncated in catalog to 72 chars): ${desc || "(none)"}`,
+    `frontmatter whenToUse (truncated in catalog to 2000 chars): ${whenToUse || "(none)"}`,
     "",
     "Effective defaults when the subagent tool omits model, thinking, inherit_context, isolated, and max_turns (persona frontmatter, then defaults_by_agent_type in ~/.agent/subagents/settings.json, then fallbacks):",
     `  model pattern before resolve: ${rawModel ?? "(omit → parent session model)"}`,
@@ -89,8 +72,7 @@ export function formatSubagentAgentInspect(
 
 function pickIndex(picked: string | number, labels: string[]): number | null {
   if (typeof picked === "number") {
-    if (!Number.isFinite(picked) || picked < 0 || picked >= labels.length)
-      return null;
+    if (!Number.isFinite(picked) || picked < 0 || picked >= labels.length) return null;
     return picked;
   }
   const s = String(picked);
@@ -99,9 +81,7 @@ function pickIndex(picked: string | number, labels: string[]): number | null {
   return i >= 0 ? i : null;
 }
 
-export async function runSubagentsAgentsCommand(
-  ctx: ExtensionContext,
-): Promise<void> {
+export async function runSubagentsAgentsCommand(ctx: ExtensionContext): Promise<void> {
   if (!ctx.hasUI) {
     ctx.ui.notify("subagents-agents requires the Pi TUI.", "warning");
     return;

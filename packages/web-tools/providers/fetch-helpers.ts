@@ -1,8 +1,7 @@
 import type { FetchResponse } from "./types.ts";
 
 const USER_AGENT = "Mozilla/5.0 (compatible; rpiv-pi/1.0)";
-const FETCH_ACCEPT_HEADER =
-  "text/html,application/xhtml+xml,application/xml;q=0.9,text/plain;q=0.8,*/*;q=0.5";
+const FETCH_ACCEPT_HEADER = "text/html,application/xhtml+xml,application/xml;q=0.9,text/plain;q=0.8,*/*;q=0.5";
 const BINARY_CONTENT_TYPE_PREFIXES = ["image/", "video/", "audio/"];
 const HTML_CONTENT_TYPE_TOKEN = "text/html";
 const SUPPORTED_HTTP_PROTOCOLS = new Set(["http:", "https:"]);
@@ -20,16 +19,11 @@ const HORIZONTAL_WHITESPACE_RUN = /[ \t]+/g;
 const BLANK_LINE_RUN = /\n{3,}/g;
 
 function stripNonContentBlocks(html: string): string {
-  return html
-    .replace(SCRIPT_BLOCK_REGEX, "")
-    .replace(STYLE_BLOCK_REGEX, "")
-    .replace(NOSCRIPT_BLOCK_REGEX, "");
+  return html.replace(SCRIPT_BLOCK_REGEX, "").replace(STYLE_BLOCK_REGEX, "").replace(NOSCRIPT_BLOCK_REGEX, "");
 }
 
 function convertBlockTagsToNewlines(text: string): string {
-  return text
-    .replace(BLOCK_CLOSER_REGEX, "\n")
-    .replace(SELF_CLOSING_BR_REGEX, "\n");
+  return text.replace(BLOCK_CLOSER_REGEX, "\n").replace(SELF_CLOSING_BR_REGEX, "\n");
 }
 
 function stripRemainingTags(text: string): string {
@@ -44,15 +38,11 @@ function decodeHtmlEntities(text: string): string {
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
     .replace(/&nbsp;/g, " ")
-    .replace(NUMERIC_HTML_ENTITY_REGEX, (_, code) =>
-      String.fromCharCode(Number(code)),
-    );
+    .replace(NUMERIC_HTML_ENTITY_REGEX, (_, code) => String.fromCharCode(Number(code)));
 }
 
 function collapseWhitespace(text: string): string {
-  return text
-    .replace(HORIZONTAL_WHITESPACE_RUN, " ")
-    .replace(BLANK_LINE_RUN, "\n\n");
+  return text.replace(HORIZONTAL_WHITESPACE_RUN, " ").replace(BLANK_LINE_RUN, "\n\n");
 }
 
 export function htmlToText(html: string): string {
@@ -75,26 +65,15 @@ export function isHtmlContentType(contentType: string): boolean {
 }
 
 export function assertTextContentType(contentType: string): void {
-  if (
-    BINARY_CONTENT_TYPE_PREFIXES.some((prefix) => contentType.includes(prefix))
-  ) {
-    throw new Error(
-      `Unsupported content type: ${contentType}. web_fetch supports text pages only.`,
-    );
+  if (BINARY_CONTENT_TYPE_PREFIXES.some((prefix) => contentType.includes(prefix))) {
+    throw new Error(`Unsupported content type: ${contentType}. web_fetch supports text pages only.`);
   }
 }
 
 export function isPrivateOrLoopbackHostname(hostname: string): boolean {
   const h = hostname.toLowerCase().replace(/^\[|\]$/g, "");
   if (h === "localhost" || h.endsWith(".localhost")) return true;
-  if (
-    h === "::1" ||
-    h === "::" ||
-    h.startsWith("fe80:") ||
-    h.startsWith("fc") ||
-    h.startsWith("fd")
-  )
-    return true;
+  if (h === "::1" || h === "::" || h.startsWith("fe80:") || h.startsWith("fc") || h.startsWith("fd")) return true;
   const v4 = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
   if (!v4) return false;
   const [a, b] = [Number(v4[1]), Number(v4[2])];
@@ -113,21 +92,15 @@ export function parseAndAssertHttpUrl(raw: string): URL {
     throw new Error(`Invalid URL: ${raw}`);
   }
   if (!SUPPORTED_HTTP_PROTOCOLS.has(parsed.protocol)) {
-    throw new Error(
-      `Unsupported URL protocol: ${parsed.protocol}. Only http and https are supported.`,
-    );
+    throw new Error(`Unsupported URL protocol: ${parsed.protocol}. Only http and https are supported.`);
   }
   if (isPrivateOrLoopbackHostname(parsed.hostname)) {
-    throw new Error(
-      `Refusing to fetch private/loopback address: ${parsed.hostname}`,
-    );
+    throw new Error(`Refusing to fetch private/loopback address: ${parsed.hostname}`);
   }
   return parsed;
 }
 
-export function buildFetchRequestInit(
-  signal: AbortSignal | undefined,
-): RequestInit {
+export function buildFetchRequestInit(signal: AbortSignal | undefined): RequestInit {
   return {
     signal,
     redirect: "follow",
@@ -135,10 +108,7 @@ export function buildFetchRequestInit(
   };
 }
 
-export async function fetchUrlOrThrow(
-  url: string,
-  signal: AbortSignal | undefined,
-): Promise<Response> {
+export async function fetchUrlOrThrow(url: string, signal: AbortSignal | undefined): Promise<Response> {
   const res = await fetch(url, buildFetchRequestInit(signal));
   if (!res.ok) {
     throw new Error(`HTTP ${res.status} ${res.statusText} for ${url}`);
@@ -158,11 +128,7 @@ export async function extractBodyAsText(
   return { text: body };
 }
 
-export async function fetchViaGenericHtml(
-  url: string,
-  raw: boolean,
-  signal?: AbortSignal,
-): Promise<FetchResponse> {
+export async function fetchViaGenericHtml(url: string, raw: boolean, signal?: AbortSignal): Promise<FetchResponse> {
   const res = await fetchUrlOrThrow(url, signal);
   const contentType = res.headers.get("content-type") ?? "";
   assertTextContentType(contentType);
@@ -172,8 +138,6 @@ export async function fetchViaGenericHtml(
     text,
     title,
     contentType: contentType || undefined,
-    contentLength: contentLengthHeader
-      ? Number(contentLengthHeader)
-      : undefined,
+    contentLength: contentLengthHeader ? Number(contentLengthHeader) : undefined,
   };
 }

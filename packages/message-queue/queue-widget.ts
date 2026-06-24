@@ -1,9 +1,5 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import {
-  truncateToWidth,
-  visibleWidth,
-  wrapTextWithAnsi,
-} from "@earendil-works/pi-tui";
+import { truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 import type { QueuedMessage } from "./queue.ts";
 
 const WIDGET_KEY = "htwang-contrib-message-queue";
@@ -19,12 +15,7 @@ function padLineToWidth(line: string, width: number): string {
   return truncated + " ".repeat(Math.max(0, width - vw));
 }
 
-function linesForQueuedMessage(
-  msg: QueuedMessage,
-  index: number,
-  theme: Theme,
-  width: number,
-): string[] {
+function linesForQueuedMessage(msg: QueuedMessage, index: number, theme: Theme, width: number): string[] {
   const badge = theme.fg("accent", `💬 #${index + 1}`);
   const sep = theme.fg("muted", " ");
   const prefix = `${badge}${sep}`;
@@ -42,11 +33,7 @@ function linesForQueuedMessage(
     const wrapped = wrapTextWithAnsi(theme.fg("dim", para), available);
     for (let wi = 0; wi < wrapped.length; wi++) {
       const piece = wrapped[wi]!;
-      out.push(
-        firstLineOfMessage && wi === 0
-          ? `${prefix}${piece}`
-          : `${indent}${piece}`,
-      );
+      out.push(firstLineOfMessage && wi === 0 ? `${prefix}${piece}` : `${indent}${piece}`);
     }
     firstLineOfMessage = false;
   }
@@ -54,11 +41,7 @@ function linesForQueuedMessage(
   return out;
 }
 
-export function renderQueueWidget(
-  messages: readonly QueuedMessage[],
-  theme: Theme,
-  width: number,
-): string[] {
+export function renderQueueWidget(messages: readonly QueuedMessage[], theme: Theme, width: number): string[] {
   if (messages.length === 0) return [];
 
   const lines: string[] = [];

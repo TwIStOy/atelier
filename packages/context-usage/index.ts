@@ -1,14 +1,7 @@
-import type {
-  ExtensionAPI,
-  ExtensionContext,
-  Theme,
-} from "@earendil-works/pi-coding-agent";
-import { Key, matchesKey } from "@earendil-works/pi-tui";
+import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import type { TUI } from "@earendil-works/pi-tui";
-import {
-  buildContextUsageDetails,
-  renderContextUsageMessage,
-} from "./context-usage.ts";
+import { Key, matchesKey } from "@earendil-works/pi-tui";
+import { buildContextUsageDetails, renderContextUsageMessage } from "./context-usage.ts";
 
 const CONTEXT_USAGE_WIDGET_KEY = "pi-extensions.context-usage";
 
@@ -66,27 +59,16 @@ export default function initContextUsage(pi: ExtensionAPI): void {
   });
 
   pi.registerCommand("context", {
-    description:
-      "Show estimated context-window usage in the below-editor widget (Esc clears).",
+    description: "Show estimated context-window usage in the below-editor widget (Esc clears).",
     handler: async (_args, ctx) => {
       const state = ensureBelowState(ctx);
       if (!state) {
-        ctx.ui.notify(
-          "Context usage needs an interactive terminal session.",
-          "warning",
-        );
+        ctx.ui.notify("Context usage needs an interactive terminal session.", "warning");
         return;
       }
-      const details = buildContextUsageDetails(
-        pi,
-        ctx,
-        latestSystemPromptOptions,
-      );
+      const details = buildContextUsageDetails(pi, ctx, latestSystemPromptOptions);
       if (!details) {
-        ctx.ui.notify(
-          "Context usage is not available yet (no token estimate from the session).",
-          "warning",
-        );
+        ctx.ui.notify("Context usage is not available yet (no token estimate from the session).", "warning");
         return;
       }
       ctx.ui.setWidget(

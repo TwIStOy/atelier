@@ -6,9 +6,7 @@ export interface GetAvailableSkillNamesOptions {
   skillPaths?: string[];
 }
 
-export function getAvailableSkillNames(
-  options: GetAvailableSkillNamesOptions = {},
-): string[] {
+export function getAvailableSkillNames(options: GetAvailableSkillNamesOptions = {}): string[] {
   const { skills } = loadSkills({
     cwd: options.cwd ?? process.cwd(),
     agentDir: options.agentDir ?? getAgentDir(),

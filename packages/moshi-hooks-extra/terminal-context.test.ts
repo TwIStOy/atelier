@@ -1,10 +1,10 @@
 import { describe, expect, test } from "vitest";
 import {
   contextFromMoshiJson,
+  EMPTY_TERMINAL_CONTEXT,
   parseMoshiContextJson,
   probeTerminalContext,
   resetTerminalContextCache,
-  EMPTY_TERMINAL_CONTEXT,
 } from "./terminal-context.ts";
 
 const HERDR_PAYLOAD = JSON.stringify({

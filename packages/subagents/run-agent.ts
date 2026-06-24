@@ -1,58 +1,37 @@
 import { randomUUID } from "node:crypto";
 import * as fs from "node:fs";
-import type {
-  AgentMessage,
-  ThinkingLevel,
-} from "@earendil-works/pi-agent-core";
+import type { AgentMessage, ThinkingLevel } from "@earendil-works/pi-agent-core";
 import type { TextContent } from "@earendil-works/pi-ai";
-import type {
-  ExtensionContext,
-  ExtensionFactory,
-} from "@earendil-works/pi-coding-agent";
+import type { ExtensionContext, ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import {
+  type AgentSession,
+  type AgentSessionEvent,
   createAgentSession,
+  DEFAULT_MAX_BYTES,
+  DEFAULT_MAX_LINES,
   DefaultResourceLoader,
+  formatSize,
   getAgentDir,
   SessionManager,
   SettingsManager,
   truncateHead,
-  DEFAULT_MAX_BYTES,
-  DEFAULT_MAX_LINES,
-  formatSize,
-  type AgentSession,
-  type AgentSessionEvent,
 } from "@earendil-works/pi-coding-agent";
 import { resolveModel } from "@htwang-contrib/common";
 import extraTools from "@htwang-contrib/extra-tools/index.ts";
 import protectSecrets from "@htwang-contrib/protect-secrets/index.ts";
 import webTools from "@htwang-contrib/web-tools/index.ts";
 import {
-  appendSubagentLinkRecord,
-  recordSubagentStarted,
-  SUBAGENT_SESSION_DIR,
-} from "./paths.ts";
-import {
   buildSubagentAgentCatalog,
   resolveSubagentAgentId,
-  subagentSystemPromptFromCatalog,
   type SubagentAgentCatalog,
+  subagentSystemPromptFromCatalog,
 } from "./agent-catalog.ts";
 import { resolveChildToolNames } from "./child-tools.ts";
+import { appendSubagentLinkRecord, recordSubagentStarted, SUBAGENT_SESSION_DIR } from "./paths.ts";
 
-const CHILD_SESSION_EXTENSION_FACTORIES: ExtensionFactory[] = [
-  protectSecrets,
-  extraTools,
-  webTools,
-];
+const CHILD_SESSION_EXTENSION_FACTORIES: ExtensionFactory[] = [protectSecrets, extraTools, webTools];
 
-const THINKING_LEVELS = new Set<string>([
-  "off",
-  "minimal",
-  "low",
-  "medium",
-  "high",
-  "xhigh",
-]);
+const THINKING_LEVELS = new Set<string>(["off", "minimal", "low", "medium", "high", "xhigh"]);
 
 export type SubagentUsageSnapshot = {
   usage_input: number;
@@ -150,10 +129,7 @@ function extractAssistantText(messages: AgentMessage[]): string {
   return "";
 }
 
-function resolveModelForSubagent(
-  raw: string | undefined,
-  ctx: ExtensionContext,
-) {
+function resolveModelForSubagent(raw: string | undefined, ctx: ExtensionContext) {
   const pattern = raw?.trim();
   if (!pattern) return ctx.model;
   const found = resolveModel(ctx.modelRegistry.getAvailable(), pattern);
@@ -205,22 +181,15 @@ export async function runSubAgent(
   let toolCallCount = 0;
 
   const finish = (
-    partial: Omit<
-      RunSubAgentResult,
-      "parent_session_id" | "parent_session_file" | keyof SubagentUsageSnapshot
-    > &
-      Partial<
-        Pick<RunSubAgentResult, "parent_session_id" | "parent_session_file"> &
-          SubagentUsageSnapshot
-      >,
+    partial: Omit<RunSubAgentResult, "parent_session_id" | "parent_session_file" | keyof SubagentUsageSnapshot> &
+      Partial<Pick<RunSubAgentResult, "parent_session_id" | "parent_session_file"> & SubagentUsageSnapshot>,
   ): RunSubAgentResult => {
     const u = session ? snapshotUsage(session) : EMPTY_USAGE;
     return {
       parent_session_id: partial.parent_session_id ?? parentSessionId,
       parent_session_file: partial.parent_session_file ?? parentSessionFile,
       tool_calls: partial.tool_calls ?? toolCallCount,
-      sub_session_file:
-        partial.sub_session_file ?? session?.sessionManager.getSessionFile(),
+      sub_session_file: partial.sub_session_file ?? session?.sessionManager.getSessionFile(),
       text: partial.text,
       isError: partial.isError,
       errorMessage: partial.errorMessage,
@@ -255,10 +224,7 @@ export async function runSubAgent(
     const personaTools = agentCatalog.agents.get(agentType)?.fileOptions.tools;
     const toolList = resolveChildToolNames(isolated, personaTools);
 
-    const systemPrompt = subagentSystemPromptFromCatalog(
-      agentType,
-      agentCatalog,
-    );
+    const systemPrompt = subagentSystemPromptFromCatalog(agentType, agentCatalog);
     const agentDir = getAgentDir();
     const settingsManager = SettingsManager.create(cwd, agentDir);
     const model = resolveModelForSubagent(input.model, ctx);
@@ -273,11 +239,7 @@ export async function runSubAgent(
       newOpts.parentSession = parentHeader.id;
     }
 
-    const sessionManager = SessionManager.create(
-      cwd,
-      SUBAGENT_SESSION_DIR,
-      newOpts,
-    );
+    const sessionManager = SessionManager.create(cwd, SUBAGENT_SESSION_DIR, newOpts);
 
     const loader = new DefaultResourceLoader({
       cwd,

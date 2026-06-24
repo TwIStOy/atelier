@@ -1,9 +1,3 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import {
-  DEFAULT_MAX_BYTES,
-  formatSize,
-  truncateHead,
-} from "@earendil-works/pi-coding-agent";
 import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { stat as fsStat } from "node:fs/promises";
@@ -11,13 +5,12 @@ import { homedir } from "node:os";
 import path from "node:path";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { DEFAULT_MAX_BYTES, formatSize, truncateHead } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 
 const globDir = path.dirname(fileURLToPath(import.meta.url));
-const globToolDescription = readFileSync(
-  path.join(globDir, "glob.txt"),
-  "utf-8",
-).trim();
+const globToolDescription = readFileSync(path.join(globDir, "glob.txt"), "utf-8").trim();
 
 const FILE_LIMIT = 100;
 
@@ -55,11 +48,10 @@ function runRgFiles(
 ): Promise<string[]> {
   return new Promise((resolve, reject) => {
     const paths: string[] = [];
-    const child = spawn(
-      "rg",
-      ["--files", "--hidden", "--glob", globPattern, "."],
-      { cwd, stdio: ["ignore", "pipe", "pipe"] },
-    );
+    const child = spawn("rg", ["--files", "--hidden", "--glob", globPattern, "."], {
+      cwd,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
 
     let stderr = "";
     let settled = false;
@@ -134,8 +126,7 @@ export function registerGlobTool(pi: ExtensionAPI) {
     name: "glob",
     label: "Glob",
     description: globToolDescription,
-    promptSnippet:
-      "List files by glob pattern (ripgrep); paths sorted by mtime; optional root directory",
+    promptSnippet: "List files by glob pattern (ripgrep); paths sorted by mtime; optional root directory",
     parameters: globParams,
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
       const pattern = params.pattern?.trim();
@@ -154,14 +145,9 @@ export function registerGlobTool(pi: ExtensionAPI) {
         throw new Error(`glob path must be a directory: ${searchPath}`);
       }
 
-      const relPaths = await runRgFiles(
-        searchPath,
-        pattern,
-        signal,
-        FILE_LIMIT + 1,
-      );
+      const relPaths = await runRgFiles(searchPath, pattern, signal, FILE_LIMIT + 1);
 
-      let truncated = relPaths.length > FILE_LIMIT;
+      const truncated = relPaths.length > FILE_LIMIT;
       const capped = truncated ? relPaths.slice(0, FILE_LIMIT) : relPaths;
 
       const withMtime = await Promise.all(

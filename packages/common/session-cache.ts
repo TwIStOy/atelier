@@ -1,9 +1,6 @@
-import type {
-  ExtensionContext,
-  SessionEntry,
-} from "@earendil-works/pi-coding-agent";
-import { convertToLlm } from "@earendil-works/pi-coding-agent";
 import type { Message } from "@earendil-works/pi-ai";
+import type { ExtensionContext, SessionEntry } from "@earendil-works/pi-coding-agent";
+import { convertToLlm } from "@earendil-works/pi-coding-agent";
 import { getGlobalState } from "./global-state.ts";
 
 export function isStaleCtxError(e: unknown): boolean {
@@ -12,9 +9,7 @@ export function isStaleCtxError(e: unknown): boolean {
 
 export function branchToMessages(branch: SessionEntry[]): Message[] {
   const agentMessages = branch
-    .filter(
-      (e): e is SessionEntry & { type: "message" } => e.type === "message",
-    )
+    .filter((e): e is SessionEntry & { type: "message" } => e.type === "message")
     .map((e) => e.message);
   return convertToLlm(agentMessages);
 }
@@ -37,10 +32,7 @@ export function createSessionCache<V>(stateKey: string): SessionCache<V> {
     }));
 
   function sessionKey(ctx: ExtensionContext): string {
-    return (
-      ctx.sessionManager.getSessionFile() ??
-      `memory:${ctx.sessionManager.getSessionId()}`
-    );
+    return ctx.sessionManager.getSessionFile() ?? `memory:${ctx.sessionManager.getSessionId()}`;
   }
 
   return {

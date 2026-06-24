@@ -39,13 +39,9 @@ describe("readHerdrEnv / isInsideHerdr", () => {
   });
 
   it("is inside herdr only when HERDR_ENV=1 AND a pane id is present", () => {
-    expect(isInsideHerdr({ HERDR_ENV: "1", HERDR_PANE_ID: "w1:p1" })).toBe(
-      true,
-    );
+    expect(isInsideHerdr({ HERDR_ENV: "1", HERDR_PANE_ID: "w1:p1" })).toBe(true);
     expect(isInsideHerdr({ HERDR_ENV: "1", HERDR_PANE_ID: "  " })).toBe(false);
-    expect(isInsideHerdr({ HERDR_ENV: "0", HERDR_PANE_ID: "w1:p1" })).toBe(
-      false,
-    );
+    expect(isInsideHerdr({ HERDR_ENV: "0", HERDR_PANE_ID: "w1:p1" })).toBe(false);
     expect(isInsideHerdr({ HERDR_ENV: "1" })).toBe(false);
     expect(isInsideHerdr({})).toBe(false);
   });
@@ -53,9 +49,7 @@ describe("readHerdrEnv / isInsideHerdr", () => {
 
 describe("resolveHerdrBinary", () => {
   it("prefers HERDR_BIN_PATH", () => {
-    expect(resolveHerdrBinary({ HERDR_BIN_PATH: "/custom/herdr" })).toBe(
-      "/custom/herdr",
-    );
+    expect(resolveHerdrBinary({ HERDR_BIN_PATH: "/custom/herdr" })).toBe("/custom/herdr");
   });
   it("falls back to the bare binary name", () => {
     expect(resolveHerdrBinary({})).toBe("herdr");
@@ -89,8 +83,7 @@ describe("parseHerdrResponse / extractResult", () => {
   });
 
   it("falls back to the first line when multiple lines are present", () => {
-    const raw =
-      JSON.stringify({ id: "x", result: { ok: true } }) + "\nextra noise";
+    const raw = JSON.stringify({ id: "x", result: { ok: true } }) + "\nextra noise";
     expect(extractResult(parseHerdrResponse(raw))).toEqual({ ok: true });
   });
 });
@@ -153,9 +146,7 @@ const PANE_GET_STDOUT = JSON.stringify({
 describe("getOurPane / isActivePane", () => {
   it("does NOT pass --json (herdr prints bare JSON and rejects the flag)", async () => {
     const { pi, calls } = fakePi(PANE_GET_STDOUT);
-    const pane = await (
-      await import("./herdr-client.ts")
-    ).getOurPane(pi, "p_2", {});
+    const pane = await (await import("./herdr-client.ts")).getOurPane(pi, "p_2", {});
     expect(calls[0]?.args).toEqual(["pane", "get", "p_2"]);
     expect(pane).not.toBeNull();
     expect(pane?.tab_id).toBe("w1:t1");
@@ -163,11 +154,7 @@ describe("getOurPane / isActivePane", () => {
 
   it("isActivePane returns the focused flag from pane get", async () => {
     const focused = fakePi(PANE_GET_STDOUT);
-    expect(
-      await (
-        await import("./herdr-client.ts")
-      ).isActivePane(focused.pi, "p_2", {}),
-    ).toBe(true);
+    expect(await (await import("./herdr-client.ts")).isActivePane(focused.pi, "p_2", {})).toBe(true);
 
     const unfocused = fakePi(
       JSON.stringify({
@@ -175,28 +162,20 @@ describe("getOurPane / isActivePane", () => {
         result: { type: "pane_info", pane: { focused: false } },
       }),
     );
-    expect(
-      await (
-        await import("./herdr-client.ts")
-      ).isActivePane(unfocused.pi, "p_2", {}),
-    ).toBe(false);
+    expect(await (await import("./herdr-client.ts")).isActivePane(unfocused.pi, "p_2", {})).toBe(false);
   });
 });
 
 describe("resolveTabId", () => {
   it("prefers HERDR_TAB_ID when injected", async () => {
     const { pi } = fakePi("");
-    const tabId = await (
-      await import("./herdr-client.ts")
-    ).resolveTabId(pi, "p_2", { HERDR_TAB_ID: "env-tab-1" });
+    const tabId = await (await import("./herdr-client.ts")).resolveTabId(pi, "p_2", { HERDR_TAB_ID: "env-tab-1" });
     expect(tabId).toBe("env-tab-1");
   });
 
   it("falls back to tab_id from pane get when the env var is absent", async () => {
     const { pi } = fakePi(PANE_GET_STDOUT);
-    const tabId = await (
-      await import("./herdr-client.ts")
-    ).resolveTabId(pi, "p_2", {});
+    const tabId = await (await import("./herdr-client.ts")).resolveTabId(pi, "p_2", {});
     expect(tabId).toBe("w1:t1");
   });
 });
@@ -252,9 +231,7 @@ describe("parseTabInfo / getTabLabel", () => {
       },
     });
     const { pi, calls } = fakePi(stdout);
-    const info = await (
-      await import("./herdr-client.ts")
-    ).getTabLabel(pi, "w1:t1", {});
+    const info = await (await import("./herdr-client.ts")).getTabLabel(pi, "w1:t1", {});
     expect(calls[0]?.args).toEqual(["tab", "get", "w1:t1"]);
     expect(info).toEqual({ tab_id: "w1:t1", label: "My Logs", number: 1 });
   });

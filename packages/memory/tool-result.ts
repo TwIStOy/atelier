@@ -1,7 +1,4 @@
-export function jsonResult(
-  data: unknown,
-  details: Record<string, unknown> = {},
-) {
+export function jsonResult(data: unknown, details: Record<string, unknown> = {}) {
   const text = typeof data === "string" ? data : JSON.stringify(data ?? null);
   return {
     content: [{ type: "text" as const, text }],

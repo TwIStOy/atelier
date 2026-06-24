@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { VoiceInputController, type VoiceInputFlowLike } from "../index.ts";
 import type { FlowContext } from "../flow.ts";
+import { VoiceInputController, type VoiceInputFlowLike } from "../index.ts";
 
 interface FakeFlow {
   startRecording: ReturnType<typeof vi.fn>;
@@ -118,9 +118,7 @@ describe("VoiceInputController.toggle — failure paths", () => {
 
   it("notifies and returns to idle when finalizeRecording fails", async () => {
     const flow = makeFakeFlow();
-    flow.finalizeRecording.mockRejectedValueOnce(
-      new Error("transcribe failed"),
-    );
+    flow.finalizeRecording.mockRejectedValueOnce(new Error("transcribe failed"));
     const ctrl = makeController(flow);
     const { ctx, calls } = makeCtx();
     await ctrl.toggle(ctx);
@@ -143,9 +141,7 @@ describe("VoiceInputController.toggle — failure paths", () => {
 
   it("redacts secrets in the failure notification", async () => {
     const flow = makeFakeFlow();
-    flow.startRecording.mockRejectedValueOnce(
-      new Error("Authorization: Bearer sk-leak failed"),
-    );
+    flow.startRecording.mockRejectedValueOnce(new Error("Authorization: Bearer sk-leak failed"));
     const ctrl = makeController(flow);
     const { ctx, calls } = makeCtx();
     await ctrl.toggle(ctx);

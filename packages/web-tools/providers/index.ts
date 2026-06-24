@@ -1,26 +1,26 @@
 import type { ProviderMeta } from "./types.ts";
 
 export { BraveProvider } from "./brave.ts";
-export { TavilyProvider } from "./tavily.ts";
-export { SerperProvider } from "./serper.ts";
-export { PerplexityProvider } from "./perplexity.ts";
-export { ExaProvider } from "./exa.ts";
-export { YouComProvider } from "./youcom.ts";
-export { JinaProvider } from "./jina.ts";
-export { FirecrawlProvider } from "./firecrawl.ts";
-export { ZaiProvider } from "./zai.ts";
 export { ProviderError, throwIfApiError } from "./errors.ts";
-export { type ProviderCredentials, createSearchProvider } from "./factory.ts";
+export { ExaProvider } from "./exa.ts";
+export { createSearchProvider, type ProviderCredentials } from "./factory.ts";
 export {
-  htmlToText,
-  extractTitle,
-  isHtmlContentType,
   assertTextContentType,
-  isPrivateOrLoopbackHostname,
-  parseAndAssertHttpUrl,
+  extractTitle,
   fetchUrlOrThrow,
   fetchViaGenericHtml,
+  htmlToText,
+  isHtmlContentType,
+  isPrivateOrLoopbackHostname,
+  parseAndAssertHttpUrl,
 } from "./fetch-helpers.ts";
+export { FirecrawlProvider } from "./firecrawl.ts";
+export { JinaProvider } from "./jina.ts";
+export { PerplexityProvider } from "./perplexity.ts";
+export { SerperProvider } from "./serper.ts";
+export { TavilyProvider } from "./tavily.ts";
+export { YouComProvider } from "./youcom.ts";
+export { ZaiProvider } from "./zai.ts";
 
 export const BRAVE_API_KEY_ENV_VAR = "BRAVE_SEARCH_API_KEY";
 export const BRAVE_PROVIDER_META: ProviderMeta = {

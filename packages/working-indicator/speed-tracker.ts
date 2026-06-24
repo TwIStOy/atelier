@@ -1,8 +1,4 @@
-import {
-  DEFAULT_SPEED_CONFIG,
-  TokenSpeedEngine,
-  type SpeedConfig,
-} from "./speed-engine.ts";
+import { DEFAULT_SPEED_CONFIG, type SpeedConfig, TokenSpeedEngine } from "./speed-engine.ts";
 
 export type CompletedMessageSpeed = {
   outputTokens: number;
@@ -59,15 +55,10 @@ export class SpeedTracker {
   }
 
   sessionAvgTokS(): number | null {
-    return this.sessionDurationMs > 0
-      ? this.sessionOutputTokens / (this.sessionDurationMs / 1000)
-      : null;
+    return this.sessionDurationMs > 0 ? this.sessionOutputTokens / (this.sessionDurationMs / 1000) : null;
   }
 
-  finishMessage(
-    outputTokens: number,
-    stopReason: string | undefined,
-  ): CompletedMessageSpeed | null {
+  finishMessage(outputTokens: number, stopReason: string | undefined): CompletedMessageSpeed | null {
     if (!this.engine.isStreaming) return null;
 
     this.engine.reconcileTotal(outputTokens);

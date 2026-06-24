@@ -1,4 +1,4 @@
-import { formatTokens, formatElapsedSeconds } from "@htwang-contrib/common";
+import { formatElapsedSeconds, formatTokens } from "@htwang-contrib/common";
 import type { Goal, TokenUsageSnapshot } from "./types.ts";
 
 export function formatGoalForTool(goal: Goal): string {
@@ -21,9 +21,7 @@ export function formatGoalForTool(goal: Goal): string {
 }
 
 export function formatGoalToolResponse(goal: Goal): Record<string, unknown> {
-  const remainingTokens = goal.tokenBudget
-    ? Math.max(0, goal.tokenBudget - goal.tokensUsed)
-    : null;
+  const remainingTokens = goal.tokenBudget ? Math.max(0, goal.tokenBudget - goal.tokensUsed) : null;
   const result: Record<string, unknown> = {
     id: goal.id,
     objective: goal.objective,

@@ -1,15 +1,7 @@
+import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth } from "@earendil-works/pi-tui";
-import type {
-  ExtensionAPI,
-  ExtensionContext,
-  Theme,
-} from "@earendil-works/pi-coding-agent";
-import {
-  ZAI_CODING_PLAN_EVENTS,
-  formatProgressBar,
-  usagePercentStressLevel,
-} from "@htwang-contrib/common";
 import type { CodingPlanUsage } from "@htwang-contrib/common";
+import { formatProgressBar, usagePercentStressLevel, ZAI_CODING_PLAN_EVENTS } from "@htwang-contrib/common";
 import type { StatusLineComponent } from "./base.ts";
 
 const PROVIDER_ID = "zai-coding-plan";
@@ -26,14 +18,11 @@ export class CodingPlanUsageComponent implements StatusLineComponent {
 
   bindRender(fn: () => void) {
     this.requestRender = fn;
-    this.unsubscribe = this.pi.events.on(
-      ZAI_CODING_PLAN_EVENTS.USAGE_UPDATE,
-      (data: unknown) => {
-        const d = data as { usage: CodingPlanUsage };
-        this.usage = d.usage;
-        this.requestRender?.();
-      },
-    );
+    this.unsubscribe = this.pi.events.on(ZAI_CODING_PLAN_EVENTS.USAGE_UPDATE, (data: unknown) => {
+      const d = data as { usage: CodingPlanUsage };
+      this.usage = d.usage;
+      this.requestRender?.();
+    });
   }
 
   dispose() {
@@ -52,17 +41,10 @@ export class CodingPlanUsageComponent implements StatusLineComponent {
     const bar = formatProgressBar(limit.percentage, 8);
 
     const stress = usagePercentStressLevel(used);
-    const pctColor =
-      stress === "high" ? "error" : stress === "medium" ? "warning" : "dim";
+    const pctColor = stress === "high" ? "error" : stress === "medium" ? "warning" : "dim";
 
     return [
-      truncateToWidth(
-        theme.fg(pctColor, `${used}%`) +
-          theme.fg("dim", ` ${bar} `) +
-          theme.fg("dim", "5h"),
-        width,
-        "",
-      ),
+      truncateToWidth(theme.fg(pctColor, `${used}%`) + theme.fg("dim", ` ${bar} `) + theme.fg("dim", "5h"), width, ""),
     ];
   }
 }

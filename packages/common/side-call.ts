@@ -1,9 +1,9 @@
 import {
   type AssistantMessage,
+  completeSimple,
   type Message,
   type Model,
   type StopReason,
-  completeSimple,
 } from "@earendil-works/pi-ai";
 import type { ModelRegistry } from "@earendil-works/pi-coding-agent";
 import { assistantMessageText } from "./message-text.ts";
@@ -28,8 +28,7 @@ export async function executeSideCall(opts: {
   signal: AbortSignal;
   commandName: string;
 }): Promise<SideCallResult> {
-  const { model, modelRegistry, systemPrompt, messages, signal, commandName } =
-    opts;
+  const { model, modelRegistry, systemPrompt, messages, signal, commandName } = opts;
   const modelLabel = `${model.provider}:${model.id}`;
 
   const auth = await modelRegistry.getApiKeyAndHeaders(model);

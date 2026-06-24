@@ -1,19 +1,10 @@
-import type {
-  ExtensionAPI,
-  ExtensionCommandContext,
-  ExtensionContext,
-} from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { buildReorganizeMemoryPrompt } from "./commands/reorganize-memory-template.js";
 import { buildSelfImprovePrompt } from "./commands/self-improve-template.js";
 import { buildMemoryStatusReport } from "./memory-status.js";
-import { registerJournalTools, registerMemoryTools } from "./tools/index.js";
-import {
-  getNamespace,
-  isDisabledByEnv,
-  isMemoryEnabled,
-  setSessionNamespace,
-} from "./settings.js";
+import { getNamespace, isDisabledByEnv, isMemoryEnabled, setSessionNamespace } from "./settings.js";
 import { generateSystemPrompt } from "./system-prompt.js";
+import { registerJournalTools, registerMemoryTools } from "./tools/index.js";
 
 const INSTALL_GUARD = Symbol.for("pi.memory.installed");
 
@@ -32,8 +23,7 @@ export default function initMemory(pi: ExtensionAPI): void {
   guard[INSTALL_GUARD] = true;
 
   pi.registerCommand("memory-status", {
-    description:
-      "Show memory extension enablement, CLI health, resolved binary, and domain list.",
+    description: "Show memory extension enablement, CLI health, resolved binary, and domain list.",
     handler: async (_args: string, ctx: ExtensionCommandContext) => {
       setSessionNamespace(getNamespace(ctx));
       const report = await buildMemoryStatusReport(ctx);
@@ -44,15 +34,11 @@ export default function initMemory(pi: ExtensionAPI): void {
   });
 
   pi.registerCommand("self-improve", {
-    description:
-      "Reflect on the current session, identify learnings, persist to memory/journal, and improve skills",
+    description: "Reflect on the current session, identify learnings, persist to memory/journal, and improve skills",
     handler: async (args: string, ctx: ExtensionCommandContext) => {
       if (!ctx.isIdle()) {
         if (ctx.hasUI) {
-          ctx.ui.notify(
-            "Agent is busy. Wait for the current turn to finish, then run /self-improve again.",
-            "warning",
-          );
+          ctx.ui.notify("Agent is busy. Wait for the current turn to finish, then run /self-improve again.", "warning");
         }
         return;
       }
@@ -87,10 +73,7 @@ export default function initMemory(pi: ExtensionAPI): void {
 
       if (!isMemoryEnabled(ctx)) {
         if (ctx.hasUI) {
-          ctx.ui.notify(
-            "memory tools are disabled. Enable memory tools before reorganizing the graph.",
-            "warning",
-          );
+          ctx.ui.notify("memory tools are disabled. Enable memory tools before reorganizing the graph.", "warning");
         }
         return;
       }

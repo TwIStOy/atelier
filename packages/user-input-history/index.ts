@@ -4,26 +4,12 @@ import {
   type ExtensionContext,
   type KeybindingsManager,
 } from "@earendil-works/pi-coding-agent";
-import type {
-  EditorComponent,
-  EditorTheme,
-  KeybindingsConfig,
-  KeyId,
-  TUI,
-} from "@earendil-works/pi-tui";
+import type { EditorComponent, EditorTheme, KeybindingsConfig, KeyId, TUI } from "@earendil-works/pi-tui";
 import { getKeybindings, Key } from "@earendil-works/pi-tui";
-import {
-  loadHistoryTextsNewestFirst,
-  MAX_ENTRIES,
-  persistHistoryMergedWithDisk,
-} from "./history-store.ts";
+import { loadHistoryTextsNewestFirst, MAX_ENTRIES, persistHistoryMergedWithDisk } from "./history-store.ts";
 import { InteractiveHistorySearch } from "./interactive-search.ts";
 
-type EditorFactory = (
-  tui: TUI,
-  theme: EditorTheme,
-  keybindings: KeybindingsManager,
-) => EditorComponent;
+type EditorFactory = (tui: TUI, theme: EditorTheme, keybindings: KeybindingsManager) => EditorComponent;
 
 const PRIOR_KEY = "__userInputHistoryPriorFactory" as const;
 const SESSION_RENAME_KEY = "app.session.rename";
@@ -38,9 +24,7 @@ function stripSessionRenameBinding(value: unknown): string[] {
     return isCtrlRKey(value) ? [] : [value];
   }
   if (Array.isArray(value)) {
-    return value.filter(
-      (v): v is string => typeof v === "string" && !isCtrlRKey(v),
-    );
+    return value.filter((v): v is string => typeof v === "string" && !isCtrlRKey(v));
   }
   return [];
 }
@@ -71,9 +55,7 @@ function detachBuiltinSessionRenameCtrlR(): void {
 
 type PriorMarked = EditorFactory & { [PRIOR_KEY]?: EditorFactory };
 
-function unwrapBaseFactory(
-  factory: EditorFactory | undefined,
-): EditorFactory | undefined {
+function unwrapBaseFactory(factory: EditorFactory | undefined): EditorFactory | undefined {
   const seen = new Set<EditorFactory>();
   let cur: EditorFactory | undefined = factory;
   while (cur) {
@@ -169,9 +151,7 @@ export default function userInputHistoryExtension(pi: ExtensionAPI): void {
     const prior = unwrapBaseFactory(ctx.ui.getEditorComponent());
     const wrapped: PriorMarked = Object.assign(
       (tui: TUI, theme: EditorTheme, keybindings: KeybindingsManager) => {
-        const inner = prior
-          ? prior(tui, theme, keybindings)
-          : new CustomEditor(tui, theme, keybindings);
+        const inner = prior ? prior(tui, theme, keybindings) : new CustomEditor(tui, theme, keybindings);
         const ed = asHistoryEditor(inner);
         applyDiskHistory(ed);
         patchAddToHistory(ed);
@@ -183,8 +163,7 @@ export default function userInputHistoryExtension(pi: ExtensionAPI): void {
   });
 
   pi.registerShortcut(Key.ctrl("r"), {
-    description:
-      "Interactive prompt history search (replaces editor; skim fuzzy rank)",
+    description: "Interactive prompt history search (replaces editor; skim fuzzy rank)",
     handler: (ctx) => openReverseSearch(ctx),
   });
 }

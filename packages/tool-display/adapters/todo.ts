@@ -1,9 +1,5 @@
 import type { ThemeColor } from "@earendil-works/pi-coding-agent";
-import {
-  truncateToWidth,
-  visibleWidth,
-  wrapTextWithAnsi,
-} from "@earendil-works/pi-tui";
+import { truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 import type { ToolDisplayAdapter } from "../types.ts";
 import { formatExpandedToolOutputLines } from "./shared.ts";
 
@@ -42,11 +38,7 @@ function findSubjectById(details: unknown, id: number): string | null {
   return t?.subject ?? null;
 }
 
-function attachSubject(
-  core: string,
-  styledSubject: string,
-  width: number | undefined,
-): string {
+function attachSubject(core: string, styledSubject: string, width: number | undefined): string {
   if (!width) return `${core} ${styledSubject}`;
   const line0Budget = width - 2;
   if (visibleWidth(core) + 1 + visibleWidth(styledSubject) <= line0Budget) {
@@ -71,8 +63,7 @@ export const todoAdapter: ToolDisplayAdapter<TodoArgs> = {
         subject = args.subject?.trim() || null;
         break;
       case "update":
-        if (args.status)
-          core += ` ${theme.fg(stateColor(args.status), `[${args.status}]`)}`;
+        if (args.status) core += ` ${theme.fg(stateColor(args.status), `[${args.status}]`)}`;
         if (args.id !== undefined) core += ` ${theme.fg("dim", `#${args.id}`)}`;
         if (args.id !== undefined) subject = findSubjectById(details, args.id);
         break;
@@ -109,13 +100,7 @@ export const todoAdapter: ToolDisplayAdapter<TodoArgs> = {
           return [truncateToWidth(theme.fg("muted", "└ 0 tasks"), width, "…")];
         }
         const count = output.split("\n").filter((l) => l.trim()).length;
-        return [
-          truncateToWidth(
-            theme.fg("muted", `└ ${count} task${count === 1 ? "" : "s"}`),
-            width,
-            "…",
-          ),
-        ];
+        return [truncateToWidth(theme.fg("muted", `└ ${count} task${count === 1 ? "" : "s"}`), width, "…")];
       }
       default:
         return [truncateToWidth(theme.fg("muted", `└ ${line}`), width, "…")];

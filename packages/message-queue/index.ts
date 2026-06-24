@@ -1,20 +1,12 @@
-import type {
-  ExtensionAPI,
-  ExtensionContext,
-  Theme,
-} from "@earendil-works/pi-coding-agent";
 import type { ImageContent, TextContent } from "@earendil-works/pi-ai";
+import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import type { TUI } from "@earendil-works/pi-tui";
 import { getKeybindings, Key, matchesKey } from "@earendil-works/pi-tui";
 import { MODAL_ACTIVE_EVENT } from "@htwang-contrib/common";
-import { MessageQueue } from "./queue.ts";
 import type { QueuedMessage } from "./queue.ts";
-import {
-  WIDGET_KEY,
-  WIDGET_OPTIONS,
-  renderQueueWidget,
-} from "./queue-widget.ts";
+import { MessageQueue } from "./queue.ts";
 import { createQueuePanel, type QueueAction } from "./queue-panel.ts";
+import { renderQueueWidget, WIDGET_KEY, WIDGET_OPTIONS } from "./queue-widget.ts";
 
 const USER_MSG_QUEUE = { deliverAs: "followUp" as const };
 
@@ -47,9 +39,7 @@ export default function messageQueueExtension(pi: ExtensionAPI): void {
     if (!panelOpen) enableEmptyEnter();
   }
 
-  function buildContent(
-    msg: QueuedMessage,
-  ): string | (TextContent | ImageContent)[] {
+  function buildContent(msg: QueuedMessage): string | (TextContent | ImageContent)[] {
     if (!msg.images || msg.images.length === 0) return msg.text;
     return [{ type: "text", text: msg.text } as TextContent, ...msg.images];
   }
@@ -184,16 +174,15 @@ export default function messageQueueExtension(pi: ExtensionAPI): void {
       panelOpen = true;
       disableEmptyEnter();
 
-      const action = await ctx.ui.custom<QueueAction>(
-        (tui: TUI, theme: Theme, kb, done) =>
-          createQueuePanel(
-            () => queue.items,
-            (idx) => deleteAt(idx),
-            theme,
-            tui,
-            kb,
-            done,
-          ),
+      const action = await ctx.ui.custom<QueueAction>((tui: TUI, theme: Theme, kb, done) =>
+        createQueuePanel(
+          () => queue.items,
+          (idx) => deleteAt(idx),
+          theme,
+          tui,
+          kb,
+          done,
+        ),
       );
 
       panelOpen = false;

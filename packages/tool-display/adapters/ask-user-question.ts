@@ -38,49 +38,29 @@ export const askUserQuestionAdapter: ToolDisplayAdapter<AskUserQuestionArgs> = {
     const title = theme.fg("toolTitle", theme.bold("AskUserQuestion"));
     if (expanded) {
       if (count === 0) {
-        return (
-          title + theme.fg("muted", " · ") + theme.fg("warning", "no questions")
-        );
+        return title + theme.fg("muted", " · ") + theme.fg("warning", "no questions");
       }
       let line = title + theme.fg("muted", " · ");
       line +=
         theme.fg("accent", `${count} question${count !== 1 ? "s" : ""}`) +
         theme.fg("muted", ", ") +
-        theme.fg(
-          "toolOutput",
-          `${optionTotal} option${optionTotal !== 1 ? "s" : ""}`,
-        );
+        theme.fg("toolOutput", `${optionTotal} option${optionTotal !== 1 ? "s" : ""}`);
       if (chips) {
-        line +=
-          theme.fg("muted", " · ") +
-          theme.fg("dim", truncateDisplay(chips, 72));
+        line += theme.fg("muted", " · ") + theme.fg("dim", truncateDisplay(chips, 72));
       }
       return line;
     }
     if (count === 0) {
-      return (
-        title + theme.fg("muted", " · ") + theme.fg("warning", "no questions")
-      );
+      return title + theme.fg("muted", " · ") + theme.fg("warning", "no questions");
     }
     return title;
   },
 
-  formatCollapsedContent(
-    args,
-    _output,
-    theme,
-    _width,
-    _details,
-    _isPartial,
-    _spinAt,
-  ) {
+  formatCollapsedContent(args, _output, theme, _width, _details, _isPartial, _spinAt) {
     const { count } = summarize(args);
     const lines: string[] = [];
     if (count > 0) {
-      lines.push(
-        INDENT +
-          theme.fg("muted", `└ ${count} question${count !== 1 ? "s" : ""}`),
-      );
+      lines.push(INDENT + theme.fg("muted", `└ ${count} question${count !== 1 ? "s" : ""}`));
     }
     return lines;
   },

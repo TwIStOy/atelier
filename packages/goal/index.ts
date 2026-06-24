@@ -1,42 +1,22 @@
-import type {
-  ExtensionAPI,
-  ExtensionContext,
-} from "@earendil-works/pi-coding-agent";
 import type { AssistantMessage } from "@earendil-works/pi-ai";
-import { Type } from "@sinclair/typebox";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { isStaleCtxError } from "@htwang-contrib/common";
-import {
-  registerGoalConfigItems,
-  setCachedModelOptions,
-} from "./goal/config.ts";
+import { Type } from "@sinclair/typebox";
 import { parseGoalCommand } from "./goal/command.ts";
+import { registerGoalConfigItems, setCachedModelOptions } from "./goal/config.ts";
 import {
-  createGoal,
-  readGoal,
-  updateGoal,
-  clearGoal,
-  accountGoalUsage,
-  type GoalStoreRef,
-} from "./goal/store.ts";
-import { validateObjective, validateTokenBudget } from "./goal/validation.ts";
-import { formatGoalForTool, formatGoalToolResponse } from "./goal/format.ts";
-import { GoalAlreadyExistsError, GoalNotFoundError } from "./goal/errors.ts";
-import {
+  shouldQueueBudgetLimitedPrompt,
   shouldQueueGoalContinuationAfterAgentEnd,
   shouldQueueGoalContinuationWhenIdle,
-  shouldQueueBudgetLimitedPrompt,
 } from "./goal/continuation.ts";
-import {
-  buildContinuationPrompt,
-  buildBudgetLimitedPrompt,
-} from "./goal/prompt.ts";
-import { verifyGoalCompletion } from "./goal/verify.ts";
+import { GoalAlreadyExistsError, GoalNotFoundError } from "./goal/errors.ts";
+import { formatGoalForTool, formatGoalToolResponse } from "./goal/format.ts";
+import { buildBudgetLimitedPrompt, buildContinuationPrompt } from "./goal/prompt.ts";
+import { accountGoalUsage, clearGoal, createGoal, type GoalStoreRef, readGoal, updateGoal } from "./goal/store.ts";
 import type { Goal, TokenUsageSnapshot } from "./goal/types.ts";
-import {
-  GOAL_WIDGET_KEY,
-  GOAL_WIDGET_OPTIONS,
-  renderGoalWidget,
-} from "./goal/ui.ts";
+import { GOAL_WIDGET_KEY, GOAL_WIDGET_OPTIONS, renderGoalWidget } from "./goal/ui.ts";
+import { validateObjective, validateTokenBudget } from "./goal/validation.ts";
+import { verifyGoalCompletion } from "./goal/verify.ts";
 
 function getStoreRef(ctx: ExtensionContext): GoalStoreRef {
   const sessionDir = ctx.sessionManager.getSessionDir();
@@ -104,10 +84,7 @@ export default function initGoal(pi: ExtensionAPI): void {
   }
 
   function queueHiddenGoalPrompt(customType: string, content: string): void {
-    pi.sendMessage(
-      { customType, content, display: false },
-      { triggerTurn: true, deliverAs: "followUp" },
-    );
+    pi.sendMessage({ customType, content, display: false }, { triggerTurn: true, deliverAs: "followUp" });
   }
 
   function startAccounting(goal: Goal): void {
@@ -121,10 +98,7 @@ export default function initGoal(pi: ExtensionAPI): void {
     goalAccounting = null;
   }
 
-  function finalizeAccounting(
-    ctx: ExtensionContext,
-    usage: TokenUsageSnapshot,
-  ): void {
+  function finalizeAccounting(ctx: ExtensionContext, usage: TokenUsageSnapshot): void {
     if (!goalAccounting) return;
     const ref = getStoreRef(ctx);
     const elapsedMs = Date.now() - goalAccounting.measuredFromMilliseconds;
@@ -164,25 +138,16 @@ export default function initGoal(pi: ExtensionAPI): void {
       if (goal.status === "active") {
         startAccounting(goal);
 
-        if (
-          shouldQueueGoalContinuationWhenIdle(
-            goal,
-            ctx.isIdle(),
-            ctx.hasPendingMessages(),
-          )
-        ) {
-          queueHiddenGoalPrompt(
-            "pi-goal-continuation",
-            buildContinuationPrompt(goal),
-          );
+        if (shouldQueueGoalContinuationWhenIdle(goal, ctx.isIdle(), ctx.hasPendingMessages())) {
+          queueHiddenGoalPrompt("pi-goal-continuation", buildContinuationPrompt(goal));
         }
       }
 
       if (event.reason === "resume" && goal.status === "paused" && ctx.hasUI) {
-        const choice = await ctx.ui.select(
-          `Goal is paused: "${goal.objective}". Resume it?`,
-          ["Resume", "Keep paused"],
-        );
+        const choice = await ctx.ui.select(`Goal is paused: "${goal.objective}". Resume it?`, [
+          "Resume",
+          "Keep paused",
+        ]);
         if (choice === "Resume") {
           const updated = updateGoal(ref, { status: "active" });
           startAccounting(updated);
@@ -224,20 +189,9 @@ export default function initGoal(pi: ExtensionAPI): void {
         emitGoalUpdate(goal);
 
         if (shouldQueueBudgetLimitedPrompt(goal)) {
-          queueHiddenGoalPrompt(
-            "pi-goal-budget-limit",
-            buildBudgetLimitedPrompt(goal),
-          );
-        } else if (
-          shouldQueueGoalContinuationAfterAgentEnd(
-            goal,
-            ctx.hasPendingMessages(),
-          )
-        ) {
-          queueHiddenGoalPrompt(
-            "pi-goal-continuation",
-            buildContinuationPrompt(goal),
-          );
+          queueHiddenGoalPrompt("pi-goal-budget-limit", buildBudgetLimitedPrompt(goal));
+        } else if (shouldQueueGoalContinuationAfterAgentEnd(goal, ctx.hasPendingMessages())) {
+          queueHiddenGoalPrompt("pi-goal-continuation", buildContinuationPrompt(goal));
         }
       } catch (e) {
         if (isStaleCtxError(e)) return;
@@ -276,10 +230,7 @@ export default function initGoal(pi: ExtensionAPI): void {
         case "show": {
           const goal = readGoal(ref);
           if (!goal) {
-            ctx.ui.notify(
-              "No active goal. Use /goal <objective> to set one.",
-              "info",
-            );
+            ctx.ui.notify("No active goal. Use /goal <objective> to set one.", "info");
             return;
           }
           ctx.ui.notify(formatGoalForTool(goal), "info");
@@ -290,10 +241,7 @@ export default function initGoal(pi: ExtensionAPI): void {
           const objective = validateObjective(cmd.objective);
           const existing = readGoal(ref);
           if (existing) {
-            const choice = await ctx.ui.select(
-              "Goal already exists. Replace it?",
-              ["Replace", "Cancel"],
-            );
+            const choice = await ctx.ui.select("Goal already exists. Replace it?", ["Replace", "Cancel"]);
             if (choice !== "Replace") {
               ctx.ui.notify("Goal unchanged.", "info");
               return;
@@ -306,17 +254,8 @@ export default function initGoal(pi: ExtensionAPI): void {
           }
           ctx.ui.notify(`Goal set: ${goal.objective}`, "info");
           emitGoalUpdate(goal);
-          if (
-            shouldQueueGoalContinuationWhenIdle(
-              goal,
-              ctx.isIdle(),
-              ctx.hasPendingMessages(),
-            )
-          ) {
-            queueHiddenGoalPrompt(
-              "pi-goal-continuation",
-              buildContinuationPrompt(goal),
-            );
+          if (shouldQueueGoalContinuationWhenIdle(goal, ctx.isIdle(), ctx.hasPendingMessages())) {
+            queueHiddenGoalPrompt("pi-goal-continuation", buildContinuationPrompt(goal));
           }
           return;
         }
@@ -328,10 +267,7 @@ export default function initGoal(pi: ExtensionAPI): void {
             return;
           }
           if (cmd.status === "paused" && goal.status !== "active") {
-            ctx.ui.notify(
-              `Goal is already ${goal.status}, cannot pause.`,
-              "warning",
-            );
+            ctx.ui.notify(`Goal is already ${goal.status}, cannot pause.`, "warning");
             return;
           }
           if (cmd.status === "active" && goal.status === "active") {
@@ -349,16 +285,9 @@ export default function initGoal(pi: ExtensionAPI): void {
           emitGoalUpdate(updated);
           if (
             cmd.status === "active" &&
-            shouldQueueGoalContinuationWhenIdle(
-              updated,
-              ctx.isIdle(),
-              ctx.hasPendingMessages(),
-            )
+            shouldQueueGoalContinuationWhenIdle(updated, ctx.isIdle(), ctx.hasPendingMessages())
           ) {
-            queueHiddenGoalPrompt(
-              "pi-goal-continuation",
-              buildContinuationPrompt(updated),
-            );
+            queueHiddenGoalPrompt("pi-goal-continuation", buildContinuationPrompt(updated));
           }
           return;
         }

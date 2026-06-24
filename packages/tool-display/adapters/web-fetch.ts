@@ -29,25 +29,11 @@ export const webFetchAdapter: ToolDisplayAdapter<WebFetchArgs> = {
     const url = typeof args.url === "string" ? args.url : "";
     const backend = backendFromDetails(_details);
     const tag = backend ? " " + theme.fg("dim", `(${backend})`) : "";
-    return (
-      theme.fg("toolTitle", theme.bold("WebFetch")) +
-      tag +
-      " " +
-      theme.fg("accent", url)
-    );
+    return theme.fg("toolTitle", theme.bold("WebFetch")) + tag + " " + theme.fg("accent", url);
   },
 
-  formatCollapsedContent(
-    _args,
-    _output,
-    theme,
-    _width,
-    details?: unknown,
-    isPartial?: boolean,
-    _spinAt?: number,
-  ) {
-    if (isPartial)
-      return [theme.fg("muted", truncateToWidth("└ fetching…", _width))];
+  formatCollapsedContent(_args, _output, theme, _width, details?: unknown, isPartial?: boolean, _spinAt?: number) {
+    if (isPartial) return [theme.fg("muted", truncateToWidth("└ fetching…", _width))];
     const title = titleFromDetails(details);
     const truncated = isTruncated(details);
     const parts: string[] = ["└"];

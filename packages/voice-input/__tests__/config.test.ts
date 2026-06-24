@@ -1,12 +1,6 @@
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
-import { join } from "node:path";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 let tmpDir: string;
@@ -26,10 +20,7 @@ afterEach(() => {
 function writeConfig(section: Record<string, unknown>): void {
   const configDir = join(tmpDir, "pi");
   mkdirSync(configDir, { recursive: true });
-  writeFileSync(
-    join(configDir, "extensions.json"),
-    JSON.stringify({ "voice-input": section }),
-  );
+  writeFileSync(join(configDir, "extensions.json"), JSON.stringify({ "voice-input": section }));
 }
 
 describe("loadConfig", () => {
@@ -48,10 +39,7 @@ describe("loadConfig", () => {
   it("returns defaults when the voice-input section is missing", async () => {
     const configDir = join(tmpDir, "pi");
     mkdirSync(configDir, { recursive: true });
-    writeFileSync(
-      join(configDir, "extensions.json"),
-      JSON.stringify({ other: { foo: "bar" } }),
-    );
+    writeFileSync(join(configDir, "extensions.json"), JSON.stringify({ other: { foo: "bar" } }));
     const { loadConfig } = await import("../config.ts");
     expect(loadConfig().provider).toBe("inference-self-host");
   });
@@ -180,9 +168,7 @@ describe("STT_PROVIDER_PRESETS", () => {
 
   it("includes the inference-self-host preset", async () => {
     const { STT_PROVIDER_PRESETS } = await import("../providers/presets.ts");
-    expect(STT_PROVIDER_PRESETS.map((p) => p.name)).toContain(
-      "inference-self-host",
-    );
+    expect(STT_PROVIDER_PRESETS.map((p) => p.name)).toContain("inference-self-host");
   });
 });
 

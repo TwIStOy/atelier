@@ -1,8 +1,6 @@
 import type { AssistantMessage, UserMessage } from "@earendil-works/pi-ai";
 
-export function extractMessageText(
-  content: UserMessage["content"] | AssistantMessage["content"],
-): string {
+export function extractMessageText(content: UserMessage["content"] | AssistantMessage["content"]): string {
   if (typeof content === "string") return content;
   return content
     .filter((c): c is { type: "text"; text: string } => c.type === "text")

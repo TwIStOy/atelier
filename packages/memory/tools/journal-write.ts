@@ -16,8 +16,7 @@ export const journalWrite = (getCwd: () => string) => ({
     }),
     tags: Type.Optional(
       Type.Array(Type.String(), {
-        description:
-          'Tags for categorization (e.g., ["debugging", "networking"]).',
+        description: 'Tags for categorization (e.g., ["debugging", "networking"]).',
       }),
     ),
   }),
@@ -33,8 +32,7 @@ export const journalWrite = (getCwd: () => string) => ({
         "--project",
         getCwd(),
       ];
-      if ((args.tags as string[])?.length)
-        cliArgs.push("--tags", (args.tags as string[]).join(","));
+      if ((args.tags as string[])?.length) cliArgs.push("--tags", (args.tags as string[]).join(","));
       const result = await runHat(cliArgs);
       return jsonResult(result, { title: args.title });
     } catch (e) {

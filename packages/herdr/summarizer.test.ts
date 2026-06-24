@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
+import { describe, expect, it } from "vitest";
 import { firstUserPrompt, parseSessionTitle } from "./summarizer.ts";
 
 function msgEntry(message: AgentMessage, id: string): SessionEntry {
@@ -14,10 +14,7 @@ function msgEntry(message: AgentMessage, id: string): SessionEntry {
 }
 
 function userEntry(text: string, id: string): SessionEntry {
-  return msgEntry(
-    { role: "user", content: text, timestamp: Number(id) } as AgentMessage,
-    id,
-  );
+  return msgEntry({ role: "user", content: text, timestamp: Number(id) } as AgentMessage, id);
 }
 
 function assistantEntry(text: string, id: string): SessionEntry {

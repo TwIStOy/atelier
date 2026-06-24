@@ -7,10 +7,7 @@ export function commandExists(name: string): boolean {
   if (process.platform === "win32") {
     return spawnExists("where", [name]);
   }
-  return spawnExists("sh", [
-    "-c",
-    `command -v ${shellQuote(name)} >/dev/null 2>&1`,
-  ]);
+  return spawnExists("sh", ["-c", `command -v ${shellQuote(name)} >/dev/null 2>&1`]);
 }
 
 function spawnExists(cmd: string, args: string[]): boolean {
@@ -34,9 +31,7 @@ export function selectRecorder(
   if (process.platform === "linux" && exists("parecord")) return "parecord";
   if (exists("ffmpeg")) return "ffmpeg";
   if (exists("sox")) return "sox";
-  throw new Error(
-    "No recorder found. Install ffmpeg, sox, or pulseaudioUtils (parecord).",
-  );
+  throw new Error("No recorder found. Install ffmpeg, sox, or pulseaudioUtils (parecord).");
 }
 
 export function selectStreamRecorder(
@@ -48,39 +43,17 @@ export function selectStreamRecorder(
   }
   if (exists("ffmpeg")) return "ffmpeg";
   if (exists("sox")) return "sox";
-  throw new Error(
-    "Stream recording requires ffmpeg or sox (parecord cannot pipe to stdout). Install one of them.",
-  );
+  throw new Error("Stream recording requires ffmpeg or sox (parecord cannot pipe to stdout). Install one of them.");
 }
 
-export function buildRecorderArgs(
-  recorder: ResolvedRecorder,
-  file: string,
-  device?: string,
-): string[] {
+export function buildRecorderArgs(recorder: ResolvedRecorder, file: string, device?: string): string[] {
   const rate = "16000";
   const channels = "1";
   switch (recorder) {
     case "ffmpeg":
-      return [
-        "-y",
-        ...ffmpegInputArgs(device),
-        "-ar",
-        rate,
-        "-ac",
-        channels,
-        "-f",
-        "wav",
-        file,
-      ];
+      return ["-y", ...ffmpegInputArgs(device), "-ar", rate, "-ac", channels, "-f", "wav", file];
     case "parecord":
-      return [
-        "--file-format=wav",
-        "--channels=1",
-        "--rate=16000",
-        "--format=s16le",
-        file,
-      ];
+      return ["--file-format=wav", "--channels=1", "--rate=16000", "--format=s16le", file];
     case "sox":
       return ["-d", "-r", rate, "-c", channels, file];
   }
@@ -97,42 +70,14 @@ function ffmpegInputArgs(device?: string): string[] {
   }
 }
 
-export function buildStreamRecorderArgs(
-  recorder: ResolvedRecorder,
-  device?: string,
-): string[] {
+export function buildStreamRecorderArgs(recorder: ResolvedRecorder, device?: string): string[] {
   const rate = "16000";
   switch (recorder) {
     case "ffmpeg":
-      return [
-        "-y",
-        ...ffmpegInputArgs(device),
-        "-ar",
-        rate,
-        "-ac",
-        "1",
-        "-f",
-        "s16le",
-        "-",
-      ];
+      return ["-y", ...ffmpegInputArgs(device), "-ar", rate, "-ac", "1", "-f", "s16le", "-"];
     case "sox":
-      return [
-        "-d",
-        "-t",
-        "raw",
-        "-r",
-        rate,
-        "-c",
-        "1",
-        "-b",
-        "16",
-        "-e",
-        "signed-integer",
-        "-",
-      ];
+      return ["-d", "-t", "raw", "-r", rate, "-c", "1", "-b", "16", "-e", "signed-integer", "-"];
     case "parecord":
-      throw new Error(
-        "parecord cannot stream raw PCM to stdout; use ffmpeg or sox for VAD mode.",
-      );
+      throw new Error("parecord cannot stream raw PCM to stdout; use ffmpeg or sox for VAD mode.");
   }
 }

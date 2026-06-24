@@ -11,12 +11,7 @@ import {
   statSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import {
-  extname,
-  join,
-  sep as pathSep,
-  resolve as resolvePath,
-} from "node:path";
+import { extname, join, sep as pathSep, resolve as resolvePath } from "node:path";
 import type { FetchResponse } from "../providers/types.ts";
 import type { UrlInterceptor } from "./types.ts";
 
@@ -229,12 +224,7 @@ function cacheKey(owner: string, repo: string, ref?: string): string {
   return ref ? `${owner}/${repo}@${ref}` : `${owner}/${repo}`;
 }
 
-function cloneDir(
-  clonePath: string,
-  owner: string,
-  repo: string,
-  ref?: string,
-): string {
+function cloneDir(clonePath: string, owner: string, repo: string, ref?: string): string {
   const dirName = ref ? `${repo}@${ref}` : repo;
   return join(clonePath, owner, dirName);
 }
@@ -255,20 +245,14 @@ export class GitHubInterceptor implements UrlInterceptor {
     const { cloneCache, ...rest } = opts;
     this.options = {
       enabled: rest.enabled ?? GITHUB_INTERCEPTOR_DEFAULTS.enabled,
-      maxRepoSizeMB:
-        rest.maxRepoSizeMB ?? GITHUB_INTERCEPTOR_DEFAULTS.maxRepoSizeMB,
-      cloneTimeoutSeconds:
-        rest.cloneTimeoutSeconds ??
-        GITHUB_INTERCEPTOR_DEFAULTS.cloneTimeoutSeconds,
+      maxRepoSizeMB: rest.maxRepoSizeMB ?? GITHUB_INTERCEPTOR_DEFAULTS.maxRepoSizeMB,
+      cloneTimeoutSeconds: rest.cloneTimeoutSeconds ?? GITHUB_INTERCEPTOR_DEFAULTS.cloneTimeoutSeconds,
       clonePath: rest.clonePath ?? GITHUB_INTERCEPTOR_DEFAULTS.clonePath,
     };
     this.cloneCache = cloneCache ?? new Map();
   }
 
-  async intercept(
-    url: string,
-    opts: { raw: boolean; signal?: AbortSignal },
-  ): Promise<FetchResponse | null> {
+  async intercept(url: string, opts: { raw: boolean; signal?: AbortSignal }): Promise<FetchResponse | null> {
     return this.fetchGitHub(url, opts.signal);
   }
 
@@ -282,25 +266,17 @@ export class GitHubInterceptor implements UrlInterceptor {
     });
   }
 
-  private async checkRepoSize(
-    owner: string,
-    repo: string,
-  ): Promise<number | null> {
+  private async checkRepoSize(owner: string, repo: string): Promise<number | null> {
     if (!(await this.checkGhAvailable())) return null;
     return new Promise((resolve) => {
-      execFile(
-        "gh",
-        ["api", `repos/${owner}/${repo}`, "--jq", ".size"],
-        { timeout: 10000 },
-        (err, stdout) => {
-          if (err) {
-            resolve(null);
-            return;
-          }
-          const kb = parseInt(stdout.trim(), 10);
-          resolve(Number.isNaN(kb) ? null : kb);
-        },
-      );
+      execFile("gh", ["api", `repos/${owner}/${repo}`, "--jq", ".size"], { timeout: 10000 }, (err, stdout) => {
+        if (err) {
+          resolve(null);
+          return;
+        }
+        const kb = parseInt(stdout.trim(), 10);
+        resolve(Number.isNaN(kb) ? null : kb);
+      });
     });
   }
 
@@ -320,16 +296,11 @@ export class GitHubInterceptor implements UrlInterceptor {
   private showGhHint(): void {
     if (!this.ghHintShown) {
       this.ghHintShown = true;
-      console.error(
-        "[web-tools] Install `gh` CLI for better GitHub repo access including private repos.",
-      );
+      console.error("[web-tools] Install `gh` CLI for better GitHub repo access including private repos.");
     }
   }
 
-  private async getDefaultBranch(
-    owner: string,
-    repo: string,
-  ): Promise<string | null> {
+  private async getDefaultBranch(owner: string, repo: string): Promise<string | null> {
     if (!(await this.checkGhAvailable())) return null;
     return new Promise((resolve) => {
       execFile(
@@ -347,21 +318,12 @@ export class GitHubInterceptor implements UrlInterceptor {
     });
   }
 
-  private async fetchTreeViaApi(
-    owner: string,
-    repo: string,
-    ref: string,
-  ): Promise<string | null> {
+  private async fetchTreeViaApi(owner: string, repo: string, ref: string): Promise<string | null> {
     if (!(await this.checkGhAvailable())) return null;
     return new Promise((resolve) => {
       execFile(
         "gh",
-        [
-          "api",
-          `repos/${owner}/${repo}/git/trees/${ref}?recursive=1`,
-          "--jq",
-          ".tree[].path",
-        ],
+        ["api", `repos/${owner}/${repo}/git/trees/${ref}?recursive=1`, "--jq", ".tree[].path"],
         { timeout: 15000, maxBuffer: 5 * 1024 * 1024 },
         (err, stdout) => {
           if (err) {
@@ -375,21 +337,13 @@ export class GitHubInterceptor implements UrlInterceptor {
           }
           const truncated = paths.length > MAX_TREE_ENTRIES;
           const display = paths.slice(0, MAX_TREE_ENTRIES).join("\n");
-          resolve(
-            truncated
-              ? `${display}\n... (${paths.length} total entries)`
-              : display,
-          );
+          resolve(truncated ? `${display}\n... (${paths.length} total entries)` : display);
         },
       );
     });
   }
 
-  private async fetchReadmeViaApi(
-    owner: string,
-    repo: string,
-    ref: string,
-  ): Promise<string | null> {
+  private async fetchReadmeViaApi(owner: string, repo: string, ref: string): Promise<string | null> {
     if (!(await this.checkGhAvailable())) return null;
     return new Promise((resolve) => {
       execFile(
@@ -402,14 +356,8 @@ export class GitHubInterceptor implements UrlInterceptor {
             return;
           }
           try {
-            const decoded = Buffer.from(stdout.trim(), "base64").toString(
-              "utf-8",
-            );
-            resolve(
-              decoded.length > 8192
-                ? `${decoded.slice(0, 8192)}\n\n[README truncated at 8K chars]`
-                : decoded,
-            );
+            const decoded = Buffer.from(stdout.trim(), "base64").toString("utf-8");
+            resolve(decoded.length > 8192 ? `${decoded.slice(0, 8192)}\n\n[README truncated at 8K chars]` : decoded);
           } catch {
             resolve(null);
           }
@@ -418,22 +366,12 @@ export class GitHubInterceptor implements UrlInterceptor {
     });
   }
 
-  private async fetchFileViaApi(
-    owner: string,
-    repo: string,
-    path: string,
-    ref: string,
-  ): Promise<string | null> {
+  private async fetchFileViaApi(owner: string, repo: string, path: string, ref: string): Promise<string | null> {
     if (!(await this.checkGhAvailable())) return null;
     return new Promise((resolve) => {
       execFile(
         "gh",
-        [
-          "api",
-          `repos/${owner}/${repo}/contents/${path}?ref=${ref}`,
-          "--jq",
-          ".content",
-        ],
+        ["api", `repos/${owner}/${repo}/contents/${path}?ref=${ref}`, "--jq", ".content"],
         { timeout: 10000, maxBuffer: 2 * 1024 * 1024 },
         (err, stdout) => {
           if (err) {
@@ -498,13 +436,9 @@ export class GitHubInterceptor implements UrlInterceptor {
       lines.push(readme);
       lines.push("");
     }
-    lines.push(
-      "This is an API-only view. Clone the repo or use `read`/`bash` for deeper exploration.",
-    );
+    lines.push("This is an API-only view. Clone the repo or use `read`/`bash` for deeper exploration.");
 
-    const title = info.path
-      ? `${owner}/${repo} - ${info.path}`
-      : `${owner}/${repo}`;
+    const title = info.path ? `${owner}/${repo} - ${info.path}` : `${owner}/${repo}`;
     return { text: lines.join("\n"), title, contentType: "text/plain" };
   }
 
@@ -515,23 +449,18 @@ export class GitHubInterceptor implements UrlInterceptor {
     signal?: AbortSignal,
   ): Promise<string | null> {
     return new Promise((resolve) => {
-      const child = execFile(
-        args[0]!,
-        args.slice(1),
-        { timeout: timeoutMs },
-        (err) => {
-          if (err) {
-            try {
-              rmSync(localPath, { recursive: true, force: true });
-            } catch {
-              // ignore cleanup errors
-            }
-            resolve(null);
-            return;
+      const child = execFile(args[0]!, args.slice(1), { timeout: timeoutMs }, (err) => {
+        if (err) {
+          try {
+            rmSync(localPath, { recursive: true, force: true });
+          } catch {
+            // ignore cleanup errors
           }
-          resolve(localPath);
-        },
-      );
+          resolve(null);
+          return;
+        }
+        resolve(localPath);
+      });
       if (signal) {
         const onAbort = () => child.kill();
         signal.addEventListener("abort", onAbort, { once: true });
@@ -557,17 +486,7 @@ export class GitHubInterceptor implements UrlInterceptor {
     const hasGh = await this.checkGhAvailable();
 
     if (hasGh) {
-      const args = [
-        "gh",
-        "repo",
-        "clone",
-        `${owner}/${repo}`,
-        localPath,
-        "--",
-        "--depth",
-        "1",
-        "--single-branch",
-      ];
+      const args = ["gh", "repo", "clone", `${owner}/${repo}`, localPath, "--", "--depth", "1", "--single-branch"];
       if (ref) args.push("--branch", ref);
       return this.execClone(args, localPath, timeoutMs, signal);
     }
@@ -592,18 +511,13 @@ export class GitHubInterceptor implements UrlInterceptor {
     if (signal?.aborted) return null;
     if (result) {
       const text = generateCloneContent(result, info);
-      const title = info.path
-        ? `${owner}/${repo} - ${info.path}`
-        : `${owner}/${repo}`;
+      const title = info.path ? `${owner}/${repo} - ${info.path}` : `${owner}/${repo}`;
       return { text, title, contentType: "text/plain" };
     }
     return this.fetchViaApi(owner, repo, info);
   }
 
-  private async fetchGitHub(
-    url: string,
-    signal?: AbortSignal,
-  ): Promise<FetchResponse | null> {
+  private async fetchGitHub(url: string, signal?: AbortSignal): Promise<FetchResponse | null> {
     const info = parseGitHubUrl(url);
     if (!info) return null;
     if (signal?.aborted) return null;
@@ -619,8 +533,7 @@ export class GitHubInterceptor implements UrlInterceptor {
 
     if (info.refIsFullSha) {
       if (signal?.aborted) return null;
-      const sizeNote =
-        "Note: Commit SHA URLs use the GitHub API instead of cloning.";
+      const sizeNote = "Note: Commit SHA URLs use the GitHub API instead of cloning.";
       return this.fetchViaApi(owner, repo, info, sizeNote);
     }
 
@@ -663,9 +576,7 @@ export class GitHubInterceptor implements UrlInterceptor {
     }
 
     const text = generateCloneContent(result, info);
-    const title = info.path
-      ? `${owner}/${repo} - ${info.path}`
-      : `${owner}/${repo}`;
+    const title = info.path ? `${owner}/${repo} - ${info.path}` : `${owner}/${repo}`;
     return { text, title, contentType: "text/plain" };
   }
 }
@@ -705,16 +616,11 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function resolveWithinRepo(
-  rootPath: string,
-  relativePath: string,
-): string | null {
+function resolveWithinRepo(rootPath: string, relativePath: string): string | null {
   const normalizedRoot = resolvePath(rootPath);
   const candidate = resolvePath(normalizedRoot, relativePath);
   if (candidate !== normalizedRoot) {
-    const rootPrefix = normalizedRoot.endsWith(pathSep)
-      ? normalizedRoot
-      : normalizedRoot + pathSep;
+    const rootPrefix = normalizedRoot.endsWith(pathSep) ? normalizedRoot : normalizedRoot + pathSep;
     if (!candidate.startsWith(rootPrefix)) return null;
   }
   if (!existsSync(candidate)) return candidate;
@@ -722,9 +628,7 @@ function resolveWithinRepo(
     const realRoot = realpathSync(normalizedRoot);
     const realCandidate = realpathSync(candidate);
     if (realCandidate === realRoot) return candidate;
-    const realRootPrefix = realRoot.endsWith(pathSep)
-      ? realRoot
-      : realRoot + pathSep;
+    const realRootPrefix = realRoot.endsWith(pathSep) ? realRoot : realRoot + pathSep;
     return realCandidate.startsWith(realRootPrefix) ? candidate : null;
   } catch {
     return null;
@@ -797,11 +701,7 @@ function buildDirListing(rootPath: string, subPath: string): string {
     }
     try {
       const stat = statSync(safePath);
-      lines.push(
-        stat.isDirectory()
-          ? `  ${item}/`
-          : `  ${item}  (${formatFileSize(stat.size)})`,
-      );
+      lines.push(stat.isDirectory() ? `  ${item}/` : `  ${item}  (${formatFileSize(stat.size)})`);
     } catch {
       lines.push(`  ${item}  (unreadable)`);
     }
@@ -810,21 +710,13 @@ function buildDirListing(rootPath: string, subPath: string): string {
 }
 
 function readReadme(localPath: string): string | null {
-  const candidates = [
-    "README.md",
-    "readme.md",
-    "README",
-    "README.txt",
-    "README.rst",
-  ];
+  const candidates = ["README.md", "readme.md", "README", "README.txt", "README.rst"];
   for (const name of candidates) {
     const readmePath = join(localPath, name);
     if (existsSync(readmePath)) {
       try {
         const content = readFileSync(readmePath, "utf-8");
-        return content.length > 8192
-          ? `${content.slice(0, 8192)}\n\n[README truncated at 8K chars]`
-          : content;
+        return content.length > 8192 ? `${content.slice(0, 8192)}\n\n[README truncated at 8K chars]` : content;
       } catch {
         // skip
       }
@@ -848,9 +740,7 @@ function generateCloneContent(localPath: string, info: GitHubUrlInfo): string {
       lines.push(readme);
       lines.push("");
     }
-    lines.push(
-      "Use `read` and `bash` tools at the path above to explore further.",
-    );
+    lines.push("Use `read` and `bash` tools at the path above to explore further.");
     return lines.join("\n");
   }
 
@@ -858,9 +748,7 @@ function generateCloneContent(localPath: string, info: GitHubUrlInfo): string {
     const dirPath = info.path || "";
     const fullDirPath = resolveWithinRepo(localPath, dirPath);
     if (!fullDirPath || !existsSync(fullDirPath)) {
-      lines.push(
-        `Path \`${dirPath}\` not found in clone. Showing repository root instead.`,
-      );
+      lines.push(`Path \`${dirPath}\` not found in clone. Showing repository root instead.`);
       lines.push("");
       lines.push("## Structure");
       lines.push(buildTree(localPath));
@@ -869,9 +757,7 @@ function generateCloneContent(localPath: string, info: GitHubUrlInfo): string {
       lines.push(buildDirListing(localPath, dirPath));
     }
     lines.push("");
-    lines.push(
-      "Use `read` and `bash` tools at the path above to explore further.",
-    );
+    lines.push("Use `read` and `bash` tools at the path above to explore further.");
     return lines.join("\n");
   }
 
@@ -879,16 +765,12 @@ function generateCloneContent(localPath: string, info: GitHubUrlInfo): string {
   const filePath = info.path || "";
   const fullFilePath = resolveWithinRepo(localPath, filePath);
   if (!fullFilePath || !existsSync(fullFilePath)) {
-    lines.push(
-      `Path \`${filePath}\` not found in clone. Showing repository root instead.`,
-    );
+    lines.push(`Path \`${filePath}\` not found in clone. Showing repository root instead.`);
     lines.push("");
     lines.push("## Structure");
     lines.push(buildTree(localPath));
     lines.push("");
-    lines.push(
-      "Use `read` and `bash` tools at the path above to explore further.",
-    );
+    lines.push("Use `read` and `bash` tools at the path above to explore further.");
     return lines.join("\n");
   }
 
@@ -899,9 +781,7 @@ function generateCloneContent(localPath: string, info: GitHubUrlInfo): string {
     const message = err instanceof Error ? err.message : String(err);
     lines.push(`Could not inspect \`${filePath}\`: ${message}`);
     lines.push("");
-    lines.push(
-      "Use `read` and `bash` tools at the path above to explore further.",
-    );
+    lines.push("Use `read` and `bash` tools at the path above to explore further.");
     return lines.join("\n");
   }
 
@@ -909,9 +789,7 @@ function generateCloneContent(localPath: string, info: GitHubUrlInfo): string {
     lines.push(`## ${filePath || "/"}`);
     lines.push(buildDirListing(localPath, filePath));
     lines.push("");
-    lines.push(
-      "Use `read` and `bash` tools at the path above to explore further.",
-    );
+    lines.push("Use `read` and `bash` tools at the path above to explore further.");
     return lines.join("\n");
   }
 
@@ -930,9 +808,7 @@ function generateCloneContent(localPath: string, info: GitHubUrlInfo): string {
   } catch {
     lines.push(`Could not read \`${filePath}\` as UTF-8 text.`);
     lines.push("");
-    lines.push(
-      "Use `read` and `bash` tools at the path above to explore further.",
-    );
+    lines.push("Use `read` and `bash` tools at the path above to explore further.");
     return lines.join("\n");
   }
 
@@ -944,8 +820,6 @@ function generateCloneContent(localPath: string, info: GitHubUrlInfo): string {
     lines.push(content);
   }
   lines.push("");
-  lines.push(
-    "Use `read` and `bash` tools at the path above to explore further.",
-  );
+  lines.push("Use `read` and `bash` tools at the path above to explore further.");
   return lines.join("\n");
 }

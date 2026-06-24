@@ -1,32 +1,16 @@
+import type { Message, Model } from "@earendil-works/pi-ai";
 import type { ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
-import type { Model, Message } from "@earendil-works/pi-ai";
-import { executeSideCall } from "@htwang-contrib/common";
 import type { SideCallResult } from "@htwang-contrib/common";
-import {
-  isGitRepo,
-  stageAll,
-  unstageAll,
-  stageFiles,
-  getDiff,
-  commit,
-  countChanges,
-} from "./git.ts";
-import {
-  SINGLE_COMMIT_PROMPT,
-  GROUPING_PROMPT,
-  GROUPING_RETRY_PROMPT,
-} from "./prompt.ts";
-import type { CommitterProgress } from "./widget.ts";
-import type { CommitterOverlayController } from "./widget.ts";
+import { executeSideCall } from "@htwang-contrib/common";
+import { commit, countChanges, getDiff, isGitRepo, stageAll, stageFiles, unstageAll } from "./git.ts";
+import { loadConfig, resolveCommitModel } from "./model-select.ts";
+import { GROUPING_PROMPT, GROUPING_RETRY_PROMPT, SINGLE_COMMIT_PROMPT } from "./prompt.ts";
+import type { CommitterOverlayController, CommitterProgress } from "./widget.ts";
 import { showCommitterOverlay } from "./widget.ts";
-import { resolveCommitModel, loadConfig } from "./model-select.ts";
 
 type AnyModel = Model<any>;
 
-export async function handleCommit(
-  args: string,
-  ctx: ExtensionCommandContext,
-): Promise<void> {
+export async function handleCommit(args: string, ctx: ExtensionCommandContext): Promise<void> {
   if (!ctx.hasUI) {
     ctx.ui.notify("/commit requires an interactive terminal.", "warning");
     return;
@@ -44,11 +28,7 @@ export async function handleCommit(
     startTime: Date.now(),
   };
 
-  const { overlayPromise, ctrl } = await showCommitterOverlay(
-    ctx,
-    progress,
-    controller,
-  );
+  const { overlayPromise, ctrl } = await showCommitterOverlay(ctx, progress, controller);
 
   try {
     if (controller.signal.aborted) return;
@@ -102,30 +82,12 @@ export async function handleCommit(
 
     if (controller.signal.aborted) return;
 
-    const shouldGroup =
-      diff.files.length >= loadConfig().groupingThreshold &&
-      !args.includes("--single");
+    const shouldGroup = diff.files.length >= loadConfig().groupingThreshold && !args.includes("--single");
 
     if (shouldGroup) {
-      await commitGrouped(
-        ctx.cwd,
-        diff.diff,
-        model,
-        ctx,
-        progress,
-        ctrl,
-        controller.signal,
-      );
+      await commitGrouped(ctx.cwd, diff.diff, model, ctx, progress, ctrl, controller.signal);
     } else {
-      await commitSingle(
-        ctx.cwd,
-        diff.diff,
-        model,
-        ctx,
-        progress,
-        ctrl,
-        controller.signal,
-      );
+      await commitSingle(ctx.cwd, diff.diff, model, ctx, progress, ctrl, controller.signal);
     }
   } catch (err) {
     if (controller.signal.aborted) {
@@ -160,8 +122,7 @@ async function commitSingle(
   const result: SideCallResult = await executeSideCall({
     model,
     modelRegistry: ctx.modelRegistry,
-    systemPrompt:
-      "You are a commit message generator. Output ONLY valid conventional commit messages.",
+    systemPrompt: "You are a commit message generator. Output ONLY valid conventional commit messages.",
     messages: [{ role: "user", content: prompt, timestamp: Date.now() }],
     signal,
     commandName: "/commit",
@@ -224,15 +185,7 @@ async function commitGrouped(
   const { files: allFiles } = await getDiff(cwd);
   const truncatedDiff = diffText.slice(0, loadConfig().maxDiffLength);
 
-  const groups = await groupingWithRetry(
-    truncatedDiff,
-    allFiles,
-    model,
-    ctx,
-    progress,
-    ctrl,
-    signal,
-  );
+  const groups = await groupingWithRetry(truncatedDiff, allFiles, model, ctx, progress, ctrl, signal);
 
   if (signal.aborted) {
     progress.phase = "cancelled";
@@ -304,16 +257,12 @@ async function groupingWithRetry(
   ctrl: CommitterOverlayController,
   signal: AbortSignal,
 ): Promise<CommitGroup[]> {
-  const systemPrompt =
-    "You are a commit message generator. Output ONLY the requested JSON array.";
+  const systemPrompt = "You are a commit message generator. Output ONLY the requested JSON array.";
   const changedFilesList = allFiles.join("\n");
 
-  const firstPrompt =
-    GROUPING_PROMPT.replace("{changed_files}", changedFilesList) + diffText;
+  const firstPrompt = GROUPING_PROMPT.replace("{changed_files}", changedFilesList) + diffText;
 
-  let messages: Message[] = [
-    { role: "user" as const, content: firstPrompt, timestamp: Date.now() },
-  ];
+  let messages: Message[] = [{ role: "user" as const, content: firstPrompt, timestamp: Date.now() }];
 
   const maxRetries = loadConfig().maxGroupingRetries;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -346,10 +295,7 @@ async function groupingWithRetry(
     if (missing.length === 0) return groups;
 
     if (attempt < maxRetries) {
-      const retryPrompt = GROUPING_RETRY_PROMPT.replace(
-        "{changed_files}",
-        changedFilesList,
-      )
+      const retryPrompt = GROUPING_RETRY_PROMPT.replace("{changed_files}", changedFilesList)
         .replace("{missing_files}", missing.join("\n"))
         .replace("{previous_groups}", JSON.stringify(groups, null, 2));
       messages = [
@@ -378,17 +324,9 @@ function parseGroups(response: string): CommitGroup[] {
 
     const groups: CommitGroup[] = [];
     for (const item of parsed) {
-      if (
-        !item ||
-        typeof item !== "object" ||
-        !Array.isArray(item.files) ||
-        typeof item.message !== "string"
-      )
-        continue;
+      if (!item || typeof item !== "object" || !Array.isArray(item.files) || typeof item.message !== "string") continue;
 
-      const files = item.files
-        .map((f: unknown) => String(f))
-        .filter((f: string) => f.length > 0);
+      const files = item.files.map((f: unknown) => String(f)).filter((f: string) => f.length > 0);
       if (files.length === 0 || !item.message.trim()) continue;
 
       groups.push({ files, message: item.message.trim() });

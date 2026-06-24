@@ -7,9 +7,7 @@ export function validateObjective(value: unknown): string {
     throw new Error("Objective must not be empty.");
   }
   if (trimmed.length > 4000) {
-    throw new Error(
-      `Objective must be ≤ 4000 characters (got ${trimmed.length}).`,
-    );
+    throw new Error(`Objective must be ≤ 4000 characters (got ${trimmed.length}).`);
   }
   return trimmed;
 }

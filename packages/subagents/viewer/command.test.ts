@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { VIEWER_DEFAULTS } from "./command.ts";
 
 describe("subagents viewer command defaults", () => {

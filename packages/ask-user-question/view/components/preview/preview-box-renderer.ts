@@ -40,10 +40,7 @@ export function renderBorderedBox(
   hidden = 0,
 ): string[] {
   const dashSpan = Math.max(1, width - BORDER_HORIZONTAL_OVERHEAD);
-  const contentInner = Math.max(
-    1,
-    dashSpan - 2 * BORDER_INNER_PADDING_HORIZONTAL,
-  );
+  const contentInner = Math.max(1, dashSpan - 2 * BORDER_INNER_PADDING_HORIZONTAL);
   const pad = " ".repeat(BORDER_INNER_PADDING_HORIZONTAL);
   const top = colorFn(`┌${"─".repeat(dashSpan)}┐`);
   const out: string[] = [top];
@@ -55,9 +52,7 @@ export function renderBorderedBox(
     const indicator = ` ✂ ── ${hidden} lines hidden ── `;
     const space = dashSpan - indicator.length;
     const leftFill = "─".repeat(Math.max(0, Math.floor(space / 2)));
-    const rightFill = "─".repeat(
-      Math.max(0, dashSpan - leftFill.length - indicator.length),
-    );
+    const rightFill = "─".repeat(Math.max(0, dashSpan - leftFill.length - indicator.length));
     out.push(colorFn(`└${leftFill}${indicator}${rightFill}┘`));
   } else {
     out.push(colorFn(`└${"─".repeat(dashSpan)}┘`));
@@ -86,9 +81,6 @@ export function computeBoxDimensions(
     if (w > widest) widest = w;
   }
   const innerWidth = Math.min(widest, maxInnerWidth);
-  const boxWidth =
-    innerWidth +
-    BORDER_HORIZONTAL_OVERHEAD +
-    2 * BORDER_INNER_PADDING_HORIZONTAL;
+  const boxWidth = innerWidth + BORDER_HORIZONTAL_OVERHEAD + 2 * BORDER_INNER_PADDING_HORIZONTAL;
   return { innerWidth, boxWidth };
 }

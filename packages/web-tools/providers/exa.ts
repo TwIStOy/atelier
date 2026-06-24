@@ -1,10 +1,5 @@
-import type {
-  FetchResponse,
-  FullProvider,
-  SearchResponse,
-  SearchResult,
-} from "./types.ts";
 import { throwIfApiError } from "./errors.ts";
+import type { FetchResponse, FullProvider, SearchResponse, SearchResult } from "./types.ts";
 
 const EXA_API_URL = "https://api.exa.ai/search";
 const EXA_CONTENTS_API_URL = "https://api.exa.ai/contents";
@@ -37,15 +32,9 @@ export class ExaProvider implements FullProvider {
 
   constructor(private readonly apiKey: string) {}
 
-  async search(
-    query: string,
-    maxResults: number,
-    signal?: AbortSignal,
-  ): Promise<SearchResponse> {
+  async search(query: string, maxResults: number, signal?: AbortSignal): Promise<SearchResponse> {
     if (!this.apiKey) {
-      throw new Error(
-        `${this.envVar} is not set. Use /config to set the API key, or export the env var.`,
-      );
+      throw new Error(`${this.envVar} is not set. Use /config to set the API key, or export the env var.`);
     }
 
     const res = await fetch(EXA_API_URL, {
@@ -70,15 +59,9 @@ export class ExaProvider implements FullProvider {
     return { query, results: normalizeExaResults(raw.results ?? []) };
   }
 
-  async fetch(
-    url: string,
-    _raw: boolean,
-    signal?: AbortSignal,
-  ): Promise<FetchResponse> {
+  async fetch(url: string, _raw: boolean, signal?: AbortSignal): Promise<FetchResponse> {
     if (!this.apiKey) {
-      throw new Error(
-        `${this.envVar} is not set. Use /config to set the API key, or export the env var.`,
-      );
+      throw new Error(`${this.envVar} is not set. Use /config to set the API key, or export the env var.`);
     }
 
     const res = await fetch(EXA_CONTENTS_API_URL, {
@@ -101,9 +84,7 @@ export class ExaProvider implements FullProvider {
     const data = (await res.json()) as ExaRawResponse;
     const result = data.results?.[0];
     if (!result?.text) {
-      throw new Error(
-        `${this.label} Fetch API error: no content returned for ${url}`,
-      );
+      throw new Error(`${this.label} Fetch API error: no content returned for ${url}`);
     }
 
     return {

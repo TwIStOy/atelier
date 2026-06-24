@@ -189,15 +189,9 @@ export const DEFAULT_PHRASES = [
   "Zigzagging",
 ] as const;
 
-export function pickPhrase(
-  phrases: readonly string[] = DEFAULT_PHRASES,
-  random: () => number = Math.random,
-): string {
+export function pickPhrase(phrases: readonly string[] = DEFAULT_PHRASES, random: () => number = Math.random): string {
   if (phrases.length === 0) return "Working";
-  const index = Math.min(
-    phrases.length - 1,
-    Math.floor(random() * phrases.length),
-  );
+  const index = Math.min(phrases.length - 1, Math.floor(random() * phrases.length));
   return phrases[index] ?? "Working";
 }
 

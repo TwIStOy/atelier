@@ -28,9 +28,7 @@ export interface BoundPerTabBinding {
   apply(state: QuestionnaireState, ctx: PerTabBindingContext): void;
 }
 
-export function globalBinding<P>(
-  spec: ComponentBinding<P>,
-): BoundGlobalBinding {
+export function globalBinding<P>(spec: ComponentBinding<P>): BoundGlobalBinding {
   return {
     apply: (state, ctx) => spec.component.setProps(spec.select(state, ctx)),
     invalidate: () => spec.component.invalidate(),

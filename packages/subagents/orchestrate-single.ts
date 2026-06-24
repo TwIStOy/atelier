@@ -1,18 +1,9 @@
-import type {
-  AgentToolUpdateCallback,
-  ExtensionContext,
-} from "@earendil-works/pi-coding-agent";
-import {
-  buildSubagentAgentCatalog,
-  resolveSubagentAgentId,
-} from "./agent-catalog.ts";
+import type { AgentToolUpdateCallback, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { buildSubagentAgentCatalog, resolveSubagentAgentId } from "./agent-catalog.ts";
 import { subagentDetails } from "./details.ts";
-import {
-  tryParentToolUpdate,
-  withThrottledParentFlush,
-} from "./parent-update.ts";
-import { defaultsForAgentType, type SubagentSettings } from "./settings.ts";
+import { tryParentToolUpdate, withThrottledParentFlush } from "./parent-update.ts";
 import { runSubAgent, type SubagentRunDetails } from "./run-agent.ts";
+import { defaultsForAgentType, type SubagentSettings } from "./settings.ts";
 
 export async function runSingleSubagent(
   ctx: ExtensionContext,

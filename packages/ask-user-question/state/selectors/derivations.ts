@@ -61,11 +61,8 @@ export function selectConfirmedIndicator(
     if (otherIndex < 0) return undefined;
     return { index: otherIndex, labelOverride: prior.answer ?? "" };
   }
-  if (prior.kind !== "option" || typeof prior.answer !== "string")
-    return undefined;
-  const index = items.findIndex(
-    (it) => it.kind === "option" && it.label === prior.answer,
-  );
+  if (prior.kind !== "option" || typeof prior.answer !== "string") return undefined;
+  const index = items.findIndex((it) => it.kind === "option" && it.label === prior.answer);
   if (index < 0) return undefined;
   return { index };
 }
@@ -75,10 +72,7 @@ export function selectConfirmedIndicator(
  * questions.length) reuses the last question's pane purely for layout — the strategy
  * machinery picks the right body component independently. Defensive against `totalQuestions === 0`.
  */
-export function selectActivePreviewPaneIndex(
-  currentTab: number,
-  totalQuestions: number,
-): number {
+export function selectActivePreviewPaneIndex(currentTab: number, totalQuestions: number): number {
   if (totalQuestions <= 0) return 0;
   return Math.min(currentTab, totalQuestions - 1);
 }

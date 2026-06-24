@@ -1,12 +1,6 @@
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import {
-  basename,
-  dirname,
-  extname,
-  join,
-  resolve as resolvePath,
-} from "node:path";
+import { basename, dirname, extname, join, resolve as resolvePath } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseFrontmatter } from "@earendil-works/pi-coding-agent";
 
@@ -48,10 +42,7 @@ export function normalizeSubagentAgentId(raw: string): string {
   return s;
 }
 
-function agentIdFromFrontmatter(
-  fm: Record<string, unknown>,
-  defaultId: string,
-): string {
+function agentIdFromFrontmatter(fm: Record<string, unknown>, defaultId: string): string {
   const n = fm["name"];
   if (typeof n === "string" && n.trim()) {
     const x = normalizeSubagentAgentId(n);
@@ -64,20 +55,14 @@ function agentIdFromFrontmatter(
   return defaultId;
 }
 
-function parseStringField(
-  fm: Record<string, unknown>,
-  key: string,
-): string | undefined {
+function parseStringField(fm: Record<string, unknown>, key: string): string | undefined {
   const v = fm[key];
   if (typeof v !== "string") return undefined;
   const t = v.trim();
   return t ? t : undefined;
 }
 
-function parseBooleanField(
-  fm: Record<string, unknown>,
-  key: string,
-): boolean | undefined {
+function parseBooleanField(fm: Record<string, unknown>, key: string): boolean | undefined {
   const v = fm[key];
   if (typeof v === "boolean") return v;
   return undefined;
@@ -126,20 +111,11 @@ function parseToolsField(fm: Record<string, unknown>): string[] | undefined {
   return names.length > max ? names.slice(0, max) : names;
 }
 
-function parseFileOptionsFromFrontmatter(
-  fm: Record<string, unknown>,
-): SubagentAgentFileOptions {
+function parseFileOptionsFromFrontmatter(fm: Record<string, unknown>): SubagentAgentFileOptions {
   const descriptionRaw = parseStringField(fm, "description");
-  const description =
-    descriptionRaw && descriptionRaw.length > 72
-      ? descriptionRaw.slice(0, 72)
-      : descriptionRaw;
-  const whenToUseRaw =
-    parseStringField(fm, "whenToUse") ?? parseStringField(fm, "when_to_use");
-  const whenToUse =
-    whenToUseRaw && whenToUseRaw.length > 2000
-      ? whenToUseRaw.slice(0, 2000)
-      : whenToUseRaw;
+  const description = descriptionRaw && descriptionRaw.length > 72 ? descriptionRaw.slice(0, 72) : descriptionRaw;
+  const whenToUseRaw = parseStringField(fm, "whenToUse") ?? parseStringField(fm, "when_to_use");
+  const whenToUse = whenToUseRaw && whenToUseRaw.length > 2000 ? whenToUseRaw.slice(0, 2000) : whenToUseRaw;
   const model = parseStringField(fm, "model");
   const thinking = parseStringField(fm, "thinking");
   const inherit_context = parseBooleanField(fm, "inherit_context");
@@ -210,9 +186,7 @@ function collectMdFilesInDir(dir: string): string[] {
       const p = join(dir, name);
       try {
         if (statSync(p).isFile()) out.push(p);
-      } catch {
-        continue;
-      }
+      } catch {}
     }
   } catch {
     return [];
@@ -316,26 +290,17 @@ export function buildSubagentAgentCatalog(cwd: string): SubagentAgentCatalog {
   return { agents };
 }
 
-export function resolveSubagentAgentId(
-  raw: string | undefined,
-  catalog: SubagentAgentCatalog,
-): string {
+export function resolveSubagentAgentId(raw: string | undefined, catalog: SubagentAgentCatalog): string {
   const t = normalizeSubagentAgentId(raw ?? "");
   if (t && catalog.agents.has(t)) return t;
   return SUBAGENT_FALLBACK_AGENT_ID;
 }
 
 function escapeXmlText(s: string): string {
-  return s
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;");
+  return s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 }
 
-export function subagentSystemPromptFromCatalog(
-  agentId: string,
-  catalog: SubagentAgentCatalog,
-): string {
+export function subagentSystemPromptFromCatalog(agentId: string, catalog: SubagentAgentCatalog): string {
   const row = catalog.agents.get(agentId);
   const fallbackRow = catalog.agents.get(SUBAGENT_FALLBACK_AGENT_ID);
   const entry = row ?? fallbackRow;
@@ -345,9 +310,7 @@ export function subagentSystemPromptFromCatalog(
   return `<when_to_use>\n${escapeXmlText(whenToUse)}\n</when_to_use>\n\n${body}`;
 }
 
-export function subagentsPersonasSystemPromptXml(
-  catalog: SubagentAgentCatalog,
-): string {
+export function subagentsPersonasSystemPromptXml(catalog: SubagentAgentCatalog): string {
   const ids = [...catalog.agents.keys()].sort((a, b) => a.localeCompare(b));
   const lines = ["<subagents>"];
   for (const id of ids) {

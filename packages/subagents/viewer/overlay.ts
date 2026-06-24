@@ -1,24 +1,17 @@
-import { Theme } from "@earendil-works/pi-coding-agent";
+import type { Theme } from "@earendil-works/pi-coding-agent";
 import {
+  type Component,
   Container,
   Key,
-  type Component,
+  matchesKey,
   type OverlayOptions,
   type TUI,
-  matchesKey,
   truncateToWidth,
   visibleWidth,
   wrapTextWithAnsi,
 } from "@earendil-works/pi-tui";
-import {
-  type SubagentRunSummary,
-  loadSubagentMessages,
-  refreshRunRunning,
-} from "./index.ts";
-import {
-  buildSubagentConversation,
-  type SubagentConversationRenderOptions,
-} from "./render.ts";
+import { loadSubagentMessages, refreshRunRunning, type SubagentRunSummary } from "./index.ts";
+import { buildSubagentConversation, type SubagentConversationRenderOptions } from "./render.ts";
 
 export type SubagentViewerAction = "done" | "picker";
 
@@ -55,10 +48,7 @@ export class SubagentViewerOverlay implements Component {
   private lastMaxScroll = 0;
 
   constructor(private readonly params: SubagentViewerParams) {
-    this.currentIndex = Math.max(
-      0,
-      Math.min(params.initialIndex, params.runs.length - 1),
-    );
+    this.currentIndex = Math.max(0, Math.min(params.initialIndex, params.runs.length - 1));
     this.body = this.rebuildBody();
     this.bodyEntryCount = this.body.children.length;
     this.startLiveRefresh();
@@ -89,10 +79,7 @@ export class SubagentViewerOverlay implements Component {
     if (!run) return;
 
     const before = run.running;
-    const fresh = refreshRunRunning(
-      this.params.parentSessionId,
-      run.subSessionFile,
-    );
+    const fresh = refreshRunRunning(this.params.parentSessionId, run.subSessionFile);
     if (fresh.running !== before) {
       run.running = fresh.running;
     }
@@ -100,12 +87,7 @@ export class SubagentViewerOverlay implements Component {
     if (fresh.running) {
       const messages = loadSubagentMessages(run.subSessionFile);
       if (messages.length === 0) return;
-      const conv = buildSubagentConversation(
-        messages,
-        this.params.renderOptions,
-        this.params.tui,
-        run.cwd,
-      );
+      const conv = buildSubagentConversation(messages, this.params.renderOptions, this.params.tui, run.cwd);
       if (conv.children.length !== this.bodyEntryCount) {
         this.body.clear();
         for (const child of conv.children) this.body.addChild(child);
@@ -131,8 +113,7 @@ export class SubagentViewerOverlay implements Component {
       return;
     }
     if (matchesKey(data, "t")) {
-      this.params.renderOptions.hideThinkingBlock =
-        !this.params.renderOptions.hideThinkingBlock;
+      this.params.renderOptions.hideThinkingBlock = !this.params.renderOptions.hideThinkingBlock;
       this.rebuildAndInvalidate();
       return;
     }
@@ -207,10 +188,7 @@ export class SubagentViewerOverlay implements Component {
   render(width: number): string[] {
     const termCols = this.params.tui.terminal.columns;
     const termRows = this.params.tui.terminal.rows;
-    const overlayWidth = Math.max(
-      20,
-      Math.min(width, Math.floor(termCols * 0.8)),
-    );
+    const overlayWidth = Math.max(20, Math.min(width, Math.floor(termCols * 0.8)));
     const overlayHeight = Math.max(8, Math.floor(termRows * 0.8));
     const innerWidth = Math.max(1, overlayWidth - 4);
     const contentHeight = Math.max(1, overlayHeight - 2);
@@ -237,11 +215,7 @@ export class SubagentViewerOverlay implements Component {
 
     const viewLen = Math.max(0, contentHeight - headerLen - footerLen);
     const start = headerLen + this.scrollOffset;
-    const content: string[] = [
-      ...headerLines,
-      ...natural.slice(start, start + viewLen),
-      ...footerLines,
-    ];
+    const content: string[] = [...headerLines, ...natural.slice(start, start + viewLen), ...footerLines];
     while (content.length < contentHeight) {
       content.splice(content.length - footerLen, 0, "");
     }
@@ -251,21 +225,13 @@ export class SubagentViewerOverlay implements Component {
 
   /** Wrap content lines in a `│ … │` box with a top/bottom border. Each content
    * line is padded/truncated to innerWidth so the right border aligns. */
-  private withBorder(
-    content: string[],
-    innerWidth: number,
-    overlayWidth: number,
-  ): string[] {
+  private withBorder(content: string[], innerWidth: number, overlayWidth: number): string[] {
     const theme = this.params.theme;
     const border = theme.fg("dim", "│");
     const top =
-      theme.fg("dim", "┌") +
-      theme.fg("dim", "─".repeat(Math.max(0, overlayWidth - 2))) +
-      theme.fg("dim", "┐");
+      theme.fg("dim", "┌") + theme.fg("dim", "─".repeat(Math.max(0, overlayWidth - 2))) + theme.fg("dim", "┐");
     const bottom =
-      theme.fg("dim", "└") +
-      theme.fg("dim", "─".repeat(Math.max(0, overlayWidth - 2))) +
-      theme.fg("dim", "┘");
+      theme.fg("dim", "└") + theme.fg("dim", "─".repeat(Math.max(0, overlayWidth - 2))) + theme.fg("dim", "┘");
     const lines = [top];
     for (const raw of content) {
       const padded = padToWidth(raw, innerWidth);
@@ -280,18 +246,13 @@ export class SubagentViewerOverlay implements Component {
     const title = run ? run.label || "(untitled subagent)" : "Subagent Viewer";
     const statusTag = run?.running ? " ⏳ live" : "";
     const banner = ` Subagent output · ${title}${statusTag} `;
-    const left = this.params.theme.bg(
-      "selectedBg",
-      truncateToWidth(banner, width, "…", true),
-    );
+    const left = this.params.theme.bg("selectedBg", truncateToWidth(banner, width, "…", true));
     const lines = [left];
     if (run) {
       const meta = formatRunMeta(run, width);
       lines.push(this.params.theme.fg("dim", meta));
     } else if (this.params.runs.length === 0) {
-      lines.push(
-        this.params.theme.fg("muted", "No subagent runs for this session yet."),
-      );
+      lines.push(this.params.theme.fg("muted", "No subagent runs for this session yet."));
     }
     return lines;
   }
@@ -313,32 +274,16 @@ export class SubagentViewerOverlay implements Component {
   private renderFooter(width: number): string[] {
     const theme = this.params.theme;
     const run = this.params.runs[this.currentIndex];
-    const position = run
-      ? `${this.currentIndex + 1}/${this.params.runs.length}`
-      : "0/0";
+    const position = run ? `${this.currentIndex + 1}/${this.params.runs.length}` : "0/0";
     const hints: string[] = [
       theme.fg("dim", "↑↓") + theme.fg("muted", " scroll"),
-      theme.fg("dim", "G") +
-        theme.fg(
-          "muted",
-          this.stickToBottom ? " following (live)" : " jump to latest",
-        ),
+      theme.fg("dim", "G") + theme.fg("muted", this.stickToBottom ? " following (live)" : " jump to latest"),
       theme.fg("dim", "←/→") + theme.fg("muted", " prev/next subagent"),
       theme.fg("dim", "Tab") + theme.fg("muted", " picker"),
       theme.fg("dim", "t") +
-        theme.fg(
-          "muted",
-          this.params.renderOptions.hideThinkingBlock
-            ? " show thinking"
-            : " hide thinking",
-        ),
+        theme.fg("muted", this.params.renderOptions.hideThinkingBlock ? " show thinking" : " hide thinking"),
       theme.fg("dim", "e") +
-        theme.fg(
-          "muted",
-          this.params.renderOptions.expanded
-            ? " collapse tools"
-            : " expand tools",
-        ),
+        theme.fg("muted", this.params.renderOptions.expanded ? " collapse tools" : " expand tools"),
       theme.fg("dim", "Esc") + theme.fg("muted", " dismiss"),
     ];
     const right = theme.fg("accent", position);
@@ -368,12 +313,7 @@ export class SubagentViewerOverlay implements Component {
     if (!run) return container;
     const messages = loadSubagentMessages(run.subSessionFile);
     if (messages.length === 0) return container;
-    const conv = buildSubagentConversation(
-      messages,
-      this.params.renderOptions,
-      this.params.tui,
-      run.cwd,
-    );
+    const conv = buildSubagentConversation(messages, this.params.renderOptions, this.params.tui, run.cwd);
     for (const child of conv.children) {
       container.addChild(child);
     }

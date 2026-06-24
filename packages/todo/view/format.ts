@@ -14,14 +14,9 @@ export function overlayStatusGlyph(status: TaskStatus, theme: Theme): string {
   }
 }
 
-export function formatOverlayTaskLine(
-  t: Task,
-  theme: Theme,
-  showId: boolean,
-): string {
+export function formatOverlayTaskLine(t: Task, theme: Theme, showId: boolean): string {
   const glyph = overlayStatusGlyph(t.status, theme);
-  const subjectColor =
-    t.status === "completed" || t.status === "deleted" ? "dim" : "text";
+  const subjectColor = t.status === "completed" || t.status === "deleted" ? "dim" : "text";
   let subject = theme.fg(subjectColor, t.subject);
   if (t.status === "completed" || t.status === "deleted") {
     subject = theme.strikethrough(subject);
@@ -39,10 +34,7 @@ export function formatOverlayTaskLine(
 }
 
 export function formatCommandTaskLine(t: Task, glyph: string): string {
-  const form =
-    t.status === "in_progress" && t.activeForm ? ` (${t.activeForm})` : "";
-  const block = t.blockedBy?.length
-    ? `    ⛓ ${t.blockedBy.map((id) => `#${id}`).join(",")}`
-    : "";
+  const form = t.status === "in_progress" && t.activeForm ? ` (${t.activeForm})` : "";
+  const block = t.blockedBy?.length ? `    ⛓ ${t.blockedBy.map((id) => `#${id}`).join(",")}` : "";
   return `  ${glyph} #${t.id} ${t.subject}${form}${block}`;
 }

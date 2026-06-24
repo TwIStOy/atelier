@@ -1,8 +1,4 @@
-import {
-  type Component,
-  truncateToWidth,
-  visibleWidth,
-} from "@earendil-works/pi-tui";
+import { type Component, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import type { QuestionData } from "../../../tool/types.ts";
 import type { StatefulView } from "../../stateful-view.ts";
 import type { OptionListView } from "../option-list-view.ts";
@@ -88,9 +84,7 @@ export class PreviewPane implements StatefulView<PreviewPaneProps>, Component {
    * rather than a silent fallback to a magic constant — render is illegal until injected.
    */
   private globalLeftWidth: (paneWidth: number) => number = () => {
-    throw new Error(
-      "PreviewPane.setGlobalLeftWidth must be called before render()",
-    );
+    throw new Error("PreviewPane.setGlobalLeftWidth must be called before render()");
   };
 
   constructor(config: PreviewPaneConfig) {
@@ -121,11 +115,9 @@ export class PreviewPane implements StatefulView<PreviewPaneProps>, Component {
   }
 
   render(width: number): string[] {
-    if (this.question.multiSelect === true)
-      return this.optionListView.render(width);
+    if (this.question.multiSelect === true) return this.optionListView.render(width);
     // Spec: hide the preview pane entirely when no option carries a `preview`.
-    if (!this.previewBlock.hasAnyPreview())
-      return this.optionListView.render(width);
+    if (!this.previewBlock.hasAnyPreview()) return this.optionListView.render(width);
 
     const mode = decideLayout(this.getTerminalWidth(), width);
     if (mode === "side-by-side") return this.renderSideBySide(width, mode);
@@ -145,61 +137,40 @@ export class PreviewPane implements StatefulView<PreviewPaneProps>, Component {
   }
 
   focusedItemRowRange(width: number): [number, number] {
-    if (this.question.multiSelect === true)
-      return this.optionListView.focusedItemRowRange(width);
-    if (!this.previewBlock.hasAnyPreview())
-      return this.optionListView.focusedItemRowRange(width);
+    if (this.question.multiSelect === true) return this.optionListView.focusedItemRowRange(width);
+    if (!this.previewBlock.hasAnyPreview()) return this.optionListView.focusedItemRowRange(width);
     const mode = decideLayout(this.getTerminalWidth(), width);
-    if (mode === "stacked")
-      return this.optionListView.focusedItemRowRange(width);
+    if (mode === "stacked") return this.optionListView.focusedItemRowRange(width);
     const adaptiveLeft = this.getAdaptiveLeft(width);
     const { leftWidth } = columnWidths(width, adaptiveLeft);
     return this.optionListView.focusedItemRowRange(leftWidth);
   }
 
   naturalHeight(width: number): number {
-    if (this.question.multiSelect === true)
-      return this.optionListView.render(width).length;
-    if (!this.previewBlock.hasAnyPreview())
-      return this.optionListView.render(width).length;
+    if (this.question.multiSelect === true) return this.optionListView.render(width).length;
+    if (!this.previewBlock.hasAnyPreview()) return this.optionListView.render(width).length;
     const mode = decideLayout(this.getTerminalWidth(), width);
     const adaptiveLeft = this.getAdaptiveLeft(width);
-    const { optionsWidth, previewWidth } = bodyWidths(
-      width,
-      mode,
-      adaptiveLeft,
-    );
+    const { optionsWidth, previewWidth } = bodyWidths(width, mode, adaptiveLeft);
     const optionsHeight = this.optionListView.render(optionsWidth).length;
-    const previewBlockHeight = this.previewBlock.blockHeight(
-      previewWidth,
-      this.props.selectedIndex,
-      mode,
-    );
-    if (mode === "side-by-side")
-      return Math.max(optionsHeight, previewBlockHeight);
+    const previewBlockHeight = this.previewBlock.blockHeight(previewWidth, this.props.selectedIndex, mode);
+    if (mode === "side-by-side") return Math.max(optionsHeight, previewBlockHeight);
     return optionsHeight + STACKED_GAP_ROWS + previewBlockHeight;
   }
 
   maxNaturalHeight(width: number): number {
-    if (this.question.multiSelect === true)
-      return this.optionListView.render(width).length;
-    if (!this.previewBlock.hasAnyPreview())
-      return this.optionListView.render(width).length;
+    if (this.question.multiSelect === true) return this.optionListView.render(width).length;
+    if (!this.previewBlock.hasAnyPreview()) return this.optionListView.render(width).length;
     const mode = decideLayout(this.getTerminalWidth(), width);
     const adaptiveLeft = this.getAdaptiveLeft(width);
-    const { optionsWidth, previewWidth } = bodyWidths(
-      width,
-      mode,
-      adaptiveLeft,
-    );
+    const { optionsWidth, previewWidth } = bodyWidths(width, mode, adaptiveLeft);
     const optionsHeight = this.optionListView.render(optionsWidth).length;
     let maxPreviewBlock = 0;
     for (let i = 0; i < this.question.options.length; i++) {
       const h = this.previewBlock.blockHeight(previewWidth, i, mode);
       if (h > maxPreviewBlock) maxPreviewBlock = h;
     }
-    if (mode === "side-by-side")
-      return Math.max(optionsHeight, maxPreviewBlock);
+    if (mode === "side-by-side") return Math.max(optionsHeight, maxPreviewBlock);
     return optionsHeight + STACKED_GAP_ROWS + maxPreviewBlock;
   }
 
@@ -215,19 +186,14 @@ export class PreviewPane implements StatefulView<PreviewPaneProps>, Component {
       const leftRaw = leftLines[i] ?? "";
       const rightRaw = rightLines[i] ?? "";
       const leftClamped = truncateToWidth(leftRaw, leftWidth, "");
-      const leftPad = " ".repeat(
-        Math.max(0, leftWidth - visibleWidth(leftClamped)),
-      );
+      const leftPad = " ".repeat(Math.max(0, leftWidth - visibleWidth(leftClamped)));
       const joined = `${leftClamped}${leftPad}${gapStr}${rightRaw}`;
       out.push(truncateToWidth(joined, width, ""));
     }
     return out;
   }
 
-  private renderPaddedPreviewLines(
-    colWidth: number,
-    mode: PreviewLayoutMode,
-  ): string[] {
+  private renderPaddedPreviewLines(colWidth: number, mode: PreviewLayoutMode): string[] {
     const inner = Math.max(1, colWidth - PREVIEW_PADDING_LEFT);
     const contentLines = this.previewBlock.renderBlock(
       inner,

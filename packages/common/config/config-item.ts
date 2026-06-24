@@ -1,13 +1,6 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 
-export type ConfigItemType =
-  | "string"
-  | "number"
-  | "boolean"
-  | "select"
-  | "multiselect"
-  | "reorderable"
-  | "color";
+export type ConfigItemType = "string" | "number" | "boolean" | "select" | "multiselect" | "reorderable" | "color";
 
 export interface ConfigItemSelectOption<T = unknown> {
   label: string;
@@ -24,14 +17,9 @@ export interface ConfigItemPreviewHandle {
   dispose?(): void;
 }
 
-export type ConfigItemPreview = (
-  ctx: ConfigItemPreviewContext,
-) => ConfigItemPreviewHandle;
+export type ConfigItemPreview = (ctx: ConfigItemPreviewContext) => ConfigItemPreviewHandle;
 
-export interface ConfigItemBase<
-  T,
-  Type extends ConfigItemType = ConfigItemType,
-> {
+export interface ConfigItemBase<T, Type extends ConfigItemType = ConfigItemType> {
   key: string;
   type: Type;
   label: string;
@@ -60,24 +48,15 @@ export interface BooleanConfigItem extends ConfigItemBase<boolean, "boolean"> {}
 
 export type LazyOptions<T> = () => ConfigItemSelectOption<T>[];
 
-export interface SelectConfigItem<T = string> extends ConfigItemBase<
-  T,
-  "select"
-> {
+export interface SelectConfigItem<T = string> extends ConfigItemBase<T, "select"> {
   options: ConfigItemSelectOption<T>[] | LazyOptions<T>;
 }
 
-export interface MultiSelectConfigItem<T = string> extends ConfigItemBase<
-  T[],
-  "multiselect"
-> {
+export interface MultiSelectConfigItem<T = string> extends ConfigItemBase<T[], "multiselect"> {
   options: ConfigItemSelectOption<T>[] | LazyOptions<T>;
 }
 
-export interface ReorderableConfigItem<T = string> extends ConfigItemBase<
-  T[],
-  "reorderable"
-> {
+export interface ReorderableConfigItem<T = string> extends ConfigItemBase<T[], "reorderable"> {
   options: ConfigItemSelectOption<T>[] | LazyOptions<T>;
 }
 
@@ -109,25 +88,17 @@ function getRegistry(): GlobalRegistry {
   return g[REGISTRY_KEY]!;
 }
 
-export function registerConfigItems(
-  extensionId: string,
-  items: ConfigItem[],
-): void {
+export function registerConfigItems(extensionId: string, items: ConfigItem[]): void {
   const registry = getRegistry();
   const existing = registry.get(extensionId) ?? [];
   const incomingKeys = new Set(items.map((i) => i.key));
-  const merged = [
-    ...existing.filter((i) => !incomingKeys.has(i.key)),
-    ...items,
-  ];
+  const merged = [...existing.filter((i) => !incomingKeys.has(i.key)), ...items];
   registry.set(extensionId, merged);
 }
 
 export function getConfigItems(extensionId: string): ConfigItem[];
 export function getConfigItems(): ConfigItemRegistry[];
-export function getConfigItems(
-  extensionId?: string,
-): ConfigItem[] | ConfigItemRegistry[] {
+export function getConfigItems(extensionId?: string): ConfigItem[] | ConfigItemRegistry[] {
   const registry = getRegistry();
   if (extensionId !== undefined) {
     return registry.get(extensionId) ?? [];

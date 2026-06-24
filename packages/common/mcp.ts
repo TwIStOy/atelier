@@ -35,9 +35,7 @@ export async function mcpInit(
     }),
   });
   if (!res.ok) {
-    throw new Error(
-      `MCP init ${res.status}: ${(await res.text()).slice(0, 200)}`,
-    );
+    throw new Error(`MCP init ${res.status}: ${(await res.text()).slice(0, 200)}`);
   }
   const sessionId = res.headers.get("Mcp-Session-Id");
   if (!sessionId) throw new Error("MCP: no session ID returned");
@@ -65,9 +63,7 @@ export async function mcpCall<T = unknown>(
     body: JSON.stringify({ jsonrpc: "2.0", id, method, params }),
   });
   if (!res.ok) {
-    throw new Error(
-      `MCP ${method} ${res.status}: ${(await res.text()).slice(0, 200)}`,
-    );
+    throw new Error(`MCP ${method} ${res.status}: ${(await res.text()).slice(0, 200)}`);
   }
   const text = await res.text();
   const lines = text.split("\n");

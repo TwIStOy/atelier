@@ -7,8 +7,8 @@
  * agent turn.
  */
 import { appendFileSync, mkdirSync } from "node:fs";
-import { dirname, join } from "node:path";
 import { homedir } from "node:os";
+import { dirname, join } from "node:path";
 
 function resolveLogPath(env: NodeJS.ProcessEnv = process.env): string {
   const xdg = env.XDG_STATE_HOME?.trim();

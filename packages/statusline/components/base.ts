@@ -1,5 +1,5 @@
-import type { Component, TUI } from "@earendil-works/pi-tui";
 import type { Theme } from "@earendil-works/pi-coding-agent";
+import type { Component, TUI } from "@earendil-works/pi-tui";
 
 export interface StatusLineComponent {
   render(width: number, theme: Theme): string[];

@@ -1,11 +1,11 @@
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import {
   AssistantMessageComponent,
+  getMarkdownTheme,
   ToolExecutionComponent,
   UserMessageComponent,
-  getMarkdownTheme,
 } from "@earendil-works/pi-coding-agent";
-import { Container, type Component, type TUI } from "@earendil-works/pi-tui";
+import { type Component, Container, type TUI } from "@earendil-works/pi-tui";
 
 function getUserText(message: AgentMessage): string {
   if (message.role !== "user") return "";
@@ -43,11 +43,7 @@ export function buildSubagentConversation(
 
   for (const message of messages) {
     if (message.role === "assistant") {
-      const assistant = new AssistantMessageComponent(
-        message,
-        opts.hideThinkingBlock,
-        markdownTheme,
-      );
+      const assistant = new AssistantMessageComponent(message, opts.hideThinkingBlock, markdownTheme);
       if (container.children.length > 0) addSpacer();
       container.addChild(assistant);
 
@@ -71,14 +67,8 @@ export function buildSubagentConversation(
         tool.setExpanded(opts.expanded);
         container.addChild(tool);
 
-        if (
-          message.stopReason === "aborted" ||
-          message.stopReason === "error"
-        ) {
-          const reason =
-            message.stopReason === "aborted"
-              ? "Operation aborted"
-              : (message.errorMessage ?? "Error");
+        if (message.stopReason === "aborted" || message.stopReason === "error") {
+          const reason = message.stopReason === "aborted" ? "Operation aborted" : (message.errorMessage ?? "Error");
           tool.updateResult({
             content: [{ type: "text", text: reason }],
             isError: true,

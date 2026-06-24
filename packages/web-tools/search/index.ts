@@ -1,16 +1,13 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { instantiateProviders, isRateLimitError } from "../config.ts";
 import type { SearchResult } from "../providers/types.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const searchToolDescription = readFileSync(
-  join(__dirname, "prompt.txt"),
-  "utf-8",
-).trim();
+const searchToolDescription = readFileSync(join(__dirname, "prompt.txt"), "utf-8").trim();
 
 const MIN_SEARCH_RESULTS = 1;
 const MAX_SEARCH_RESULTS = 10;
@@ -21,10 +18,7 @@ function clampSearchResultCount(requested: number | undefined): number {
   return Math.min(Math.max(value, MIN_SEARCH_RESULTS), MAX_SEARCH_RESULTS);
 }
 
-function formatSearchResultsBody(response: {
-  query: string;
-  results: SearchResult[];
-}): string {
+function formatSearchResultsBody(response: { query: string; results: SearchResult[] }): string {
   let text = `**Search results for "${response.query}":**\n\n`;
   response.results.forEach((r, i) => {
     text += `${i + 1}. **${r.title}**\n   ${r.url}\n   ${r.snippet}\n\n`;
@@ -75,11 +69,7 @@ export function registerWebSearchTool(pi: ExtensionAPI): void {
         });
 
         try {
-          const response = await provider.search(
-            params.query,
-            maxResults,
-            signal,
-          );
+          const response = await provider.search(params.query, maxResults, signal);
 
           if (response.results.length === 0) {
             return {
@@ -98,9 +88,7 @@ export function registerWebSearchTool(pi: ExtensionAPI): void {
           }
 
           return {
-            content: [
-              { type: "text", text: formatSearchResultsBody(response) },
-            ],
+            content: [{ type: "text", text: formatSearchResultsBody(response) }],
             details: {
               query: params.query,
               backend: providerName,

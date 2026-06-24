@@ -1,13 +1,8 @@
 import { readFile } from "node:fs/promises";
-import { safeError } from "../secrets.ts";
 import { encodeAudioBase64, inferAudioFormat } from "../base64.ts";
+import { safeError } from "../secrets.ts";
 
-export type SttErrorCode =
-  | "missing_api_key"
-  | "network_error"
-  | "auth_error"
-  | "api_error"
-  | "empty_transcript";
+export type SttErrorCode = "missing_api_key" | "network_error" | "auth_error" | "api_error" | "empty_transcript";
 
 export class SttError extends Error {
   readonly code: SttErrorCode;
@@ -78,17 +73,11 @@ export async function transcribeWithMimoChat(
 
   if (!resp.ok) {
     const body = await resp.text().catch(() => "");
-    const code: SttErrorCode =
-      resp.status === 401 || resp.status === 403 ? "auth_error" : "api_error";
-    throw new SttError(
-      code,
-      safeError(`STT request failed (${resp.status}): ${body}`, [apiKey]),
-    );
+    const code: SttErrorCode = resp.status === 401 || resp.status === 403 ? "auth_error" : "api_error";
+    throw new SttError(code, safeError(`STT request failed (${resp.status}): ${body}`, [apiKey]));
   }
 
-  const parsed = (await resp
-    .json()
-    .catch(() => ({}))) as ChatCompletionResponse;
+  const parsed = (await resp.json().catch(() => ({}))) as ChatCompletionResponse;
   const message = parsed.choices?.[0]?.message;
   const text = (message?.content ?? message?.reasoning_content ?? "").trim();
 
@@ -98,10 +87,7 @@ export async function transcribeWithMimoChat(
   return text;
 }
 
-export function setHttpDeps(deps: {
-  fetch?: typeof fetch;
-  readFile?: typeof readFile;
-}): void {
+export function setHttpDeps(deps: { fetch?: typeof fetch; readFile?: typeof readFile }): void {
   if (deps.fetch) _fetch = deps.fetch;
   if (deps.readFile) _readFile = deps.readFile;
 }

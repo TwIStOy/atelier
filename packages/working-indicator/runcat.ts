@@ -25,10 +25,7 @@ export const DEFAULT_RUNCAT_SPEED_CONFIG: RuncatSpeedConfig = {
   quantizeSteps: DEFAULT_RUNCAT_QUANTIZE_STEPS,
 };
 
-export function clampInterval(
-  value: number,
-  config: RuncatSpeedConfig = DEFAULT_RUNCAT_SPEED_CONFIG,
-): number {
+export function clampInterval(value: number, config: RuncatSpeedConfig = DEFAULT_RUNCAT_SPEED_CONFIG): number {
   const lower = Math.min(config.minIntervalMs, config.maxIntervalMs);
   const upper = Math.max(config.minIntervalMs, config.maxIntervalMs);
   return Math.max(lower, Math.min(upper, value));
@@ -56,10 +53,7 @@ export function shouldRefreshRuncatInterval(thinking: boolean): boolean {
   return !thinking;
 }
 
-export function quantizeInterval(
-  intervalMs: number,
-  config: RuncatSpeedConfig = DEFAULT_RUNCAT_SPEED_CONFIG,
-): number {
+export function quantizeInterval(intervalMs: number, config: RuncatSpeedConfig = DEFAULT_RUNCAT_SPEED_CONFIG): number {
   const steps = Math.max(1, Math.floor(config.quantizeSteps));
   if (steps === 1) return config.minIntervalMs;
   const lower = Math.min(config.minIntervalMs, config.maxIntervalMs);

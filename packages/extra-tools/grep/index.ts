@@ -1,9 +1,3 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import {
-  DEFAULT_MAX_BYTES,
-  formatSize,
-  truncateHead,
-} from "@earendil-works/pi-coding-agent";
 import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { stat as fsStat } from "node:fs/promises";
@@ -11,32 +5,28 @@ import { homedir } from "node:os";
 import path from "node:path";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { DEFAULT_MAX_BYTES, formatSize, truncateHead } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 
 const grepDir = path.dirname(fileURLToPath(import.meta.url));
-const grepToolDescription = readFileSync(
-  path.join(grepDir, "grep.txt"),
-  "utf-8",
-).trim();
+const grepToolDescription = readFileSync(path.join(grepDir, "grep.txt"), "utf-8").trim();
 
 const MAX_LINE_LENGTH = 2000;
 const MATCH_LIMIT = 100;
 
 const grepParams = Type.Object({
   pattern: Type.String({
-    description:
-      "The regex pattern to search for in file contents (ripgrep regex syntax).",
+    description: "The regex pattern to search for in file contents (ripgrep regex syntax).",
   }),
   path: Type.Optional(
     Type.String({
-      description:
-        "Directory or file to search (relative to session cwd). Defaults to the current working directory.",
+      description: "Directory or file to search (relative to session cwd). Defaults to the current working directory.",
     }),
   ),
   include: Type.Optional(
     Type.String({
-      description:
-        'Glob filter for paths to search (e.g. "*.ts", "*.{ts,tsx}").',
+      description: 'Glob filter for paths to search (e.g. "*.ts", "*.{ts,tsx}").',
     }),
   ),
 });
@@ -113,15 +103,10 @@ function runRipgrep(
       const linesObj = d?.lines as { text?: string } | undefined;
       const pathText = pathObj?.text;
       if (!pathText || typeof lineNum !== "number") return;
-      const absPath = path.isAbsolute(pathText)
-        ? path.normalize(pathText)
-        : path.resolve(execCwd, pathText);
+      const absPath = path.isAbsolute(pathText) ? path.normalize(pathText) : path.resolve(execCwd, pathText);
       const text =
         typeof linesObj?.text === "string"
-          ? linesObj.text
-              .replace(/\r\n/g, "\n")
-              .replace(/\r/g, "")
-              .replace(/\n$/, "")
+          ? linesObj.text.replace(/\r\n/g, "\n").replace(/\r/g, "").replace(/\n$/, "")
           : "";
       matches.push({ absPath, line: lineNum, text });
       if (matches.length >= maxMatches && !child.killed) {
@@ -165,8 +150,7 @@ export function registerGrepTool(pi: ExtensionAPI) {
     name: "grep",
     label: "Grep",
     description: grepToolDescription,
-    promptSnippet:
-      "Search file contents with regex (ripgrep); optional include glob; results sorted by file mtime",
+    promptSnippet: "Search file contents with regex (ripgrep); optional include glob; results sorted by file mtime",
     parameters: grepParams,
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
       const pattern = params.pattern?.trim();
@@ -233,9 +217,7 @@ export function registerGrepTool(pi: ExtensionAPI) {
       const truncated = total > MATCH_LIMIT;
       const final = truncated ? enriched.slice(0, MATCH_LIMIT) : enriched;
 
-      const outLines = [
-        `Found ${total} matches${truncated ? ` (showing first ${MATCH_LIMIT})` : ""}`,
-      ];
+      const outLines = [`Found ${total} matches${truncated ? ` (showing first ${MATCH_LIMIT})` : ""}`];
 
       let currentPath = "";
       for (const match of final) {
@@ -245,9 +227,7 @@ export function registerGrepTool(pi: ExtensionAPI) {
           outLines.push(`${match.absPath}:`);
         }
         const lineText =
-          match.text.length > MAX_LINE_LENGTH
-            ? `${match.text.slice(0, MAX_LINE_LENGTH)}...`
-            : match.text;
+          match.text.length > MAX_LINE_LENGTH ? `${match.text.slice(0, MAX_LINE_LENGTH)}...` : match.text;
         outLines.push(` Line ${match.line}: ${lineText}`);
       }
 

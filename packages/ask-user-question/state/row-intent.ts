@@ -15,11 +15,7 @@ export type RowKind = WrappingSelectItem["kind"];
  * derivation, and `LABELS_BY_KIND` consumers iterate this list.
  */
 export type SentinelKind = Exclude<RowKind, "option">;
-export const SENTINEL_KINDS: readonly SentinelKind[] = [
-  "other",
-  "chat",
-  "next",
-];
+export const SENTINEL_KINDS: readonly SentinelKind[] = ["other", "chat", "next"];
 
 /**
  * Per-kind static metadata. Pure data — no closures, no per-kind handler
@@ -136,9 +132,7 @@ export const LABELS_BY_KIND: { readonly [K in SentinelKind]: string } = {
  */
 export const RESERVED_LABEL_SET: ReadonlySet<string> = new Set<string>([
   "Other",
-  ...SENTINEL_KINDS.filter((k) => ROW_INTENT_META[k].reserved).map(
-    (k) => ROW_INTENT_META[k].label,
-  ),
+  ...SENTINEL_KINDS.filter((k) => ROW_INTENT_META[k].reserved).map((k) => ROW_INTENT_META[k].label),
 ]);
 
 /**
@@ -150,10 +144,7 @@ export const RESERVED_LABEL_SET: ReadonlySet<string> = new Set<string>([
  * Returns sentinel descriptors in declaration order of `SENTINEL_KINDS`. The
  * caller wraps each with the `WrappingSelectItem` shape (kind + label).
  */
-export function sentinelsToAppend(
-  question: QuestionData,
-  hasAnyPreview: boolean,
-): SentinelKind[] {
+export function sentinelsToAppend(question: QuestionData, hasAnyPreview: boolean): SentinelKind[] {
   const out: SentinelKind[] = [];
   for (const k of SENTINEL_KINDS) {
     const meta = ROW_INTENT_META[k];

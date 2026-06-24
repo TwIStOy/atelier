@@ -1,10 +1,5 @@
-import type {
-  FetchResponse,
-  FullProvider,
-  SearchResponse,
-  SearchResult,
-} from "./types.ts";
 import { throwIfApiError } from "./errors.ts";
+import type { FetchResponse, FullProvider, SearchResponse, SearchResult } from "./types.ts";
 
 const TAVILY_API_URL = "https://api.tavily.com/search";
 const TAVILY_EXTRACT_API_URL = "https://api.tavily.com/extract";
@@ -46,15 +41,9 @@ export class TavilyProvider implements FullProvider {
 
   constructor(private readonly apiKey: string) {}
 
-  async search(
-    query: string,
-    maxResults: number,
-    signal?: AbortSignal,
-  ): Promise<SearchResponse> {
+  async search(query: string, maxResults: number, signal?: AbortSignal): Promise<SearchResponse> {
     if (!this.apiKey) {
-      throw new Error(
-        `${this.envVar} is not set. Use /config to set the API key, or export the env var.`,
-      );
+      throw new Error(`${this.envVar} is not set. Use /config to set the API key, or export the env var.`);
     }
 
     const res = await fetch(TAVILY_API_URL, {
@@ -77,15 +66,9 @@ export class TavilyProvider implements FullProvider {
     return { query, results: normalizeTavilyResults(raw.results ?? []) };
   }
 
-  async fetch(
-    url: string,
-    _raw: boolean,
-    signal?: AbortSignal,
-  ): Promise<FetchResponse> {
+  async fetch(url: string, _raw: boolean, signal?: AbortSignal): Promise<FetchResponse> {
     if (!this.apiKey) {
-      throw new Error(
-        `${this.envVar} is not set. Use /config to set the API key, or export the env var.`,
-      );
+      throw new Error(`${this.envVar} is not set. Use /config to set the API key, or export the env var.`);
     }
 
     const res = await fetch(TAVILY_EXTRACT_API_URL, {
@@ -114,9 +97,7 @@ export class TavilyProvider implements FullProvider {
 
     const result = data.results?.[0];
     if (!result?.raw_content) {
-      throw new Error(
-        `${this.label} Fetch API error: no content returned for ${url}`,
-      );
+      throw new Error(`${this.label} Fetch API error: no content returned for ${url}`);
     }
 
     return {

@@ -1,23 +1,18 @@
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import {
-  loadConfig,
-  registerVoiceInputConfigItems,
-  resolveApiKey,
-} from "./config.ts";
 import { LocalAudioCapture } from "./audio/capture.ts";
 import { selectRecorder, selectStreamRecorder } from "./audio/recorder.ts";
 import { StreamCapture } from "./audio/stream-capture.ts";
-import { VadPipeline } from "./audio/vad-pipeline.ts";
 import { SileroVad } from "./audio/vad/silero.ts";
+import { VadPipeline } from "./audio/vad-pipeline.ts";
+import { loadConfig, registerVoiceInputConfigItems, resolveApiKey } from "./config.ts";
+import { type FlowContext, VoiceInputFlow } from "./flow.ts";
 import { createSttProvider } from "./providers/index.ts";
-import { VoiceInputFlow, type FlowContext } from "./flow.ts";
 import { safeError } from "./secrets.ts";
-import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
 
 const EXTENSION_ID = "voice-input";
-const MODEL_SHA256 =
-  "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3";
+const MODEL_SHA256 = "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3";
 
 function resolveModelPath(): string {
   const here = dirname(fileURLToPath(import.meta.url));
@@ -98,10 +93,7 @@ async function createFlow(ctx: FlowContext): Promise<VoiceInputFlow> {
         pipeline,
       });
     }
-    ctx.ui.notify(
-      "VAD enabled but unavailable — falling back to whole-file recording.",
-      "warning",
-    );
+    ctx.ui.notify("VAD enabled but unavailable — falling back to whole-file recording.", "warning");
   }
 
   const recorder = selectRecorder(config);

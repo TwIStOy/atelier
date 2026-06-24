@@ -1,22 +1,19 @@
 import { BraveProvider } from "./brave.ts";
-import { TavilyProvider } from "./tavily.ts";
-import { SerperProvider } from "./serper.ts";
-import { PerplexityProvider } from "./perplexity.ts";
 import { ExaProvider } from "./exa.ts";
-import { YouComProvider } from "./youcom.ts";
-import { JinaProvider } from "./jina.ts";
 import { FirecrawlProvider } from "./firecrawl.ts";
-import { ZaiProvider } from "./zai.ts";
+import { JinaProvider } from "./jina.ts";
+import { PerplexityProvider } from "./perplexity.ts";
+import { SerperProvider } from "./serper.ts";
+import { TavilyProvider } from "./tavily.ts";
 import type { FullProvider, SearchProvider } from "./types.ts";
+import { YouComProvider } from "./youcom.ts";
+import { ZaiProvider } from "./zai.ts";
 
 export interface ProviderCredentials {
   apiKey?: string;
 }
 
-export function createSearchProvider(
-  name: string,
-  creds: ProviderCredentials,
-): SearchProvider | FullProvider {
+export function createSearchProvider(name: string, creds: ProviderCredentials): SearchProvider | FullProvider {
   const apiKey = creds.apiKey ?? "";
   switch (name) {
     case "brave":

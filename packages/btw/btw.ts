@@ -1,3 +1,7 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import type { Message, UserMessage } from "@earendil-works/pi-ai";
 import type {
   ExtensionAPI,
   ExtensionCommandContext,
@@ -5,7 +9,7 @@ import type {
   SessionCompactEvent,
   SessionTreeEvent,
 } from "@earendil-works/pi-coding-agent";
-import type { Message, UserMessage } from "@earendil-works/pi-ai";
+import type { SideCallResult } from "@htwang-contrib/common";
 import {
   branchToMessages,
   createSessionCache,
@@ -13,12 +17,8 @@ import {
   getGlobalState,
   userMessageText,
 } from "@htwang-contrib/common";
-import type { SideCallResult } from "@htwang-contrib/common";
-import { showBtwOverlay } from "./btw-ui.ts";
 import type { BtwTurn } from "./btw-ui.ts";
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { join, dirname } from "node:path";
+import { showBtwOverlay } from "./btw-ui.ts";
 
 const BTW_STATE_KEY = "htwang-contrib-btw";
 const BTW_CACHE_KEY = "htwang-contrib-btw-snapshot";
@@ -43,10 +43,7 @@ function getBtwState(): BtwState {
 }
 
 function sessionKey(ctx: ExtensionContext): string {
-  return (
-    ctx.sessionManager.getSessionFile() ??
-    `memory:${ctx.sessionManager.getSessionId()}`
-  );
+  return ctx.sessionManager.getSessionFile() ?? `memory:${ctx.sessionManager.getSessionId()}`;
 }
 
 function getSessionHistory(state: BtwState, ctx: ExtensionContext): BtwTurn[] {
@@ -59,10 +56,7 @@ function getSessionHistory(state: BtwState, ctx: ExtensionContext): BtwTurn[] {
   return history;
 }
 
-export function clearSessionHistory(
-  state: BtwState,
-  ctx: ExtensionContext,
-): void {
+export function clearSessionHistory(state: BtwState, ctx: ExtensionContext): void {
   const key = sessionKey(ctx);
   state.histories.set(key, []);
 }
@@ -73,19 +67,12 @@ function buildBtwMessages(
   history: BtwTurn[],
   userMessage: UserMessage,
 ): Message[] {
-  const branchMessages =
-    cache.get(ctx) ?? branchToMessages(ctx.sessionManager.getBranch());
-  const historyMessages = history.flatMap((h) => [
-    h.userMessage,
-    h.assistantMessage,
-  ]);
+  const branchMessages = cache.get(ctx) ?? branchToMessages(ctx.sessionManager.getBranch());
+  const historyMessages = history.flatMap((h) => [h.userMessage, h.assistantMessage]);
   return [...branchMessages, ...historyMessages, userMessage];
 }
 
-function getCrossSessionHint(
-  state: BtwState,
-  currentSessionKey: string,
-): string {
+function getCrossSessionHint(state: BtwState, currentSessionKey: string): string {
   const allQuestions: string[] = [];
   for (const [key, turns] of state.histories) {
     if (key === currentSessionKey) continue;
@@ -99,24 +86,15 @@ function getCrossSessionHint(
   return `\n\nRecent /btw questions across sessions:\n${listed}`;
 }
 
-function registerMessageEndSnapshot(
-  pi: ExtensionAPI,
-  cache: ReturnType<typeof createSessionCache<Message[]>>,
-): void {
-  pi.on(
-    "message_end",
-    (event: { type: "message_end"; message: { role: string } }, ctx) => {
-      if (event.message.role !== "assistant") return;
-      const msgs = branchToMessages(ctx.sessionManager.getBranch());
-      cache.set(ctx, msgs);
-    },
-  );
+function registerMessageEndSnapshot(pi: ExtensionAPI, cache: ReturnType<typeof createSessionCache<Message[]>>): void {
+  pi.on("message_end", (event: { type: "message_end"; message: { role: string } }, ctx) => {
+    if (event.message.role !== "assistant") return;
+    const msgs = branchToMessages(ctx.sessionManager.getBranch());
+    cache.set(ctx, msgs);
+  });
 }
 
-function registerInvalidationHooks(
-  pi: ExtensionAPI,
-  cache: ReturnType<typeof createSessionCache<Message[]>>,
-): void {
+function registerInvalidationHooks(pi: ExtensionAPI, cache: ReturnType<typeof createSessionCache<Message[]>>): void {
   pi.on("session_compact", (_event: SessionCompactEvent, ctx) => {
     cache.safeInvalidate(ctx);
   });
@@ -125,23 +103,14 @@ function registerInvalidationHooks(
   });
 }
 
-async function handleBtwCommand(
-  args: string,
-  ctx: ExtensionCommandContext,
-): Promise<void> {
+async function handleBtwCommand(args: string, ctx: ExtensionCommandContext): Promise<void> {
   if (!ctx.hasUI) {
-    ctx.ui.notify(
-      `${COMMAND_NAME} requires an interactive terminal.`,
-      "warning",
-    );
+    ctx.ui.notify(`${COMMAND_NAME} requires an interactive terminal.`, "warning");
     return;
   }
   const question = args.trim();
   if (!question) {
-    ctx.ui.notify(
-      `${COMMAND_NAME} requires a question. Usage: /btw <question>`,
-      "warning",
-    );
+    ctx.ui.notify(`${COMMAND_NAME} requires a question. Usage: /btw <question>`, "warning");
     return;
   }
   if (!ctx.model) {

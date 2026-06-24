@@ -1,29 +1,12 @@
-import type {
-  AgentToolUpdateCallback,
-  ExtensionContext,
-} from "@earendil-works/pi-coding-agent";
+import type { AgentToolUpdateCallback, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { mapConcurrent } from "@htwang-contrib/common";
 import { mergeAbortWithTimeoutMs } from "./abort-timeout.ts";
-import {
-  buildSubagentAgentCatalog,
-  resolveSubagentAgentId,
-} from "./agent-catalog.ts";
+import { buildSubagentAgentCatalog, resolveSubagentAgentId } from "./agent-catalog.ts";
 import { formatBatchToolText } from "./batch-text.ts";
 import { subagentDetails } from "./details.ts";
-import {
-  tryParentToolUpdate,
-  withThrottledParentFlush,
-} from "./parent-update.ts";
-import {
-  defaultsForAgentType,
-  resolveTimeoutMs,
-  type SubagentSettings,
-} from "./settings.ts";
-import {
-  runSubAgent,
-  type SubagentBatchItemDetail,
-  type SubagentRunDetails,
-} from "./run-agent.ts";
+import { tryParentToolUpdate, withThrottledParentFlush } from "./parent-update.ts";
+import { runSubAgent, type SubagentBatchItemDetail, type SubagentRunDetails } from "./run-agent.ts";
+import { defaultsForAgentType, resolveTimeoutMs, type SubagentSettings } from "./settings.ts";
 
 export type ParallelTaskRow = {
   task: string;
@@ -108,88 +91,70 @@ export async function runParallelBatchSubagent(
 
   let results: Awaited<ReturnType<typeof runSubAgent>>[];
   try {
-    results = await mapConcurrent(
-      tasks,
-      limits.maxConcurrent,
-      async (item, i) => {
-        perTaskStarted[i] = true;
-        const at = resolveSubagentAgentId(
-          item.agent_type ?? globalAgentType,
-          catalog,
-        );
-        const file = catalog.agents.get(at)?.fileOptions ?? {};
-        const defs = defaultsForAgentType(subagentSettings, at);
-        const taskTimeout = resolveTimeoutMs(
-          item.timeout_ms,
-          subagentSettings.timeoutMs,
-        );
-        const taskSignal = mergeAbortWithTimeoutMs(merged, taskTimeout);
-        const r = await runSubAgent(
-          ctx,
-          {
-            task: item.task,
-            model: item.model ?? globalModel ?? file.model ?? defs.model,
-            thinking:
-              item.thinking ?? globalThinking ?? file.thinking ?? defs.thinking,
-            inherit_context:
-              item.inherit_context ??
-              globalInherit ??
-              file.inherit_context ??
-              false,
-            isolated: item.isolated ?? globalIsolated ?? file.isolated ?? true,
-            max_turns: item.max_turns ?? globalMaxTurns ?? file.max_turns,
-            agent_type: item.agent_type ?? globalAgentType,
-            stream: { task_index: i, task_total: n },
-          },
-          taskSignal,
-          (p) => {
-            const ti = p.task_index;
-            if (typeof ti === "number" && ti >= 0 && ti < n) {
-              perTaskStarted[ti] = true;
-              perTaskTools[ti] = p.tool_calls;
-              perTaskUsageIn[ti] = p.usage_input;
-              perTaskUsageOut[ti] = p.usage_output;
-              perTaskCtxPct[ti] = p.context_percent;
-            }
-          },
-          catalog,
-        );
-        perTaskTools[i] = r.tool_calls;
-        perTaskUsageIn[i] = r.usage_input;
-        perTaskUsageOut[i] = r.usage_output;
-        perTaskCtxPct[i] = r.context_percent;
-        perTaskDone[i] = true;
-        perTaskOk[i] = !r.isError;
-        if (onUpdate) {
-          tryParentToolUpdate(onUpdate, {
-            content: [{ type: "text" as const, text: "" }],
-            details: subagentDetails({
-              ...parentBase,
-              tool_calls: perTaskTools.reduce((s, x) => s + x, 0),
-              task_index: i,
-              task_total: n,
-              per_task_tool_calls: [...perTaskTools],
-              per_task_started: [...perTaskStarted],
-              per_task_done: [...perTaskDone],
-              per_task_ok: [...perTaskOk],
-              per_task_usage_input: [...perTaskUsageIn],
-              per_task_usage_output: [...perTaskUsageOut],
-              per_task_context_percent: [...perTaskCtxPct],
-            }),
-          });
-        }
-        return r;
-      },
-    );
+    results = await mapConcurrent(tasks, limits.maxConcurrent, async (item, i) => {
+      perTaskStarted[i] = true;
+      const at = resolveSubagentAgentId(item.agent_type ?? globalAgentType, catalog);
+      const file = catalog.agents.get(at)?.fileOptions ?? {};
+      const defs = defaultsForAgentType(subagentSettings, at);
+      const taskTimeout = resolveTimeoutMs(item.timeout_ms, subagentSettings.timeoutMs);
+      const taskSignal = mergeAbortWithTimeoutMs(merged, taskTimeout);
+      const r = await runSubAgent(
+        ctx,
+        {
+          task: item.task,
+          model: item.model ?? globalModel ?? file.model ?? defs.model,
+          thinking: item.thinking ?? globalThinking ?? file.thinking ?? defs.thinking,
+          inherit_context: item.inherit_context ?? globalInherit ?? file.inherit_context ?? false,
+          isolated: item.isolated ?? globalIsolated ?? file.isolated ?? true,
+          max_turns: item.max_turns ?? globalMaxTurns ?? file.max_turns,
+          agent_type: item.agent_type ?? globalAgentType,
+          stream: { task_index: i, task_total: n },
+        },
+        taskSignal,
+        (p) => {
+          const ti = p.task_index;
+          if (typeof ti === "number" && ti >= 0 && ti < n) {
+            perTaskStarted[ti] = true;
+            perTaskTools[ti] = p.tool_calls;
+            perTaskUsageIn[ti] = p.usage_input;
+            perTaskUsageOut[ti] = p.usage_output;
+            perTaskCtxPct[ti] = p.context_percent;
+          }
+        },
+        catalog,
+      );
+      perTaskTools[i] = r.tool_calls;
+      perTaskUsageIn[i] = r.usage_input;
+      perTaskUsageOut[i] = r.usage_output;
+      perTaskCtxPct[i] = r.context_percent;
+      perTaskDone[i] = true;
+      perTaskOk[i] = !r.isError;
+      if (onUpdate) {
+        tryParentToolUpdate(onUpdate, {
+          content: [{ type: "text" as const, text: "" }],
+          details: subagentDetails({
+            ...parentBase,
+            tool_calls: perTaskTools.reduce((s, x) => s + x, 0),
+            task_index: i,
+            task_total: n,
+            per_task_tool_calls: [...perTaskTools],
+            per_task_started: [...perTaskStarted],
+            per_task_done: [...perTaskDone],
+            per_task_ok: [...perTaskOk],
+            per_task_usage_input: [...perTaskUsageIn],
+            per_task_usage_output: [...perTaskUsageOut],
+            per_task_context_percent: [...perTaskCtxPct],
+          }),
+        });
+      }
+      return r;
+    });
   } finally {
     ui.stopAndFlush();
   }
 
   const batchItems: SubagentBatchItemDetail[] = results.map((r, i) => {
-    const at = resolveSubagentAgentId(
-      tasks[i]?.agent_type ?? globalAgentType,
-      catalog,
-    );
+    const at = resolveSubagentAgentId(tasks[i]?.agent_type ?? globalAgentType, catalog);
     const desc = tasks[i]!.description.trim();
     return r.isError
       ? {

@@ -5,17 +5,17 @@
  * session's intent and is stable across the whole session, so it is computed
  * once rather than regenerated on every turn.
  */
-import type { ModelRegistry } from "@earendil-works/pi-coding-agent";
-import type { SessionEntry } from "@earendil-works/pi-coding-agent";
+
 import type { Message, Model } from "@earendil-works/pi-ai";
+import type { ModelRegistry, SessionEntry } from "@earendil-works/pi-coding-agent";
 import {
   assistantMessageText,
   branchToMessages,
+  type ExtensionConfigSchema,
   executeSideCall,
   extractMessageText,
   readConfig,
   resolveModel,
-  type ExtensionConfigSchema,
   type SideCallResult,
 } from "@htwang-contrib/common";
 import { logDebug } from "./log.ts";
@@ -40,15 +40,9 @@ export function loadConfig(): HerdrConfig {
   return readConfig(CONFIG_NAME, CONFIG_SCHEMA);
 }
 
-export function resolveSummaryModel(
-  registry: ModelRegistry,
-  config: HerdrConfig,
-): AnyModel | undefined {
+export function resolveSummaryModel(registry: ModelRegistry, config: HerdrConfig): AnyModel | undefined {
   if (!config.model) return undefined;
-  return (
-    (resolveModel(registry.getAvailable(), config.model) as AnyModel) ??
-    undefined
-  );
+  return (resolveModel(registry.getAvailable(), config.model) as AnyModel) ?? undefined;
 }
 
 const TITLE_SYSTEM_PROMPT =
@@ -91,9 +85,7 @@ export function parseSessionTitle(rawAnswer: string): string {
     .replace(/[.:;\s]+$/, "")
     .trim();
   if (cleaned.length === 0) return "";
-  return cleaned.length > TITLE_MAX
-    ? cleaned.slice(0, TITLE_MAX - 1) + "…"
-    : cleaned;
+  return cleaned.length > TITLE_MAX ? cleaned.slice(0, TITLE_MAX - 1) + "…" : cleaned;
 }
 
 export interface TitleOutcome {
@@ -124,12 +116,9 @@ export async function summarizeSessionTitle(opts: {
 }): Promise<TitleOutcome> {
   const { branch, model, modelRegistry, fallbackTitle, signal } = opts;
 
-  const promptText =
-    (opts.firstPrompt ?? "").trim() || (branch ? firstUserPrompt(branch) : "");
+  const promptText = (opts.firstPrompt ?? "").trim() || (branch ? firstUserPrompt(branch) : "");
   if (!promptText || !model) {
-    logDebug(
-      `summarizeSessionTitle: skipping (promptLen=${promptText.length} hasModel=${!!model})`,
-    );
+    logDebug(`summarizeSessionTitle: skipping (promptLen=${promptText.length} hasModel=${!!model})`);
     return { title: fallbackTitle, fromModel: false };
   }
   logDebug(
@@ -158,17 +147,13 @@ export async function summarizeSessionTitle(opts: {
       commandName: "herdr-title",
     });
   } catch (e) {
-    logDebug(
-      `summarizeSessionTitle: executeSideCall threw ${String(e).slice(0, 300)}`,
-    );
+    logDebug(`summarizeSessionTitle: executeSideCall threw ${String(e).slice(0, 300)}`);
     return { title: fallbackTitle, fromModel: false };
   }
 
   if (!result.ok) {
     const reason = "aborted" in result ? "aborted" : result.error;
-    logDebug(
-      `summarizeSessionTitle: side-call failed: ${String(reason).slice(0, 300)}`,
-    );
+    logDebug(`summarizeSessionTitle: side-call failed: ${String(reason).slice(0, 300)}`);
     return { title: fallbackTitle, fromModel: false };
   }
 

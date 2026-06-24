@@ -1,9 +1,5 @@
 import type { StatefulView } from "../stateful-view.ts";
-import {
-  WrappingSelect,
-  type WrappingSelectItem,
-  type WrappingSelectTheme,
-} from "./wrapping-select.ts";
+import { WrappingSelect, type WrappingSelectItem, type WrappingSelectTheme } from "./wrapping-select.ts";
 
 /**
  * Maximum number of option rows visible in the WrappingSelect window. Lifted here from
@@ -45,24 +41,16 @@ export class OptionListView implements StatefulView<OptionListViewProps> {
     // Reserve a slot for the chat row in the WrappingSelect's number-padding so
     // the column width is identical whether or not the user navigates into chat
     // (chat row uses items.length + 1).
-    this.select = new WrappingSelect(
-      config.items,
-      Math.min(config.items.length, MAX_VISIBLE_OPTIONS),
-      config.theme,
-      {
-        numberStartOffset: 0,
-        totalItemsForNumbering: config.items.length + 1,
-      },
-    );
+    this.select = new WrappingSelect(config.items, Math.min(config.items.length, MAX_VISIBLE_OPTIONS), config.theme, {
+      numberStartOffset: 0,
+      totalItemsForNumbering: config.items.length + 1,
+    });
   }
 
   setProps(props: OptionListViewProps): void {
     this.select.setSelectedIndex(props.selectedIndex);
     this.select.setFocused(props.focused);
-    this.select.setConfirmedIndex(
-      props.confirmed?.index,
-      props.confirmed?.labelOverride,
-    );
+    this.select.setConfirmedIndex(props.confirmed?.index, props.confirmed?.labelOverride);
     this.select.setInputBuffer(props.inputBuffer);
     this.select.setInputCursorOffset(props.inputCursorOffset);
   }

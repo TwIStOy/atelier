@@ -1,9 +1,5 @@
 import type { Component } from "@earendil-works/pi-tui";
-import {
-  CURSOR_MARKER,
-  visibleWidth,
-  wrapTextWithAnsi,
-} from "@earendil-works/pi-tui";
+import { CURSOR_MARKER, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 
 // Grapheme-aware extraction at the cursor: pi-tui's Input advances `cursor` by
 // grapheme-cluster code-unit length, so the cursor can land between code units of
@@ -96,8 +92,7 @@ export class WrappingSelect implements Component {
     this.maxVisible = Math.max(1, maxVisible);
     this.theme = theme;
     this.numberStartOffset = options.numberStartOffset ?? 0;
-    this.totalItemsForNumbering =
-      options.totalItemsForNumbering ?? items.length;
+    this.totalItemsForNumbering = options.totalItemsForNumbering ?? items.length;
   }
 
   /**
@@ -105,10 +100,7 @@ export class WrappingSelect implements Component {
    * Used by the host to keep the chat-row WrappingSelect's number aligned with the active tab's
    * options list when the user switches tabs (each tab can have a different items count).
    */
-  setNumbering(
-    numberStartOffset: number,
-    totalItemsForNumbering: number,
-  ): void {
+  setNumbering(numberStartOffset: number, totalItemsForNumbering: number): void {
     this.numberStartOffset = numberStartOffset;
     this.totalItemsForNumbering = Math.max(1, totalItemsForNumbering);
   }
@@ -166,11 +158,7 @@ export class WrappingSelect implements Component {
     }
 
     if (this.hasItemsOutsideWindow(startIndex, endIndex)) {
-      lines.push(
-        this.theme.scrollInfo(
-          `  (${this.selectedIndex + 1}/${this.items.length})`,
-        ),
-      );
+      lines.push(this.theme.scrollInfo(`  (${this.selectedIndex + 1}/${this.items.length})`));
     }
     return lines;
   }
@@ -189,13 +177,7 @@ export class WrappingSelect implements Component {
       const item = this.items[i];
       if (!item) continue;
       const isActive = i === this.selectedIndex && this.focused;
-      const itemRowCount = this.computeItemRowCount(
-        item,
-        i,
-        isActive,
-        width,
-        numberWidth,
-      );
+      const itemRowCount = this.computeItemRowCount(item, i, isActive, width, numberWidth);
       if (i === this.selectedIndex) {
         return [row, row + itemRowCount];
       }
@@ -221,10 +203,7 @@ export class WrappingSelect implements Component {
 
   private computeVisibleWindow(): { startIndex: number; endIndex: number } {
     const half = Math.floor(this.maxVisible / 2);
-    const startIndex = Math.max(
-      0,
-      Math.min(this.selectedIndex - half, this.items.length - this.maxVisible),
-    );
+    const startIndex = Math.max(0, Math.min(this.selectedIndex - half, this.items.length - this.maxVisible));
     const endIndex = Math.min(startIndex + this.maxVisible, this.items.length);
     return { startIndex, endIndex };
   }
@@ -242,17 +221,10 @@ export class WrappingSelect implements Component {
   ): string[] {
     const rowPrefix = this.buildRowPrefix(index, isActive, numberWidth);
     const continuationPrefix = " ".repeat(visibleWidth(rowPrefix));
-    const contentWidth = Math.max(
-      WrappingSelect.MIN_CONTENT_WIDTH,
-      width - visibleWidth(rowPrefix),
-    );
+    const contentWidth = Math.max(WrappingSelect.MIN_CONTENT_WIDTH, width - visibleWidth(rowPrefix));
 
     if (this.shouldRenderAsInlineInput(item, isActive)) {
-      return this.renderInlineInputRow(
-        rowPrefix,
-        continuationPrefix,
-        contentWidth,
-      );
+      return this.renderInlineInputRow(rowPrefix, continuationPrefix, contentWidth);
     }
 
     // Confirmed row gets a trailing ` ✔` and accent+bold styling; pointer is independent
@@ -268,38 +240,19 @@ export class WrappingSelect implements Component {
     const applySelectedStyle = isActive || isConfirmed;
 
     return [
-      ...this.renderLabelBlock(
-        label,
-        rowPrefix,
-        continuationPrefix,
-        contentWidth,
-        applySelectedStyle,
-      ),
-      ...this.renderDescriptionBlock(
-        item.description,
-        continuationPrefix,
-        contentWidth,
-      ),
+      ...this.renderLabelBlock(label, rowPrefix, continuationPrefix, contentWidth, applySelectedStyle),
+      ...this.renderDescriptionBlock(item.description, continuationPrefix, contentWidth),
     ];
   }
 
-  private buildRowPrefix(
-    index: number,
-    isActive: boolean,
-    numberWidth: number,
-  ): string {
-    const pointer = isActive
-      ? WrappingSelect.ACTIVE_POINTER
-      : WrappingSelect.INACTIVE_POINTER;
+  private buildRowPrefix(index: number, isActive: boolean, numberWidth: number): string {
+    const pointer = isActive ? WrappingSelect.ACTIVE_POINTER : WrappingSelect.INACTIVE_POINTER;
     const displayNumber = this.numberStartOffset + index + 1;
     const paddedNumber = String(displayNumber).padStart(numberWidth, " ");
     return `${pointer}${paddedNumber}${WrappingSelect.NUMBER_SEPARATOR}`;
   }
 
-  private shouldRenderAsInlineInput(
-    item: WrappingSelectItem,
-    isActive: boolean,
-  ): boolean {
+  private shouldRenderAsInlineInput(item: WrappingSelectItem, isActive: boolean): boolean {
     return item.kind === "other" && isActive;
   }
 
@@ -331,17 +284,10 @@ export class WrappingSelect implements Component {
    * break — the conventional workaround documented across ANSI-aware string
    * wrappers.
    */
-  private renderInlineInputRow(
-    rowPrefix: string,
-    continuationPrefix: string,
-    contentWidth: number,
-  ): string[] {
+  private renderInlineInputRow(rowPrefix: string, continuationPrefix: string, contentWidth: number): string[] {
     const buffer = this.inputBuffer;
     const requested = this.inputCursorOffset;
-    const offset =
-      requested !== undefined && requested >= 0 && requested <= buffer.length
-        ? requested
-        : buffer.length;
+    const offset = requested !== undefined && requested >= 0 && requested <= buffer.length ? requested : buffer.length;
     const before = buffer.slice(0, offset);
     const [firstGrapheme] = graphemeSegmenter.segment(buffer.slice(offset));
     const rawAt = firstGrapheme ? firstGrapheme.segment : "";
@@ -380,8 +326,6 @@ export class WrappingSelect implements Component {
   ): string[] {
     if (!description) return [];
     const wrapped = wrapTextWithAnsi(description, contentWidth);
-    return wrapped.map(
-      (segment) => `${continuationPrefix}${this.theme.description(segment)}`,
-    );
+    return wrapped.map((segment) => `${continuationPrefix}${this.theme.description(segment)}`);
   }
 }

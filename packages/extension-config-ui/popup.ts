@@ -1,43 +1,29 @@
-import type {
-  ExtensionAPI,
-  ExtensionCommandContext,
-  ExtensionContext,
-  Theme,
-} from "@earendil-works/pi-coding-agent";
-import { Key, matchesKey } from "@earendil-works/pi-tui";
+import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import type { TUI } from "@earendil-works/pi-tui";
+import { Key, matchesKey } from "@earendil-works/pi-tui";
+import type { ConfigItemPreviewHandle } from "@htwang-contrib/common";
 import {
+  buildSelectDisplayOptions,
   buildSettingRows,
   buildTabs,
   filterRows,
-  saveSetting,
-  resetSetting,
-  resetExtensionSettings,
   getSelectOptions,
-  buildSelectDisplayOptions,
+  moveReorderableItem,
+  resetExtensionSettings,
+  resetSetting,
+  saveSetting,
+  stringifyValue,
   toggleMultiSelectValue,
   toggleReorderableValue,
-  moveReorderableItem,
-  stringifyValue,
 } from "./config-registry.ts";
-import {
-  handleInlineEditInput,
-  parseSettingInput,
-} from "./render/inline-edit.ts";
-import { renderTabBar } from "./render/tab-bar.ts";
-import { renderSearchBar } from "./render/search-bar.ts";
-import { renderSettingList, renderSelectPage } from "./render/setting-list.ts";
-import type { ConfigItemPreviewHandle } from "@htwang-contrib/common";
 import { renderFooter } from "./render/footer.ts";
 import { divider, wrapLine } from "./render/frame.ts";
-import type {
-  PopupLayout,
-  SelectingState,
-  SettingRow,
-  TabDef,
-  UiState,
-} from "./types.ts";
-import { TAB_ALL, SELECT_PAGE_SIZE } from "./types.ts";
+import { handleInlineEditInput, parseSettingInput } from "./render/inline-edit.ts";
+import { renderSearchBar } from "./render/search-bar.ts";
+import { renderSelectPage, renderSettingList } from "./render/setting-list.ts";
+import { renderTabBar } from "./render/tab-bar.ts";
+import type { PopupLayout, SelectingState, SettingRow, TabDef, UiState } from "./types.ts";
+import { SELECT_PAGE_SIZE, TAB_ALL } from "./types.ts";
 
 function makeInitialUiState(): UiState {
   return { tab: TAB_ALL, search: "", selected: 0, scroll: 0 };
@@ -106,10 +92,7 @@ function createConfigComponent(
     previewHandle = preview({
       getValue: () => {
         if (ui.selecting && row) {
-          const { options } = buildSelectDisplayOptions(
-            row,
-            ui.selecting.filter,
-          );
+          const { options } = buildSelectDisplayOptions(row, ui.selecting.filter);
           const opt = options[ui.selecting.selectedOptionIndex];
           if (opt) return opt.value;
         }
@@ -119,11 +102,7 @@ function createConfigComponent(
     });
   };
 
-  const cycle = <T extends string>(
-    values: T[],
-    current: string,
-    delta: number,
-  ): T => {
+  const cycle = <T extends string>(values: T[], current: string, delta: number): T => {
     const idx = Math.max(0, values.indexOf(current as T));
     return values[(idx + delta + values.length) % values.length]!;
   };
@@ -141,41 +120,23 @@ function createConfigComponent(
     const half = Math.floor(SELECT_PAGE_SIZE / 2);
     if (sel.selectedOptionIndex < sel.scroll + half) {
       sel.scroll = Math.max(0, sel.selectedOptionIndex - half);
-    } else if (
-      sel.selectedOptionIndex >=
-      sel.scroll + SELECT_PAGE_SIZE - half
-    ) {
-      sel.scroll = Math.max(
-        0,
-        sel.selectedOptionIndex - SELECT_PAGE_SIZE + half + 1,
-      );
+    } else if (sel.selectedOptionIndex >= sel.scroll + SELECT_PAGE_SIZE - half) {
+      sel.scroll = Math.max(0, sel.selectedOptionIndex - SELECT_PAGE_SIZE + half + 1);
     }
-    sel.scroll = Math.max(
-      0,
-      Math.min(sel.scroll, Math.max(0, total - SELECT_PAGE_SIZE)),
-    );
+    sel.scroll = Math.max(0, Math.min(sel.scroll, Math.max(0, total - SELECT_PAGE_SIZE)));
   };
 
   const enterSelectPage = (): void => {
     const row = selectedRow();
     if (!row) return;
-    if (
-      row.item.type === "select" ||
-      row.item.type === "multiselect" ||
-      row.item.type === "reorderable"
-    ) {
+    if (row.item.type === "select" || row.item.type === "multiselect" || row.item.type === "reorderable") {
       const opts = getSelectOptions(row);
       let initialIndex = 0;
       if (row.item.type === "select") {
-        initialIndex = opts.findIndex(
-          (o) => JSON.stringify(o.value) === JSON.stringify(row.currentValue),
-        );
+        initialIndex = opts.findIndex((o) => JSON.stringify(o.value) === JSON.stringify(row.currentValue));
         if (initialIndex < 0) initialIndex = 0;
       }
-      const scroll = Math.max(
-        0,
-        initialIndex - Math.floor(SELECT_PAGE_SIZE / 2),
-      );
+      const scroll = Math.max(0, initialIndex - Math.floor(SELECT_PAGE_SIZE / 2));
       ui.selecting = {
         rowId: row.id,
         selectedOptionIndex: initialIndex,
@@ -209,8 +170,7 @@ function createConfigComponent(
     }
     try {
       const value = parseSettingInput(row.item, editing.buffer);
-      const changed =
-        JSON.stringify(value) !== JSON.stringify(row.currentValue);
+      const changed = JSON.stringify(value) !== JSON.stringify(row.currentValue);
       if (changed) {
         saveSetting(row, value);
         row.currentValue = value;
@@ -257,10 +217,7 @@ function createConfigComponent(
         requestRender();
         return;
       }
-      if (
-        canFilter &&
-        (matchesKey(data, "backspace") || matchesKey(data, "ctrl+u"))
-      ) {
+      if (canFilter && (matchesKey(data, "backspace") || matchesKey(data, "ctrl+u"))) {
         if (matchesKey(data, "ctrl+u")) ui.selecting.filter = "";
         else ui.selecting.filter = ui.selecting.filter.slice(0, -1);
         ui.selecting.selectedOptionIndex = 0;
@@ -276,28 +233,19 @@ function createConfigComponent(
         return;
       }
       if (matchesKey(data, "up")) {
-        ui.selecting.selectedOptionIndex = Math.max(
-          0,
-          ui.selecting.selectedOptionIndex - 1,
-        );
+        ui.selecting.selectedOptionIndex = Math.max(0, ui.selecting.selectedOptionIndex - 1);
         syncSelectScroll(ui.selecting, opts.length);
         requestRender();
         return;
       }
       if (matchesKey(data, "down")) {
-        ui.selecting.selectedOptionIndex = Math.min(
-          opts.length - 1,
-          ui.selecting.selectedOptionIndex + 1,
-        );
+        ui.selecting.selectedOptionIndex = Math.min(opts.length - 1, ui.selecting.selectedOptionIndex + 1);
         syncSelectScroll(ui.selecting, opts.length);
         requestRender();
         return;
       }
       if (matchesKey(data, "-") || matchesKey(data, "pageUp")) {
-        ui.selecting.selectedOptionIndex = Math.max(
-          0,
-          ui.selecting.selectedOptionIndex - SELECT_PAGE_SIZE,
-        );
+        ui.selecting.selectedOptionIndex = Math.max(0, ui.selecting.selectedOptionIndex - SELECT_PAGE_SIZE);
         syncSelectScroll(ui.selecting, opts.length);
         requestRender();
         return;
@@ -338,22 +286,15 @@ function createConfigComponent(
         !filterActive &&
         (matchesKey(data, "alt+up") || matchesKey(data, "ctrl+p"))
       ) {
-        const vals = Array.isArray(row.currentValue)
-          ? [...row.currentValue]
-          : [];
+        const vals = Array.isArray(row.currentValue) ? [...row.currentValue] : [];
         const optVal = opts[ui.selecting.selectedOptionIndex]?.value;
-        const fromIdx = vals.findIndex(
-          (v) => JSON.stringify(v) === JSON.stringify(optVal),
-        );
+        const fromIdx = vals.findIndex((v) => JSON.stringify(v) === JSON.stringify(optVal));
         if (fromIdx > 0) {
           const newVals = moveReorderableItem(row, fromIdx, -1);
           saveSetting(row, newVals);
           row.currentValue = newVals;
           row.isExplicit = true;
-          ui.selecting.selectedOptionIndex = Math.max(
-            0,
-            ui.selecting.selectedOptionIndex - 1,
-          );
+          ui.selecting.selectedOptionIndex = Math.max(0, ui.selecting.selectedOptionIndex - 1);
         }
         requestRender();
         return;
@@ -363,22 +304,15 @@ function createConfigComponent(
         !filterActive &&
         (matchesKey(data, "alt+down") || matchesKey(data, "ctrl+n"))
       ) {
-        const vals = Array.isArray(row.currentValue)
-          ? [...row.currentValue]
-          : [];
+        const vals = Array.isArray(row.currentValue) ? [...row.currentValue] : [];
         const optVal = opts[ui.selecting.selectedOptionIndex]?.value;
-        const fromIdx = vals.findIndex(
-          (v) => JSON.stringify(v) === JSON.stringify(optVal),
-        );
+        const fromIdx = vals.findIndex((v) => JSON.stringify(v) === JSON.stringify(optVal));
         if (fromIdx >= 0 && fromIdx < vals.length - 1) {
           const newVals = moveReorderableItem(row, fromIdx, 1);
           saveSetting(row, newVals);
           row.currentValue = newVals;
           row.isExplicit = true;
-          ui.selecting.selectedOptionIndex = Math.min(
-            opts.length - 1,
-            ui.selecting.selectedOptionIndex + 1,
-          );
+          ui.selecting.selectedOptionIndex = Math.min(opts.length - 1, ui.selecting.selectedOptionIndex + 1);
         }
         requestRender();
         return;
@@ -386,8 +320,7 @@ function createConfigComponent(
       return;
     }
 
-    if (matchesKey(data, Key.escape) || matchesKey(data, "ctrl+c"))
-      return done();
+    if (matchesKey(data, Key.escape) || matchesKey(data, "ctrl+c")) return done();
 
     if (matchesKey(data, "tab") || matchesKey(data, "right")) {
       switchTab(1);
@@ -439,10 +372,7 @@ function createConfigComponent(
       const row = selectedRow();
       if (row) {
         resetSetting(row);
-        row.currentValue =
-          typeof row.item.value === "function"
-            ? (row.item.value as () => unknown)()
-            : row.item.value;
+        row.currentValue = typeof row.item.value === "function" ? (row.item.value as () => unknown)() : row.item.value;
         row.isExplicit = false;
       }
       requestRender();
@@ -454,10 +384,7 @@ function createConfigComponent(
         resetExtensionSettings(rows, row.extensionId);
         for (const r of rows) {
           if (r.extensionId === row.extensionId) {
-            r.currentValue =
-              typeof r.item.value === "function"
-                ? (r.item.value as () => unknown)()
-                : r.item.value;
+            r.currentValue = typeof r.item.value === "function" ? (r.item.value as () => unknown)() : r.item.value;
             r.isExplicit = false;
           }
         }
@@ -487,15 +414,7 @@ function createConfigComponent(
         ensurePreview();
         lines.push(theme.fg("accent", theme.bold(" Extension Settings")));
         lines.push("");
-        lines.push(
-          ...renderSelectPage(
-            row,
-            ui.selecting,
-            safeWidth,
-            theme,
-            previewHandle,
-          ),
-        );
+        lines.push(...renderSelectPage(row, ui.selecting, safeWidth, theme, previewHandle));
         lines.push("");
         lines.push(divider(safeWidth, theme));
         lines.push(
@@ -524,16 +443,10 @@ function createConfigComponent(
     lines.push(divider(safeWidth, theme));
 
     const footer = renderFooter(theme, ui.editing ? "editing" : "browse");
-    const footerLines = [
-      divider(safeWidth, theme),
-      ...wrapLine(footer, safeWidth),
-    ];
+    const footerLines = [divider(safeWidth, theme), ...wrapLine(footer, safeWidth)];
 
     const layout = getLayout();
-    const availableRows = Math.max(
-      1,
-      layout.bodyRows - lines.length - footerLines.length,
-    );
+    const availableRows = Math.max(1, layout.bodyRows - lines.length - footerLines.length);
 
     const currentFiltered = filtered();
     syncViewport(ui, currentFiltered.length, availableRows);

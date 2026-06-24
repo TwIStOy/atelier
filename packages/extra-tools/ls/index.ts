@@ -1,21 +1,14 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import {
-  DEFAULT_MAX_BYTES,
-  formatSize,
-  truncateHead,
-} from "@earendil-works/pi-coding-agent";
 import { constants as fsConstants, readFileSync } from "node:fs";
 import { access, readdir as fsReaddir, stat as fsStat } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { DEFAULT_MAX_BYTES, formatSize, truncateHead } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 
 const lsDir = path.dirname(fileURLToPath(import.meta.url));
-const lsToolDescription = readFileSync(
-  path.join(lsDir, "ls.txt"),
-  "utf-8",
-).trim();
+const lsToolDescription = readFileSync(path.join(lsDir, "ls.txt"), "utf-8").trim();
 
 const DEFAULT_LIMIT = 500;
 
@@ -72,9 +65,7 @@ export function registerLsTool(pi: ExtensionAPI) {
       const effectiveLimit = Math.max(
         1,
         Math.min(
-          typeof rawLimit === "number" && Number.isFinite(rawLimit)
-            ? Math.floor(rawLimit)
-            : DEFAULT_LIMIT,
+          typeof rawLimit === "number" && Number.isFinite(rawLimit) ? Math.floor(rawLimit) : DEFAULT_LIMIT,
           50_000,
         ),
       );
@@ -134,9 +125,7 @@ export function registerLsTool(pi: ExtensionAPI) {
       let output = truncation.content;
       const notices: string[] = [];
       if (entryLimitReached) {
-        notices.push(
-          `${effectiveLimit} entries limit reached. Use limit=${effectiveLimit * 2} for more`,
-        );
+        notices.push(`${effectiveLimit} entries limit reached. Use limit=${effectiveLimit * 2} for more`);
       }
       if (truncation.truncated) {
         notices.push(`${formatSize(DEFAULT_MAX_BYTES)} limit reached`);

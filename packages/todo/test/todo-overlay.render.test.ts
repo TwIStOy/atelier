@@ -5,9 +5,7 @@ import { TodoOverlay } from "../todo-overlay.ts";
 import type { TaskAction } from "../tool/types.ts";
 import { createMockPi, createMockUI, identityTheme } from "./helpers.ts";
 
-async function setup(
-  actions: Array<{ action: TaskAction; [k: string]: unknown }>,
-) {
+async function setup(actions: Array<{ action: TaskAction; [k: string]: unknown }>) {
   __resetState();
   const { pi, tools } = createMockPi();
   registerTodoTool(pi);
@@ -90,9 +88,7 @@ describe("TodoOverlay — natural-order rendering (no overflow)", () => {
 
 describe("TodoOverlay — per-task formatting", () => {
   it("pending task uses '○' glyph", async () => {
-    const { widget } = await setup([
-      { action: "create", subject: "pending-task" },
-    ]);
+    const { widget } = await setup([{ action: "create", subject: "pending-task" }]);
     expect(widget.render(200)[1]).toContain("○");
     expect(widget.render(200)[1]).toContain("pending-task");
   });
@@ -147,8 +143,7 @@ describe("TodoOverlay — showIds gate", () => {
 describe("TodoOverlay — overflow collapse", () => {
   it("drops completed first when dropping is enough", async () => {
     const actions: Array<{ action: TaskAction; [k: string]: unknown }> = [];
-    for (let i = 1; i <= 8; i++)
-      actions.push({ action: "create", subject: `p${i}` });
+    for (let i = 1; i <= 8; i++) actions.push({ action: "create", subject: `p${i}` });
     for (let i = 9; i <= 12; i++) {
       actions.push({ action: "create", subject: `c${i}` });
       actions.push({ action: "update", id: i, status: "completed" });
@@ -164,8 +159,7 @@ describe("TodoOverlay — overflow collapse", () => {
 
   it("truncates pending tail when dropping all completed isn't enough", async () => {
     const actions: Array<{ action: TaskAction; [k: string]: unknown }> = [];
-    for (let i = 1; i <= 12; i++)
-      actions.push({ action: "create", subject: `t${i}` });
+    for (let i = 1; i <= 12; i++) actions.push({ action: "create", subject: `t${i}` });
     const { widget } = await setup(actions);
     const lines = widget.render(200);
     expect(lines).toHaveLength(13);
@@ -178,8 +172,7 @@ describe("TodoOverlay — overflow collapse", () => {
 
   it("summary contains both 'completed' and 'pending' when mixed overflow", async () => {
     const actions: Array<{ action: TaskAction; [k: string]: unknown }> = [];
-    for (let i = 1; i <= 12; i++)
-      actions.push({ action: "create", subject: `p${i}` });
+    for (let i = 1; i <= 12; i++) actions.push({ action: "create", subject: `p${i}` });
     for (let i = 13; i <= 15; i++) {
       actions.push({ action: "create", subject: `c${i}` });
       actions.push({ action: "update", id: i, status: "completed" });
@@ -193,8 +186,7 @@ describe("TodoOverlay — overflow collapse", () => {
 
   it("hides overflowed completed tasks on the next agent turn too", async () => {
     const actions: Array<{ action: TaskAction; [k: string]: unknown }> = [];
-    for (let i = 1; i <= 11; i++)
-      actions.push({ action: "create", subject: `p${i}` });
+    for (let i = 1; i <= 11; i++) actions.push({ action: "create", subject: `p${i}` });
     for (let i = 12; i <= 16; i++) {
       actions.push({ action: "create", subject: `c${i}` });
       actions.push({ action: "update", id: i, status: "completed" });
@@ -214,8 +206,7 @@ describe("TodoOverlay — overflow collapse", () => {
 
   it("does not engage overflow at exactly 11 visible tasks", async () => {
     const actions: Array<{ action: TaskAction; [k: string]: unknown }> = [];
-    for (let i = 1; i <= 11; i++)
-      actions.push({ action: "create", subject: `t${i}` });
+    for (let i = 1; i <= 11; i++) actions.push({ action: "create", subject: `t${i}` });
     const { widget } = await setup(actions);
     const lines = widget.render(200);
     expect(lines).toHaveLength(13);
@@ -255,19 +246,11 @@ describe("TodoOverlay — width truncation", () => {
   });
 
   it("re-renders reflect live state changes without re-registering", async () => {
-    const { widget, tool } = await setup([
-      { action: "create", subject: "first" },
-    ]);
+    const { widget, tool } = await setup([{ action: "create", subject: "first" }]);
     const out1 = widget.render(200).join("\n");
     expect(out1).toContain("first");
     const execute = tool.execute as Function;
-    await execute(
-      "tc",
-      { action: "create", subject: "second" },
-      undefined,
-      undefined,
-      {},
-    );
+    await execute("tc", { action: "create", subject: "second" }, undefined, undefined, {});
     const out2 = widget.render(200).join("\n");
     expect(out2).toContain("first");
     expect(out2).toContain("second");

@@ -1,12 +1,9 @@
 import { EventEmitter } from "node:events";
-import { describe, expect, it, vi } from "vitest";
 import { Readable } from "node:stream";
-import { StreamCapture } from "../audio/stream-capture.ts";
-import type {
-  StreamRecorderChild,
-  StreamSpawnFn,
-} from "../audio/stream-capture.ts";
+import { describe, expect, it, vi } from "vitest";
 import type { ResolvedRecorder } from "../audio/recorder.ts";
+import type { StreamRecorderChild, StreamSpawnFn } from "../audio/stream-capture.ts";
+import { StreamCapture } from "../audio/stream-capture.ts";
 
 interface FakeStreamChild extends StreamRecorderChild {
   emit(code: number | null, signal?: NodeJS.Signals | null): void;

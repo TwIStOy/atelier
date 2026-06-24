@@ -1,16 +1,8 @@
-import type {
-  ExtensionCommandContext,
-  Theme,
-} from "@earendil-works/pi-coding-agent";
-import {
-  Key,
-  matchesKey,
-  truncateToWidth,
-  visibleWidth,
-} from "@earendil-works/pi-tui";
-import type { TUI, OverlayOptions, Component } from "@earendil-works/pi-tui";
-import { spinnerGlyph, SpinnerTimer } from "@htwang-contrib/tool-display";
+import type { ExtensionCommandContext, Theme } from "@earendil-works/pi-coding-agent";
+import type { Component, OverlayOptions, TUI } from "@earendil-works/pi-tui";
+import { Key, matchesKey, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { formatElapsedSeconds } from "@htwang-contrib/common";
+import { SpinnerTimer, spinnerGlyph } from "@htwang-contrib/tool-display";
 
 function padToVisible(line: string, width: number): string {
   const vw = visibleWidth(line);
@@ -24,13 +16,7 @@ const OVERLAY_OPTIONS: OverlayOptions = {
   margin: { left: 0, right: 0, bottom: 0 },
 };
 
-export type CommitPhase =
-  | "preparing"
-  | "generating"
-  | "committing"
-  | "done"
-  | "cancelled"
-  | "error";
+export type CommitPhase = "preparing" | "generating" | "committing" | "done" | "cancelled" | "error";
 
 export interface CommitEntry {
   hash: string;
@@ -108,14 +94,10 @@ export class CommitterOverlayController implements Component {
   private buildLines(width: number): string[] {
     const innerW = Math.max(1, width - 4);
     const content: string[] = [];
-    const elapsed = formatElapsedSeconds(
-      (Date.now() - this.progress.startTime) / 1000,
-    );
+    const elapsed = formatElapsedSeconds((Date.now() - this.progress.startTime) / 1000);
 
     const banner = ` /commit  ${this.phaseLabel()}  ${elapsed}`;
-    content.push(
-      this.theme.bg("selectedBg", truncateToWidth(banner, innerW, "…", true)),
-    );
+    content.push(this.theme.bg("selectedBg", truncateToWidth(banner, innerW, "…", true)));
     content.push("");
 
     if (this.progress.model) {
@@ -123,9 +105,7 @@ export class CommitterOverlayController implements Component {
     }
 
     if (this.progress.filesTotal > 0) {
-      content.push(
-        this.theme.fg("dim", `Files: ${this.progress.filesTotal} changed`),
-      );
+      content.push(this.theme.fg("dim", `Files: ${this.progress.filesTotal} changed`));
     }
 
     if (this.progress.diffStat) {
@@ -144,20 +124,14 @@ export class CommitterOverlayController implements Component {
 
       case "generating":
         content.push(
-          "  " +
-            spinnerGlyph(this.theme) +
-            " " +
-            (this.progress.statusMessage || "Generating commit message..."),
+          "  " + spinnerGlyph(this.theme) + " " + (this.progress.statusMessage || "Generating commit message..."),
         );
         break;
 
       case "committing": {
         const { commitsCompleted, commitsTotal } = this.progress;
-        const prog =
-          commitsTotal > 1 ? ` (${commitsCompleted}/${commitsTotal})` : "";
-        content.push(
-          "  " + spinnerGlyph(this.theme) + ` Creating commit${prog}...`,
-        );
+        const prog = commitsTotal > 1 ? ` (${commitsCompleted}/${commitsTotal})` : "";
+        content.push("  " + spinnerGlyph(this.theme) + ` Creating commit${prog}...`);
         break;
       }
 
@@ -167,12 +141,7 @@ export class CommitterOverlayController implements Component {
           const icon = entry.success ? "✓" : "✗";
           const color = entry.success ? "accent" : "error";
           const firstLine = entry.message.split("\n")[0] ?? "";
-          content.push(
-            this.theme.fg(
-              color,
-              `  ${icon} ${entry.hash} ${truncateToWidth(firstLine, innerW - 8)}`,
-            ),
-          );
+          content.push(this.theme.fg(color, `  ${icon} ${entry.hash} ${truncateToWidth(firstLine, innerW - 8)}`));
         }
         break;
       }
@@ -182,12 +151,7 @@ export class CommitterOverlayController implements Component {
         break;
 
       case "error":
-        content.push(
-          this.theme.fg(
-            "error",
-            `  ✗ ${this.progress.errorMessage ?? "Unknown error"}`,
-          ),
-        );
+        content.push(this.theme.fg("error", `  ✗ ${this.progress.errorMessage ?? "Unknown error"}`));
         break;
     }
 
@@ -198,9 +162,7 @@ export class CommitterOverlayController implements Component {
       footer.push(this.theme.fg("dim", "Enter") + " close");
       footer.push(this.theme.fg("dim", "↑↓") + " scroll");
     }
-    content.push(
-      this.theme.fg("dim", truncateToWidth(footer.join("  "), innerW)),
-    );
+    content.push(this.theme.fg("dim", truncateToWidth(footer.join("  "), innerW)));
 
     const dim = (s: string) => this.theme.fg("dim", s);
     const hBorder = dim("─".repeat(Math.max(0, width - 2)));
@@ -241,19 +203,11 @@ export function showCommitterOverlay(
   ctrl: CommitterOverlayController;
 }> {
   let resolveCtrl!: (c: CommitterOverlayController) => void;
-  const ctrlReady = new Promise<CommitterOverlayController>(
-    (resolve) => (resolveCtrl = resolve),
-  );
+  const ctrlReady = new Promise<CommitterOverlayController>((resolve) => (resolveCtrl = resolve));
 
   const overlayPromise = ctx.ui.custom<void>(
     (tui, theme, _keybindings, done) => {
-      const ctrl = new CommitterOverlayController(
-        tui,
-        theme,
-        progress,
-        controller,
-        done,
-      );
+      const ctrl = new CommitterOverlayController(tui, theme, progress, controller, done);
       resolveCtrl(ctrl);
       return ctrl;
     },

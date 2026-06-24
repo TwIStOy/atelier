@@ -2,8 +2,8 @@ import { describe, expect, test } from "vitest";
 import {
   clampInterval,
   DEFAULT_RUNCAT_SPEED_CONFIG,
-  type RuncatSpeedConfig,
   quantizeInterval,
+  type RuncatSpeedConfig,
   runcatSpeedIntervalMs,
   shouldRefreshRuncatInterval,
   shouldUpdateInterval,
@@ -20,9 +20,7 @@ describe("runcatSpeedIntervalMs", () => {
     expect(runcatSpeedIntervalMs(0)).toBe(CONFIG.defaultIntervalMs);
     expect(runcatSpeedIntervalMs(-5)).toBe(CONFIG.defaultIntervalMs);
     expect(runcatSpeedIntervalMs(Number.NaN)).toBe(CONFIG.defaultIntervalMs);
-    expect(runcatSpeedIntervalMs(Number.POSITIVE_INFINITY)).toBe(
-      CONFIG.defaultIntervalMs,
-    );
+    expect(runcatSpeedIntervalMs(Number.POSITIVE_INFINITY)).toBe(CONFIG.defaultIntervalMs);
   });
 
   test("clamps very fast speed to the minimum interval", () => {

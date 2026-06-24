@@ -1,10 +1,5 @@
-import type {
-  FetchResponse,
-  FullProvider,
-  SearchResponse,
-  SearchResult,
-} from "./types.ts";
 import { throwIfApiError } from "./errors.ts";
+import type { FetchResponse, FullProvider, SearchResponse, SearchResult } from "./types.ts";
 
 const FIRECRAWL_API_URL = "https://api.firecrawl.dev/v1";
 
@@ -35,9 +30,7 @@ interface FirecrawlScrapeResponse {
   error?: string;
 }
 
-function normalizeFirecrawlResults(
-  results: FirecrawlSearchResult[],
-): SearchResult[] {
+function normalizeFirecrawlResults(results: FirecrawlSearchResult[]): SearchResult[] {
   return results.map((r) => ({
     title: r.title ?? "",
     url: r.url ?? "",
@@ -52,15 +45,9 @@ export class FirecrawlProvider implements FullProvider {
 
   constructor(private readonly apiKey: string) {}
 
-  async search(
-    query: string,
-    maxResults: number,
-    signal?: AbortSignal,
-  ): Promise<SearchResponse> {
+  async search(query: string, maxResults: number, signal?: AbortSignal): Promise<SearchResponse> {
     if (!this.apiKey) {
-      throw new Error(
-        `${this.envVar} is not set. Use /config to set the API key, or export the env var.`,
-      );
+      throw new Error(`${this.envVar} is not set. Use /config to set the API key, or export the env var.`);
     }
 
     const res = await fetch(`${FIRECRAWL_API_URL}/search`, {
@@ -81,15 +68,9 @@ export class FirecrawlProvider implements FullProvider {
     return { query, results: normalizeFirecrawlResults(raw.data ?? []) };
   }
 
-  async fetch(
-    url: string,
-    _raw: boolean,
-    signal?: AbortSignal,
-  ): Promise<FetchResponse> {
+  async fetch(url: string, _raw: boolean, signal?: AbortSignal): Promise<FetchResponse> {
     if (!this.apiKey) {
-      throw new Error(
-        `${this.envVar} is not set. Use /config to set the API key, or export the env var.`,
-      );
+      throw new Error(`${this.envVar} is not set. Use /config to set the API key, or export the env var.`);
     }
 
     const res = await fetch(`${FIRECRAWL_API_URL}/scrape`, {
@@ -108,14 +89,10 @@ export class FirecrawlProvider implements FullProvider {
 
     const raw = (await res.json()) as FirecrawlScrapeResponse;
     if (!raw.success) {
-      throw new Error(
-        `${this.label} Fetch API error: ${raw.error ?? "scrape failed"}`,
-      );
+      throw new Error(`${this.label} Fetch API error: ${raw.error ?? "scrape failed"}`);
     }
     if (!raw.data?.markdown) {
-      throw new Error(
-        `${this.label} Fetch API error: no content returned for ${url}`,
-      );
+      throw new Error(`${this.label} Fetch API error: no content returned for ${url}`);
     }
 
     return {

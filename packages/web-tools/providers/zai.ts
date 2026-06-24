@@ -1,11 +1,6 @@
-import { mcpInit, mcpCall } from "@htwang-contrib/common";
-import type {
-  FetchResponse,
-  FullProvider,
-  SearchResponse,
-  SearchResult,
-} from "./types.ts";
+import { mcpCall, mcpInit } from "@htwang-contrib/common";
 import { ProviderError } from "./errors.ts";
+import type { FetchResponse, FullProvider, SearchResponse, SearchResult } from "./types.ts";
 
 const ZAI_SEARCH_MCP_URL = "https://api.z.ai/api/mcp/web_search_prime/mcp";
 const ZAI_READER_MCP_URL = "https://api.z.ai/api/mcp/web_reader/mcp";
@@ -13,15 +8,7 @@ const ZAI_READER_MCP_URL = "https://api.z.ai/api/mcp/web_reader/mcp";
 const ZAI_SEARCH_CLIENT = { name: "pi-zai-search", version: "0.1.0" };
 const ZAI_READER_CLIENT = { name: "pi-zai-reader", version: "0.1.0" };
 
-const ZAI_RATE_LIMIT_CODES = new Set([
-  "1113",
-  "1302",
-  "1303",
-  "1304",
-  "1308",
-  "1310",
-  "1313",
-]);
+const ZAI_RATE_LIMIT_CODES = new Set(["1113", "1302", "1303", "1304", "1308", "1310", "1313"]);
 
 interface ZaiWebSearchResult {
   title: string;
@@ -67,25 +54,14 @@ export class ZaiProvider implements FullProvider {
 
   constructor(private readonly apiKey: string) {}
 
-  async search(
-    query: string,
-    maxResults: number,
-    signal?: AbortSignal,
-  ): Promise<SearchResponse> {
+  async search(query: string, maxResults: number, signal?: AbortSignal): Promise<SearchResponse> {
     if (!this.apiKey) {
-      throw new Error(
-        `${this.envVar} is not set. Use /config to set the API key, or export the env var.`,
-      );
+      throw new Error(`${this.envVar} is not set. Use /config to set the API key, or export the env var.`);
     }
 
     let text: string | undefined;
     try {
-      const session = await mcpInit(
-        ZAI_SEARCH_MCP_URL,
-        this.apiKey,
-        signal,
-        ZAI_SEARCH_CLIENT,
-      );
+      const session = await mcpInit(ZAI_SEARCH_MCP_URL, this.apiKey, signal, ZAI_SEARCH_CLIENT);
       const result = (await mcpCall(
         ZAI_SEARCH_MCP_URL,
         session,
@@ -115,25 +91,14 @@ export class ZaiProvider implements FullProvider {
     return { query, results };
   }
 
-  async fetch(
-    url: string,
-    _raw: boolean,
-    signal?: AbortSignal,
-  ): Promise<FetchResponse> {
+  async fetch(url: string, _raw: boolean, signal?: AbortSignal): Promise<FetchResponse> {
     if (!this.apiKey) {
-      throw new Error(
-        `${this.envVar} is not set. Use /config to set the API key, or export the env var.`,
-      );
+      throw new Error(`${this.envVar} is not set. Use /config to set the API key, or export the env var.`);
     }
 
     let text: string | undefined;
     try {
-      const session = await mcpInit(
-        ZAI_READER_MCP_URL,
-        this.apiKey,
-        signal,
-        ZAI_READER_CLIENT,
-      );
+      const session = await mcpInit(ZAI_READER_MCP_URL, this.apiKey, signal, ZAI_READER_CLIENT);
       const result = (await mcpCall(
         ZAI_READER_MCP_URL,
         session,

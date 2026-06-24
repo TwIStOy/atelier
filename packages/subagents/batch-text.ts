@@ -4,10 +4,7 @@ import type { SubagentBatchItemDetail } from "./run-agent.ts";
 export function formatBatchToolText(items: SubagentBatchItemDetail[]): string {
   const ok = items.filter((x) => x.ok).length;
   const err = items.length - ok;
-  const out: string[] = [
-    `Subagent batch: ${items.length} task(s); ${ok} ok, ${err} error(s).`,
-    "",
-  ];
+  const out: string[] = [`Subagent batch: ${items.length} task(s); ${ok} ok, ${err} error(s).`, ""];
   for (const it of items) {
     out.push(`### Task ${it.index} — ${it.ok ? "ok" : "error"}`);
     if (it.ok) {

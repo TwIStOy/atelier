@@ -1,9 +1,4 @@
-import type {
-  ExtensionAPI,
-  ExtensionContext,
-  ExtensionUIContext,
-  Theme,
-} from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext, ExtensionUIContext, Theme } from "@earendil-works/pi-coding-agent";
 import { vi } from "vitest";
 
 export const identityTheme: Theme = {
@@ -28,20 +23,14 @@ export function createMockPi(): {
   pi: ExtensionAPI;
 } {
   const tools = new Map<string, Record<string, unknown>>();
-  const commands = new Map<
-    string,
-    { description?: string; handler: Function }
-  >();
+  const commands = new Map<string, { description?: string; handler: Function }>();
   const events = new Map<string, Function>();
 
   const pi = {
     registerTool(tool: Record<string, unknown>) {
       tools.set(tool.name as string, tool);
     },
-    registerCommand(
-      name: string,
-      options: { description?: string; handler: Function },
-    ) {
+    registerCommand(name: string, options: { description?: string; handler: Function }) {
       commands.set(name, options);
     },
     on(event: string, handler: Function) {
@@ -60,9 +49,7 @@ export function createMockUI(opts: { requestRender?: () => void } = {}): {
 } {
   const setWidget = vi.fn();
   const notify = vi.fn();
-  const requestRender = opts.requestRender
-    ? vi.fn(opts.requestRender)
-    : vi.fn();
+  const requestRender = opts.requestRender ? vi.fn(opts.requestRender) : vi.fn();
 
   const ui = {
     setWidget,
@@ -100,11 +87,7 @@ export function createMockUI(opts: { requestRender?: () => void } = {}): {
 }
 
 export function createMockCtx(
-  opts: {
-    hasUI?: boolean;
-    ui?: ExtensionUIContext;
-    branch?: Iterable<unknown>;
-  } = {},
+  opts: { hasUI?: boolean; ui?: ExtensionUIContext; branch?: Iterable<unknown> } = {},
 ): ExtensionContext {
   const { ui } = createMockUI();
   const ctx: {

@@ -40,9 +40,7 @@ function readFromProjectSettings(raw: unknown): MemorySettings | undefined {
 
 export function isMemoryEnabled(ctx?: ExtensionContext): boolean {
   if (isDisabledByEnv()) return false;
-  const settings = (
-    ctx as { settingsManager?: { getProjectSettings?: () => unknown } }
-  )?.settingsManager;
+  const settings = (ctx as { settingsManager?: { getProjectSettings?: () => unknown } })?.settingsManager;
   const project = settings?.getProjectSettings?.();
   const cfg = readFromProjectSettings(project);
   if (cfg?.enabled === false) return false;
@@ -50,9 +48,7 @@ export function isMemoryEnabled(ctx?: ExtensionContext): boolean {
 }
 
 export function getNamespace(ctx?: ExtensionContext): string {
-  const settings = (
-    ctx as { settingsManager?: { getProjectSettings?: () => unknown } }
-  )?.settingsManager;
+  const settings = (ctx as { settingsManager?: { getProjectSettings?: () => unknown } })?.settingsManager;
   const project = settings?.getProjectSettings?.();
   const cfg = readFromProjectSettings(project);
   return sanitizeNamespace(cfg?.namespace ?? "");

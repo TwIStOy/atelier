@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { Task, TaskDetails } from "../tool/types.ts";
 import { isTaskDetails, replayFromBranch } from "../state/replay.ts";
+import type { Task, TaskDetails } from "../tool/types.ts";
 
 function buildBranch(snapshots: TaskDetails[]) {
   return snapshots.map((s) => ({
@@ -17,11 +17,7 @@ function buildBranch(snapshots: TaskDetails[]) {
   }));
 }
 
-const taskFixture = (
-  id: number,
-  subject: string,
-  extra: Partial<Task> = {},
-): Task => ({
+const taskFixture = (id: number, subject: string, extra: Partial<Task> = {}): Task => ({
   id,
   subject,
   status: "pending",
@@ -59,9 +55,7 @@ describe("isTaskDetails — defensive type guard", () => {
 
   it("accepts well-formed snapshot envelopes", () => {
     expect(isTaskDetails({ tasks: [], nextId: 1 })).toBe(true);
-    expect(
-      isTaskDetails({ action: "create", params: {}, tasks: [], nextId: 1 }),
-    ).toBe(true);
+    expect(isTaskDetails({ action: "create", params: {}, tasks: [], nextId: 1 })).toBe(true);
   });
 });
 
@@ -104,10 +98,7 @@ describe("replayFromBranch", () => {
     const fixture: Task = taskFixture(1, "original");
     const ctx = {
       sessionManager: {
-        getBranch: () =>
-          buildBranch([
-            { action: "create", params: {}, tasks: [fixture], nextId: 2 },
-          ]),
+        getBranch: () => buildBranch([{ action: "create", params: {}, tasks: [fixture], nextId: 2 }]),
       },
     };
     const state = replayFromBranch(ctx);

@@ -1,27 +1,7 @@
-const READ_ONLY_TOOLS = [
-  "read",
-  "grep",
-  "glob",
-  "ls",
-  "web_search",
-  "web_fetch",
-] as const;
-const FULL_BUILTIN_TOOLS = [
-  "read",
-  "bash",
-  "edit",
-  "write",
-  "grep",
-  "glob",
-  "ls",
-  "web_search",
-  "web_fetch",
-] as const;
+const READ_ONLY_TOOLS = ["read", "grep", "glob", "ls", "web_search", "web_fetch"] as const;
+const FULL_BUILTIN_TOOLS = ["read", "bash", "edit", "write", "grep", "glob", "ls", "web_search", "web_fetch"] as const;
 
-export const SUBAGENT_DELEGATION_TOOL_NAMES = [
-  "subagent",
-  "subagent_status",
-] as const;
+export const SUBAGENT_DELEGATION_TOOL_NAMES = ["subagent", "subagent_status"] as const;
 
 const DELEGATION = new Set<string>(SUBAGENT_DELEGATION_TOOL_NAMES);
 
@@ -30,10 +10,7 @@ export function childSessionToolNames(isolated: boolean): string[] {
   return raw.filter((n) => !DELEGATION.has(n));
 }
 
-export function resolveChildToolNames(
-  isolated: boolean,
-  personaTools: string[] | undefined,
-): string[] {
+export function resolveChildToolNames(isolated: boolean, personaTools: string[] | undefined): string[] {
   const base = childSessionToolNames(isolated);
   if (!personaTools?.length) return base;
   const allow = new Set(base);

@@ -1,5 +1,5 @@
-import type { SearchProvider, SearchResponse, SearchResult } from "./types.ts";
 import { throwIfApiError } from "./errors.ts";
+import type { SearchProvider, SearchResponse, SearchResult } from "./types.ts";
 
 const BRAVE_SEARCH_API_URL = "https://api.search.brave.com/res/v1/web/search";
 
@@ -24,15 +24,9 @@ export class BraveProvider implements SearchProvider {
 
   constructor(private readonly apiKey: string) {}
 
-  async search(
-    query: string,
-    maxResults: number,
-    signal?: AbortSignal,
-  ): Promise<SearchResponse> {
+  async search(query: string, maxResults: number, signal?: AbortSignal): Promise<SearchResponse> {
     if (!this.apiKey) {
-      throw new Error(
-        `${this.envVar} is not set. Use /config to set the API key, or export the env var.`,
-      );
+      throw new Error(`${this.envVar} is not set. Use /config to set the API key, or export the env var.`);
     }
 
     const url = new URL(BRAVE_SEARCH_API_URL);

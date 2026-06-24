@@ -1,20 +1,16 @@
+import type { KeybindingsManager } from "@earendil-works/pi-coding-agent";
 import {
   CustomEditor,
   type ExtensionAPI,
   type ExtensionContext,
   type ThemeColor,
 } from "@earendil-works/pi-coding-agent";
-import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import type { EditorTheme, TUI } from "@earendil-works/pi-tui";
-import type { KeybindingsManager } from "@earendil-works/pi-coding-agent";
+import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 
 const MIN_BODY_LINES = 1;
 
-function formatAbbreviatedCount(
-  value: number,
-  divisor: number,
-  suffix: string,
-): string {
+function formatAbbreviatedCount(value: number, divisor: number, suffix: string): string {
   const scaled = (value / divisor).toFixed(1);
   const num = scaled.endsWith(".0") ? scaled.slice(0, -2) : scaled;
   return `${num}${suffix}`;
@@ -36,10 +32,7 @@ function formatCost(value: number): string {
 
 function isEditorRule(line: string): boolean {
   const plain = line.replace(/\x1b\[[0-9;]*m/g, "").trim();
-  return (
-    plain.includes("─") &&
-    [...plain].every((c) => "─↑↓ 0123456789more".includes(c))
-  );
+  return plain.includes("─") && [...plain].every((c) => "─↑↓ 0123456789more".includes(c));
 }
 
 function splitEditorRender(lines: string[]): {
@@ -60,8 +53,7 @@ function splitEditorRender(lines: string[]): {
 function getSessionCost(ctx: ExtensionContext): number {
   let total = 0;
   for (const entry of ctx.sessionManager.getEntries()) {
-    if (entry.type !== "message" || entry.message.role !== "assistant")
-      continue;
+    if (entry.type !== "message" || entry.message.role !== "assistant") continue;
     const cost = entry.message.usage?.cost?.total;
     if (typeof cost === "number" && Number.isFinite(cost)) total += cost;
   }
@@ -101,9 +93,7 @@ export class MyEditor extends CustomEditor {
     }
 
     const leftTop = this.getUsageLabel();
-    const rightTop = this.getModelLabel(
-      Math.max(8, Math.floor(innerWidth * 0.48)),
-    );
+    const rightTop = this.getModelLabel(Math.max(8, Math.floor(innerWidth * 0.48)));
     const cwdLabel = this.getCwdLabel();
 
     return [
@@ -116,12 +106,8 @@ export class MyEditor extends CustomEditor {
 
   private getUsageLabel(): string {
     const usage = this.ctx.getContextUsage();
-    const pct =
-      usage?.percent == null
-        ? "?"
-        : `${Math.max(0, Math.floor(usage.percent))}%`;
-    const contextWindow =
-      usage?.contextWindow ?? this.ctx.model?.contextWindow ?? null;
+    const pct = usage?.percent == null ? "?" : `${Math.max(0, Math.floor(usage.percent))}%`;
+    const contextWindow = usage?.contextWindow ?? this.ctx.model?.contextWindow ?? null;
     const parts = [` ${pct} of ${formatCount(contextWindow)}`];
 
     const cost = getSessionCost(this.ctx);
@@ -152,12 +138,7 @@ export class MyEditor extends CustomEditor {
   private getCwdLabel(): string {
     const cwd = this.ctx.cwd;
     const home = process.env.HOME ?? "";
-    const displayCwd =
-      cwd === home
-        ? "~"
-        : cwd.startsWith(`${home}/`)
-          ? `~/${cwd.slice(home.length + 1)}`
-          : cwd;
+    const displayCwd = cwd === home ? "~" : cwd.startsWith(`${home}/`) ? `~/${cwd.slice(home.length + 1)}` : cwd;
     return ` ${displayCwd} `;
   }
 
@@ -176,11 +157,7 @@ export class MyEditor extends CustomEditor {
     });
   }
 
-  private borderWithLabels(
-    width: number,
-    leftLabel: string,
-    rightLabel: string,
-  ): string {
+  private borderWithLabels(width: number, leftLabel: string, rightLabel: string): string {
     const innerWidth = Math.max(0, width - 2);
     const maxLeft = Math.max(0, Math.floor(innerWidth * 0.44));
     const maxRight = Math.max(0, innerWidth - maxLeft - 2);
@@ -188,13 +165,7 @@ export class MyEditor extends CustomEditor {
     const right = truncateToWidth(rightLabel, maxRight, "…");
     const used = visibleWidth(left) + visibleWidth(right);
     const fill = Math.max(0, innerWidth - used);
-    return (
-      this.borderColor("╭") +
-      left +
-      this.borderColor("─".repeat(fill)) +
-      right +
-      this.borderColor("╮")
-    );
+    return this.borderColor("╭") + left + this.borderColor("─".repeat(fill)) + right + this.borderColor("╮");
   }
 
   private sideBorder(): string {
@@ -203,16 +174,8 @@ export class MyEditor extends CustomEditor {
 
   private borderWithRightLabel(width: number, label: string): string {
     const innerWidth = Math.max(0, width - 2);
-    const right = this.fg(
-      "muted",
-      truncateToWidth(label, Math.max(0, innerWidth - 2), "…"),
-    );
+    const right = this.fg("muted", truncateToWidth(label, Math.max(0, innerWidth - 2), "…"));
     const fill = Math.max(0, innerWidth - visibleWidth(right));
-    return (
-      this.borderColor("╰") +
-      this.borderColor("─".repeat(fill)) +
-      right +
-      this.borderColor("╯")
-    );
+    return this.borderColor("╰") + this.borderColor("─".repeat(fill)) + right + this.borderColor("╯");
   }
 }

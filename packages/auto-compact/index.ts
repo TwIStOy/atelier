@@ -1,14 +1,7 @@
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
-import type {
-  ExtensionAPI,
-  ExtensionContext,
-} from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { estimateTokens } from "@earendil-works/pi-coding-agent";
-import {
-  readConfig,
-  registerConfigItems,
-  type ExtensionConfigSchema,
-} from "@htwang-contrib/common";
+import { type ExtensionConfigSchema, readConfig, registerConfigItems } from "@htwang-contrib/common";
 
 type CompactionStrategy = "keep-recent" | "keep-bookends" | "summarize-all";
 
@@ -57,10 +50,7 @@ function estimateTotalTokens(messages: AgentMessage[]): number {
   return total;
 }
 
-function snapToUserBoundary(
-  messages: AgentMessage[],
-  rawIndex: number,
-): number {
+function snapToUserBoundary(messages: AgentMessage[], rawIndex: number): number {
   let idx = rawIndex;
   while (idx < messages.length) {
     if (messages[idx].role === "user") break;
@@ -69,10 +59,7 @@ function snapToUserBoundary(
   return Math.min(idx, messages.length);
 }
 
-function findCutPointRecent(
-  messages: AgentMessage[],
-  keepTokens: number,
-): number {
+function findCutPointRecent(messages: AgentMessage[], keepTokens: number): number {
   let accumulated = 0;
   for (let i = messages.length - 1; i >= 0; i--) {
     const tokens = estimateMessageTokens(messages[i]);
@@ -84,10 +71,7 @@ function findCutPointRecent(
   return 0;
 }
 
-function findBookendCutRange(
-  messages: AgentMessage[],
-  keepTokens: number,
-): [number, number] {
+function findBookendCutRange(messages: AgentMessage[], keepTokens: number): [number, number] {
   const halfBudget = Math.floor(keepTokens / 2);
   let headEnd = 0;
   let headTokens = 0;
@@ -115,10 +99,7 @@ function findBookendCutRange(
   return [headEnd, tailStart];
 }
 
-function createTruncationNotice(
-  removedCount: number,
-  removedTokens: number,
-): AgentMessage {
+function createTruncationNotice(removedCount: number, removedTokens: number): AgentMessage {
   return {
     role: "user",
     content: [
@@ -142,35 +123,23 @@ function applyTruncationStrategy(
       if (cutIndex <= 0) return null;
       const removed = messages.slice(0, cutIndex);
       const kept = messages.slice(cutIndex);
-      const notice = createTruncationNotice(
-        removed.length,
-        estimateTotalTokens(removed),
-      );
+      const notice = createTruncationNotice(removed.length, estimateTotalTokens(removed));
       return [notice, ...kept];
     }
     case "keep-bookends": {
-      const [removeStart, removeEnd] = findBookendCutRange(
-        messages,
-        keepTokens,
-      );
+      const [removeStart, removeEnd] = findBookendCutRange(messages, keepTokens);
       if (removeStart >= removeEnd) return null;
       const removed = messages.slice(removeStart, removeEnd);
       const head = messages.slice(0, removeStart);
       const tail = messages.slice(removeEnd);
-      const notice = createTruncationNotice(
-        removed.length,
-        estimateTotalTokens(removed),
-      );
+      const notice = createTruncationNotice(removed.length, estimateTotalTokens(removed));
       return [...head, notice, ...tail];
     }
     case "summarize-all": {
       if (messages.length <= 1) return null;
       const lastUserIdx = messages.length - 1;
       const removed = messages.slice(0, lastUserIdx);
-      const notice = createTruncationNotice(
-        removed.length,
-        estimateTotalTokens(removed),
-      );
+      const notice = createTruncationNotice(removed.length, estimateTotalTokens(removed));
       return [notice, messages[lastUserIdx]];
     }
     default:
@@ -178,20 +147,13 @@ function applyTruncationStrategy(
   }
 }
 
-type AutoCompactPhase =
-  | "pre-turn"
-  | "mid-turn"
-  | "emergency"
-  | "session-resume";
+type AutoCompactPhase = "pre-turn" | "mid-turn" | "emergency" | "session-resume";
 
 const AUTO_COMPACT_FOLLOW_UP: Record<AutoCompactPhase, string> = {
-  "pre-turn":
-    "Auto-compact ran before this turn. Continue with the current task.",
-  "mid-turn":
-    "Auto-compact ran mid-turn. Continue executing the remaining work.",
+  "pre-turn": "Auto-compact ran before this turn. Continue with the current task.",
+  "mid-turn": "Auto-compact ran mid-turn. Continue executing the remaining work.",
   emergency: "Emergency auto-compact ran. Resume where we left off.",
-  "session-resume":
-    "Auto-compact ran on session resume. Continue with the active task.",
+  "session-resume": "Auto-compact ran on session resume. Continue with the active task.",
 };
 
 function registerAutoCompactConfigItems(): void {
@@ -231,8 +193,7 @@ function registerAutoCompactConfigItems(): void {
       type: "select",
       label: "Compaction Strategy",
       value: () => loadConfig().strategy,
-      description:
-        "How messages are selected for removal during emergency truncation",
+      description: "How messages are selected for removal during emergency truncation",
       extensionLabel: "Auto-Compact",
       order: 2,
       options: STRATEGY_OPTIONS,
@@ -256,27 +217,18 @@ export default function autoCompact(pi: ExtensionAPI): void {
   let cachedAutoCompactLimit = 0;
   let cachedKeepRecentTokens = 0;
 
-  const computeAutoCompactLimit = (
-    config: AutoCompactConfig,
-    contextWindow: number,
-  ): number => {
+  const computeAutoCompactLimit = (config: AutoCompactConfig, contextWindow: number): number => {
     if (config.autoCompactPercent > 0) {
       return Math.floor((contextWindow * config.autoCompactPercent) / 100);
     }
     return config.autoCompactTokenLimit;
   };
 
-  const computeKeepRecentTokens = (
-    config: AutoCompactConfig,
-    contextWindow: number,
-  ): number => {
+  const computeKeepRecentTokens = (config: AutoCompactConfig, contextWindow: number): number => {
     return Math.floor((contextWindow * config.keepRecentPercent) / 100);
   };
 
-  const updateCachedLimits = (
-    config: AutoCompactConfig,
-    contextWindow: number,
-  ) => {
+  const updateCachedLimits = (config: AutoCompactConfig, contextWindow: number) => {
     if (contextWindow !== cachedContextWindow) {
       cachedContextWindow = contextWindow;
       cachedAutoCompactLimit = computeAutoCompactLimit(config, contextWindow);
@@ -299,11 +251,7 @@ export default function autoCompact(pi: ExtensionAPI): void {
     return lastEstimatedTokens;
   };
 
-  const triggerAutoCompact = (
-    ctx: ExtensionContext,
-    phase: AutoCompactPhase,
-    customInstructions?: string,
-  ): void => {
+  const triggerAutoCompact = (ctx: ExtensionContext, phase: AutoCompactPhase, customInstructions?: string): void => {
     pendingCompaction = true;
     ctx.compact({
       customInstructions,
@@ -325,11 +273,7 @@ export default function autoCompact(pi: ExtensionAPI): void {
     truncationAppliedThisTurn = false;
     const tokens = getTokenUsage(ctx);
     if (tokens >= cachedAutoCompactLimit) {
-      triggerAutoCompact(
-        ctx,
-        "pre-turn",
-        "Focus on preserving task context and recent work.",
-      );
+      triggerAutoCompact(ctx, "pre-turn", "Focus on preserving task context and recent work.");
     }
   });
 
@@ -342,11 +286,7 @@ export default function autoCompact(pi: ExtensionAPI): void {
     updateCachedLimits(config, cw);
 
     if (estimatedTokens > cachedAutoCompactLimit && !pendingCompaction) {
-      const newMessages = applyTruncationStrategy(
-        messages,
-        cachedKeepRecentTokens,
-        config.strategy,
-      );
+      const newMessages = applyTruncationStrategy(messages, cachedKeepRecentTokens, config.strategy);
       if (newMessages) {
         truncationAppliedThisTurn = true;
         setImmediate(() => {
@@ -365,24 +305,14 @@ export default function autoCompact(pi: ExtensionAPI): void {
   pi.on("turn_end", async (event, ctx) => {
     const { message } = event;
     let hasToolCalls = false;
-    if (
-      message.role === "assistant" &&
-      "content" in message &&
-      Array.isArray(message.content)
-    ) {
-      hasToolCalls = message.content.some(
-        (block: { type: string }) => block.type === "tool_use",
-      );
+    if (message.role === "assistant" && "content" in message && Array.isArray(message.content)) {
+      hasToolCalls = message.content.some((block: { type: string }) => block.type === "tool_use");
     }
     if (!hasToolCalls) return;
 
     const tokens = getTokenUsage(ctx);
     if (tokens >= cachedAutoCompactLimit && !pendingCompaction) {
-      triggerAutoCompact(
-        ctx,
-        "mid-turn",
-        "Mid-turn compaction: preserve current task context and tool call results.",
-      );
+      triggerAutoCompact(ctx, "mid-turn", "Mid-turn compaction: preserve current task context and tool call results.");
     }
   });
 
@@ -420,14 +350,8 @@ export default function autoCompact(pi: ExtensionAPI): void {
 
       const usage = ctx.getContextUsage();
       const tokens = usage?.tokens ?? lastEstimatedTokens;
-      const percent =
-        usage?.percent ??
-        (cachedAutoCompactLimit > 0
-          ? (tokens / cachedAutoCompactLimit) * 100
-          : 0);
-      const strategyLabel =
-        STRATEGY_OPTIONS.find((o) => o.value === config.strategy)?.label ??
-        config.strategy;
+      const percent = usage?.percent ?? (cachedAutoCompactLimit > 0 ? (tokens / cachedAutoCompactLimit) * 100 : 0);
+      const strategyLabel = STRATEGY_OPTIONS.find((o) => o.value === config.strategy)?.label ?? config.strategy;
       ctx.ui.notify(
         `Auto-Compact Status:\n` +
           `  Current tokens: ~${Math.round(tokens / 1000)}K\n` +

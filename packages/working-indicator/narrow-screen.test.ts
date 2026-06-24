@@ -1,5 +1,5 @@
-import { describe, expect, test } from "vitest";
 import { DEFAULT_SPINNER } from "@htwang-contrib/common";
+import { describe, expect, test } from "vitest";
 import {
   DEFAULT_NARROW_WIDTH_SPINNER,
   DEFAULT_NARROW_WIDTH_THRESHOLD,
@@ -57,9 +57,7 @@ describe("normalizeNarrowWidthOptions", () => {
   });
 
   test("clamps non-finite threshold to the default and floors it to 1", () => {
-    expect(normalizeNarrowWidthOptions({ threshold: NaN }).threshold).toBe(
-      DEFAULT_NARROW_WIDTH_THRESHOLD,
-    );
+    expect(normalizeNarrowWidthOptions({ threshold: NaN }).threshold).toBe(DEFAULT_NARROW_WIDTH_THRESHOLD);
     expect(normalizeNarrowWidthOptions({ threshold: 0 }).threshold).toBe(1);
     expect(normalizeNarrowWidthOptions({ threshold: -5 }).threshold).toBe(1);
   });
@@ -79,15 +77,11 @@ describe("resolveEffectiveSpinnerKey", () => {
   });
 
   test("keeps the configured key when the override is disabled", () => {
-    expect(resolveEffectiveSpinnerKey("runcat", 30, { enabled: false })).toBe(
-      "runcat",
-    );
+    expect(resolveEffectiveSpinnerKey("runcat", 30, { enabled: false })).toBe("runcat");
   });
 
   test("uses a custom narrow spinner", () => {
-    expect(resolveEffectiveSpinnerKey("runcat", 30, { spinner: "moon" })).toBe(
-      "moon",
-    );
+    expect(resolveEffectiveSpinnerKey("runcat", 30, { spinner: "moon" })).toBe("moon");
   });
 
   test("treats the boundary as narrow", () => {
@@ -115,17 +109,6 @@ describe("resolveEffectiveSpinner", () => {
 
   test("resolves the narrow style when narrow", () => {
     const style = resolveEffectiveSpinner("runcat", 20, undefined);
-    expect(style?.frames).toEqual([
-      "⠋",
-      "⠙",
-      "⠹",
-      "⠸",
-      "⠼",
-      "⠴",
-      "⠦",
-      "⠧",
-      "⠇",
-      "⠏",
-    ]);
+    expect(style?.frames).toEqual(["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]);
   });
 });

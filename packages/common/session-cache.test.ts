@@ -1,18 +1,12 @@
 import { describe, expect, test } from "vitest";
-import {
-  branchToMessages,
-  createSessionCache,
-  isStaleCtxError,
-} from "./session-cache.ts";
 import { clearGlobalState } from "./global-state.ts";
+import { branchToMessages, createSessionCache, isStaleCtxError } from "./session-cache.ts";
 
 const STALE_MESSAGE =
   "This extension ctx is stale after session replacement or reload. " +
   "Do not use a captured pi or command ctx after ctx.newSession().";
 
-function mockCtx(
-  opts: { sessionFile?: string | null; sessionId?: string } = {},
-) {
+function mockCtx(opts: { sessionFile?: string | null; sessionId?: string } = {}) {
   return {
     sessionManager: {
       getSessionFile: () => opts.sessionFile ?? "/tmp/test-session.jsonl",
@@ -55,9 +49,7 @@ describe("branchToMessages", () => {
       },
     ];
 
-    const messages = branchToMessages(
-      branch as unknown as import("@earendil-works/pi-coding-agent").SessionEntry[],
-    );
+    const messages = branchToMessages(branch as unknown as import("@earendil-works/pi-coding-agent").SessionEntry[]);
     expect(messages.length).toBeGreaterThanOrEqual(2);
     expect(messages[0]).toMatchObject({ role: "user" });
   });

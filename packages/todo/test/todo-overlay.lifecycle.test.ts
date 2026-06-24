@@ -7,10 +7,7 @@ import { createMockPi, createMockUI, identityTheme } from "./helpers.ts";
 
 const WIDGET_KEY = "rpiv-todos";
 
-async function seed(
-  tools: Map<string, Record<string, unknown>>,
-  actions: unknown[],
-) {
+async function seed(tools: Map<string, Record<string, unknown>>, actions: unknown[]) {
   const tool = tools.get("todo");
   if (!tool) throw new Error("todo tool not registered");
   const execute = tool.execute as Function;
@@ -111,13 +108,7 @@ describe("TodoOverlay — lifecycle", () => {
     const execute = tool.execute as Function;
     await execute("tc", { action: "clear" }, undefined, undefined, {});
     overlay.update();
-    await execute(
-      "tc",
-      { action: "create", subject: "b" },
-      undefined,
-      undefined,
-      {},
-    );
+    await execute("tc", { action: "create", subject: "b" }, undefined, undefined, {});
     overlay.update();
     expect(setWidget).toHaveBeenCalledTimes(3);
     expect(typeof setWidget.mock.calls[2][1]).toBe("function");
@@ -212,13 +203,7 @@ describe("TodoOverlay — lifecycle", () => {
     const { tools } = registerTool();
     const tool = await seed(tools, [{ action: "create", subject: "a" }]);
     const execute = tool.execute as Function;
-    await execute(
-      "tc",
-      { action: "update", id: 1, status: "deleted" },
-      undefined,
-      undefined,
-      {},
-    );
+    await execute("tc", { action: "update", id: 1, status: "deleted" }, undefined, undefined, {});
     const overlay = new TodoOverlay();
     const { ui, setWidget } = makeCtx();
     overlay.setUICtx(ui);

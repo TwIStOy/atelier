@@ -75,8 +75,7 @@ export const subagentParams = Type.Object({
   background: Type.Optional(
     Type.Boolean({
       default: false,
-      description:
-        "Return immediately with a job id; poll with subagent_status.",
+      description: "Return immediately with a job id; poll with subagent_status.",
     }),
   ),
   model: Type.Optional(

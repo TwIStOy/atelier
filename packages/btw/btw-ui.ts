@@ -1,18 +1,15 @@
+import type { AssistantMessage, UserMessage } from "@earendil-works/pi-ai";
+import type { ExtensionCommandContext, Theme } from "@earendil-works/pi-coding-agent";
 import {
-  type ExtensionCommandContext,
-  Theme,
-} from "@earendil-works/pi-coding-agent";
-import {
-  Key,
   type Component,
+  Key,
+  matchesKey,
   type OverlayOptions,
   type TUI,
-  matchesKey,
   truncateToWidth,
   wrapTextWithAnsi,
 } from "@earendil-works/pi-tui";
-import type { AssistantMessage, UserMessage } from "@earendil-works/pi-ai";
-import { spinnerGlyph, SpinnerTimer } from "@htwang-contrib/tool-display";
+import { SpinnerTimer, spinnerGlyph } from "@htwang-contrib/tool-display";
 
 const BTW_OVERLAY_OPTIONS: OverlayOptions = {
   anchor: "bottom-center",
@@ -44,10 +41,7 @@ export interface BtwOverlayResult {
   controllerReady: Promise<BtwOverlayController>;
 }
 
-type AnswerState =
-  | { kind: "pending" }
-  | { kind: "answer"; text: string }
-  | { kind: "error"; message: string };
+type AnswerState = { kind: "pending" } | { kind: "answer"; text: string } | { kind: "error"; message: string };
 
 export class BtwOverlayController implements Component {
   private answer: AnswerState = { kind: "pending" };
@@ -125,30 +119,18 @@ export class BtwOverlayController implements Component {
     const lines: string[] = [];
 
     const bannerText = BANNER_PREFIX + this.question;
-    lines.push(
-      this.theme.bg(
-        "selectedBg",
-        truncateToWidth(bannerText, width, "…", true),
-      ),
-    );
+    lines.push(this.theme.bg("selectedBg", truncateToWidth(bannerText, width, "…", true)));
 
     lines.push("");
 
     if (this.history.length > 0 && !this.historyCleared) {
       for (const turn of this.history) {
         const qText = extractShort(turn.userMessage);
-        lines.push(
-          this.theme.fg("dim", truncateToWidth(HISTORY_PREFIX + qText, width)),
-        );
+        lines.push(this.theme.fg("dim", truncateToWidth(HISTORY_PREFIX + qText, width)));
       }
     }
 
-    lines.push(
-      this.theme.fg(
-        "accent",
-        ECHO_PREFIX + this.theme.fg("muted", this.question),
-      ),
-    );
+    lines.push(this.theme.fg("accent", ECHO_PREFIX + this.theme.fg("muted", this.question)));
 
     lines.push("");
 
@@ -189,9 +171,7 @@ export class BtwOverlayController implements Component {
 
 export function showBtwOverlay(params: BtwOverlayParams): BtwOverlayResult {
   let resolveController!: (c: BtwOverlayController) => void;
-  const controllerReady = new Promise<BtwOverlayController>(
-    (resolve) => (resolveController = resolve),
-  );
+  const controllerReady = new Promise<BtwOverlayController>((resolve) => (resolveController = resolve));
 
   const overlayPromise = params.ctx.ui.custom<void>(
     (tui, theme, _keybindings, done) => {
@@ -214,10 +194,7 @@ export function showBtwOverlay(params: BtwOverlayParams): BtwOverlayResult {
 }
 
 function extractShort(msg: UserMessage): string {
-  const text =
-    typeof msg.content === "string"
-      ? msg.content
-      : extractMessageText(msg.content);
+  const text = typeof msg.content === "string" ? msg.content : extractMessageText(msg.content);
   const firstLine = text.split("\n")[0] ?? "";
   return firstLine.length > 60 ? firstLine.slice(0, 57) + "…" : firstLine;
 }

@@ -1,8 +1,8 @@
-import { describe, it, expect, vi } from "vitest";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import type { TUI } from "@earendil-works/pi-tui";
-import { SubagentViewerOverlay } from "./overlay.ts";
+import { describe, expect, it, vi } from "vitest";
 import type { SubagentRunSummary } from "./index.ts";
+import { SubagentViewerOverlay } from "./overlay.ts";
 
 const ESC = "\u001b";
 const ARROW_LEFT = "\u001b[D";
@@ -11,11 +11,7 @@ const ARROW_DOWN = "\u001b[B";
 const ARROW_UP = "\u001b[A";
 const TAB = "\t";
 
-function makeRun(
-  id: string,
-  label: string,
-  running = false,
-): SubagentRunSummary {
+function makeRun(id: string, label: string, running = false): SubagentRunSummary {
   return {
     id,
     subSessionFile: `/tmp/nonexistent-${id}.jsonl`,
@@ -86,11 +82,7 @@ describe("SubagentViewerOverlay navigation", () => {
   it("right/left arrows cycle through runs (wrapping)", () => {
     const overlay = new SubagentViewerOverlay({
       ...PARAM_BASE,
-      runs: [
-        makeRun("a", "Run A"),
-        makeRun("b", "Run B"),
-        makeRun("c", "Run C"),
-      ],
+      runs: [makeRun("a", "Run A"), makeRun("b", "Run B"), makeRun("c", "Run C")],
       initialIndex: 0,
       onAction: () => {},
     });

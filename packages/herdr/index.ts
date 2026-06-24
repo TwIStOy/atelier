@@ -1,42 +1,29 @@
-import type {
-  ExtensionAPI,
-  ExtensionContext,
-} from "@earendil-works/pi-coding-agent";
 import type { Model } from "@earendil-works/pi-ai";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import {
   ASK_USER_PROMPT_EVENT,
+  type AskUserPromptPayload,
   MODAL_ACTIVE_EVENT,
   registerConfigItems,
-  type AskUserPromptPayload,
 } from "@htwang-contrib/common";
 import {
+  getTabLabel,
   isInsideHerdr,
+  type PaneId,
   readHerdrEnv,
   renameTab,
   resolveTabId,
-  getTabLabel,
-  type PaneId,
   type TabId,
 } from "./herdr-client.ts";
-import {
-  buildTabTitle,
-  summarizeAskUserQuestion,
-  type AgentState,
-} from "./state.ts";
-import {
-  loadConfig,
-  resolveSummaryModel,
-  summarizeSessionTitle,
-} from "./summarizer.ts";
 import { logDebug } from "./log.ts";
+import { type AgentState, buildTabTitle, summarizeAskUserQuestion } from "./state.ts";
+import { loadConfig, resolveSummaryModel, summarizeSessionTitle } from "./summarizer.ts";
 
 type AnyModel = Model<any>;
 
 let cachedModels: Array<{ label: string; value: string }> = [];
 
-export function setCachedModels(
-  models: Array<{ label: string; value: string }>,
-): void {
+export function setCachedModels(models: Array<{ label: string; value: string }>): void {
   cachedModels = models;
 }
 
@@ -52,8 +39,7 @@ export default function herdrExtension(pi: ExtensionAPI): void {
       type: "boolean",
       label: "Enable Tab Title",
       value: () => loadConfig().enabled,
-      description:
-        "When on, rename the herdr tab to a short summary of the current session.",
+      description: "When on, rename the herdr tab to a short summary of the current session.",
       extensionLabel: "Pi-Herdr",
       order: 0,
     },
@@ -66,10 +52,7 @@ export default function herdrExtension(pi: ExtensionAPI): void {
         "Model used to summarize the session for the tab title. Leave as (default) to use the current session model.",
       extensionLabel: "Pi-Herdr",
       order: 1,
-      options: () => [
-        { label: "(session default)", value: "" },
-        ...cachedModels,
-      ],
+      options: () => [{ label: "(session default)", value: "" }, ...cachedModels],
     },
   ]);
 
@@ -121,9 +104,7 @@ export default function herdrExtension(pi: ExtensionAPI): void {
       return;
     }
 
-    const model =
-      resolveSummaryModel(ctx.modelRegistry, config) ??
-      (ctx.model as AnyModel | undefined);
+    const model = resolveSummaryModel(ctx.modelRegistry, config) ?? (ctx.model as AnyModel | undefined);
     const branch = ctx.sessionManager.getBranch();
     logDebug(
       `ensureSessionTitle: model=${model ? `${model.provider}/${model.id}` : "(none)"} branchLen=${branch.length} firstPromptLen=${firstPrompt.length} titleGenerated=${titleGenerated}`,
@@ -137,9 +118,7 @@ export default function herdrExtension(pi: ExtensionAPI): void {
         fallbackTitle: sessionTitle,
         signal: renderAbort.signal,
       });
-      logDebug(
-        `ensureSessionTitle: outcome fromModel=${outcome.fromModel} title=${JSON.stringify(outcome.title)}`,
-      );
+      logDebug(`ensureSessionTitle: outcome fromModel=${outcome.fromModel} title=${JSON.stringify(outcome.title)}`);
       // Only latch when the model actually produced a title. A missing first
       // prompt (early session_start before the prompt is appended) or a failed
       // side-call returns a fallback with fromModel:false — leave
@@ -184,11 +163,7 @@ export default function herdrExtension(pi: ExtensionAPI): void {
     const config = loadConfig();
     // While waiting on a question, show the question text instead of the
     // cached summary; the summary is preserved across the question cycle.
-    const body = config.enabled
-      ? currentState === "waiting"
-        ? waitingBody
-        : sessionTitle
-      : "";
+    const body = config.enabled ? (currentState === "waiting" ? waitingBody : sessionTitle) : "";
     const title = buildTabTitle(currentState, body);
     // Always rename: tabId is OUR tab (resolved from our own pane). The title
     // must reflect our live session state even when our pane is not focused —
@@ -223,8 +198,7 @@ export default function herdrExtension(pi: ExtensionAPI): void {
       originalNumber = typeof num === "number" ? num : undefined;
       // If the tab already shows one of our titles (a state icon prefix), it's
       // a leftover from a previous run — fall back to the tab number instead.
-      originalLabel =
-        label && !isOurTitle(label) ? label : originalNumber?.toString();
+      originalLabel = label && !isOurTitle(label) ? label : originalNumber?.toString();
     } catch {
       originalLabel = originalNumber?.toString();
     }
@@ -233,9 +207,7 @@ export default function herdrExtension(pi: ExtensionAPI): void {
 
   function isOurTitle(label: string): boolean {
     // State icons we emit are ⏺ / ❓ / ✓; any tab label starting with one is ours.
-    return (
-      label.startsWith("⏺") || label.startsWith("❓") || label.startsWith("✓")
-    );
+    return label.startsWith("⏺") || label.startsWith("❓") || label.startsWith("✓");
   }
 
   async function restoreOriginalLabel(): Promise<void> {
@@ -283,9 +255,7 @@ export default function herdrExtension(pi: ExtensionAPI): void {
     // (which is why reading the branch at this point used to return "").
     if (!firstPrompt && event.prompt) {
       firstPrompt = event.prompt;
-      logDebug(
-        `before_agent_start: captured firstPrompt len=${firstPrompt.length}`,
-      );
+      logDebug(`before_agent_start: captured firstPrompt len=${firstPrompt.length}`);
     }
     currentState = "running";
     pendingQuestion = null;

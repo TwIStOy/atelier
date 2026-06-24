@@ -7,9 +7,7 @@ export function isTaskDetails(value: unknown): value is TaskDetails {
   return Array.isArray(v.tasks) && typeof v.nextId === "number";
 }
 
-export function replayFromBranch(ctx: {
-  sessionManager: { getBranch(): Iterable<unknown> };
-}): TaskState {
+export function replayFromBranch(ctx: { sessionManager: { getBranch(): Iterable<unknown> } }): TaskState {
   let result: TaskState = {
     tasks: [...EMPTY_STATE.tasks],
     nextId: EMPTY_STATE.nextId,

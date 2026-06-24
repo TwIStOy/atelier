@@ -1,19 +1,11 @@
 import type { TaskState } from "../state/state.ts";
 import type { Op } from "../state/state-reducer.ts";
 import { deriveBlocks } from "../state/task-graph.ts";
-import type {
-  Task,
-  TaskAction,
-  TaskDetails,
-  TaskMutationParams,
-} from "./types.ts";
+import type { Task, TaskAction, TaskDetails, TaskMutationParams } from "./types.ts";
 
 function formatListLine(t: Task): string {
-  const block = t.blockedBy?.length
-    ? ` ⛓ ${t.blockedBy.map((id) => `#${id}`).join(",")}`
-    : "";
-  const form =
-    t.status === "in_progress" && t.activeForm ? ` (${t.activeForm})` : "";
+  const block = t.blockedBy?.length ? ` ⛓ ${t.blockedBy.map((id) => `#${id}`).join(",")}` : "";
+  const form = t.status === "in_progress" && t.activeForm ? ` (${t.activeForm})` : "";
   return `[${t.status}] #${t.id} ${t.subject}${form}${block}`;
 }
 
@@ -23,9 +15,7 @@ function formatGetLines(task: Task, state: TaskState): string {
   if (task.description) lines.push(`  description: ${task.description}`);
   if (task.activeForm) lines.push(`  activeForm: ${task.activeForm}`);
   if (task.blockedBy?.length) {
-    lines.push(
-      `  blockedBy: ${task.blockedBy.map((id) => `#${id}`).join(", ")}`,
-    );
+    lines.push(`  blockedBy: ${task.blockedBy.map((id) => `#${id}`).join(", ")}`);
   }
   if (blocks.length) {
     lines.push(`  blocks: ${blocks.map((id) => `#${id}`).join(", ")}`);
@@ -42,10 +32,7 @@ export function formatContent(op: Op, state: TaskState): string {
       return `Created #${t.id}: ${t.subject} (pending)`;
     }
     case "update": {
-      const transition =
-        op.fromStatus !== op.toStatus
-          ? ` (${op.fromStatus} → ${op.toStatus})`
-          : "";
+      const transition = op.fromStatus !== op.toStatus ? ` (${op.fromStatus} → ${op.toStatus})` : "";
       return `Updated #${op.id}${transition}`;
     }
     case "delete":
@@ -55,11 +42,8 @@ export function formatContent(op: Op, state: TaskState): string {
     case "list": {
       let view = state.tasks;
       if (!op.includeDeleted) view = view.filter((t) => t.status !== "deleted");
-      if (op.statusFilter)
-        view = view.filter((t) => t.status === op.statusFilter);
-      return view.length === 0
-        ? "No tasks"
-        : view.map(formatListLine).join("\n");
+      if (op.statusFilter) view = view.filter((t) => t.status === op.statusFilter);
+      return view.length === 0 ? "No tasks" : view.map(formatListLine).join("\n");
     }
     case "get":
       return formatGetLines(op.task, state);

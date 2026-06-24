@@ -1,25 +1,15 @@
-import {
-  MAX_QUESTIONS,
-  MIN_OPTIONS,
-  type QuestionnaireError,
-  type QuestionParams,
-  RESERVED_LABELS,
-} from "./types.ts";
+import { MAX_QUESTIONS, MIN_OPTIONS, type QuestionnaireError, type QuestionParams, RESERVED_LABELS } from "./types.ts";
 
 export const ERROR_NO_QUESTIONS = "Error: At least one question is required";
 export const ERROR_TOO_MANY_QUESTIONS = `Error: At most ${MAX_QUESTIONS} questions are allowed per invocation`;
-export const ERROR_DUPLICATE_QUESTION =
-  "Error: Question text must be unique within an invocation";
+export const ERROR_DUPLICATE_QUESTION = "Error: Question text must be unique within an invocation";
 export const ERROR_TOO_FEW_OPTIONS = `Error: Each question requires at least ${MIN_OPTIONS} options`;
 export const ERROR_RESERVED_LABEL = `Error: Option label is reserved (${RESERVED_LABELS.join(", ")})`;
-export const ERROR_DUPLICATE_OPTION_LABEL =
-  "Error: Option labels must be unique within a question";
+export const ERROR_DUPLICATE_OPTION_LABEL = "Error: Option labels must be unique within a question";
 
 const RESERVED_LABEL_SET: ReadonlySet<string> = new Set(RESERVED_LABELS);
 
-export type ValidationResult =
-  | { ok: true }
-  | { ok: false; error: QuestionnaireError; message: string };
+export type ValidationResult = { ok: true } | { ok: false; error: QuestionnaireError; message: string };
 
 /**
  * Pure runtime validator for `QuestionParams`. Covers every guard except

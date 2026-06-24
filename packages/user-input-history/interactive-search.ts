@@ -11,9 +11,9 @@ import {
   Input,
   Spacer,
   Text,
+  type TUI,
   truncateToWidth,
   visibleWidth,
-  type TUI,
 } from "@earendil-works/pi-tui";
 
 const SELECT_LIMIT = 60;
@@ -29,11 +29,7 @@ type SkimResult = { ok: true; lines: string[] } | { ok: false; reason: string };
  * Pipe prompt lines on stdin through skim filter mode (no TUI). Uses the same
  * fuzzy ranking as interactive `sk`; exit code 1 with empty stdout means no matches.
  */
-function runSkimFilter(
-  lines: string[],
-  filter: string,
-  cwd: string,
-): Promise<SkimResult> {
+function runSkimFilter(lines: string[], filter: string, cwd: string): Promise<SkimResult> {
   return new Promise((resolve) => {
     if (lines.length === 0) {
       resolve({ ok: true, lines: [] });
@@ -118,9 +114,7 @@ export class InteractiveHistorySearch extends Container {
     this.done = opts.done;
     this.addChild(new DynamicBorder());
     this.addChild(new Spacer(1));
-    this.addChild(
-      new Text(this.theme.fg("accent", "Search prompt history (Ctrl+R)"), 1, 0),
-    );
+    this.addChild(new Text(this.theme.fg("accent", "Search prompt history (Ctrl+R)"), 1, 0));
     this.addChild(new Spacer(1));
     this.addChild(new Text(this.theme.fg("muted", "Query"), 1, 0));
     this.queryInput = new Input();
@@ -134,10 +128,7 @@ export class InteractiveHistorySearch extends Container {
     this.addChild(new Spacer(1));
     this.addChild(
       new Text(
-        this.theme.fg(
-          "muted",
-          "↑↓ choose · Enter confirm · Esc cancel · type to filter (skim ranks matches)",
-        ),
+        this.theme.fg("muted", "↑↓ choose · Enter confirm · Esc cancel · type to filter (skim ranks matches)"),
         1,
         0,
       ),
@@ -179,8 +170,7 @@ export class InteractiveHistorySearch extends Container {
 
   private moveSelection(delta: number): void {
     if (this.matches.length === 0) return;
-    this.selectedIndex =
-      (this.selectedIndex + delta + this.matches.length) % this.matches.length;
+    this.selectedIndex = (this.selectedIndex + delta + this.matches.length) % this.matches.length;
     this.updateListText();
     this.tui.requestRender();
   }
@@ -220,10 +210,7 @@ export class InteractiveHistorySearch extends Container {
       if (!res.ok) {
         this.skimCache = undefined;
         this.statusText.setText(
-          this.theme.fg(
-            "muted",
-            `skim: ${res.reason} — using built-in fuzzy until \`sk\` works`,
-          ),
+          this.theme.fg("muted", `skim: ${res.reason} — using built-in fuzzy until \`sk\` works`),
         );
       } else {
         this.skimCache = { query: q, lines: res.lines };
@@ -231,18 +218,14 @@ export class InteractiveHistorySearch extends Container {
         this.statusText.setText(
           this.theme.fg(
             "muted",
-            n === 0
-              ? `skim: no matches for “${q}”`
-              : `skim: ${n} match${n === 1 ? "" : "es"} for “${q}”`,
+            n === 0 ? `skim: no matches for “${q}”` : `skim: ${n} match${n === 1 ? "" : "es"} for “${q}”`,
           ),
         );
       }
     } catch {
       if (seq !== this.skimSeq) return;
       this.skimCache = undefined;
-      this.statusText.setText(
-        this.theme.fg("muted", "skim: error — using built-in fuzzy"),
-      );
+      this.statusText.setText(this.theme.fg("muted", "skim: error — using built-in fuzzy"));
     }
     this.rebuildMatches();
     this.updateListText();
@@ -253,10 +236,7 @@ export class InteractiveHistorySearch extends Container {
     const q = this.queryInput.getValue().trim();
     if (!q) {
       this.matches = this.history.slice(0, SELECT_LIMIT);
-      this.selectedIndex = Math.min(
-        this.selectedIndex,
-        Math.max(0, this.matches.length - 1),
-      );
+      this.selectedIndex = Math.min(this.selectedIndex, Math.max(0, this.matches.length - 1));
       return;
     }
     let list: string[];
@@ -279,9 +259,7 @@ export class InteractiveHistorySearch extends Container {
     for (let i = 0; i < Math.min(rows, this.matches.length); i++) {
       const line = this.matches[i]!;
       const prefix =
-        i === this.selectedIndex
-          ? this.theme.fg("accent", `${NF_ARROW_RIGHT} `)
-          : this.theme.fg("muted", "  ");
+        i === this.selectedIndex ? this.theme.fg("accent", `${NF_ARROW_RIGHT} `) : this.theme.fg("muted", "  ");
       const inner = Math.max(4, width - visibleWidth(prefix) - 1);
       const body = truncateToWidth(line, inner, "…");
       lines.push(prefix + body);

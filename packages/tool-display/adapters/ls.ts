@@ -14,40 +14,22 @@ function entryCountFromDetails(details: unknown): number | undefined {
 }
 
 export const lsAdapter: ToolDisplayAdapter<LsArgs> = {
-  formatCallHeader(
-    args,
-    theme,
-    _details?: unknown,
-    _isPartial?: boolean,
-    _expanded?: boolean,
-  ) {
+  formatCallHeader(args, theme, _details?: unknown, _isPartial?: boolean, _expanded?: boolean) {
     const rawPath = typeof args.path === "string" ? args.path.trim() : "";
     const displayPath = rawPath ? shortenPath(rawPath) : ".";
     const lim = args.limit;
-    let header =
-      theme.fg("toolTitle", theme.bold("Ls")) +
-      " " +
-      theme.fg("accent", displayPath);
+    let header = theme.fg("toolTitle", theme.bold("Ls")) + " " + theme.fg("accent", displayPath);
     if (typeof lim === "number" && Number.isFinite(lim)) {
       header += theme.fg("toolOutput", ` (limit ${Math.floor(lim)})`);
     }
     return header;
   },
 
-  formatCollapsedContent(
-    _args,
-    output,
-    theme,
-    _width,
-    details?: unknown,
-    isPartial?: boolean,
-    _spinAt?: number,
-  ) {
+  formatCollapsedContent(_args, output, theme, _width, details?: unknown, isPartial?: boolean, _spinAt?: number) {
     if (isPartial) return [];
     const n = entryCountFromDetails(details);
     if (typeof n === "number") {
-      const msg =
-        n === 0 ? "empty directory" : `${n} ${n === 1 ? "entry" : "entries"}`;
+      const msg = n === 0 ? "empty directory" : `${n} ${n === 1 ? "entry" : "entries"}`;
       return [theme.fg("muted", `└ ${msg}`)];
     }
     if (!output) return [];

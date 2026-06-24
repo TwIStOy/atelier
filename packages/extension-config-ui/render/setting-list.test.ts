@@ -1,9 +1,9 @@
-import { describe, expect, test } from "vitest";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { visibleWidth } from "@earendil-works/pi-tui";
 import type { ConfigItem } from "@htwang-contrib/common";
-import { renderSelectPage } from "./setting-list.ts";
+import { describe, expect, test } from "vitest";
 import type { SelectingState, SettingRow } from "../types.ts";
+import { renderSelectPage } from "./setting-list.ts";
 
 const PLAIN_THEME: Theme = {
   fg: (_c: string, text: string) => text,
@@ -44,8 +44,7 @@ function longLabelSelectItem(): ConfigItem {
     type: "select",
     label: "Model",
     value: "v0",
-    description:
-      "Pick the upstream model. Some names are quite long and must truncate to fit the terminal width.",
+    description: "Pick the upstream model. Some names are quite long and must truncate to fit the terminal width.",
     options: LONG_LABELS.map((label, i) => ({ label, value: `v${i}` })),
   };
 }
@@ -55,12 +54,7 @@ describe("renderSelectPage — line width safety", () => {
     const item = longLabelSelectItem();
     const row = makeRow(item, "v0");
     const width = 45;
-    const lines = renderSelectPage(
-      row,
-      makeSelecting(row.id),
-      width,
-      PLAIN_THEME,
-    );
+    const lines = renderSelectPage(row, makeSelecting(row.id), width, PLAIN_THEME);
     expect(lines.length).toBeGreaterThan(0);
     for (const line of lines) {
       expect(visibleWidth(line)).toBeLessThanOrEqual(width);
@@ -105,12 +99,7 @@ describe("renderSelectPage — line width safety", () => {
     };
     const row = makeRow(item, ["v1"]);
     const width = 38;
-    const lines = renderSelectPage(
-      row,
-      makeSelecting(row.id),
-      width,
-      PLAIN_THEME,
-    );
+    const lines = renderSelectPage(row, makeSelecting(row.id), width, PLAIN_THEME);
     for (const line of lines) {
       expect(visibleWidth(line)).toBeLessThanOrEqual(width);
     }
@@ -144,12 +133,7 @@ describe("renderSelectPage — line width safety", () => {
         options: LONG_LABELS.map((label, i) => ({ label, value: `v${i}` })),
       } as ConfigItem;
       const row = makeRow(item, type === "select" ? "v0" : ["v1"]);
-      const lines = renderSelectPage(
-        row,
-        makeSelecting(row.id),
-        10,
-        PLAIN_THEME,
-      );
+      const lines = renderSelectPage(row, makeSelecting(row.id), 10, PLAIN_THEME);
       for (const line of lines) {
         expect(visibleWidth(line)).toBeLessThanOrEqual(10);
       }

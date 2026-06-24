@@ -1,35 +1,26 @@
-import type {
-  ExtensionAPI,
-  ExtensionContext,
-} from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { SPINNER_STYLES } from "@htwang-contrib/common";
 import { loadConfig, registerWorkingIndicatorConfigItems } from "./config.ts";
-import {
-  resolveEffectiveSpinnerKey,
-  type NarrowWidthOptions,
-} from "./narrow-screen.ts";
+import { type NarrowWidthOptions, resolveEffectiveSpinnerKey } from "./narrow-screen.ts";
 import { pickPhrase } from "./phrase.ts";
 import {
   DEFAULT_RUNCAT_SPEED_CONFIG,
   quantizeInterval,
-  runcatSpeedIntervalMs,
   RUNCAT_SPINNER_KEY,
+  type RuncatSpeedConfig,
+  runcatSpeedIntervalMs,
   shouldRefreshRuncatInterval,
   shouldUpdateInterval,
-  type RuncatSpeedConfig,
 } from "./runcat.ts";
-import { SPINNER_STYLES } from "@htwang-contrib/common";
+import { RuncatIndicatorEngine, type RuncatIndicatorSink } from "./runcat-engine.ts";
 import { SpeedTracker } from "./speed-tracker.ts";
-import {
-  RuncatIndicatorEngine,
-  type RuncatIndicatorSink,
-} from "./runcat-engine.ts";
 
-export { RuncatIndicatorEngine } from "./runcat-engine.ts";
 export type {
-  RuncatIndicatorSink,
   RuncatIndicatorOptions,
+  RuncatIndicatorSink,
   RuncatIndicatorSnapshot,
 } from "./runcat-engine.ts";
+export { RuncatIndicatorEngine } from "./runcat-engine.ts";
 
 const TICK_MS = 250;
 const TOKS_LABEL = "tok/s";
@@ -42,7 +33,7 @@ export default function (pi: ExtensionAPI) {
   const tracker = new SpeedTracker();
 
   let currentSpinnerKey: string | undefined;
-  let runcatSpeedConfig: RuncatSpeedConfig = DEFAULT_RUNCAT_SPEED_CONFIG;
+  const runcatSpeedConfig: RuncatSpeedConfig = DEFAULT_RUNCAT_SPEED_CONFIG;
   let runcatIntervalMs: number | undefined;
   let runcatEngine: RuncatIndicatorEngine | undefined;
   let sessionCtx: ExtensionContext | undefined;
@@ -56,10 +47,7 @@ export default function (pi: ExtensionAPI) {
   function currentMessage(): string {
     const base = currentPhrase;
     if (thinking) {
-      const seconds = Math.max(
-        0,
-        Math.floor((Date.now() - thinkingStartMs) / 1000),
-      );
+      const seconds = Math.max(0, Math.floor((Date.now() - thinkingStartMs) / 1000));
       return `${base}... [thinking ${seconds}s...]`;
     }
     if (tracker.isStreaming) {
@@ -106,11 +94,7 @@ export default function (pi: ExtensionAPI) {
 
   function applySpinner(ctx: ExtensionContext): void {
     const width = terminalWidth();
-    const key = resolveEffectiveSpinnerKey(
-      loadConfig().spinner,
-      width,
-      narrowWidthOptions(),
-    );
+    const key = resolveEffectiveSpinnerKey(loadConfig().spinner, width, narrowWidthOptions());
     const style = SPINNER_STYLES[key];
     currentSpinnerKey = key;
 
@@ -159,10 +143,7 @@ export default function (pi: ExtensionAPI) {
     const engine = runcatEngine;
     if (!engine) return;
     if (!shouldRefreshRuncatInterval(thinking)) return;
-    const target = quantizeInterval(
-      runcatSpeedIntervalMs(tracker.liveTokS(), runcatSpeedConfig),
-      runcatSpeedConfig,
-    );
+    const target = quantizeInterval(runcatSpeedIntervalMs(tracker.liveTokS(), runcatSpeedConfig), runcatSpeedConfig);
     const current = runcatIntervalMs ?? runcatSpeedConfig.defaultIntervalMs;
     if (!shouldUpdateInterval(current, target, runcatSpeedConfig)) return;
     runcatIntervalMs = target;
@@ -201,11 +182,7 @@ export default function (pi: ExtensionAPI) {
     // Only re-apply when the effective key actually flips (narrow ⇄ wide),
     // so a routine resize that keeps us in the same band never tears the
     // animation.
-    const effectiveKey = resolveEffectiveSpinnerKey(
-      loadConfig().spinner,
-      width,
-      narrowWidthOptions(),
-    );
+    const effectiveKey = resolveEffectiveSpinnerKey(loadConfig().spinner, width, narrowWidthOptions());
     if (effectiveKey === currentSpinnerKey) return;
     applySpinner(ctx);
   }
@@ -261,19 +238,12 @@ export default function (pi: ExtensionAPI) {
         thinkingStartMs = Date.now();
         resetRuncatInterval();
       }
-    } else if (
-      delta.type === "text_start" ||
-      delta.type === "text_delta" ||
-      delta.type === "toolcall_start"
-    ) {
+    } else if (delta.type === "text_start" || delta.type === "text_delta" || delta.type === "toolcall_start") {
       if (thinking) {
         thinking = false;
       }
     }
-    if (
-      (delta.type === "text_delta" || delta.type === "thinking_delta") &&
-      "partial" in delta
-    ) {
+    if ((delta.type === "text_delta" || delta.type === "thinking_delta") && "partial" in delta) {
       tracker.recordDelta(delta.delta, delta.partial?.usage?.output);
     }
     pushMessage(ctx);
@@ -284,10 +254,7 @@ export default function (pi: ExtensionAPI) {
     if (event.message.role !== "assistant") return;
     thinking = false;
     if (tracker.isStreaming) {
-      tracker.finishMessage(
-        event.message.usage?.output ?? 0,
-        event.message.stopReason,
-      );
+      tracker.finishMessage(event.message.usage?.output ?? 0, event.message.stopReason);
     }
     resetRuncatInterval();
   });

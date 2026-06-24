@@ -1,15 +1,12 @@
-import type {
-  ExtensionCommandContext,
-  Theme,
-} from "@earendil-works/pi-coding-agent";
 import type { Model } from "@earendil-works/pi-ai";
+import type { ExtensionCommandContext, Theme } from "@earendil-works/pi-coding-agent";
 import {
-  Key,
   type Component,
+  fuzzyFilter,
+  Key,
+  matchesKey,
   type OverlayOptions,
   type TUI,
-  fuzzyFilter,
-  matchesKey,
   truncateToWidth,
 } from "@earendil-works/pi-tui";
 
@@ -56,19 +53,8 @@ export class ModelSelectController implements Component {
     return new Promise<SelectResult>((resolve) => {
       ctx.ui.custom<void>(
         (tui, theme, _keybindings, done) => {
-          const ctrl = new ModelSelectController(
-            tui,
-            theme,
-            models,
-            currentModel,
-            resolve,
-            done,
-          );
-          if (
-            defaultIndex != null &&
-            defaultIndex >= 0 &&
-            defaultIndex < models.length
-          ) {
+          const ctrl = new ModelSelectController(tui, theme, models, currentModel, resolve, done);
+          if (defaultIndex != null && defaultIndex >= 0 && defaultIndex < models.length) {
             ctrl.cursorIndex = defaultIndex;
             ctrl.adjustScroll();
           }
@@ -98,14 +84,8 @@ export class ModelSelectController implements Component {
     lines.push(promptLine);
     lines.push("");
 
-    const maxVisible = Math.max(
-      3,
-      Math.floor(this.tui.terminal.rows * 0.6 - 6),
-    );
-    const visible = this.filtered.slice(
-      this.scrollOffset,
-      this.scrollOffset + maxVisible,
-    );
+    const maxVisible = Math.max(3, Math.floor(this.tui.terminal.rows * 0.6 - 6));
+    const visible = this.filtered.slice(this.scrollOffset, this.scrollOffset + maxVisible);
 
     for (let i = 0; i < visible.length; i++) {
       const entry = visible[i];
@@ -187,10 +167,7 @@ export class ModelSelectController implements Component {
       if (this.query.length > 0) {
         this.query = this.query.slice(0, -1);
         this.applyFilter();
-        this.cursorIndex = Math.min(
-          this.cursorIndex,
-          Math.max(0, this.filtered.length - 1),
-        );
+        this.cursorIndex = Math.min(this.cursorIndex, Math.max(0, this.filtered.length - 1));
         this.scrollOffset = 0;
         this.invalidate();
       }
@@ -228,10 +205,7 @@ export class ModelSelectController implements Component {
   }
 
   private adjustScroll(): void {
-    const maxVisible = Math.max(
-      3,
-      Math.floor(this.tui.terminal.rows * 0.6 - 6),
-    );
+    const maxVisible = Math.max(3, Math.floor(this.tui.terminal.rows * 0.6 - 6));
     if (this.cursorIndex < this.scrollOffset) {
       this.scrollOffset = this.cursorIndex;
     } else if (this.cursorIndex >= this.scrollOffset + maxVisible) {

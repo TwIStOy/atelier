@@ -11,12 +11,7 @@ function formatDomainEntry(entry: unknown): string {
     (typeof o.domain === "string" && o.domain) ||
     (typeof o.id === "string" && o.id) ||
     "?";
-  const count =
-    typeof o.count === "number"
-      ? o.count
-      : typeof o.node_count === "number"
-        ? o.node_count
-        : undefined;
+  const count = typeof o.count === "number" ? o.count : typeof o.node_count === "number" ? o.node_count : undefined;
   return count !== undefined ? `  - ${name} (${count} nodes)` : `  - ${name}`;
 }
 
@@ -36,22 +31,14 @@ function formatDomainsResult(result: unknown): string {
   }
 
   if (list.length === 0) {
-    const preview =
-      typeof result === "string"
-        ? result.slice(0, 200)
-        : JSON.stringify(result)?.slice(0, 200);
+    const preview = typeof result === "string" ? result.slice(0, 200) : JSON.stringify(result)?.slice(0, 200);
     return `Domains: no list in CLI response (${preview ?? "empty"})`;
   }
 
-  return [
-    `Domains: ${list.length} registered`,
-    ...list.map(formatDomainEntry),
-  ].join("\n");
+  return [`Domains: ${list.length} registered`, ...list.map(formatDomainEntry)].join("\n");
 }
 
-export async function buildMemoryStatusReport(
-  ctx: ExtensionCommandContext,
-): Promise<string> {
+export async function buildMemoryStatusReport(ctx: ExtensionCommandContext): Promise<string> {
   if (isDisabledByEnv()) {
     return "memory: disabled for this process (DOTPI_MEMORY=0 / false / off).";
   }
@@ -63,11 +50,7 @@ export async function buildMemoryStatusReport(
   const lines: string[] = ["memory: enabled"];
 
   const namespace = getNamespace(ctx);
-  lines.push(
-    namespace
-      ? `Namespace: ${namespace} (hat --namespace)`
-      : "Namespace: (default — shared store)",
-  );
+  lines.push(namespace ? `Namespace: ${namespace} (hat --namespace)` : "Namespace: (default — shared store)");
 
   lines.push("CLI: hat");
 

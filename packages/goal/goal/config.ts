@@ -1,11 +1,6 @@
-import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { Model } from "@earendil-works/pi-ai";
-import {
-  readConfig,
-  registerConfigItems,
-  resolveModel,
-  type ExtensionConfigSchema,
-} from "@htwang-contrib/common";
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { type ExtensionConfigSchema, readConfig, registerConfigItems, resolveModel } from "@htwang-contrib/common";
 
 export interface GoalConfig {
   verifierModel: string;
@@ -39,9 +34,7 @@ type AnyModel = Model<any>;
 
 let cachedModelOptions: Array<{ label: string; value: string }> = [];
 
-export function setCachedModelOptions(
-  models: Array<{ label: string; value: string }>,
-): void {
+export function setCachedModelOptions(models: Array<{ label: string; value: string }>): void {
   cachedModelOptions = models;
 }
 
@@ -56,10 +49,7 @@ export function registerGoalConfigItems(): void {
         "Model used by the independent verification agent when update_goal(complete) is called. Empty = use the session's current model.",
       extensionLabel: "Goal",
       order: 0,
-      options: () => [
-        { label: "(use session model)", value: "" },
-        ...cachedModelOptions,
-      ],
+      options: () => [{ label: "(use session model)", value: "" }, ...cachedModelOptions],
     },
     {
       key: "verifierMaxTurns",
@@ -92,8 +82,6 @@ export function resolveVerifierModel(ctx: ExtensionContext): AnyModel {
     return ctx.model as AnyModel;
   }
   const models = ctx.modelRegistry.getAvailable();
-  const resolved = resolveModel(models, config.verifierModel) as
-    | AnyModel
-    | undefined;
+  const resolved = resolveModel(models, config.verifierModel) as AnyModel | undefined;
   return resolved ?? (ctx.model as AnyModel);
 }

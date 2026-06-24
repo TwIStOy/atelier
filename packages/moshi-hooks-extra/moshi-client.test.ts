@@ -1,15 +1,7 @@
-import { describe, expect, test } from "vitest";
 import { EventEmitter } from "node:events";
-import {
-  buildEnvelope,
-  isMoshiHookAvailable,
-  resolveTransportMode,
-  sendEnvelope,
-} from "./moshi-client.ts";
-import {
-  getCachedTerminalContext,
-  resetTerminalContextCache,
-} from "./terminal-context.ts";
+import { describe, expect, test } from "vitest";
+import { buildEnvelope, isMoshiHookAvailable, resolveTransportMode, sendEnvelope } from "./moshi-client.ts";
+import { getCachedTerminalContext, resetTerminalContextCache } from "./terminal-context.ts";
 
 const HERDR_PAYLOAD = JSON.stringify({
   kind: "herdr",
@@ -50,9 +42,7 @@ describe("resolveTransportMode", () => {
   test("socket when socket file present", () => {
     const statSync = (() => ({ isSocket: () => true })) as never;
     const spawnSync = (() => ({ status: 0 })) as never;
-    expect(
-      resolveTransportMode({ statSync, spawnSync: spawnSync as never }),
-    ).toBe("socket");
+    expect(resolveTransportMode({ statSync, spawnSync: spawnSync as never })).toBe("socket");
   });
 
   test("spawn when socket absent but binary ok", () => {
@@ -60,9 +50,7 @@ describe("resolveTransportMode", () => {
       throw new Error("ENOENT");
     }) as never;
     const spawnSync = (() => ({ status: 0 })) as never;
-    expect(
-      resolveTransportMode({ statSync, spawnSync: spawnSync as never }),
-    ).toBe("spawn");
+    expect(resolveTransportMode({ statSync, spawnSync: spawnSync as never })).toBe("spawn");
   });
 
   test("none when socket absent and binary missing", () => {
@@ -72,9 +60,7 @@ describe("resolveTransportMode", () => {
     const spawnSync = (() => {
       throw new Error("ENOENT");
     }) as never;
-    expect(
-      resolveTransportMode({ statSync, spawnSync: spawnSync as never }),
-    ).toBe("none");
+    expect(resolveTransportMode({ statSync, spawnSync: spawnSync as never })).toBe("none");
   });
 });
 
@@ -231,12 +217,7 @@ describe("sendEnvelope dispatch", () => {
       sock.removeAllListeners();
     };
     const createConnection = () => {
-      queueMicrotask(() =>
-        sock.emit(
-          "error",
-          Object.assign(new Error("no"), { code: "ECONNREFUSED" }),
-        ),
-      );
+      queueMicrotask(() => sock.emit("error", Object.assign(new Error("no"), { code: "ECONNREFUSED" })));
       return sock;
     };
     const statSync = (() => ({ isSocket: () => true })) as never;

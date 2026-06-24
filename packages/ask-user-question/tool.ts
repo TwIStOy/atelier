@@ -3,16 +3,13 @@ import { MODAL_ACTIVE_EVENT } from "@htwang-contrib/common";
 import { buildItemsForQuestion } from "./build-items.ts";
 import { emitAskUserPrompt } from "./events.ts";
 import { QuestionnaireSession } from "./state/questionnaire-session.ts";
-import {
-  buildQuestionnaireResponse,
-  buildToolResult,
-} from "./tool/response-envelope.ts";
+import { buildQuestionnaireResponse, buildToolResult } from "./tool/response-envelope.ts";
 import {
   MAX_OPTIONS,
   MAX_QUESTIONS,
   MIN_OPTIONS,
-  type QuestionParams,
   type QuestionnaireResult,
+  type QuestionParams,
   QuestionParamsSchema,
 } from "./tool/types.ts";
 import { validateQuestionnaire } from "./tool/validate-questionnaire.ts";
@@ -81,18 +78,16 @@ export function registerAskUserQuestionTool(pi: ExtensionAPI): void {
 
       pi.events.emit(MODAL_ACTIVE_EVENT, true);
       try {
-        const result = await ctx.ui.custom<QuestionnaireResult>(
-          (tui, theme, _keybindings, done) => {
-            const session = new QuestionnaireSession({
-              tui,
-              theme,
-              params: typed,
-              itemsByTab,
-              done,
-            });
-            return session.component;
-          },
-        );
+        const result = await ctx.ui.custom<QuestionnaireResult>((tui, theme, _keybindings, done) => {
+          const session = new QuestionnaireSession({
+            tui,
+            theme,
+            params: typed,
+            itemsByTab,
+            done,
+          });
+          return session.component;
+        });
 
         return buildQuestionnaireResponse(result, typed);
       } finally {

@@ -1,6 +1,6 @@
 import { exec } from "node:child_process";
-import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import type { Theme } from "@earendil-works/pi-coding-agent";
+import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import type { StatusLineComponent } from "./base.ts";
 
 export class GitComponent implements StatusLineComponent {
@@ -67,13 +67,9 @@ export class GitComponent implements StatusLineComponent {
   render(width: number, theme: Theme): string[] {
     if (!this.branch) return [];
 
-    const marker = this.dirty
-      ? theme.fg("error", "✗")
-      : theme.fg("success", "✓");
+    const marker = this.dirty ? theme.fg("error", "✗") : theme.fg("success", "✓");
     const branchBudget = Math.max(0, width - visibleWidth(marker) - 1);
     const branch = truncateToWidth(this.branch, branchBudget, "…");
-    return [
-      truncateToWidth(theme.fg("muted", branch) + " " + marker, width, ""),
-    ];
+    return [truncateToWidth(theme.fg("muted", branch) + " " + marker, width, "")];
   }
 }

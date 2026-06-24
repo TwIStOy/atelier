@@ -1,14 +1,12 @@
 import {
+  DEFAULT_SPINNER,
+  type ExtensionConfigSchema,
   readConfig,
   registerConfigItems,
-  type ExtensionConfigSchema,
+  SPINNER_STYLES,
 } from "@htwang-contrib/common";
-import { DEFAULT_SPINNER, SPINNER_STYLES } from "@htwang-contrib/common";
+import { DEFAULT_NARROW_WIDTH_SPINNER, DEFAULT_NARROW_WIDTH_THRESHOLD } from "./narrow-screen.ts";
 import { createSpinnerPreview } from "./preview.ts";
-import {
-  DEFAULT_NARROW_WIDTH_SPINNER,
-  DEFAULT_NARROW_WIDTH_THRESHOLD,
-} from "./narrow-screen.ts";
 
 export interface WorkingIndicatorConfig {
   spinner: string;
@@ -35,12 +33,10 @@ export function loadConfig(): WorkingIndicatorConfig {
 }
 
 export function registerWorkingIndicatorConfigItems(): void {
-  const spinnerOptions = Object.entries(SPINNER_STYLES).map(
-    ([value, style]) => ({
-      label: `${style.frames[0]}  ${value} · ${style.intervalMs}ms`,
-      value,
-    }),
-  );
+  const spinnerOptions = Object.entries(SPINNER_STYLES).map(([value, style]) => ({
+    label: `${style.frames[0]}  ${value} · ${style.intervalMs}ms`,
+    value,
+  }));
 
   registerConfigItems(CONFIG_ID, [
     {
@@ -49,8 +45,7 @@ export function registerWorkingIndicatorConfigItems(): void {
       label: "Spinner Style",
       value: () => loadConfig().spinner,
       options: spinnerOptions,
-      description:
-        "Spinner preset: the glyph sequence, its visual width, and frame interval.",
+      description: "Spinner preset: the glyph sequence, its visual width, and frame interval.",
       extensionLabel: "Working Indicator",
       order: 0,
       preview: createSpinnerPreview(),
@@ -60,8 +55,7 @@ export function registerWorkingIndicatorConfigItems(): void {
       type: "boolean",
       label: "Narrow-Width Switch",
       value: () => loadConfig().narrowWidthEnabled,
-      description:
-        "When on, the spinner switches to the narrow preset when the terminal is narrow (likely a phone).",
+      description: "When on, the spinner switches to the narrow preset when the terminal is narrow (likely a phone).",
       extensionLabel: "Working Indicator",
       order: 10,
     },
@@ -72,8 +66,7 @@ export function registerWorkingIndicatorConfigItems(): void {
       value: () => loadConfig().narrowWidthThreshold,
       min: 1,
       max: 200,
-      description:
-        "Terminal width (columns) at or below which the screen is treated as narrow.",
+      description: "Terminal width (columns) at or below which the screen is treated as narrow.",
       extensionLabel: "Working Indicator",
       order: 11,
     },
@@ -83,8 +76,7 @@ export function registerWorkingIndicatorConfigItems(): void {
       label: "Narrow-Width Spinner",
       value: () => loadConfig().narrowWidthSpinner,
       options: spinnerOptions,
-      description:
-        "Spinner preset used while the terminal is narrow. Defaults to dots.",
+      description: "Spinner preset used while the terminal is narrow. Defaults to dots.",
       extensionLabel: "Working Indicator",
       order: 12,
       preview: createSpinnerPreview(),

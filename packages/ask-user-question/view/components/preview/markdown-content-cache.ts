@@ -1,9 +1,5 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import {
-  Markdown,
-  type MarkdownTheme,
-  visibleWidth,
-} from "@earendil-works/pi-tui";
+import { Markdown, type MarkdownTheme, visibleWidth } from "@earendil-works/pi-tui";
 import type { QuestionData } from "../../../tool/types.ts";
 import { stripFenceMarkers } from "./preview-box-renderer.ts";
 
@@ -31,11 +27,7 @@ export class MarkdownContentCache {
   private readonly theme: Theme;
   private readonly markdownTheme: MarkdownTheme;
 
-  constructor(
-    question: QuestionData,
-    theme: Theme,
-    markdownTheme: MarkdownTheme,
-  ) {
+  constructor(question: QuestionData, theme: Theme, markdownTheme: MarkdownTheme) {
     this.theme = theme;
     this.markdownTheme = markdownTheme;
     this.previewTexts = new Map();

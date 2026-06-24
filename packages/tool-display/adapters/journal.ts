@@ -11,11 +11,7 @@ interface JournalWriteArgs {
 export const journalWriteAdapter: ToolDisplayAdapter<JournalWriteArgs> = {
   formatCallHeader(args, theme) {
     const title = args?.title ?? "";
-    return (
-      theme.fg("toolTitle", theme.bold("Journal write")) +
-      " " +
-      theme.fg("accent", title)
-    );
+    return theme.fg("toolTitle", theme.bold("Journal write")) + " " + theme.fg("accent", title);
   },
 
   formatCollapsedContent(_args, _output, theme) {
@@ -40,11 +36,7 @@ interface JournalReadDetails {
 export const journalReadAdapter: ToolDisplayAdapter<JournalReadArgs> = {
   formatCallHeader(args, theme) {
     const id = args?.id ?? "";
-    return (
-      theme.fg("toolTitle", theme.bold("Journal read")) +
-      " " +
-      theme.fg("accent", id)
-    );
+    return theme.fg("toolTitle", theme.bold("Journal read")) + " " + theme.fg("accent", id);
   },
 
   formatCollapsedContent(_args, _output, theme, width, details) {
@@ -52,8 +44,7 @@ export const journalReadAdapter: ToolDisplayAdapter<JournalReadArgs> = {
     const count = d?.content_lines ?? 0;
     if (count === 0) return [`${INDENT}${theme.fg("muted", "empty")}`];
     const preview = d?.content_preview?.split("\n")[0] ?? "";
-    const truncated =
-      preview.length > 100 ? `${preview.slice(0, 99)}…` : preview;
+    const truncated = preview.length > 100 ? `${preview.slice(0, 99)}…` : preview;
     const line = `${INDENT}${theme.fg("success", `${count} line${count === 1 ? "" : "s"}`)} ${theme.fg("dim", truncated)}`;
     return [truncateToWidth(line, width, "…")];
   },
@@ -68,19 +59,10 @@ export const journalReadAdapter: ToolDisplayAdapter<JournalReadArgs> = {
       .slice(0, limit)
       .map(
         (line) =>
-          INDENT +
-          theme.fg("muted", "│ ") +
-          truncateToWidth(
-            theme.fg("dim", line),
-            width - INDENT.length - 4,
-            "…",
-          ),
+          INDENT + theme.fg("muted", "│ ") + truncateToWidth(theme.fg("dim", line), width - INDENT.length - 4, "…"),
       );
     if (allLines.length > limit) {
-      lines.push(
-        INDENT +
-          theme.fg("muted", `│ … ${allLines.length - limit} more line(s)`),
-      );
+      lines.push(INDENT + theme.fg("muted", `│ … ${allLines.length - limit} more line(s)`));
     }
     return lines;
   },
@@ -102,11 +84,7 @@ interface JournalSearchDetails {
 export const journalSearchAdapter: ToolDisplayAdapter<JournalSearchArgs> = {
   formatCallHeader(args, theme) {
     const query = args?.text ?? (args?.tags?.length ? args.tags.join(",") : "");
-    return (
-      theme.fg("toolTitle", theme.bold("Journal search")) +
-      " " +
-      theme.fg("accent", query || "(all)")
-    );
+    return theme.fg("toolTitle", theme.bold("Journal search")) + " " + theme.fg("accent", query || "(all)");
   },
 
   formatCollapsedContent(_args, _output, theme, width, details) {
@@ -116,18 +94,12 @@ export const journalSearchAdapter: ToolDisplayAdapter<JournalSearchArgs> = {
       return [`${INDENT}${theme.fg("muted", "no results")}`];
     }
     const first = d?.items?.[0];
-    const parts: string[] = [
-      INDENT,
-      theme.fg("success", `${total} result${total === 1 ? "" : "s"}`),
-    ];
+    const parts: string[] = [INDENT, theme.fg("success", `${total} result${total === 1 ? "" : "s"}`)];
     if (first) {
       parts.push(" ");
       parts.push(theme.fg("dim", first.id));
       if (first.title) {
-        const snip =
-          first.title.length > 80
-            ? `${first.title.slice(0, 79)}…`
-            : first.title;
+        const snip = first.title.length > 80 ? `${first.title.slice(0, 79)}…` : first.title;
         parts.push(` ${theme.fg("dim", snip)}`);
       }
     }
@@ -147,21 +119,11 @@ export const journalSearchAdapter: ToolDisplayAdapter<JournalSearchArgs> = {
       const connector = isLast ? "  └ " : "  │ ";
       const idLine =
         theme.fg("dim", item.id) +
-        (item.title
-          ? ` ${theme.fg("dim", item.title.length > 100 ? `${item.title.slice(0, 99)}…` : item.title)}`
-          : "");
-      lines.push(
-        INDENT + theme.fg("muted", connector.replace(/^\s{2}/, "")) + idLine,
-      );
+        (item.title ? ` ${theme.fg("dim", item.title.length > 100 ? `${item.title.slice(0, 99)}…` : item.title)}` : "");
+      lines.push(INDENT + theme.fg("muted", connector.replace(/^\s{2}/, "")) + idLine);
     }
     if (total > limit) {
-      lines.push(
-        INDENT +
-          theme.fg(
-            "muted",
-            `  └ … ${total - limit} more result${total - limit === 1 ? "" : "s"}`,
-          ),
-      );
+      lines.push(INDENT + theme.fg("muted", `  └ … ${total - limit} more result${total - limit === 1 ? "" : "s"}`));
     }
     return lines;
   },

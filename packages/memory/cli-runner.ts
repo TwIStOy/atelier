@@ -9,21 +9,12 @@ export type RunHatOptions = {
   namespace?: string;
 };
 
-export function buildHatArgv(
-  args: string[],
-  options?: RunHatOptions,
-): string[] {
-  const ns =
-    options?.namespace !== undefined
-      ? sanitizeNamespace(options.namespace)
-      : getSessionNamespace();
+export function buildHatArgv(args: string[], options?: RunHatOptions): string[] {
+  const ns = options?.namespace !== undefined ? sanitizeNamespace(options.namespace) : getSessionNamespace();
   return ["--json", ...(ns ? ["--namespace", ns] : []), ...args];
 }
 
-export async function runHat(
-  args: string[],
-  options?: RunHatOptions,
-): Promise<unknown> {
+export async function runHat(args: string[], options?: RunHatOptions): Promise<unknown> {
   try {
     const { stdout } = await execFile(HAT_BIN, buildHatArgv(args, options), {
       maxBuffer: 10 * 1024 * 1024,

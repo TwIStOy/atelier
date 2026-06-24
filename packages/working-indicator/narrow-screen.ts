@@ -1,8 +1,4 @@
-import {
-  DEFAULT_SPINNER,
-  SPINNER_STYLES,
-  type SpinnerStyle,
-} from "@htwang-contrib/common";
+import { DEFAULT_SPINNER, SPINNER_STYLES, type SpinnerStyle } from "@htwang-contrib/common";
 
 /**
  * Terminal width (in columns) below which the working indicator is treated as
@@ -27,9 +23,7 @@ export interface NarrowWidthOptions {
   spinner: string;
 }
 
-export function normalizeNarrowWidthOptions(
-  options: Partial<NarrowWidthOptions> | undefined,
-): NarrowWidthOptions {
+export function normalizeNarrowWidthOptions(options: Partial<NarrowWidthOptions> | undefined): NarrowWidthOptions {
   const rawThreshold = options?.threshold;
   const threshold =
     typeof rawThreshold === "number" && Number.isFinite(rawThreshold)

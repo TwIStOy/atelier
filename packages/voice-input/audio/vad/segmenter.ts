@@ -41,10 +41,7 @@ export class VadSegmenter {
   private pendingFrames: Float32Array[] = [];
   private currentSilenceMs = 0;
 
-  constructor(
-    opts: Partial<VadSegmenterOptions> = {},
-    callbacks: SegmenterCallbacks = {},
-  ) {
+  constructor(opts: Partial<VadSegmenterOptions> = {}, callbacks: SegmenterCallbacks = {}) {
     this.opts = { ...DEFAULT_VAD_OPTIONS, ...opts };
     this.callbacks = callbacks;
   }
@@ -60,18 +57,12 @@ export class VadSegmenter {
 
   close(): ClosedSegment | null {
     const segment =
-      this.state === "speech" && this.currentSpeechMs >= this.opts.minSpeechMs
-        ? this.buildSegment()
-        : null;
+      this.state === "speech" && this.currentSpeechMs >= this.opts.minSpeechMs ? this.buildSegment() : null;
     this.resetToSilence();
     return segment;
   }
 
-  private handleSilence(
-    prob: number,
-    samples: Float32Array,
-    frameMs: number,
-  ): void {
+  private handleSilence(prob: number, samples: Float32Array, frameMs: number): void {
     if (prob >= this.opts.threshold) {
       this.pendingFrames.push(samples);
       this.pendingSpeechMs += frameMs;
@@ -84,11 +75,7 @@ export class VadSegmenter {
     }
   }
 
-  private handleSpeech(
-    prob: number,
-    samples: Float32Array,
-    frameMs: number,
-  ): void {
+  private handleSpeech(prob: number, samples: Float32Array, frameMs: number): void {
     this.currentSegment.push(samples);
     this.currentSpeechMs += frameMs;
     if (this.currentSpeechMs >= this.opts.maxSpeechMs) {

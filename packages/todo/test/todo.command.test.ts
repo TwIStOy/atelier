@@ -1,7 +1,7 @@
 import type { ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { __resetState } from "../state/store.ts";
-import { registerTodoTool, registerTodosCommand } from "../todo.ts";
+import { registerTodosCommand, registerTodoTool } from "../todo.ts";
 import { createMockCtx, createMockPi } from "./helpers.ts";
 
 function setup() {
@@ -16,10 +16,7 @@ function setup() {
   return { tool, cmd };
 }
 
-async function seed(
-  tool: Record<string, unknown>,
-  actions: Array<Record<string, unknown>>,
-) {
+async function seed(tool: Record<string, unknown>, actions: Array<Record<string, unknown>>) {
   const execute = tool.execute as Function;
   for (const p of actions) {
     await execute("tc", p, undefined, undefined, {});
@@ -51,20 +48,14 @@ describe("/todos command — guard branches", () => {
       hasUI: false,
     }) as unknown as ExtensionCommandContext;
     await cmd.handler("", ctx);
-    expect(ctx.ui.notify).toHaveBeenCalledWith(
-      expect.stringContaining("interactive"),
-      "error",
-    );
+    expect(ctx.ui.notify).toHaveBeenCalledWith(expect.stringContaining("interactive"), "error");
   });
 
   it("notifies an info message when there are no visible tasks", async () => {
     const { cmd } = setup();
     const ctx = makeCtx();
     await cmd.handler("", ctx);
-    expect(ctx.ui.notify).toHaveBeenCalledWith(
-      expect.stringContaining("No todos"),
-      "info",
-    );
+    expect(ctx.ui.notify).toHaveBeenCalledWith(expect.stringContaining("No todos"), "info");
   });
 
   it("treats all-deleted tasks as empty (info notify, not group render)", async () => {
@@ -75,19 +66,14 @@ describe("/todos command — guard branches", () => {
     ]);
     const ctx = makeCtx();
     await cmd.handler("", ctx);
-    expect(ctx.ui.notify).toHaveBeenCalledWith(
-      expect.stringContaining("No todos"),
-      "info",
-    );
+    expect(ctx.ui.notify).toHaveBeenCalledWith(expect.stringContaining("No todos"), "info");
   });
 });
 
 describe("/todos command — grouped output", () => {
   function grabOutput(ctx: ExtensionCommandContext): string {
     expect(ctx.ui.notify).toHaveBeenCalledTimes(1);
-    const calls = (
-      ctx.ui.notify as unknown as ReturnType<typeof import("vitest").vi.fn>
-    ).mock.calls;
+    const calls = (ctx.ui.notify as unknown as ReturnType<typeof import("vitest").vi.fn>).mock.calls;
     const [text, level] = calls[0];
     expect(level).toBe("info");
     return text as string;

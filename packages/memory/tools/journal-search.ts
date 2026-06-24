@@ -14,8 +14,7 @@ function parseListResult(result: unknown): Record<string, unknown>[] {
 export const journalSearch = {
   name: "journal-search",
   label: "Journal search",
-  description:
-    "Search journal entries by text content or tags with pagination. Returns summaries sorted by recency.",
+  description: "Search journal entries by text content or tags with pagination. Returns summaries sorted by recency.",
   parameters: Type.Object({
     text: Type.Optional(
       Type.String({
@@ -42,18 +41,14 @@ export const journalSearch = {
     try {
       const cliArgs = ["journal", "search"];
       if (args.text) cliArgs.push("--text", args.text as string);
-      if ((args.tags as string[])?.length)
-        cliArgs.push("--tags", (args.tags as string[]).join(","));
+      if ((args.tags as string[])?.length) cliArgs.push("--tags", (args.tags as string[]).join(","));
       if (args.limit !== undefined) cliArgs.push("--limit", String(args.limit));
-      if (args.offset !== undefined)
-        cliArgs.push("--offset", String(args.offset));
+      if (args.offset !== undefined) cliArgs.push("--offset", String(args.offset));
       const result = await runHat(cliArgs);
-      const items = parseListResult(result).map(
-        (e: Record<string, unknown>) => ({
-          id: String(e.id ?? e.timestamp ?? ""),
-          title: String(e.title ?? ""),
-        }),
-      );
+      const items = parseListResult(result).map((e: Record<string, unknown>) => ({
+        id: String(e.id ?? e.timestamp ?? ""),
+        title: String(e.title ?? ""),
+      }));
       return jsonResult(result, {
         query: args.text ?? args.tags ?? "",
         total: items.length,

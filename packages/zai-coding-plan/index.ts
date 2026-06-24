@@ -1,12 +1,6 @@
-import type {
-  ExtensionAPI,
-  ExtensionContext,
-} from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { resetForegroundBeforeText, ZAI_CODING_PLAN_EVENTS } from "@htwang-contrib/common";
 import { queryUsage } from "./quota.ts";
-import {
-  ZAI_CODING_PLAN_EVENTS,
-  resetForegroundBeforeText,
-} from "@htwang-contrib/common";
 
 const PROVIDER_ID = "zai-coding-plan";
 
@@ -116,15 +110,9 @@ export default function (pi: ExtensionAPI) {
 
       try {
         const usageInfo = await queryUsage(pi, apiKey);
-        ctx.ui.notify(
-          ctx.hasUI ? resetForegroundBeforeText(usageInfo) : usageInfo,
-          "info",
-        );
+        ctx.ui.notify(ctx.hasUI ? resetForegroundBeforeText(usageInfo) : usageInfo, "info");
       } catch (e) {
-        ctx.ui.notify(
-          `Failed to query quota: ${e instanceof Error ? e.message : String(e)}`,
-          "error",
-        );
+        ctx.ui.notify(`Failed to query quota: ${e instanceof Error ? e.message : String(e)}`, "error");
       }
     },
   });

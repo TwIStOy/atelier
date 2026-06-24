@@ -1,6 +1,6 @@
+import { loadConfig } from "../config.ts";
 import { GitHubInterceptor } from "./github.ts";
 import type { UrlInterceptor } from "./types.ts";
-import { loadConfig } from "../config.ts";
 
 export {
   GITHUB_INTERCEPTOR_DEFAULTS,

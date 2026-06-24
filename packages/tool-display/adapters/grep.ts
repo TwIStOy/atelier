@@ -16,23 +16,14 @@ function matchCountFromDetails(details: unknown): number | undefined {
 }
 
 export const grepAdapter: ToolDisplayAdapter<GrepArgs> = {
-  formatCallHeader(
-    args,
-    theme,
-    _details?: unknown,
-    _isPartial?: boolean,
-    _expanded?: boolean,
-  ) {
+  formatCallHeader(args, theme, _details?: unknown, _isPartial?: boolean, _expanded?: boolean) {
     const pattern = typeof args.pattern === "string" ? args.pattern : "";
     const pathRaw = typeof args.path === "string" ? args.path.trim() : "";
     const filterRaw =
       (typeof args.include === "string" ? args.include.trim() : "") ||
       (typeof args.glob === "string" ? args.glob.trim() : "");
 
-    let header =
-      theme.fg("toolTitle", theme.bold("Grep")) +
-      " " +
-      theme.fg("accent", `/${pattern}/`);
+    let header = theme.fg("toolTitle", theme.bold("Grep")) + " " + theme.fg("accent", `/${pattern}/`);
     if (pathRaw) {
       header += " " + theme.fg("toolOutput", `in ${shortenPath(pathRaw)}`);
     }
@@ -42,15 +33,7 @@ export const grepAdapter: ToolDisplayAdapter<GrepArgs> = {
     return header;
   },
 
-  formatCollapsedContent(
-    _args,
-    output,
-    theme,
-    _width,
-    details?: unknown,
-    isPartial?: boolean,
-    _spinAt?: number,
-  ) {
+  formatCollapsedContent(_args, output, theme, _width, details?: unknown, isPartial?: boolean, _spinAt?: number) {
     if (isPartial) return [];
     const matches = matchCountFromDetails(details);
     if (typeof matches === "number") {

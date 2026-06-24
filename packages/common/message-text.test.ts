@@ -1,9 +1,5 @@
 import { describe, expect, test } from "vitest";
-import {
-  assistantMessageText,
-  extractMessageText,
-  userMessageText,
-} from "./message-text.ts";
+import { assistantMessageText, extractMessageText, userMessageText } from "./message-text.ts";
 
 describe("extractMessageText", () => {
   test("returns string content as-is", () => {

@@ -1,8 +1,4 @@
-import type {
-  QuestionAnswer,
-  QuestionData,
-  QuestionnaireResult,
-} from "../tool/types.ts";
+import type { QuestionAnswer, QuestionData, QuestionnaireResult } from "../tool/types.ts";
 import type { WrappingSelectItem } from "../view/components/wrapping-select.ts";
 import type { QuestionnaireAction } from "./key-router.ts";
 import { ROW_INTENT_META } from "./row-intent.ts";
@@ -34,10 +30,7 @@ export interface ApplyResult {
   effects: readonly Effect[];
 }
 
-function orderedAnswers(
-  state: QuestionnaireState,
-  questions: readonly QuestionData[],
-): QuestionAnswer[] {
+function orderedAnswers(state: QuestionnaireState, questions: readonly QuestionData[]): QuestionAnswer[] {
   const out: QuestionAnswer[] = [];
   for (let i = 0; i < questions.length; i++) {
     const a = state.answers.get(i);
@@ -50,11 +43,7 @@ function withFocusedOptionHasPreview(
   state: QuestionnaireState,
   questions: readonly QuestionData[],
 ): QuestionnaireState {
-  const focusedOptionHasPreview = computeFocusedOptionHasPreview(
-    questions,
-    state.currentTab,
-    state.optionIndex,
-  );
+  const focusedOptionHasPreview = computeFocusedOptionHasPreview(questions, state.currentTab, state.optionIndex);
   if (state.focusedOptionHasPreview === focusedOptionHasPreview) return state;
   return { ...state, focusedOptionHasPreview };
 }
@@ -75,10 +64,7 @@ function syncMultiSelectFromAnswers(
   return indices;
 }
 
-function persistMultiSelectAnswer(
-  state: QuestionnaireState,
-  ctx: ApplyContext,
-): ReadonlyMap<number, QuestionAnswer> {
+function persistMultiSelectAnswer(state: QuestionnaireState, ctx: ApplyContext): ReadonlyMap<number, QuestionAnswer> {
   const q = ctx.questions[state.currentTab];
   if (!q?.multiSelect) return state.answers;
   const selected: string[] = [];
@@ -102,13 +88,8 @@ function persistMultiSelectAnswer(
   return out;
 }
 
-function switchTabResult(
-  state: QuestionnaireState,
-  nextTab: number,
-  ctx: ApplyContext,
-): ApplyResult {
-  const notesValue =
-    state.notesByTab.get(nextTab) ?? state.answers.get(nextTab)?.notes ?? "";
+function switchTabResult(state: QuestionnaireState, nextTab: number, ctx: ApplyContext): ApplyResult {
+  const notesValue = state.notesByTab.get(nextTab) ?? state.answers.get(nextTab)?.notes ?? "";
   const transitioned: QuestionnaireState = {
     ...state,
     currentTab: nextTab,
@@ -117,11 +98,7 @@ function switchTabResult(
     notesVisible: false,
     chatFocused: false,
     submitChoiceIndex: 0,
-    multiSelectChecked: syncMultiSelectFromAnswers(
-      state.answers,
-      ctx.questions,
-      nextTab,
-    ),
+    multiSelectChecked: syncMultiSelectFromAnswers(state.answers, ctx.questions, nextTab),
     notesDraft: notesValue,
   };
   const finalState = withFocusedOptionHasPreview(transitioned, ctx.questions);
@@ -134,11 +111,7 @@ function switchTabResult(
   };
 }
 
-function doneFor(
-  state: QuestionnaireState,
-  ctx: ApplyContext,
-  cancelled: boolean,
-): ApplyResult {
+function doneFor(state: QuestionnaireState, ctx: ApplyContext, cancelled: boolean): ApplyResult {
   const result: QuestionnaireResult = {
     answers: orderedAnswers(state, ctx.questions),
     cancelled,
@@ -159,13 +132,8 @@ type Handler<K extends QuestionnaireAction["kind"]> = (
 const navHandler: Handler<"nav"> = (state, action, ctx) => {
   const items = ctx.itemsByTab[state.currentTab] ?? [];
   const item = items[action.nextIndex];
-  const inputMode = item
-    ? ROW_INTENT_META[item.kind].activatesInputMode
-    : false;
-  const next = withFocusedOptionHasPreview(
-    { ...state, optionIndex: action.nextIndex, inputMode },
-    ctx.questions,
-  );
+  const inputMode = item ? ROW_INTENT_META[item.kind].activatesInputMode : false;
+  const next = withFocusedOptionHasPreview({ ...state, optionIndex: action.nextIndex, inputMode }, ctx.questions);
   if (!inputMode) {
     return { state: next, effects: [{ kind: "clear_input_buffer" }] };
   }
@@ -179,8 +147,7 @@ const navHandler: Handler<"nav"> = (state, action, ctx) => {
   return { state: next, effects: [] };
 };
 
-const tabSwitchHandler: Handler<"tab_switch"> = (state, action, ctx) =>
-  switchTabResult(state, action.nextTab, ctx);
+const tabSwitchHandler: Handler<"tab_switch"> = (state, action, ctx) => switchTabResult(state, action.nextTab, ctx);
 
 const confirmHandler: Handler<"confirm"> = (state, action, ctx) => {
   let answer = action.answer;
@@ -199,8 +166,7 @@ const confirmHandler: Handler<"confirm"> = (state, action, ctx) => {
   answers.set(answer.questionIndex, answer);
   const next: QuestionnaireState = { ...state, answers };
   if (answer.kind === "chat") return doneFor(next, ctx, false);
-  if (action.autoAdvanceTab !== undefined)
-    return switchTabResult(next, action.autoAdvanceTab, ctx);
+  if (action.autoAdvanceTab !== undefined) return switchTabResult(next, action.autoAdvanceTab, ctx);
   return doneFor(next, ctx, false);
 };
 
@@ -232,14 +198,9 @@ const multiConfirmHandler: Handler<"multi_confirm"> = (state, action, ctx) => {
   const synced: QuestionnaireState = {
     ...state,
     answers,
-    multiSelectChecked: syncMultiSelectFromAnswers(
-      answers,
-      ctx.questions,
-      state.currentTab,
-    ),
+    multiSelectChecked: syncMultiSelectFromAnswers(answers, ctx.questions, state.currentTab),
   };
-  if (action.autoAdvanceTab !== undefined)
-    return switchTabResult(synced, action.autoAdvanceTab, ctx);
+  if (action.autoAdvanceTab !== undefined) return switchTabResult(synced, action.autoAdvanceTab, ctx);
   return doneFor(synced, ctx, false);
 };
 
@@ -280,9 +241,7 @@ const notesExitHandler: Handler<"notes_exit"> = (state, _action, _ctx) => {
 const focusOptionsHandler: Handler<"focus_options"> = (state, action, ctx) => {
   const items = ctx.itemsByTab[state.currentTab] ?? [];
   const focused = items[action.optionIndex];
-  const inputMode = focused
-    ? ROW_INTENT_META[focused.kind].activatesInputMode
-    : false;
+  const inputMode = focused ? ROW_INTENT_META[focused.kind].activatesInputMode : false;
   const next = withFocusedOptionHasPreview(
     {
       ...state,
@@ -345,11 +304,7 @@ const HANDLERS: { [K in QuestionnaireAction["kind"]]: Handler<K> } = {
  * Delegates to `HANDLERS` — per-kind handlers above are pure, named, and individually testable.
  * `ignore` is also handled outside the reducer by `handleIgnoreInline` in the runtime fast path.
  */
-export function reduce(
-  state: QuestionnaireState,
-  action: QuestionnaireAction,
-  ctx: ApplyContext,
-): ApplyResult {
+export function reduce(state: QuestionnaireState, action: QuestionnaireAction, ctx: ApplyContext): ApplyResult {
   const handler = HANDLERS[action.kind] as Handler<typeof action.kind>;
   return handler(state, action as never, ctx);
 }

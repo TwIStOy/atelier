@@ -21,9 +21,7 @@ const jobs = new Map<string, BackgroundJobSnapshot>();
 
 function pruneIfNeeded() {
   if (jobs.size < MAX_JOBS) return;
-  const finished = [...jobs.entries()].filter(
-    ([, v]) => v.status === "done" || v.status === "error",
-  );
+  const finished = [...jobs.entries()].filter(([, v]) => v.status === "done" || v.status === "error");
   finished.sort((a, b) => a[1].updated_at - b[1].updated_at);
   const over = jobs.size - MAX_JOBS + 48;
   for (let i = 0; i < Math.min(over, finished.length); i++) {
@@ -31,10 +29,7 @@ function pruneIfNeeded() {
   }
 }
 
-export function createBackgroundJob(input: {
-  mode: "single" | "batch";
-  label: string;
-}): string {
+export function createBackgroundJob(input: { mode: "single" | "batch"; label: string }): string {
   pruneIfNeeded();
   const id = randomUUID();
   const now = Date.now();
@@ -51,9 +46,7 @@ export function createBackgroundJob(input: {
 
 export function updateBackgroundJob(
   id: string,
-  patch: Partial<
-    Omit<BackgroundJobSnapshot, "id" | "created_at" | "mode" | "label">
-  >,
+  patch: Partial<Omit<BackgroundJobSnapshot, "id" | "created_at" | "mode" | "label">>,
 ) {
   const j = jobs.get(id);
   if (!j) return;
@@ -64,9 +57,7 @@ export function updateBackgroundJob(
   });
 }
 
-export function getBackgroundJob(
-  id: string,
-): BackgroundJobSnapshot | undefined {
+export function getBackgroundJob(id: string): BackgroundJobSnapshot | undefined {
   return jobs.get(id);
 }
 
@@ -76,8 +67,7 @@ export function backgroundJobStatusPayload(id: string): unknown {
     return {
       status: "unknown",
       id,
-      message:
-        "No background subagent with this id (wrong id or pruned after many newer jobs).",
+      message: "No background subagent with this id (wrong id or pruned after many newer jobs).",
     };
   }
   if (j.status === "running") {
@@ -118,10 +108,7 @@ export type SubagentStatusToolDetails = {
   message?: string;
 };
 
-export function subagentStatusToolDetails(
-  id: string,
-  payload: unknown,
-): SubagentStatusToolDetails {
+export function subagentStatusToolDetails(id: string, payload: unknown): SubagentStatusToolDetails {
   const p = (payload ?? {}) as Record<string, unknown>;
   const status = typeof p.status === "string" ? p.status : "unknown";
   const known = status !== "unknown";

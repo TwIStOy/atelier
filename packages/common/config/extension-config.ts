@@ -1,12 +1,6 @@
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  renameSync,
-  writeFileSync,
-} from "node:fs";
-import { dirname, join } from "node:path";
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
+import { dirname, join } from "node:path";
 
 export interface ExtensionConfigSchema<T> {
   defaults: T;
@@ -45,10 +39,7 @@ function writeConfigFile(data: ConfigFile): void {
   renameSync(tmp, CONFIG_PATH);
 }
 
-export function readConfig<T>(
-  extensionId: string,
-  schema: ExtensionConfigSchema<T>,
-): T {
+export function readConfig<T>(extensionId: string, schema: ExtensionConfigSchema<T>): T {
   const file = readConfigFile();
   const section = file[extensionId];
   if (!section || typeof section !== "object") return { ...schema.defaults };
@@ -61,32 +52,21 @@ export function writeConfig<T>(extensionId: string, config: T): void {
   writeConfigFile(file);
 }
 
-export function updateConfig<T>(
-  extensionId: string,
-  schema: ExtensionConfigSchema<T>,
-  patch: Partial<T>,
-): T {
+export function updateConfig<T>(extensionId: string, schema: ExtensionConfigSchema<T>, patch: Partial<T>): T {
   const current = readConfig(extensionId, schema);
   const updated = { ...current, ...patch };
   writeConfig(extensionId, updated);
   return updated;
 }
 
-export function readRawConfig(
-  extensionId: string,
-): Record<string, unknown> | undefined {
+export function readRawConfig(extensionId: string): Record<string, unknown> | undefined {
   const file = readConfigFile();
   const section = file[extensionId];
-  if (section && typeof section === "object" && !Array.isArray(section))
-    return section as Record<string, unknown>;
+  if (section && typeof section === "object" && !Array.isArray(section)) return section as Record<string, unknown>;
   return undefined;
 }
 
-function setDeep(
-  obj: Record<string, unknown>,
-  path: string[],
-  value: unknown,
-): void {
+function setDeep(obj: Record<string, unknown>, path: string[], value: unknown): void {
   let current: Record<string, unknown> = obj;
   for (let i = 0; i < path.length - 1; i++) {
     const seg = path[i];
@@ -104,27 +84,16 @@ function deleteDeep(obj: Record<string, unknown>, path: string[]): void {
     delete obj[path[0]];
     return;
   }
-  const parent = path
-    .slice(0, -1)
-    .reduce<Record<string, unknown> | undefined>((cur, seg) => {
-      if (
-        cur == null ||
-        typeof cur[seg] !== "object" ||
-        Array.isArray(cur[seg])
-      )
-        return undefined;
-      return cur[seg] as Record<string, unknown>;
-    }, obj);
+  const parent = path.slice(0, -1).reduce<Record<string, unknown> | undefined>((cur, seg) => {
+    if (cur == null || typeof cur[seg] !== "object" || Array.isArray(cur[seg])) return undefined;
+    return cur[seg] as Record<string, unknown>;
+  }, obj);
   if (parent != null) {
     delete parent[path[path.length - 1]];
   }
 }
 
-export function setConfigKey(
-  extensionId: string,
-  key: string,
-  value: unknown,
-): void {
+export function setConfigKey(extensionId: string, key: string, value: unknown): void {
   const file = readConfigFile();
   if (!file[extensionId] || typeof file[extensionId] !== "object") {
     file[extensionId] = {};

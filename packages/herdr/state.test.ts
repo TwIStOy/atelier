@@ -1,11 +1,6 @@
-import { describe, expect, it } from "vitest";
 import type { AskUserPromptPayload } from "@htwang-contrib/common";
-import {
-  buildTabTitle,
-  stateIcon,
-  summarizeAskUserQuestion,
-  type AgentState,
-} from "./state.ts";
+import { describe, expect, it } from "vitest";
+import { type AgentState, buildTabTitle, stateIcon, summarizeAskUserQuestion } from "./state.ts";
 
 describe("stateIcon", () => {
   it("maps each state to a distinct glyph", () => {
@@ -58,9 +53,7 @@ describe("summarizeAskUserQuestion", () => {
         },
       ],
     };
-    expect(summarizeAskUserQuestion(payload)).toBe(
-      "Which library should we use?",
-    );
+    expect(summarizeAskUserQuestion(payload)).toBe("Which library should we use?");
   });
 
   it("falls back to the header when the question is empty", () => {

@@ -5,14 +5,9 @@ import type {
   ReorderableConfigItem,
   SelectConfigItem,
 } from "@htwang-contrib/common";
-import {
-  getConfigItems,
-  readRawConfig,
-  setConfigKey,
-  deleteConfigKey,
-} from "@htwang-contrib/common";
+import { deleteConfigKey, getConfigItems, readRawConfig, setConfigKey } from "@htwang-contrib/common";
 import type { SettingRow, TabDef } from "./types.ts";
-import { TAB_ALL, PACKAGE_TAB_PREFIX } from "./types.ts";
+import { PACKAGE_TAB_PREFIX, TAB_ALL } from "./types.ts";
 
 export function resolveOptions<T>(
   options: ConfigItemSelectOption<T>[] | (() => ConfigItemSelectOption<T>[]),
@@ -31,10 +26,7 @@ export function buildSettingRows(): SettingRow[] {
   for (const { extensionId, items } of registries) {
     const rawSection = readRawConfig(extensionId);
 
-    const extLabel =
-      items.length > 0 && items[0]!.extensionLabel
-        ? items[0]!.extensionLabel!
-        : extensionId;
+    const extLabel = items.length > 0 && items[0]!.extensionLabel ? items[0]!.extensionLabel! : extensionId;
 
     for (const item of items) {
       const currentValue = resolveValue(item.value);
@@ -73,17 +65,9 @@ export function buildTabs(rows: SettingRow[]): TabDef[] {
   return tabs;
 }
 
-export function filterRows(
-  rows: SettingRow[],
-  search: string,
-  tab: string,
-): SettingRow[] {
-  const extensionId = tab.startsWith(PACKAGE_TAB_PREFIX)
-    ? tab.slice(PACKAGE_TAB_PREFIX.length)
-    : undefined;
-  const scoped = extensionId
-    ? rows.filter((r) => r.extensionId === extensionId)
-    : rows;
+export function filterRows(rows: SettingRow[], search: string, tab: string): SettingRow[] {
+  const extensionId = tab.startsWith(PACKAGE_TAB_PREFIX) ? tab.slice(PACKAGE_TAB_PREFIX.length) : undefined;
+  const scoped = extensionId ? rows.filter((r) => r.extensionId === extensionId) : rows;
   const query = search.trim().toLowerCase();
   if (!query) return scoped;
   return scoped.filter((row) => {
@@ -110,10 +94,7 @@ export function resetSetting(row: SettingRow): void {
   deleteConfigKey(row.extensionId, row.item.key);
 }
 
-export function resetExtensionSettings(
-  rows: SettingRow[],
-  extensionId: string,
-): void {
+export function resetExtensionSettings(rows: SettingRow[], extensionId: string): void {
   const extRows = rows.filter((r) => r.extensionId === extensionId);
   for (const r of extRows) {
     deleteConfigKey(extensionId, r.item.key);
@@ -133,15 +114,10 @@ export function getSelectOptions(row: SettingRow) {
   return [];
 }
 
-export function toggleMultiSelectValue(
-  row: SettingRow,
-  optionValue: unknown,
-): unknown[] {
+export function toggleMultiSelectValue(row: SettingRow, optionValue: unknown): unknown[] {
   const current = row.currentValue;
   const vals = Array.isArray(current) ? [...current] : [];
-  const idx = vals.findIndex(
-    (v) => JSON.stringify(v) === JSON.stringify(optionValue),
-  );
+  const idx = vals.findIndex((v) => JSON.stringify(v) === JSON.stringify(optionValue));
   if (idx >= 0) {
     vals.splice(idx, 1);
   } else {
@@ -150,15 +126,10 @@ export function toggleMultiSelectValue(
   return vals;
 }
 
-export function toggleReorderableValue(
-  row: SettingRow,
-  optionValue: unknown,
-): unknown[] {
+export function toggleReorderableValue(row: SettingRow, optionValue: unknown): unknown[] {
   const current = row.currentValue;
   const vals = Array.isArray(current) ? [...current] : [];
-  const idx = vals.findIndex(
-    (v) => JSON.stringify(v) === JSON.stringify(optionValue),
-  );
+  const idx = vals.findIndex((v) => JSON.stringify(v) === JSON.stringify(optionValue));
   if (idx >= 0) {
     vals.splice(idx, 1);
   } else {
@@ -167,11 +138,7 @@ export function toggleReorderableValue(
   return vals;
 }
 
-export function moveReorderableItem(
-  row: SettingRow,
-  fromIndex: number,
-  direction: -1 | 1,
-): unknown[] {
+export function moveReorderableItem(row: SettingRow, fromIndex: number, direction: -1 | 1): unknown[] {
   const current = row.currentValue;
   const vals = Array.isArray(current) ? [...current] : [];
   const toIndex = fromIndex + direction;
@@ -187,23 +154,15 @@ export interface SelectDisplayResult {
   canFilter: boolean;
 }
 
-export function filterSelectOptions(
-  options: ConfigItemSelectOption[],
-  query: string,
-): ConfigItemSelectOption[] {
+export function filterSelectOptions(options: ConfigItemSelectOption[], query: string): ConfigItemSelectOption[] {
   const q = query.trim().toLowerCase();
   if (!q) return options;
   return options.filter((opt) => opt.label.toLowerCase().includes(q));
 }
 
-export function buildSelectDisplayOptions(
-  row: SettingRow,
-  query: string,
-): SelectDisplayResult {
+export function buildSelectDisplayOptions(row: SettingRow, query: string): SelectDisplayResult {
   const opts: ConfigItemSelectOption[] = getSelectOptions(row);
-  const canFilter =
-    opts.length > 0 &&
-    opts.every((o) => typeof o.label === "string" && o.label.length > 0);
+  const canFilter = opts.length > 0 && opts.every((o) => typeof o.label === "string" && o.label.length > 0);
 
   if (row.item.type !== "reorderable") {
     return {
@@ -224,9 +183,7 @@ export function buildSelectDisplayOptions(
   const selected = vals
     .map((v) => optMap.get(JSON.stringify(v)))
     .filter((o): o is ConfigItemSelectOption => o !== undefined);
-  const unselected = opts.filter(
-    (o) => !selectedSet.has(JSON.stringify(o.value)),
-  );
+  const unselected = opts.filter((o) => !selectedSet.has(JSON.stringify(o.value)));
   const ordered = [...selected, ...unselected];
 
   return {

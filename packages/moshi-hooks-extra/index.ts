@@ -1,51 +1,38 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import {
   ASK_USER_PROMPT_EVENT,
-  MODAL_ACTIVE_EVENT,
-  ZAI_CODING_PLAN_EVENTS,
-  registerConfigItems,
   type AskUserPromptPayload,
   type CodingPlanRawUsage,
   type CodingPlanUsage,
+  MODAL_ACTIVE_EVENT,
+  registerConfigItems,
+  ZAI_CODING_PLAN_EVENTS,
 } from "@htwang-contrib/common";
 import {
-  isMoshiHookAvailable,
-  resolveTransportMode,
-  sendEnvelope,
-} from "./moshi-client.ts";
-import {
-  buildZaiRawSnapshot,
-  buildZaiSnapshot,
-  pushUsageSnapshot,
-} from "./usage-publisher.ts";
-import {
-  readMoshiSecretsFromFile,
-  type MoshiCredentials,
-} from "./moshi-secrets.ts";
-import { previewContent } from "./envelope.ts";
-import {
   ActivityTracker,
+  type AskUserQuestionSummary,
   lastAssistantTitleFromMessages,
   sessionKeyFor,
   summarizeAskUserQuestion,
-  type AskUserQuestionSummary,
 } from "./activity.ts";
+import { previewContent } from "./envelope.ts";
+import { isMoshiHookAvailable, resolveTransportMode, sendEnvelope } from "./moshi-client.ts";
+import { type MoshiCredentials, readMoshiSecretsFromFile } from "./moshi-secrets.ts";
 import {
   lastAssistantMessage,
   loadSummaryConfig,
   resolveSummaryModel,
-  summarizeAgentTurn,
   SUMMARY_TITLE_FALLBACK,
+  summarizeAgentTurn,
 } from "./summarizer.ts";
+import { buildZaiRawSnapshot, buildZaiSnapshot, pushUsageSnapshot } from "./usage-publisher.ts";
 
 const IDLE_TITLE_FALLBACK = "Thinking next step...";
 const USAGE_PUSH_MIN_INTERVAL_MS = 60_000;
 
 let cachedModels: Array<{ label: string; value: string }> = [];
 
-export function setCachedModels(
-  models: Array<{ label: string; value: string }>,
-): void {
+export function setCachedModels(models: Array<{ label: string; value: string }>): void {
   cachedModels = models;
 }
 
@@ -77,10 +64,7 @@ export default function moshiHooksExtra(pi: ExtensionAPI): void {
         "Model used to summarize completed agent turns before sending to Moshi. Leave as (default) to use the current session model.",
       extensionLabel: "Moshi Hooks Extra",
       order: 1,
-      options: () => [
-        { label: "(session default)", value: "" },
-        ...cachedModels,
-      ],
+      options: () => [{ label: "(session default)", value: "" }, ...cachedModels],
     },
   ]);
 
@@ -155,8 +139,7 @@ export default function moshiHooksExtra(pi: ExtensionAPI): void {
     const userPrompt = activity.userPrompt(key);
     if (!userPrompt) return;
 
-    const fallbackTitle =
-      lastAssistantTitleFromMessages(event.messages) || IDLE_TITLE_FALLBACK;
+    const fallbackTitle = lastAssistantTitleFromMessages(event.messages) || IDLE_TITLE_FALLBACK;
     const config = loadSummaryConfig();
     const lastAssistant = lastAssistantMessage(event.messages);
     const contextPercent = contextPercentFromCtx(ctx);
@@ -183,8 +166,7 @@ export default function moshiHooksExtra(pi: ExtensionAPI): void {
       return;
     }
 
-    const summaryModel =
-      resolveSummaryModel(ctx.modelRegistry, config) ?? ctx.model;
+    const summaryModel = resolveSummaryModel(ctx.modelRegistry, config) ?? ctx.model;
 
     void summarizeAgentTurn({
       userPrompt,
@@ -218,10 +200,7 @@ export default function moshiHooksExtra(pi: ExtensionAPI): void {
     if (!usage || usage.windows.length === 0) return;
     lastRawUsage = usage;
     const now = Date.now();
-    if (
-      usagePushInFlight ||
-      now - lastUsagePushAt < USAGE_PUSH_MIN_INTERVAL_MS
-    ) {
+    if (usagePushInFlight || now - lastUsagePushAt < USAGE_PUSH_MIN_INTERVAL_MS) {
       return;
     }
     usagePushInFlight = true;
@@ -243,10 +222,7 @@ export default function moshiHooksExtra(pi: ExtensionAPI): void {
     const usage = payload?.usage;
     if (!usage || usage.limits.length === 0) return;
     const now = Date.now();
-    if (
-      usagePushInFlight ||
-      now - lastUsagePushAt < USAGE_PUSH_MIN_INTERVAL_MS
-    ) {
+    if (usagePushInFlight || now - lastUsagePushAt < USAGE_PUSH_MIN_INTERVAL_MS) {
       return;
     }
     usagePushInFlight = true;
@@ -262,8 +238,7 @@ export default function moshiHooksExtra(pi: ExtensionAPI): void {
     const key = sessionKeyFor(cachedSessionId, cwd);
     const event = { active, session_id: cachedSessionId };
     if (active === true) {
-      const summary =
-        pendingQuestion.get(key) ?? summarizeAskUserQuestion(null);
+      const summary = pendingQuestion.get(key) ?? summarizeAskUserQuestion(null);
       void sendEnvelope(
         {
           eventName: "question_asked",

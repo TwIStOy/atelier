@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { resolveModel } from "./model-resolve.ts";
 import type { ResolvableModel } from "./model-resolve.ts";
+import { resolveModel } from "./model-resolve.ts";
 
 const MODELS: ResolvableModel[] = [
   { id: "glm-5.1", name: "GLM-5.1", provider: "inference-self-host" },

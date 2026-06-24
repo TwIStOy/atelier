@@ -20,10 +20,7 @@ export const DEFAULT_SPEED_CONFIG: SpeedConfig = {
 
 const COMPACTION_THRESHOLD = 5000;
 
-export function estimateTokensFromDelta(
-  text: string,
-  strategy: CountStrategy,
-): number {
+export function estimateTokensFromDelta(text: string, strategy: CountStrategy): number {
   if (!text) return 0;
   if (strategy === "direct") return 1;
   const matches = text.match(/\w+|[^\s\w]/g);
@@ -70,10 +67,7 @@ export class TokenSpeedEngine {
     return this._tokenCount / elapsedSec;
   }
 
-  sanitizeTokS(
-    value: number | null,
-    durationMs: number = this.elapsedMs,
-  ): number | null {
+  sanitizeTokS(value: number | null, durationMs: number = this.elapsedMs): number | null {
     if (value === null || !Number.isFinite(value) || value <= 0) return null;
     if (durationMs < this._config.minReliableDurationMs) return null;
     if (value > this._config.maxDisplayTokS) return null;
@@ -94,10 +88,7 @@ export class TokenSpeedEngine {
     const now = Date.now();
     const windowStart = now - this._config.slidingWindowMs;
 
-    while (
-      this._windowStartIndex < this._events.length &&
-      this._events[this._windowStartIndex].time < windowStart
-    ) {
+    while (this._windowStartIndex < this._events.length && this._events[this._windowStartIndex].time < windowStart) {
       this._windowStartIndex++;
     }
 
@@ -109,8 +100,7 @@ export class TokenSpeedEngine {
     }
     if (windowTokenCount === 0) return this.avgTokS;
 
-    const windowDuration =
-      (now - this._events[this._windowStartIndex].time) / 1000;
+    const windowDuration = (now - this._events[this._windowStartIndex].time) / 1000;
     if (windowDuration <= 0) return 0;
 
     return windowTokenCount / windowDuration;
@@ -137,19 +127,13 @@ export class TokenSpeedEngine {
   recordDelta(delta: string, usageOutput?: number): void {
     if (!this._isStreaming) return;
 
-    if (
-      this._config.useProviderTokens &&
-      usageOutput !== undefined &&
-      usageOutput > this._countedUsageOutput
-    ) {
+    if (this._config.useProviderTokens && usageOutput !== undefined && usageOutput > this._countedUsageOutput) {
       this.recordTokens(usageOutput - this._countedUsageOutput);
       this._countedUsageOutput = usageOutput;
       return;
     }
 
-    this.recordTokens(
-      estimateTokensFromDelta(delta, this._config.countStrategy),
-    );
+    this.recordTokens(estimateTokensFromDelta(delta, this._config.countStrategy));
   }
 
   reconcileTotal(tokens: number): void {

@@ -9,13 +9,7 @@ export const MSG_NO_TODOS = "No todos yet. Ask the agent to add some!";
 
 export type TaskStatus = "pending" | "in_progress" | "completed" | "deleted";
 
-export type TaskAction =
-  | "create"
-  | "update"
-  | "list"
-  | "get"
-  | "delete"
-  | "clear";
+export type TaskAction = "create" | "update" | "list" | "get" | "delete" | "clear";
 
 export interface Task {
   id: number;
@@ -60,26 +54,16 @@ export const TodoParamsSchema = Type.Object({
     Type.Literal("delete"),
     Type.Literal("clear"),
   ]),
-  subject: Type.Optional(
-    Type.String({ description: "Task subject line (required for create)" }),
-  ),
-  description: Type.Optional(
-    Type.String({ description: "Long-form task description" }),
-  ),
+  subject: Type.Optional(Type.String({ description: "Task subject line (required for create)" })),
+  description: Type.Optional(Type.String({ description: "Long-form task description" })),
   activeForm: Type.Optional(
     Type.String({
-      description:
-        "Present-continuous spinner label shown while status is in_progress (e.g. 'writing tests')",
+      description: "Present-continuous spinner label shown while status is in_progress (e.g. 'writing tests')",
     }),
   ),
   status: Type.Optional(
     Type.Union(
-      [
-        Type.Literal("pending"),
-        Type.Literal("in_progress"),
-        Type.Literal("completed"),
-        Type.Literal("deleted"),
-      ],
+      [Type.Literal("pending"), Type.Literal("in_progress"), Type.Literal("completed"), Type.Literal("deleted")],
       {
         description: "Target status (update) or list filter (list)",
       },
@@ -97,17 +81,13 @@ export const TodoParamsSchema = Type.Object({
   ),
   removeBlockedBy: Type.Optional(
     Type.Array(Type.Number(), {
-      description:
-        "Task ids to remove from blockedBy (update only, additive merge)",
+      description: "Task ids to remove from blockedBy (update only, additive merge)",
     }),
   ),
-  owner: Type.Optional(
-    Type.String({ description: "Agent/owner assigned to this task" }),
-  ),
+  owner: Type.Optional(Type.String({ description: "Agent/owner assigned to this task" })),
   metadata: Type.Optional(
     Type.Record(Type.String(), Type.Unknown(), {
-      description:
-        "Arbitrary metadata; pass null value for a key to delete that key on update",
+      description: "Arbitrary metadata; pass null value for a key to delete that key on update",
     }),
   ),
   id: Type.Optional(
@@ -117,8 +97,7 @@ export const TodoParamsSchema = Type.Object({
   ),
   includeDeleted: Type.Optional(
     Type.Boolean({
-      description:
-        "If true, list action returns deleted (tombstoned) tasks as well. Default: false.",
+      description: "If true, list action returns deleted (tombstoned) tasks as well. Default: false.",
     }),
   ),
 });

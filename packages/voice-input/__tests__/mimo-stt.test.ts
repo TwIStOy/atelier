@@ -2,12 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import {
-  resetHttpDeps,
-  setHttpDeps,
-  SttError,
-  transcribeWithMimoChat,
-} from "../providers/mimo-stt.ts";
+import { resetHttpDeps, SttError, setHttpDeps, transcribeWithMimoChat } from "../providers/mimo-stt.ts";
 
 const CONFIG = { baseUrl: "https://inference.example/v1", model: "mimo-v2.5" };
 const API_KEY = "sk-secret-abc";
@@ -32,9 +27,7 @@ function stubFetch(
   respond: (
     url: string,
     init?: RequestInit,
-  ) =>
-    | { ok: true; body: unknown }
-    | { ok: false; status: number; body: string },
+  ) => { ok: true; body: unknown } | { ok: false; status: number; body: string },
 ): void {
   setHttpDeps({
     fetch: (async (url: string, init?: RequestInit) => {
@@ -87,9 +80,7 @@ describe("transcribeWithMimoChat — success", () => {
         ],
       },
     }));
-    expect(await transcribeWithMimoChat(wavFile, CONFIG, API_KEY)).toBe(
-      "primary",
-    );
+    expect(await transcribeWithMimoChat(wavFile, CONFIG, API_KEY)).toBe("primary");
   });
 
   it("sends OpenAI-standard input_audio (pure base64, format, no data URL)", async () => {
@@ -101,17 +92,13 @@ describe("transcribeWithMimoChat — success", () => {
     const body = lastBody();
     expect(body.model).toBe("mimo-v2.5");
     expect(body.max_completion_tokens).toBe(4096);
-    const content = (
-      body.messages as Array<{ content: Array<Record<string, unknown>> }>
-    )[0].content;
+    const content = (body.messages as Array<{ content: Array<Record<string, unknown>> }>)[0].content;
     const audioBlock = content.find((b) => b.type === "input_audio");
     expect(audioBlock?.input_audio).toMatchObject({ format: "wav" });
     const data = (audioBlock?.input_audio as { data: string }).data;
     expect(data).not.toMatch(/^data:/);
     expect(data).not.toContain(",");
-    expect(Buffer.from(data, "base64")).toEqual(
-      Buffer.from([0x52, 0x49, 0x46, 0x46]),
-    );
+    expect(Buffer.from(data, "base64")).toEqual(Buffer.from([0x52, 0x49, 0x46, 0x46]));
   });
 
   it("posts to ${baseUrl}/chat/completions with Bearer auth header", async () => {
@@ -134,27 +121,21 @@ describe("transcribeWithMimoChat — empty transcript", () => {
       ok: true,
       body: { choices: [{ message: { content: "[NO SPEECH]" } }] },
     }));
-    await expect(
-      transcribeWithMimoChat(wavFile, CONFIG, API_KEY),
-    ).rejects.toMatchObject({
+    await expect(transcribeWithMimoChat(wavFile, CONFIG, API_KEY)).rejects.toMatchObject({
       code: "empty_transcript",
     });
   });
 
   it("throws empty_transcript on empty content + empty reasoning", async () => {
     stubFetch(() => ({ ok: true, body: { choices: [{ message: {} }] } }));
-    await expect(
-      transcribeWithMimoChat(wavFile, CONFIG, API_KEY),
-    ).rejects.toMatchObject({
+    await expect(transcribeWithMimoChat(wavFile, CONFIG, API_KEY)).rejects.toMatchObject({
       code: "empty_transcript",
     });
   });
 
   it("throws empty_transcript when choices array is missing", async () => {
     stubFetch(() => ({ ok: true, body: {} }));
-    await expect(
-      transcribeWithMimoChat(wavFile, CONFIG, API_KEY),
-    ).rejects.toMatchObject({
+    await expect(transcribeWithMimoChat(wavFile, CONFIG, API_KEY)).rejects.toMatchObject({
       code: "empty_transcript",
     });
   });
@@ -163,48 +144,36 @@ describe("transcribeWithMimoChat — empty transcript", () => {
 describe("transcribeWithMimoChat — HTTP errors", () => {
   it("maps 401 to auth_error", async () => {
     stubFetch(() => ({ ok: false, status: 401, body: "unauthorized" }));
-    await expect(
-      transcribeWithMimoChat(wavFile, CONFIG, API_KEY),
-    ).rejects.toMatchObject({
+    await expect(transcribeWithMimoChat(wavFile, CONFIG, API_KEY)).rejects.toMatchObject({
       code: "auth_error",
     });
   });
 
   it("maps 403 to auth_error", async () => {
     stubFetch(() => ({ ok: false, status: 403, body: "forbidden" }));
-    await expect(
-      transcribeWithMimoChat(wavFile, CONFIG, API_KEY),
-    ).rejects.toMatchObject({
+    await expect(transcribeWithMimoChat(wavFile, CONFIG, API_KEY)).rejects.toMatchObject({
       code: "auth_error",
     });
   });
 
   it("maps 500 to api_error", async () => {
     stubFetch(() => ({ ok: false, status: 500, body: "boom" }));
-    await expect(
-      transcribeWithMimoChat(wavFile, CONFIG, API_KEY),
-    ).rejects.toMatchObject({
+    await expect(transcribeWithMimoChat(wavFile, CONFIG, API_KEY)).rejects.toMatchObject({
       code: "api_error",
     });
   });
 
   it("redacts the API key from the failure message", async () => {
     stubFetch(() => ({ ok: false, status: 500, body: `leak ${API_KEY}` }));
-    await expect(
-      transcribeWithMimoChat(wavFile, CONFIG, API_KEY),
-    ).rejects.toThrow();
-    const err = await transcribeWithMimoChat(wavFile, CONFIG, API_KEY).catch(
-      (e) => e,
-    );
+    await expect(transcribeWithMimoChat(wavFile, CONFIG, API_KEY)).rejects.toThrow();
+    const err = await transcribeWithMimoChat(wavFile, CONFIG, API_KEY).catch((e) => e);
     expect(err.message).not.toContain(API_KEY);
     expect(err.message).toContain("<redacted>");
   });
 
   it("includes the status code in the error message", async () => {
     stubFetch(() => ({ ok: false, status: 502, body: "bad gateway" }));
-    const err = await transcribeWithMimoChat(wavFile, CONFIG, API_KEY).catch(
-      (e) => e,
-    );
+    const err = await transcribeWithMimoChat(wavFile, CONFIG, API_KEY).catch((e) => e);
     expect(err.message).toMatch(/502/);
   });
 });
@@ -216,9 +185,7 @@ describe("transcribeWithMimoChat — network errors", () => {
         throw new TypeError(`fetch failed with key ${API_KEY}`);
       }) as typeof fetch,
     });
-    const err = await transcribeWithMimoChat(wavFile, CONFIG, API_KEY).catch(
-      (e) => e,
-    );
+    const err = await transcribeWithMimoChat(wavFile, CONFIG, API_KEY).catch((e) => e);
     expect(err).toBeInstanceOf(SttError);
     expect(err.code).toBe("network_error");
     expect(err.message).not.toContain(API_KEY);
@@ -231,9 +198,7 @@ describe("transcribeWithMimoChat — network errors", () => {
         throw sttErr;
       }) as typeof fetch,
     });
-    await expect(transcribeWithMimoChat(wavFile, CONFIG, API_KEY)).rejects.toBe(
-      sttErr,
-    );
+    await expect(transcribeWithMimoChat(wavFile, CONFIG, API_KEY)).rejects.toBe(sttErr);
   });
 });
 

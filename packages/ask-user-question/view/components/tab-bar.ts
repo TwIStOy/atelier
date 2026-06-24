@@ -47,10 +47,7 @@ export class TabBar implements StatefulView<TabBarProps> {
     const submitText = " ✓ Submit ";
     const submitStyled = this.props.submit.active
       ? this.theme.bg("selectedBg", this.theme.fg("text", submitText))
-      : this.theme.fg(
-          this.props.submit.allAnswered ? "success" : "dim",
-          submitText,
-        );
+      : this.theme.fg(this.props.submit.allAnswered ? "success" : "dim", submitText);
     pieces.push(submitStyled);
     pieces.push(" →");
 

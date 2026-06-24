@@ -1,9 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  DEFAULT_VAD_OPTIONS,
-  VadSegmenter,
-  type ClosedSegment,
-} from "../audio/vad/segmenter.ts";
+import { type ClosedSegment, DEFAULT_VAD_OPTIONS, VadSegmenter } from "../audio/vad/segmenter.ts";
 
 const FRAME_MS = 32;
 
@@ -55,10 +51,7 @@ describe("VadSegmenter — speech detection", () => {
 describe("VadSegmenter — segment closure by silence", () => {
   it("closes a segment after minSilenceMs of below-threshold frames", () => {
     const segments: ClosedSegment[] = [];
-    const seg = new VadSegmenter(
-      { minSpeechMs: 250, minSilenceMs: 500 },
-      { onSegment: (s) => segments.push(s) },
-    );
+    const seg = new VadSegmenter({ minSpeechMs: 250, minSilenceMs: 500 }, { onSegment: (s) => segments.push(s) });
     const speechFrames = framesForMs(500);
     for (let i = 0; i < speechFrames; i++) {
       seg.push({ prob: 0.9, frameMs: FRAME_MS, samples: makeSamples() });
@@ -96,10 +89,7 @@ describe("VadSegmenter — segment closure by silence", () => {
 describe("VadSegmenter — max speech length", () => {
   it("forces a segment close at maxSpeechMs even without silence", () => {
     const segments: ClosedSegment[] = [];
-    const seg = new VadSegmenter(
-      { minSpeechMs: 100, maxSpeechMs: 320 },
-      { onSegment: (s) => segments.push(s) },
-    );
+    const seg = new VadSegmenter({ minSpeechMs: 100, maxSpeechMs: 320 }, { onSegment: (s) => segments.push(s) });
     for (let i = 0; i < framesForMs(320); i++) {
       seg.push({ prob: 0.9, frameMs: FRAME_MS, samples: makeSamples() });
     }
@@ -110,10 +100,7 @@ describe("VadSegmenter — max speech length", () => {
 describe("VadSegmenter — close flushes trailing speech", () => {
   it("flushes an in-progress speech segment on close if it meets minSpeechMs", () => {
     const segments: ClosedSegment[] = [];
-    const seg = new VadSegmenter(
-      { minSpeechMs: 250 },
-      { onSegment: (s) => segments.push(s) },
-    );
+    const seg = new VadSegmenter({ minSpeechMs: 250 }, { onSegment: (s) => segments.push(s) });
     for (let i = 0; i < framesForMs(500); i++) {
       seg.push({ prob: 0.9, frameMs: FRAME_MS, samples: makeSamples() });
     }

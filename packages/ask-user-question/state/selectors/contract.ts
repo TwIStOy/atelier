@@ -20,11 +20,5 @@ export interface PerTabBindingContext extends BindingContext {
   readonly i: number;
 }
 
-export type GlobalSelector<P> = (
-  state: QuestionnaireState,
-  ctx: BindingContext,
-) => P;
-export type PerTabSelector<P> = (
-  state: QuestionnaireState,
-  ctx: PerTabBindingContext,
-) => P;
+export type GlobalSelector<P> = (state: QuestionnaireState, ctx: BindingContext) => P;
+export type PerTabSelector<P> = (state: QuestionnaireState, ctx: PerTabBindingContext) => P;

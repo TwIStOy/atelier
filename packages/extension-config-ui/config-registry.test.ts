@@ -1,9 +1,6 @@
-import { describe, expect, test } from "vitest";
 import type { ConfigItem } from "@htwang-contrib/common";
-import {
-  buildSelectDisplayOptions,
-  filterSelectOptions,
-} from "./config-registry.ts";
+import { describe, expect, test } from "vitest";
+import { buildSelectDisplayOptions, filterSelectOptions } from "./config-registry.ts";
 import type { SettingRow } from "./types.ts";
 
 function makeRow(item: ConfigItem, currentValue: unknown): SettingRow {
@@ -17,10 +14,7 @@ function makeRow(item: ConfigItem, currentValue: unknown): SettingRow {
   };
 }
 
-function makeOptions(
-  labels: string[],
-  prefix = "v",
-): { label: string; value: string }[] {
+function makeOptions(labels: string[], prefix = "v"): { label: string; value: string }[] {
   return labels.map((label, i) => ({ label, value: `${prefix}${i}` }));
 }
 
@@ -62,10 +56,7 @@ describe("buildSelectDisplayOptions — select", () => {
 
   test("no filter returns all options in original order", () => {
     const row = makeRow(item, "v1");
-    const { options, reorderableOrder, canFilter } = buildSelectDisplayOptions(
-      row,
-      "",
-    );
+    const { options, reorderableOrder, canFilter } = buildSelectDisplayOptions(row, "");
     expect(options.map((o) => o.label)).toEqual(["Red", "Green", "Blue"]);
     expect(reorderableOrder.size).toBe(0);
     expect(canFilter).toBe(true);
@@ -97,12 +88,7 @@ describe("buildSelectDisplayOptions — multiselect", () => {
   test("preserves option order regardless of selection", () => {
     const row = makeRow(item, ["v2", "v0"]);
     const { options, reorderableOrder } = buildSelectDisplayOptions(row, "");
-    expect(options.map((o) => o.label)).toEqual([
-      "Alpha",
-      "Beta",
-      "Gamma",
-      "Delta",
-    ]);
+    expect(options.map((o) => o.label)).toEqual(["Alpha", "Beta", "Gamma", "Delta"]);
     expect(reorderableOrder.size).toBe(0);
   });
 
@@ -125,12 +111,7 @@ describe("buildSelectDisplayOptions — reorderable", () => {
   test("selected items come first, preserving currentValue order", () => {
     const row = makeRow(item, ["v2", "v0"]);
     const { options, reorderableOrder } = buildSelectDisplayOptions(row, "");
-    expect(options.map((o) => o.label)).toEqual([
-      "Three",
-      "One",
-      "Two",
-      "Four",
-    ]);
+    expect(options.map((o) => o.label)).toEqual(["Three", "One", "Two", "Four"]);
     expect(reorderableOrder.get(JSON.stringify("v2"))).toBe(1);
     expect(reorderableOrder.get(JSON.stringify("v0"))).toBe(2);
     expect(reorderableOrder.has(JSON.stringify("v1"))).toBe(false);
@@ -147,12 +128,7 @@ describe("buildSelectDisplayOptions — reorderable", () => {
   test("empty currentValue shows all unselected", () => {
     const row = makeRow(item, []);
     const { options, reorderableOrder } = buildSelectDisplayOptions(row, "");
-    expect(options.map((o) => o.label)).toEqual([
-      "One",
-      "Two",
-      "Three",
-      "Four",
-    ]);
+    expect(options.map((o) => o.label)).toEqual(["One", "Two", "Three", "Four"]);
     expect(reorderableOrder.size).toBe(0);
   });
 });

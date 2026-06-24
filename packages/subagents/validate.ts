@@ -13,10 +13,7 @@ export function validateTaskShape(
     agent_type?: string;
   },
   catalog: SubagentAgentCatalog,
-):
-  | { ok: true; mode: "single" }
-  | { ok: true; mode: "batch" }
-  | { ok: false; message: string } {
+): { ok: true; mode: "single" } | { ok: true; mode: "batch" } | { ok: false; message: string } {
   const hasTask = Boolean(params.task?.trim());
   const hasTasks = Boolean(params.tasks && params.tasks.length > 0);
   if (hasTask && hasTasks) {
@@ -28,8 +25,7 @@ export function validateTaskShape(
   if (!hasTask && !hasTasks) {
     return {
       ok: false,
-      message:
-        "subagent: provide `task` (single) or a non-empty `tasks` array (parallel batch).",
+      message: "subagent: provide `task` (single) or a non-empty `tasks` array (parallel batch).",
     };
   }
   if (hasTasks && params.tasks) {
@@ -41,10 +37,7 @@ export function validateTaskShape(
           message: `subagent: tasks[${i}].task is empty.`,
         };
       }
-      const aid = resolveSubagentAgentId(
-        row.agent_type ?? params.agent_type,
-        catalog,
-      );
+      const aid = resolveSubagentAgentId(row.agent_type ?? params.agent_type, catalog);
       const fileDesc = catalog.agents.get(aid)?.fileOptions.description?.trim();
       if (!row.description?.trim() && !fileDesc) {
         return {
@@ -60,8 +53,7 @@ export function validateTaskShape(
   if (!params.description?.trim() && !fileDesc) {
     return {
       ok: false,
-      message:
-        "subagent: pass `description` (single mode) or set `description` in the persona Markdown frontmatter.",
+      message: "subagent: pass `description` (single mode) or set `description` in the persona Markdown frontmatter.",
     };
   }
   return { ok: true, mode: "single" };

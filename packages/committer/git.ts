@@ -3,11 +3,7 @@ import { promisify } from "node:util";
 
 const exec = promisify(execFile);
 
-async function git(
-  cwd: string,
-  args: string[],
-  opts?: { maxBuffer?: number },
-): Promise<string> {
+async function git(cwd: string, args: string[], opts?: { maxBuffer?: number }): Promise<string> {
   const { stdout } = await exec("git", args, {
     cwd,
     encoding: "utf-8",
@@ -80,10 +76,7 @@ export async function stageFiles(cwd: string, files: string[]): Promise<void> {
   await git(cwd, ["add", "--", ...files]);
 }
 
-export async function getDiff(
-  cwd: string,
-  maxBytes = 1_000_000,
-): Promise<DiffResult> {
+export async function getDiff(cwd: string, maxBytes = 1_000_000): Promise<DiffResult> {
   const [stat, diff, names] = await Promise.all([
     git(cwd, ["diff", "--cached", "--stat"], { maxBuffer: maxBytes }),
     git(cwd, ["diff", "--cached"], { maxBuffer: maxBytes }),
@@ -108,17 +101,12 @@ export async function getBranchName(cwd: string): Promise<string> {
   }
 }
 
-export async function getLastCommitLog(
-  cwd: string,
-  count = 5,
-): Promise<string> {
+export async function getLastCommitLog(cwd: string, count = 5): Promise<string> {
   const log = await git(cwd, ["log", "--oneline", `-n${count}`]);
   return log.trim();
 }
 
 export async function countChanges(cwd: string): Promise<number> {
   const status = await getGitStatus(cwd);
-  return (
-    status.staged.length + status.unstaged.length + status.untracked.length
-  );
+  return status.staged.length + status.unstaged.length + status.untracked.length;
 }

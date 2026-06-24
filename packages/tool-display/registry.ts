@@ -1,19 +1,10 @@
-import { ToolDisplayRegistry } from "./tool-call-display.ts";
 import { askUserQuestionAdapter } from "./adapters/ask-user-question.ts";
 import { bashAdapter } from "./adapters/bash.ts";
 import { editAdapter } from "./adapters/edit.ts";
 import { globAdapter } from "./adapters/glob.ts";
-import {
-  createGoalAdapter,
-  getGoalAdapter,
-  updateGoalAdapter,
-} from "./adapters/goal.ts";
+import { createGoalAdapter, getGoalAdapter, updateGoalAdapter } from "./adapters/goal.ts";
 import { grepAdapter } from "./adapters/grep.ts";
-import {
-  journalReadAdapter,
-  journalSearchAdapter,
-  journalWriteAdapter,
-} from "./adapters/journal.ts";
+import { journalReadAdapter, journalSearchAdapter, journalWriteAdapter } from "./adapters/journal.ts";
 import { lsAdapter } from "./adapters/ls.ts";
 import {
   memoryAliasAdapter,
@@ -31,9 +22,10 @@ import { readAdapter } from "./adapters/read.ts";
 import { subagentAdapter } from "./adapters/subagent.ts";
 import { subagentStatusAdapter } from "./adapters/subagent-status.ts";
 import { todoAdapter } from "./adapters/todo.ts";
-import { writeAdapter } from "./adapters/write.ts";
-import { webSearchAdapter } from "./adapters/web-search.ts";
 import { webFetchAdapter } from "./adapters/web-fetch.ts";
+import { webSearchAdapter } from "./adapters/web-search.ts";
+import { writeAdapter } from "./adapters/write.ts";
+import { ToolDisplayRegistry } from "./tool-call-display.ts";
 
 export const globalToolDisplayRegistry = new ToolDisplayRegistry();
 globalToolDisplayRegistry.register("ask_user_question", askUserQuestionAdapter);

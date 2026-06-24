@@ -5,10 +5,7 @@ import { buildStreamRecorderArgs, type ResolvedRecorder } from "./recorder.ts";
 export interface StreamRecorderChild {
   readonly stdout: Readable;
   on(event: "error", listener: (err: Error) => void): this;
-  on(
-    event: "exit",
-    listener: (code: number | null, signal: NodeJS.Signals | null) => void,
-  ): this;
+  on(event: "exit", listener: (code: number | null, signal: NodeJS.Signals | null) => void): this;
   kill(signal?: NodeJS.Signals): boolean;
   readonly pid?: number;
 }
@@ -107,20 +104,14 @@ export class StreamCapture {
 
   private assertAcceptableExit(code: number | null): void {
     if (code === null) return;
-    const ok =
-      this._recorder === "ffmpeg"
-        ? FFMPEG_OK_EXIT_CODES
-        : GENERIC_OK_EXIT_CODES;
+    const ok = this._recorder === "ffmpeg" ? FFMPEG_OK_EXIT_CODES : GENERIC_OK_EXIT_CODES;
     if (!ok.has(code)) {
       throw new Error(`Recorder ${this._recorder} exited with code ${code}.`);
     }
   }
 }
 
-function waitForExit(
-  child: StreamRecorderChild,
-  timeoutMs: number,
-): Promise<number | null> {
+function waitForExit(child: StreamRecorderChild, timeoutMs: number): Promise<number | null> {
   return new Promise((resolve, reject) => {
     let settled = false;
     const timer = setTimeout(() => {

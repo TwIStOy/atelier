@@ -1,28 +1,20 @@
 import { describe, expect, it } from "vitest";
-import type { Task } from "../tool/types.ts";
 import { deriveBlocks, detectCycle } from "../state/task-graph.ts";
+import type { Task } from "../tool/types.ts";
 
-const task = (
-  overrides: Partial<Task> & { id: number; subject: string },
-): Task => ({
+const task = (overrides: Partial<Task> & { id: number; subject: string }): Task => ({
   status: "pending",
   ...overrides,
 });
 
 describe("detectCycle", () => {
   it("detects direct cycle", () => {
-    const tasks = [
-      task({ id: 1, subject: "a" }),
-      task({ id: 2, subject: "b", blockedBy: [1] }),
-    ];
+    const tasks = [task({ id: 1, subject: "a" }), task({ id: 2, subject: "b", blockedBy: [1] })];
     expect(detectCycle(tasks, 1, [2])).toBe(true);
   });
 
   it("returns false for acyclic graph", () => {
-    const tasks = [
-      task({ id: 1, subject: "a" }),
-      task({ id: 2, subject: "b", blockedBy: [1] }),
-    ];
+    const tasks = [task({ id: 1, subject: "a" }), task({ id: 2, subject: "b", blockedBy: [1] })];
     expect(detectCycle(tasks, 2, [1])).toBe(false);
   });
 });

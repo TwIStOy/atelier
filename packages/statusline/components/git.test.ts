@@ -1,5 +1,5 @@
-import { describe, expect, test } from "vitest";
 import { visibleWidth } from "@earendil-works/pi-tui";
+import { describe, expect, test } from "vitest";
 import { GitComponent } from "./git.ts";
 
 function stripAnsi(s: string): string {

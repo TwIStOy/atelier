@@ -2,12 +2,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 
-export const SUBAGENT_SESSION_DIR = path.join(
-  os.homedir(),
-  ".agent",
-  "subagents",
-  "session",
-);
+export const SUBAGENT_SESSION_DIR = path.join(os.homedir(), ".agent", "subagents", "session");
 
 export function subagentParentIndexDir(): string {
   return path.join(os.homedir(), ".agent", "subagents", "by-parent");
@@ -27,10 +22,7 @@ export type SubagentLinkRecord = {
   status?: "running" | "done" | "error";
 };
 
-function appendLinkRecord(
-  parentSessionId: string,
-  record: SubagentLinkRecord,
-): void {
+function appendLinkRecord(parentSessionId: string, record: SubagentLinkRecord): void {
   try {
     const dir = subagentParentIndexDir();
     fs.mkdirSync(dir, { recursive: true });

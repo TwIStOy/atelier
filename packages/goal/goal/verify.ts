@@ -3,11 +3,10 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { TextContent } from "@earendil-works/pi-ai";
-import type {
-  ExtensionContext,
-  ExtensionFactory,
-} from "@earendil-works/pi-coding-agent";
+import type { ExtensionContext, ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import {
+  type AgentSession,
+  type AgentSessionEvent,
   createAgentSession,
   DEFAULT_MAX_BYTES,
   DEFAULT_MAX_LINES,
@@ -16,26 +15,19 @@ import {
   SessionManager,
   SettingsManager,
   truncateHead,
-  type AgentSession,
-  type AgentSessionEvent,
 } from "@earendil-works/pi-coding-agent";
 import extraTools from "@htwang-contrib/extra-tools/index.ts";
 import protectSecrets from "@htwang-contrib/protect-secrets/index.ts";
-import { resolveVerifierModel, loadGoalConfig } from "./config.ts";
+import { loadGoalConfig, resolveVerifierModel } from "./config.ts";
 import type { Goal } from "./types.ts";
 
 const VERIFIER_TOOLS = ["read", "bash", "grep", "glob", "ls"];
-const VERIFIER_EXTENSION_FACTORIES: ExtensionFactory[] = [
-  protectSecrets,
-  extraTools,
-];
+const VERIFIER_EXTENSION_FACTORIES: ExtensionFactory[] = [protectSecrets, extraTools];
 const TURN_GRACE = 3;
 const FORMAT_NUDGE =
   "Your previous response did not end with a valid verdict line. Based on your investigation so far, do not run more tools — respond now with a brief summary ending with exactly one line on its own: VERDICT: COMPLETE or VERDICT: INCOMPLETE.";
 
-type VerdictParseResult =
-  | { parsed: true; complete: boolean; reasoning: string }
-  | { parsed: false };
+type VerdictParseResult = { parsed: true; complete: boolean; reasoning: string } | { parsed: false };
 
 export type GoalVerificationResult =
   | { complete: true; reasoning: string }
@@ -43,11 +35,7 @@ export type GoalVerificationResult =
   | { error: true; message: string };
 
 function escapeXml(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
 function buildVerificationSystemPrompt(): string {

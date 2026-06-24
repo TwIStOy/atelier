@@ -1,15 +1,11 @@
 import {
-  getMarkdownTheme,
-  Theme,
-  UserMessageComponent,
   type ExtensionAPI,
+  getMarkdownTheme,
+  type Theme,
   type ThemeColor,
+  UserMessageComponent,
 } from "@earendil-works/pi-coding-agent";
-import {
-  Markdown,
-  truncateToWidth,
-  visibleWidth,
-} from "@earendil-works/pi-tui";
+import { Markdown, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 
 const PREFIX_MARKER = "▌ ";
 
@@ -45,18 +41,11 @@ function getThinkingColor(level: string): ThemeColor {
   }
 }
 
-function styledLine(
-  line: string,
-  width: number,
-  theme: Theme | undefined,
-  color: ThemeColor,
-): string {
+function styledLine(line: string, width: number, theme: Theme | undefined, color: ThemeColor): string {
   const prefix = theme ? theme.fg(color, PREFIX_MARKER) : PREFIX_MARKER;
   const contentWidth = Math.max(1, width - visibleWidth(prefix));
   const clipped = truncateToWidth(line, contentWidth, "");
-  const text = theme
-    ? theme.fg("userMessageText", theme.italic(clipped))
-    : clipped;
+  const text = theme ? theme.fg("userMessageText", theme.italic(clipped)) : clipped;
   const padding = " ".repeat(Math.max(0, contentWidth - visibleWidth(clipped)));
   return `${prefix}${text}${padding}`;
 }
@@ -79,10 +68,7 @@ function renderUserMessage(
   return ["", ...body.map((line) => styledLine(line, width, theme, color))];
 }
 
-function patchUserMessageRender(
-  getTheme: () => Theme | undefined,
-  getThinkingLevel: () => string,
-): void {
+function patchUserMessageRender(getTheme: () => Theme | undefined, getThinkingLevel: () => string): void {
   const proto: any = UserMessageComponent.prototype;
   proto.__getTheme = getTheme;
   proto.__getThinkingLevel = getThinkingLevel;

@@ -1,41 +1,28 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
-import { formatTokens, formatElapsedSeconds } from "@htwang-contrib/common";
+import { formatElapsedSeconds, formatTokens } from "@htwang-contrib/common";
 import type { Goal } from "./types.ts";
 
 export const GOAL_WIDGET_KEY = "pi-extensions.goal";
 
 export const GOAL_WIDGET_OPTIONS = { placement: "aboveEditor" as const };
 
-export function renderGoalWidget(
-  goal: Goal | null,
-  theme: Theme,
-  width: number,
-): string[] {
+export function renderGoalWidget(goal: Goal | null, theme: Theme, width: number): string[] {
   if (!goal) return [];
 
   let statusText: string;
   switch (goal.status) {
     case "active":
-      statusText = theme.fg(
-        "accent",
-        `◉ ${formatElapsedSeconds(goal.timeUsedSeconds)}`,
-      );
+      statusText = theme.fg("accent", `◉ ${formatElapsedSeconds(goal.timeUsedSeconds)}`);
       break;
     case "paused":
       statusText = theme.fg("muted", "◎ paused");
       break;
     case "budgetLimited":
-      statusText = theme.fg(
-        "warning",
-        `unmet ${formatTokens(goal.tokensUsed)}/${formatTokens(goal.tokenBudget ?? 0)}`,
-      );
+      statusText = theme.fg("warning", `unmet ${formatTokens(goal.tokensUsed)}/${formatTokens(goal.tokenBudget ?? 0)}`);
       break;
     case "complete":
-      statusText = theme.fg(
-        "success",
-        `✓ ${formatElapsedSeconds(goal.timeUsedSeconds)}`,
-      );
+      statusText = theme.fg("success", `✓ ${formatElapsedSeconds(goal.timeUsedSeconds)}`);
       break;
     default:
       return [];
@@ -52,8 +39,5 @@ export function renderGoalWidget(
   if (wrappedLines.length === 0) return [prefix];
 
   const indent = " ".repeat(prefixWidth);
-  return [
-    `${prefix}${wrappedLines[0]}`,
-    ...wrappedLines.slice(1).map((line) => `${indent}${line}`),
-  ];
+  return [`${prefix}${wrappedLines[0]}`, ...wrappedLines.slice(1).map((line) => `${indent}${line}`)];
 }

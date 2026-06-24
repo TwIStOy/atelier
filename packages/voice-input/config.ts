@@ -1,15 +1,6 @@
-import {
-  readConfig,
-  registerConfigItems,
-  type ExtensionConfigSchema,
-} from "@htwang-contrib/common";
+import { type ExtensionConfigSchema, readConfig, registerConfigItems } from "@htwang-contrib/common";
 import { findPreset, STT_PROVIDER_PRESETS } from "./providers/presets.ts";
-import type {
-  RecorderKind,
-  SttProviderConfig,
-  VadConfig,
-  VoiceInputConfig,
-} from "./types.ts";
+import type { RecorderKind, SttProviderConfig, VadConfig, VoiceInputConfig } from "./types.ts";
 
 export const DEFAULT_PROVIDER = "inference-self-host";
 export const DEFAULT_TRANSCRIBE_TIMEOUT_MS = 60_000;
@@ -53,9 +44,7 @@ export function resolveApiKey(providerName: string): string | undefined {
   return undefined;
 }
 
-export function resolveProviderConfig(
-  providerName: string,
-): Pick<SttProviderConfig, "baseUrl" | "model"> {
+export function resolveProviderConfig(providerName: string): Pick<SttProviderConfig, "baseUrl" | "model"> {
   const config = loadConfig();
   const provider = config.providers[providerName] ?? {};
   const preset = findPreset(providerName);
@@ -84,8 +73,7 @@ export function registerVoiceInputConfigItems(): void {
           label: resolveApiKey(p.name) ? `${p.label} ✓` : `${p.label} ✗`,
           value: p.name,
         })),
-      description:
-        "Provider used for speech-to-text (inference-self-host with mimo-v2.5).",
+      description: "Provider used for speech-to-text (inference-self-host with mimo-v2.5).",
       extensionLabel: "Voice Input",
       order: 0,
     },
@@ -129,8 +117,7 @@ export function registerVoiceInputConfigItems(): void {
       label: "Recorder",
       value: () => loadConfig().recorder,
       options: RECORDER_OPTIONS,
-      description:
-        "Recording backend. Auto detects per platform (parecord on Linux PulseAudio, ffmpeg elsewhere).",
+      description: "Recording backend. Auto detects per platform (parecord on Linux PulseAudio, ffmpeg elsewhere).",
       extensionLabel: "Voice Input",
       order: 100,
     },
@@ -171,8 +158,7 @@ export function registerVoiceInputConfigItems(): void {
       type: "number",
       label: "VAD Speech Threshold",
       value: () => loadConfig().vad.threshold,
-      description:
-        "Probability above which a frame counts as speech (0–1). Higher = stricter.",
+      description: "Probability above which a frame counts as speech (0–1). Higher = stricter.",
       extensionLabel: "Voice Input",
       order: 201,
       min: 0,
@@ -183,8 +169,7 @@ export function registerVoiceInputConfigItems(): void {
       type: "number",
       label: "VAD Min Speech (ms)",
       value: () => loadConfig().vad.minSpeechMs,
-      description:
-        "Minimum speech duration to open a segment. Filters out brief noises.",
+      description: "Minimum speech duration to open a segment. Filters out brief noises.",
       extensionLabel: "Voice Input",
       order: 202,
       min: 50,
@@ -195,8 +180,7 @@ export function registerVoiceInputConfigItems(): void {
       type: "number",
       label: "VAD Min Silence (ms)",
       value: () => loadConfig().vad.minSilenceMs,
-      description:
-        "Silence duration that closes a segment and triggers transcription.",
+      description: "Silence duration that closes a segment and triggers transcription.",
       extensionLabel: "Voice Input",
       order: 203,
       min: 100,
@@ -207,8 +191,7 @@ export function registerVoiceInputConfigItems(): void {
       type: "number",
       label: "VAD Max Speech (ms)",
       value: () => loadConfig().vad.maxSpeechMs,
-      description:
-        "Hard cap on a single segment length. Forces a split at this duration.",
+      description: "Hard cap on a single segment length. Forces a split at this duration.",
       extensionLabel: "Voice Input",
       order: 204,
       min: 1_000,

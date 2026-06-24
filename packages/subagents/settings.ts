@@ -1,10 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
-import {
-  normalizeSubagentAgentId,
-  SUBAGENT_FALLBACK_AGENT_ID,
-} from "./agent-catalog.ts";
+import { normalizeSubagentAgentId, SUBAGENT_FALLBACK_AGENT_ID } from "./agent-catalog.ts";
 
 const DEFAULT_MAX_CONCURRENT = 3;
 const DEFAULT_MAX_TOTAL = 10;
@@ -34,9 +31,7 @@ function parseNonNegativeInt(v: unknown, fallback: number): number {
   return n >= 0 ? n : fallback;
 }
 
-function parseDefaultsByAgentType(
-  raw: unknown,
-): Partial<Record<string, SubagentAgentTypeDefaults>> {
+function parseDefaultsByAgentType(raw: unknown): Partial<Record<string, SubagentAgentTypeDefaults>> {
   const out: Partial<Record<string, SubagentAgentTypeDefaults>> = {};
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return out;
   const obj = raw as Record<string, unknown>;
@@ -46,14 +41,8 @@ function parseDefaultsByAgentType(
     const v = obj[k];
     if (!v || typeof v !== "object" || Array.isArray(v)) continue;
     const row = v as Record<string, unknown>;
-    const model =
-      typeof row.model === "string" && row.model.trim()
-        ? row.model.trim()
-        : undefined;
-    const thinking =
-      typeof row.thinking === "string" && row.thinking.trim()
-        ? row.thinking.trim()
-        : undefined;
+    const model = typeof row.model === "string" && row.model.trim() ? row.model.trim() : undefined;
+    const thinking = typeof row.thinking === "string" && row.thinking.trim() ? row.thinking.trim() : undefined;
     if (model || thinking) {
       out[nk] = {
         ...(model ? { model } : {}),
@@ -82,15 +71,12 @@ export type SubagentSettingsOverrides = {
   timeout_ms?: number;
 };
 
-export function readSubagentSettings(
-  overrides?: SubagentSettingsOverrides,
-): SubagentSettings {
+export function readSubagentSettings(overrides?: SubagentSettingsOverrides): SubagentSettings {
   const parsed = readSettingsFile();
   let maxConcurrent = DEFAULT_MAX_CONCURRENT;
   let maxTotal = DEFAULT_MAX_TOTAL;
   let timeoutMs = DEFAULT_TIMEOUT_MS;
-  let defaultsByAgentType: Partial<Record<string, SubagentAgentTypeDefaults>> =
-    {};
+  let defaultsByAgentType: Partial<Record<string, SubagentAgentTypeDefaults>> = {};
 
   if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
     const o = parsed as Record<string, unknown>;
@@ -120,18 +106,12 @@ export function readSubagentConcurrencyLimits(
   return { maxConcurrent: s.maxConcurrent, maxTotal: s.maxTotal };
 }
 
-export function resolveTimeoutMs(
-  taskOverride: number | undefined,
-  fallback: number,
-): number {
+export function resolveTimeoutMs(taskOverride: number | undefined, fallback: number): number {
   if (taskOverride === undefined) return fallback;
   return parseNonNegativeInt(taskOverride, fallback);
 }
 
-export function defaultsForAgentType(
-  settings: SubagentSettings,
-  agentType: string,
-): SubagentAgentTypeDefaults {
+export function defaultsForAgentType(settings: SubagentSettings, agentType: string): SubagentAgentTypeDefaults {
   const key = normalizeSubagentAgentId(agentType) || SUBAGENT_FALLBACK_AGENT_ID;
   return settings.defaultsByAgentType[key] ?? {};
 }

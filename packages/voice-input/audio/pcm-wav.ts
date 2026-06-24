@@ -1,9 +1,6 @@
 export const DEFAULT_SAMPLE_RATE = 16000;
 
-export function encodeWav(
-  samples: Int16Array,
-  sampleRate: number = DEFAULT_SAMPLE_RATE,
-): Uint8Array {
+export function encodeWav(samples: Int16Array, sampleRate: number = DEFAULT_SAMPLE_RATE): Uint8Array {
   const dataLength = samples.byteLength;
   const buffer = new ArrayBuffer(44 + dataLength);
   const view = new DataView(buffer);

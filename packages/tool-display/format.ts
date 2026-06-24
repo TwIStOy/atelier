@@ -1,9 +1,5 @@
-import {
-  truncateToWidth,
-  visibleWidth,
-  wrapTextWithAnsi,
-} from "@earendil-works/pi-tui";
 import type { Theme } from "@earendil-works/pi-coding-agent";
+import { truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 
 export { wrapTextWithAnsi };
 
@@ -14,11 +10,7 @@ export function spinnerGlyph(theme: Theme, nowMs = Date.now()): string {
   return theme.fg("accent", SPINNER_FRAMES[i] ?? "");
 }
 
-export function prefixLine(
-  line: string,
-  prefix: string,
-  width: number,
-): string {
+export function prefixLine(line: string, prefix: string, width: number): string {
   const prefixWidth = visibleWidth(prefix);
   const innerWidth = Math.max(1, width - prefixWidth);
   return prefix + truncateToWidth(line, innerWidth, "");

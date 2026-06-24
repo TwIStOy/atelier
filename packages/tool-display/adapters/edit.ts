@@ -1,14 +1,13 @@
-import type { Theme } from "@earendil-works/pi-coding-agent";
-import { truncateToWidth } from "@earendil-works/pi-tui";
-import { shortenPath, extractAnsiRgb } from "@htwang-contrib/common";
-import type { ToolDisplayAdapter } from "../types.ts";
-import { INDENT, replaceTabs } from "./shared.ts";
-import { loadConfig } from "../config.ts";
-
+import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { execSync } from "node:child_process";
+import type { Theme } from "@earendil-works/pi-coding-agent";
+import { truncateToWidth } from "@earendil-works/pi-tui";
+import { extractAnsiRgb, shortenPath } from "@htwang-contrib/common";
 import { diffLines } from "diff";
+import { loadConfig } from "../config.ts";
+import type { ToolDisplayAdapter } from "../types.ts";
+import { INDENT, replaceTabs } from "./shared.ts";
 
 const BAR_WIDTH = 6;
 
@@ -49,16 +48,8 @@ function mixHex(a: string, ratioA: number, b: string, ratioB: number): string {
   );
 }
 
-function buildDeltaArgs(
-  styles: DeltaStyles,
-  isSplit: boolean,
-  width: number,
-): string[] {
-  const args = [
-    "delta",
-    isSplit ? "--side-by-side" : "--color-only",
-    `--width=${width}`,
-  ];
+function buildDeltaArgs(styles: DeltaStyles, isSplit: boolean, width: number): string[] {
+  const args = ["delta", isSplit ? "--side-by-side" : "--color-only", `--width=${width}`];
 
   const q = (flag: string, value: string) => args.push(`${flag}="${value}"`);
 
@@ -75,15 +66,9 @@ function buildDeltaArgs(
   q("--line-numbers-zero-style", styles.overlay0);
 
   q("--minus-style", `syntax ${mixHex(styles.red, 20, styles.base, 80)}`);
-  q(
-    "--minus-emph-style",
-    `bold syntax ${mixHex(styles.red, 35, styles.base, 65)}`,
-  );
+  q("--minus-emph-style", `bold syntax ${mixHex(styles.red, 35, styles.base, 65)}`);
   q("--plus-style", `syntax ${mixHex(styles.green, 20, styles.base, 80)}`);
-  q(
-    "--plus-emph-style",
-    `bold syntax ${mixHex(styles.green, 35, styles.base, 65)}`,
-  );
+  q("--plus-emph-style", `bold syntax ${mixHex(styles.green, 35, styles.base, 65)}`);
 
   return args;
 }
@@ -143,10 +128,7 @@ function buildFullFileDiff(
 
     positions.sort((a, b) => b.pos - a.pos);
     for (const p of positions) {
-      oldContent =
-        oldContent.slice(0, p.pos) +
-        p.oldText +
-        oldContent.slice(p.pos + p.newText.length);
+      oldContent = oldContent.slice(0, p.pos) + p.oldText + oldContent.slice(p.pos + p.newText.length);
     }
 
     return { oldFull: oldContent, newFull: newContent };
@@ -155,11 +137,7 @@ function buildFullFileDiff(
   }
 }
 
-function generateUnifiedDiff(
-  filePath: string,
-  oldText: string,
-  newText: string,
-): string {
+function generateUnifiedDiff(filePath: string, oldText: string, newText: string): string {
   const changes = diffLines(oldText ?? "", newText ?? "", {
     newlineIsToken: true,
   });
@@ -200,9 +178,7 @@ function generateUnifiedDiff(
 
   function flushHunk() {
     if (!inHunk || hunkBody.length === 0) return;
-    hunks.push(
-      `@@ -${hunkOldStart},${hunkOldCount} +${hunkNewStart},${hunkNewCount} @@`,
-    );
+    hunks.push(`@@ -${hunkOldStart},${hunkOldCount} +${hunkNewStart},${hunkNewCount} @@`);
     hunks.push(...hunkBody);
     hunkBody = [];
     inHunk = false;
@@ -266,22 +242,14 @@ function resolveIsSplit(innerWidth: number): boolean {
   return innerWidth >= cfg.splitDiffMinWidth;
 }
 
-function renderWithDelta(
-  unifiedDiff: string,
-  width: number,
-  theme: Theme,
-): string[] {
+function renderWithDelta(unifiedDiff: string, width: number, theme: Theme): string[] {
   const innerWidth = Math.max(1, width - INDENT.length);
   const isSplit = resolveIsSplit(innerWidth);
   const styles = probeDeltaStyles(theme);
 
   const deltaArgs = styles
     ? buildDeltaArgs(styles, isSplit, innerWidth)
-    : [
-        "delta",
-        isSplit ? "--side-by-side" : "--color-only",
-        `--width=${innerWidth}`,
-      ];
+    : ["delta", isSplit ? "--side-by-side" : "--color-only", `--width=${innerWidth}`];
 
   const diffHeaderRe = /^(diff --git|---|\+\+\+)/;
   try {
@@ -308,39 +276,18 @@ function renderChangeBar(added: number, removed: number, theme: Theme): string {
   if (total === 0) return "";
   const removedW = Math.round((BAR_WIDTH * removed) / total);
   const addedW = BAR_WIDTH - removedW;
-  return (
-    "[" +
-    theme.fg("error", "-".repeat(removedW)) +
-    theme.fg("success", "-".repeat(addedW)) +
-    "]"
-  );
+  return "[" + theme.fg("error", "-".repeat(removedW)) + theme.fg("success", "-".repeat(addedW)) + "]";
 }
 
 export const editAdapter: ToolDisplayAdapter<EditArgs> = {
-  formatCallHeader(
-    args,
-    theme,
-    _details?: unknown,
-    _isPartial?: boolean,
-    _expanded?: boolean,
-  ) {
+  formatCallHeader(args, theme, _details?: unknown, _isPartial?: boolean, _expanded?: boolean) {
     const rawPath = args?.file_path ?? args?.path ?? "";
     const path = shortenPath(rawPath);
-    const pathDisplay = path
-      ? theme.fg("accent", path)
-      : theme.fg("toolOutput", "...");
+    const pathDisplay = path ? theme.fg("accent", path) : theme.fg("toolOutput", "...");
     return theme.fg("toolTitle", theme.bold("Edit")) + " " + pathDisplay;
   },
 
-  formatCollapsedContent(
-    args,
-    _output,
-    theme,
-    width,
-    _details?: unknown,
-    _isPartial?: boolean,
-    _spinAt?: number,
-  ) {
+  formatCollapsedContent(args, _output, theme, width, _details?: unknown, _isPartial?: boolean, _spinAt?: number) {
     const edits = getEdits(args);
     if (edits.length === 0) return [theme.fg("muted", "└ no changes")];
 
@@ -349,12 +296,7 @@ export const editAdapter: ToolDisplayAdapter<EditArgs> = {
     parts.push(theme.fg("muted", "diff"));
     if (added > 0) parts.push(theme.fg("success", `+${added}`));
     if (removed > 0) parts.push(theme.fg("error", `-${removed}`));
-    parts.push(
-      theme.fg(
-        "muted",
-        resolveIsSplit(width - INDENT.length * 2) ? "side-by-side" : "unified",
-      ),
-    );
+    parts.push(theme.fg("muted", resolveIsSplit(width - INDENT.length * 2) ? "side-by-side" : "unified"));
     if (added > 0 || removed > 0) {
       parts.push(renderChangeBar(added, removed, theme));
     }
@@ -370,22 +312,14 @@ export const editAdapter: ToolDisplayAdapter<EditArgs> = {
     if (edits.length > 1) {
       const fullDiff = buildFullFileDiff(rawPath, edits);
       if (fullDiff) {
-        const unified = generateUnifiedDiff(
-          rawPath,
-          fullDiff.oldFull,
-          fullDiff.newFull,
-        );
+        const unified = generateUnifiedDiff(rawPath, fullDiff.oldFull, fullDiff.newFull);
         if (unified) return renderWithDelta(unified, width, _theme);
       }
     }
 
     const allDiff: string[] = [];
     for (let i = 0; i < edits.length; i++) {
-      const unified = generateUnifiedDiff(
-        rawPath,
-        edits[i].oldText,
-        edits[i].newText,
-      );
+      const unified = generateUnifiedDiff(rawPath, edits[i].oldText, edits[i].newText);
       if (unified) allDiff.push(unified);
     }
 

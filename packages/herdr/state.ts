@@ -31,23 +31,15 @@ export function stateIcon(state: AgentState): string {
 export function buildTabTitle(state: AgentState, body: string): string {
   const icon = stateIcon(state);
   const trimmed = body.trim();
-  const fallback =
-    state === "running"
-      ? "Working…"
-      : state === "waiting"
-        ? "Needs input"
-        : "Pi";
+  const fallback = state === "running" ? "Working…" : state === "waiting" ? "Needs input" : "Pi";
   const text = trimmed.length > 0 ? trimmed : fallback;
   return `${icon} ${text}`.slice(0, 80);
 }
 
 /** Format the first question of an `ask_user_question` payload for display. */
-export function summarizeAskUserQuestion(
-  payload: AskUserPromptPayload | null | undefined,
-): string {
+export function summarizeAskUserQuestion(payload: AskUserPromptPayload | null | undefined): string {
   const first = payload?.questions?.[0];
   if (!first) return "Needs input";
-  const message =
-    first.question?.trim() || first.header?.trim() || "Needs input";
+  const message = first.question?.trim() || first.header?.trim() || "Needs input";
   return message;
 }

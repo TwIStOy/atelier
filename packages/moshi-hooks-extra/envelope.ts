@@ -43,10 +43,7 @@ export interface TerminalContextLike {
   herdrTab: string;
 }
 
-export function projectNameForCwd(
-  cwd: string,
-  ctx: TerminalContextLike,
-): string {
+export function projectNameForCwd(cwd: string, ctx: TerminalContextLike): string {
   if (ctx.tmuxSession) return ctx.tmuxSession;
   if (ctx.herdrSession) return ctx.herdrSession;
   if (ctx.zellijSession) return ctx.zellijSession;
@@ -88,10 +85,7 @@ export function buildSessionUpdateEnvelope(
   };
 }
 
-export function sessionIdFromEventCtx(
-  event: MoshiHookEvent,
-  ctx: MoshiHookCtx,
-): string {
+export function sessionIdFromEventCtx(event: MoshiHookEvent, ctx: MoshiHookCtx): string {
   const sessionManager = ctx.sessionManager as
     | (Record<string, unknown> & {
         getSessionFile?: (...args: unknown[]) => unknown;
@@ -106,13 +100,7 @@ export function sessionIdFromEventCtx(
       sessionFile = "";
     }
   }
-  return firstString(
-    event.session_id as string,
-    event.sessionId as string,
-    sessionFile,
-    ctx.cwd as string,
-    "pi",
-  );
+  return firstString(event.session_id as string, event.sessionId as string, sessionFile, ctx.cwd as string, "pi");
 }
 
 export function modelNameFromCtx(ctx: MoshiHookCtx): string {

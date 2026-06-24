@@ -9,8 +9,7 @@ export const memoryRead = {
     "Read a memory node by URI. Supports regular URIs (e.g. 'core://agent/identity') and system URIs (e.g. 'system://boot', 'system://index', 'system://glossary').",
   parameters: Type.Object({
     uri: Type.String({
-      description:
-        "Memory URI (e.g. 'core://agent/identity') or system URI (e.g. 'system://boot').",
+      description: "Memory URI (e.g. 'core://agent/identity') or system URI (e.g. 'system://boot').",
     }),
   }),
   execute: async (_id: string, args: Record<string, unknown>) => {

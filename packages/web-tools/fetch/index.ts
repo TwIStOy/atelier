@@ -1,30 +1,24 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import {
-  DEFAULT_MAX_BYTES,
-  DEFAULT_MAX_LINES,
-  formatSize,
-  truncateHead,
-  type TruncationResult,
-} from "@earendil-works/pi-coding-agent";
 import { readFileSync } from "node:fs";
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import {
+  DEFAULT_MAX_BYTES,
+  DEFAULT_MAX_LINES,
+  formatSize,
+  type TruncationResult,
+  truncateHead,
+} from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { instantiateProviders, isRateLimitError } from "../config.ts";
 import { buildInterceptors, getInterceptors } from "../interceptors/index.ts";
-import {
-  fetchViaGenericHtml,
-  parseAndAssertHttpUrl,
-} from "../providers/fetch-helpers.ts";
+import { fetchViaGenericHtml, parseAndAssertHttpUrl } from "../providers/fetch-helpers.ts";
 import type { FetchResponse } from "../providers/types.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const fetchToolDescription = readFileSync(
-  join(__dirname, "prompt.txt"),
-  "utf-8",
-).trim();
+const fetchToolDescription = readFileSync(join(__dirname, "prompt.txt"), "utf-8").trim();
 
 interface FetchDetails {
   url: string;
@@ -43,10 +37,7 @@ async function spillFullContentToTempFile(content: string): Promise<string> {
   return tempFile;
 }
 
-function formatTruncationFooter(
-  truncation: TruncationResult,
-  tempFile: string,
-): string {
+function formatTruncationFooter(truncation: TruncationResult, tempFile: string): string {
   const truncatedLines = truncation.totalLines - truncation.outputLines;
   const truncatedBytes = truncation.totalBytes - truncation.outputBytes;
   return (
@@ -57,11 +48,7 @@ function formatTruncationFooter(
   );
 }
 
-function formatFetchHeader(
-  url: string,
-  title: string | undefined,
-  contentType: string | undefined,
-): string {
+function formatFetchHeader(url: string, title: string | undefined, contentType: string | undefined): string {
   const lines = [`**Fetched:** ${url}`];
   if (title) lines.push(`**Title:** ${title}`);
   if (contentType) lines.push(`**Content-Type:** ${contentType}`);
@@ -74,8 +61,7 @@ const fetchParams = Type.Object({
   }),
   raw: Type.Optional(
     Type.Boolean({
-      description:
-        "If true, return the raw HTML instead of extracted text. Default: false.",
+      description: "If true, return the raw HTML instead of extracted text. Default: false.",
       default: false,
     }),
   ),
@@ -139,12 +125,7 @@ export function registerWebFetchTool(pi: ExtensionAPI): void {
         fetchResponse = await fetchViaGenericHtml(url, raw, signal);
       }
 
-      const {
-        text: bodyText,
-        title,
-        contentType,
-        contentLength,
-      } = fetchResponse;
+      const { text: bodyText, title, contentType, contentLength } = fetchResponse;
 
       const truncation = truncateHead(bodyText, {
         maxLines: DEFAULT_MAX_LINES,

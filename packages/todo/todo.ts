@@ -1,10 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { loadConfig } from "./config.ts";
-import {
-  selectTasksByStatus,
-  selectTodoCounts,
-  selectVisibleTasks,
-} from "./state/selectors.ts";
+import { selectTasksByStatus, selectTodoCounts, selectVisibleTasks } from "./state/selectors.ts";
 import { applyTaskMutation } from "./state/state-reducer.ts";
 import { commitState, getState } from "./state/store.ts";
 import { buildToolResult } from "./tool/response-envelope.ts";
@@ -23,8 +19,7 @@ const SECTION_PENDING = "── Pending ──";
 const SECTION_IN_PROGRESS = "── In Progress ──";
 const SECTION_COMPLETED = "── Completed ──";
 
-export const DEFAULT_PROMPT_SNIPPET =
-  "Manage a task list to track multi-step progress";
+export const DEFAULT_PROMPT_SNIPPET = "Manage a task list to track multi-step progress";
 export const DEFAULT_PROMPT_GUIDELINES: string[] = [
   "Use `todo` for complex work with 3+ steps, when the user gives you a list of tasks, or immediately after receiving new instructions to capture requirements. Skip it for single trivial tasks and purely conversational requests.",
   "When starting any task, mark it in_progress BEFORE beginning work. Mark it completed IMMEDIATELY when done — never batch completions. Exactly one task should be in_progress at a time.",
@@ -47,18 +42,9 @@ export function registerTodoTool(pi: ExtensionAPI): void {
     parameters: TodoParamsSchema,
 
     async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
-      const result = applyTaskMutation(
-        getState(),
-        params.action,
-        params as TaskMutationParams,
-      );
+      const result = applyTaskMutation(getState(), params.action, params as TaskMutationParams);
       commitState(result.state);
-      return buildToolResult(
-        params.action,
-        params as TaskMutationParams,
-        result.state,
-        result.op,
-      );
+      return buildToolResult(params.action, params as TaskMutationParams, result.state, result.op);
     },
   });
 }
@@ -81,27 +67,22 @@ export function registerTodosCommand(pi: ExtensionAPI): void {
       const counts = selectTodoCounts(state);
 
       const header: string[] = [];
-      if (counts.completed > 0)
-        header.push(`${counts.completed}/${counts.total} completed`);
-      if (counts.inProgress > 0)
-        header.push(`${counts.inProgress} in_progress`);
+      if (counts.completed > 0) header.push(`${counts.completed}/${counts.total} completed`);
+      if (counts.inProgress > 0) header.push(`${counts.inProgress} in_progress`);
       if (counts.pending > 0) header.push(`${counts.pending} pending`);
 
       const lines: string[] = [header.join(" · ")];
       if (groups.pending.length > 0) {
         lines.push(SECTION_PENDING);
-        for (const task of groups.pending)
-          lines.push(formatCommandTaskLine(task, "○"));
+        for (const task of groups.pending) lines.push(formatCommandTaskLine(task, "○"));
       }
       if (groups.inProgress.length > 0) {
         lines.push(SECTION_IN_PROGRESS);
-        for (const task of groups.inProgress)
-          lines.push(formatCommandTaskLine(task, "◐"));
+        for (const task of groups.inProgress) lines.push(formatCommandTaskLine(task, "◐"));
       }
       if (groups.completed.length > 0) {
         lines.push(SECTION_COMPLETED);
-        for (const task of groups.completed)
-          lines.push(formatCommandTaskLine(task, "✓"));
+        for (const task of groups.completed) lines.push(formatCommandTaskLine(task, "✓"));
       }
 
       ctx.ui.notify(lines.join("\n"), "info");

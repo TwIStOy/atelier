@@ -9,8 +9,7 @@ export const memoryTriggers = {
     "Manage glossary trigger keywords for a node. When a keyword appears in any memory's content, the system auto-links to the target node.",
   parameters: Type.Object({
     uri: Type.String({
-      description:
-        "Target node URI in domain://path format (e.g. 'core://agent/identity').",
+      description: "Target node URI in domain://path format (e.g. 'core://agent/identity').",
     }),
     add: Type.Optional(
       Type.Array(Type.String(), {
@@ -26,10 +25,8 @@ export const memoryTriggers = {
   execute: async (_id: string, args: Record<string, unknown>) => {
     try {
       const cliArgs = ["memory", "triggers", args.uri as string];
-      if ((args.add as string[])?.length)
-        cliArgs.push("--add", (args.add as string[]).join(","));
-      if ((args.remove as string[])?.length)
-        cliArgs.push("--remove", (args.remove as string[]).join(","));
+      if ((args.add as string[])?.length) cliArgs.push("--add", (args.add as string[]).join(","));
+      if ((args.remove as string[])?.length) cliArgs.push("--remove", (args.remove as string[]).join(","));
       const result = await runHat(cliArgs);
       return jsonResult(result, {
         uri: args.uri,

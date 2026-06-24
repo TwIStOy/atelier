@@ -1,9 +1,5 @@
-import {
-  readConfig,
-  updateConfig,
-  registerConfigItems,
-} from "@htwang-contrib/common";
 import type { ExtensionConfigSchema } from "@htwang-contrib/common";
+import { readConfig, registerConfigItems, updateConfig } from "@htwang-contrib/common";
 
 export interface ToolDisplayConfig {
   previewLines: number;
@@ -27,9 +23,7 @@ export function loadConfig(): ToolDisplayConfig {
   return readConfig(CONFIG_NAME, CONFIG_SCHEMA);
 }
 
-export function saveConfig(
-  patch: Partial<ToolDisplayConfig>,
-): ToolDisplayConfig {
+export function saveConfig(patch: Partial<ToolDisplayConfig>): ToolDisplayConfig {
   return updateConfig(CONFIG_NAME, CONFIG_SCHEMA, patch);
 }
 
@@ -40,8 +34,7 @@ export function registerToolDisplayConfigItems(): void {
       type: "number",
       label: "Preview Lines",
       value: () => loadConfig().previewLines,
-      description:
-        "Number of output lines shown in collapsed tool call view (default 3)",
+      description: "Number of output lines shown in collapsed tool call view (default 3)",
       extensionLabel: "Tool Display",
       order: 0,
       min: 1,
@@ -67,8 +60,7 @@ export function registerToolDisplayConfigItems(): void {
       type: "number",
       label: "Split Diff Min Width",
       value: () => loadConfig().splitDiffMinWidth,
-      description:
-        'Minimum terminal width to use side-by-side diff when diff mode is "auto" (default 100)',
+      description: 'Minimum terminal width to use side-by-side diff when diff mode is "auto" (default 100)',
       extensionLabel: "Tool Display",
       order: 2,
       min: 40,

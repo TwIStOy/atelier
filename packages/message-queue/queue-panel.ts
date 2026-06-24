@@ -1,12 +1,6 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import type { KeybindingsManager, TUI } from "@earendil-works/pi-tui";
-import {
-  Key,
-  matchesKey,
-  truncateToWidth,
-  visibleWidth,
-  wrapTextWithAnsi,
-} from "@earendil-works/pi-tui";
+import { Key, matchesKey, truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 import type { QueuedMessage } from "./queue.ts";
 
 const MIN_VISIBLE = 3;
@@ -16,22 +10,11 @@ interface QueuePanelState {
   scroll: number;
 }
 
-function syncViewport(
-  state: QueuePanelState,
-  itemCount: number,
-  listRows: number,
-): void {
-  state.selected = Math.max(
-    0,
-    Math.min(state.selected, Math.max(0, itemCount - 1)),
-  );
+function syncViewport(state: QueuePanelState, itemCount: number, listRows: number): void {
+  state.selected = Math.max(0, Math.min(state.selected, Math.max(0, itemCount - 1)));
   if (state.selected < state.scroll) state.scroll = state.selected;
-  else if (state.selected >= state.scroll + listRows)
-    state.scroll = state.selected - listRows + 1;
-  state.scroll = Math.max(
-    0,
-    Math.min(state.scroll, Math.max(0, itemCount - listRows)),
-  );
+  else if (state.selected >= state.scroll + listRows) state.scroll = state.selected - listRows + 1;
+  state.scroll = Math.max(0, Math.min(state.scroll, Math.max(0, itemCount - listRows)));
 }
 
 function padOrTruncate(text: string, width: number): string {
@@ -65,10 +48,7 @@ function renderMessageRows(
 
   for (const raw of parts) {
     const para = raw.length === 0 ? " " : raw;
-    const wrapped = wrapTextWithAnsi(
-      theme.fg(isSelected ? "text" : "dim", para),
-      available,
-    );
+    const wrapped = wrapTextWithAnsi(theme.fg(isSelected ? "text" : "dim", para), available);
     for (let wi = 0; wi < wrapped.length; wi++) {
       const line = wrapped[wi]!;
       const full = first && wi === 0 ? `${prefix}${line}` : `${indent}${line}`;
@@ -193,10 +173,7 @@ export function createQueuePanel(
     const hBorder = theme.fg("dim", "─".repeat(Math.max(0, width - 2)));
 
     const title = theme.fg("accent", theme.bold("Message Queue"));
-    const count = theme.fg(
-      "muted",
-      `${msgs.length} message${msgs.length === 1 ? "" : "s"}`,
-    );
+    const count = theme.fg("muted", `${msgs.length} message${msgs.length === 1 ? "" : "s"}`);
     const footer = theme.fg("muted", "enter send · d delete · esc close");
 
     const lines: string[] = [];
@@ -204,13 +181,7 @@ export function createQueuePanel(
     lines.push(borderedLine(`${title}  ${count}  ${footer}`, contentWidth));
 
     for (let i = 0; i < msgs.length; i++) {
-      const rows = renderMessageRows(
-        msgs[i]!,
-        i,
-        i === state.selected,
-        contentWidth,
-        theme,
-      );
+      const rows = renderMessageRows(msgs[i]!, i, i === state.selected, contentWidth, theme);
       lines.push(...rows);
     }
 

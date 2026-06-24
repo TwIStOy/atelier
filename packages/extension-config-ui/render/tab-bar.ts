@@ -10,12 +10,7 @@ function inactivePill(theme: Theme, label: string): string {
   return theme.bg("selectedBg", theme.fg("accent", label));
 }
 
-export function renderTabBar(
-  tabs: TabDef[],
-  activeId: string,
-  width: number,
-  theme: Theme,
-): string {
+export function renderTabBar(tabs: TabDef[], activeId: string, width: number, theme: Theme): string {
   const safeWidth = Math.max(1, width);
   if (tabs.length === 0) return " ".repeat(safeWidth);
 
@@ -68,16 +63,10 @@ export function renderTabBar(
 
   const cells = tabs.slice(start, end).map((tab) => {
     const label = ` ${tab.label} `;
-    return tab.id === activeId
-      ? activePill(theme, label)
-      : inactivePill(theme, label);
+    return tab.id === activeId ? activePill(theme, label) : inactivePill(theme, label);
   });
 
   if (start > 0) cells.unshift(theme.fg("dim", "‹"));
   if (end < tabs.length) cells.push(theme.fg("dim", "›"));
-  return truncateToWidth(
-    cells.join(" ") + " ".repeat(Math.max(0, safeWidth)),
-    safeWidth,
-    "",
-  );
+  return truncateToWidth(cells.join(" ") + " ".repeat(Math.max(0, safeWidth)), safeWidth, "");
 }

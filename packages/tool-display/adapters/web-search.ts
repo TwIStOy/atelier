@@ -22,23 +22,10 @@ export const webSearchAdapter: ToolDisplayAdapter<WebSearchArgs> = {
     const query = typeof args.query === "string" ? args.query : "";
     const backend = backendFromDetails(_details);
     const tag = backend ? " " + theme.fg("dim", `(${backend})`) : "";
-    return (
-      theme.fg("toolTitle", theme.bold("WebSearch")) +
-      tag +
-      " " +
-      theme.fg("accent", `"${query}"`)
-    );
+    return theme.fg("toolTitle", theme.bold("WebSearch")) + tag + " " + theme.fg("accent", `"${query}"`);
   },
 
-  formatCollapsedContent(
-    _args,
-    _output,
-    theme,
-    _width,
-    details?: unknown,
-    isPartial?: boolean,
-    _spinAt?: number,
-  ) {
+  formatCollapsedContent(_args, _output, theme, _width, details?: unknown, isPartial?: boolean, _spinAt?: number) {
     if (isPartial) return [theme.fg("muted", "└ searching…")];
     const count = resultCountFromDetails(details);
     if (typeof count === "number" && count > 0) {

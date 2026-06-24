@@ -1,7 +1,4 @@
-import type {
-  AgentToolResult,
-  AgentToolUpdateCallback,
-} from "@earendil-works/pi-coding-agent";
+import type { AgentToolResult, AgentToolUpdateCallback } from "@earendil-works/pi-coding-agent";
 import type { SubagentRunDetails } from "./run-agent.ts";
 
 export const SUBAGENT_TOOL_UI_TICK_MS = 100;

@@ -1,7 +1,7 @@
-import { describe, it, expect } from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { describe, expect, it } from "vitest";
 import { loadSubagentMessages, loadSubagentRuns } from "./index.ts";
 
 function findSampleChildSession(): string | null {
@@ -37,19 +37,12 @@ describe("subagents viewer-index", () => {
     const runsUnknown = loadSubagentRuns("definitely-not-a-real-parent-id");
     expect(runsUnknown).toEqual([]);
 
-    const byParentDir = path.join(
-      os.homedir(),
-      ".agent",
-      "subagents",
-      "by-parent",
-    );
+    const byParentDir = path.join(os.homedir(), ".agent", "subagents", "by-parent");
     if (!fs.existsSync(byParentDir)) {
       console.warn("no by-parent dir; skipping positive case");
       return;
     }
-    const files = fs
-      .readdirSync(byParentDir)
-      .filter((f) => f.endsWith(".jsonl"));
+    const files = fs.readdirSync(byParentDir).filter((f) => f.endsWith(".jsonl"));
     if (files.length === 0) {
       console.warn("no by-parent index files; skipping positive case");
       return;

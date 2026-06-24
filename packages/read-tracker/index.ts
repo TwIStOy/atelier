@@ -1,10 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { isToolCallEventType } from "@earendil-works/pi-coding-agent";
-import {
-  buildReadRows,
-  renderReadTrackerTable,
-  summarizeRows,
-} from "./display.ts";
+import { buildReadRows, renderReadTrackerTable, summarizeRows } from "./display.ts";
 import { ReadTracker } from "./read-tracker.ts";
 
 const WRITE_LIKE_TOOLS = new Set(["edit", "write"]);
@@ -48,41 +44,29 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.registerCommand("read-tracker", {
-    description:
-      "List files tracked by read-tracker (read op time, size, mtime). Args: clear|count",
+    description: "List files tracked by read-tracker (read op time, size, mtime). Args: clear|count",
     handler: async (args, ctx) => {
       const trimmed = (args ?? "").trim().toLowerCase();
       if (trimmed === "clear") {
         const n = tracker.paths().length;
         tracker.clear();
-        ctx.ui.notify(
-          `Cleared ${n} tracked file${n === 1 ? "" : "s"}.`,
-          "info",
-        );
+        ctx.ui.notify(`Cleared ${n} tracked file${n === 1 ? "" : "s"}.`, "info");
         return;
       }
       if (trimmed === "count") {
         const { total } = summarizeRows(buildReadRows(tracker.entries()));
-        ctx.ui.notify(
-          `${total} tracked file${total === 1 ? "" : "s"}.`,
-          "info",
-        );
+        ctx.ui.notify(`${total} tracked file${total === 1 ? "" : "s"}.`, "info");
         return;
       }
       if (trimmed !== "") {
-        ctx.ui.notify(
-          `Unknown argument: ${args}. Usage: /read-tracker [clear|count]`,
-          "warning",
-        );
+        ctx.ui.notify(`Unknown argument: ${args}. Usage: /read-tracker [clear|count]`, "warning");
         return;
       }
       const rows = buildReadRows(tracker.entries());
       const { total, stale } = summarizeRows(rows);
       const body = renderReadTrackerTable(rows);
       ctx.ui.notify(
-        `${total} tracked file${total === 1 ? "" : "s"}${
-          stale > 0 ? ` · ${stale} stale (⚠ > 1h old read)` : ""
-        }`,
+        `${total} tracked file${total === 1 ? "" : "s"}${stale > 0 ? ` · ${stale} stale (⚠ > 1h old read)` : ""}`,
         "info",
       );
       ctx.ui.setWidget("read-tracker", body.split("\n"));

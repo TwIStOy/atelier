@@ -1,10 +1,6 @@
 import type { Task } from "../tool/types.ts";
 
-export function detectCycle(
-  taskList: readonly Task[],
-  taskId: number,
-  newBlockedBy: readonly number[],
-): boolean {
+export function detectCycle(taskList: readonly Task[], taskId: number, newBlockedBy: readonly number[]): boolean {
   const edges = new Map<number, number[]>();
   for (const t of taskList) {
     if (t.id === taskId) {

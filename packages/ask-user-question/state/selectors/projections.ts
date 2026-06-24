@@ -1,8 +1,5 @@
 import type { ChatRowViewProps } from "../../view/components/chat-row-view.ts";
-import {
-  MULTI_SUBMIT_LABEL,
-  type MultiSelectViewProps,
-} from "../../view/components/multi-select-view.ts";
+import { MULTI_SUBMIT_LABEL, type MultiSelectViewProps } from "../../view/components/multi-select-view.ts";
 import type { OptionListViewProps } from "../../view/components/option-list-view.ts";
 import type { PreviewPaneProps } from "../../view/components/preview/preview-pane.ts";
 import type { SubmitPickerProps } from "../../view/components/submit-picker.ts";
@@ -10,16 +7,9 @@ import type { TabBarProps } from "../../view/components/tab-bar.ts";
 import type { DialogProps } from "../../view/dialog-builder.ts";
 import { ROW_INTENT_META } from "../row-intent.ts";
 import type { GlobalSelector, PerTabSelector } from "./contract.ts";
-import {
-  chatNumberingFor,
-  selectActiveTabItems,
-  selectConfirmedIndicator,
-} from "./derivations.ts";
+import { chatNumberingFor, selectActiveTabItems, selectConfirmedIndicator } from "./derivations.ts";
 
-export const selectMultiSelectProps: PerTabSelector<MultiSelectViewProps> = (
-  state,
-  ctx,
-) => {
+export const selectMultiSelectProps: PerTabSelector<MultiSelectViewProps> = (state, ctx) => {
   const question = ctx.questions[ctx.i];
   if (!question)
     return {
@@ -37,24 +27,14 @@ export const selectMultiSelectProps: PerTabSelector<MultiSelectViewProps> = (
   }
   const nextActive = focused && state.optionIndex === question.options.length;
   const isLastQuestion = ctx.i === ctx.questions.length - 1;
-  const nextLabel = isLastQuestion
-    ? MULTI_SUBMIT_LABEL
-    : ROW_INTENT_META.next.label;
+  const nextLabel = isLastQuestion ? MULTI_SUBMIT_LABEL : ROW_INTENT_META.next.label;
   return { rows, nextActive, nextLabel };
 };
 
-export const selectOptionListProps: PerTabSelector<OptionListViewProps> = (
-  state,
-  ctx,
-) => {
+export const selectOptionListProps: PerTabSelector<OptionListViewProps> = (state, ctx) => {
   const items = ctx.itemsByTab[ctx.i] ?? [];
   const focused = ctx.activeView === "options";
-  const confirmed = selectConfirmedIndicator(
-    ctx.questions,
-    state.currentTab,
-    state.answers,
-    items,
-  );
+  const confirmed = selectConfirmedIndicator(ctx.questions, state.currentTab, state.answers, items);
   return {
     selectedIndex: state.optionIndex,
     focused,
@@ -64,23 +44,14 @@ export const selectOptionListProps: PerTabSelector<OptionListViewProps> = (
   };
 };
 
-export const selectSubmitPickerProps: GlobalSelector<SubmitPickerProps> = (
-  state,
-  ctx,
-) => {
+export const selectSubmitPickerProps: GlobalSelector<SubmitPickerProps> = (state, ctx) => {
   const focused = ctx.activeView === "submit";
   return {
-    rows: [
-      { active: focused && state.submitChoiceIndex === 0 },
-      { active: focused && state.submitChoiceIndex === 1 },
-    ],
+    rows: [{ active: focused && state.submitChoiceIndex === 0 }, { active: focused && state.submitChoiceIndex === 1 }],
   };
 };
 
-export const selectPreviewPaneProps: PerTabSelector<PreviewPaneProps> = (
-  state,
-  ctx,
-) => ({
+export const selectPreviewPaneProps: PerTabSelector<PreviewPaneProps> = (state, ctx) => ({
   notesVisible: state.notesVisible,
   selectedIndex: state.optionIndex,
   focused: ctx.activeView === "options",
@@ -96,21 +67,13 @@ export const selectTabBarProps: GlobalSelector<TabBarProps> = (state, ctx) => {
     tabs,
     submit: {
       active: state.currentTab === ctx.questions.length,
-      allAnswered:
-        state.answers.size === ctx.questions.length && ctx.questions.length > 0,
+      allAnswered: state.answers.size === ctx.questions.length && ctx.questions.length > 0,
     },
   };
 };
 
-export const selectChatRowProps: GlobalSelector<ChatRowViewProps> = (
-  state,
-  ctx,
-) => {
-  const activeItems = selectActiveTabItems(
-    ctx.itemsByTab,
-    state.currentTab,
-    ctx.totalQuestions,
-  );
+export const selectChatRowProps: GlobalSelector<ChatRowViewProps> = (state, ctx) => {
+  const activeItems = selectActiveTabItems(ctx.itemsByTab, state.currentTab, ctx.totalQuestions);
   return {
     focused: ctx.activeView === "chat",
     numbering: chatNumberingFor(activeItems),

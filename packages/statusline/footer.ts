@@ -1,32 +1,24 @@
-import { truncateToWidth } from "@earendil-works/pi-tui";
-import type { Component, TUI } from "@earendil-works/pi-tui";
 import type {
   ExtensionAPI,
   ExtensionContext,
   ReadonlyFooterDataProvider,
   Theme,
 } from "@earendil-works/pi-coding-agent";
+import type { Component, TUI } from "@earendil-works/pi-tui";
+import { truncateToWidth } from "@earendil-works/pi-tui";
+import type { StatusLineComponent } from "./components/base.ts";
 import { CodingPlanUsageComponent } from "./components/coding-plan-usage.ts";
 import { GitComponent } from "./components/git.ts";
 import { TokensComponent } from "./components/tokens.ts";
-import type { StatusLineComponent } from "./components/base.ts";
 
 export function makeFooter(
   ctx: ExtensionContext,
   pi: ExtensionAPI,
-): (
-  tui: TUI,
-  theme: Theme,
-  _footerData: ReadonlyFooterDataProvider,
-) => Component & { dispose?(): void } {
+): (tui: TUI, theme: Theme, _footerData: ReadonlyFooterDataProvider) => Component & { dispose?(): void } {
   const git = new GitComponent(ctx.cwd);
   const codingPlan = new CodingPlanUsageComponent(ctx, pi);
 
-  const components: StatusLineComponent[] = [
-    git,
-    codingPlan,
-    new TokensComponent(ctx),
-  ];
+  const components: StatusLineComponent[] = [git, codingPlan, new TokensComponent(ctx)];
 
   return (tui, theme) => {
     git.bindRender(() => tui.requestRender());

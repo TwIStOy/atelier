@@ -10,16 +10,13 @@ let sideCallAnswer: { fromModel: boolean; title?: string; throw?: boolean } = {
   fromModel: false,
 };
 vi.mock("@htwang-contrib/common", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("@htwang-contrib/common")>();
+  const actual = await importOriginal<typeof import("@htwang-contrib/common")>();
   return {
     ...actual,
     executeSideCall: vi.fn(async () => {
-      if (sideCallDelayMs > 0)
-        await new Promise((r) => setTimeout(r, sideCallDelayMs));
+      if (sideCallDelayMs > 0) await new Promise((r) => setTimeout(r, sideCallDelayMs));
       if (sideCallAnswer.throw) throw new Error("boom");
-      if (!sideCallAnswer.fromModel)
-        return { ok: false, error: "no prompt yet" };
+      if (!sideCallAnswer.fromModel) return { ok: false, error: "no prompt yet" };
       return { ok: true, answer: sideCallAnswer.title ?? "Title" };
     }),
   };
@@ -121,9 +118,7 @@ describe("herdr index.ts: title latch + event retry", () => {
       // First render happens after a 0ms timeout (scheduleRender(0)).
       expect(execCalls.some((c) => c.args[0] === "tab")).toBe(true);
     });
-    let renamedWith = execCalls
-      .filter((c) => c.args[0] === "tab" && c.args[1] === "rename")
-      .map((c) => c.args[3]);
+    const renamedWith = execCalls.filter((c) => c.args[0] === "tab" && c.args[1] === "rename").map((c) => c.args[3]);
     // No first prompt yet -> title body falls back to "Pi" state-specific text.
     expect(renamedWith.every((t) => !/RealTitle|Title/.test(t))).toBe(true);
 
@@ -140,9 +135,7 @@ describe("herdr index.ts: title latch + event retry", () => {
     // Pass the prompt on the event — this is the real primary path now.
     handlers.get("before_agent_start")!({ prompt: "build the thing" }, ctx);
     await vi.waitFor(() => {
-      const renames = execCalls
-        .filter((c) => c.args[0] === "tab" && c.args[1] === "rename")
-        .map((c) => c.args[3]);
+      const renames = execCalls.filter((c) => c.args[0] === "tab" && c.args[1] === "rename").map((c) => c.args[3]);
       expect(renames.some((t) => /RealTitle/.test(String(t)))).toBe(true);
     });
   });
@@ -264,9 +257,7 @@ describe("herdr index.ts: title latch + event retry", () => {
     execCalls.length = 0;
     handlers.get("session_shutdown")!({}, ctx);
     await vi.waitFor(() => {
-      const last = execCalls
-        .filter((c) => c.args[0] === "tab" && c.args[1] === "rename")
-        .map((c) => c.args[3]);
+      const last = execCalls.filter((c) => c.args[0] === "tab" && c.args[1] === "rename").map((c) => c.args[3]);
       expect(last.some((t) => t === "My Logs")).toBe(true);
     });
   });
@@ -286,17 +277,13 @@ describe("herdr index.ts: title latch + event retry", () => {
 
     handlers.get("before_agent_start")!({}, ctx);
     await vi.waitFor(() => {
-      expect(
-        execCalls.some((c) => c.args[0] === "tab" && c.args[1] === "get"),
-      ).toBe(true);
+      expect(execCalls.some((c) => c.args[0] === "tab" && c.args[1] === "get")).toBe(true);
     });
 
     execCalls.length = 0;
     handlers.get("session_shutdown")!({}, ctx);
     await vi.waitFor(() => {
-      const last = execCalls
-        .filter((c) => c.args[0] === "tab" && c.args[1] === "rename")
-        .map((c) => c.args[3]);
+      const last = execCalls.filter((c) => c.args[0] === "tab" && c.args[1] === "rename").map((c) => c.args[3]);
       // The leftover "⏺ old run" is ours, so we restore the number "7".
       expect(last.some((t) => t === "7")).toBe(true);
     });

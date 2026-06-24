@@ -3,8 +3,7 @@ import { readMoshiSecretsFromFile, resolveStateDir } from "./moshi-secrets.ts";
 
 function makeFs(files: Record<string, string>) {
   return {
-    existsSync: (p: string): boolean =>
-      Object.prototype.hasOwnProperty.call(files, p),
+    existsSync: (p: string): boolean => Object.hasOwn(files, p),
     readFileSync: (p: string): string => files[p] ?? "",
   };
 }
@@ -87,14 +86,10 @@ describe("readMoshiSecretsFromFile", () => {
 
 describe("resolveStateDir", () => {
   test("prefers XDG_STATE_HOME", () => {
-    expect(resolveStateDir({ XDG_STATE_HOME: "/xdg/state" })).toBe(
-      "/xdg/state",
-    );
+    expect(resolveStateDir({ XDG_STATE_HOME: "/xdg/state" })).toBe("/xdg/state");
   });
 
   test("falls back to HOME/.local/state", () => {
-    expect(resolveStateDir({ HOME: "/home/u" }, "/home/u")).toBe(
-      "/home/u/.local/state",
-    );
+    expect(resolveStateDir({ HOME: "/home/u" }, "/home/u")).toBe("/home/u/.local/state");
   });
 });

@@ -1,14 +1,10 @@
-import { describe, it, expect } from "vitest";
+import * as crypto from "node:crypto";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import * as crypto from "node:crypto";
 import { initTheme } from "@earendil-works/pi-coding-agent";
-import {
-  appendSubagentLinkRecord,
-  recordSubagentStarted,
-  subagentParentIndexPath,
-} from "../paths.ts";
+import { describe, expect, it } from "vitest";
+import { appendSubagentLinkRecord, recordSubagentStarted, subagentParentIndexPath } from "../paths.ts";
 import { loadSubagentRuns, refreshRunRunning } from "./index.ts";
 
 initTheme(undefined, false);
@@ -49,8 +45,7 @@ describe("subagents live index (running state)", () => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "sub-live-"));
     const subFile = path.join(tmp, "child.jsonl");
     fs.writeFileSync(subFile, "");
-    const sessionId =
-      "test-parent-live-" + crypto.randomBytes(4).toString("hex");
+    const sessionId = "test-parent-live-" + crypto.randomBytes(4).toString("hex");
 
     // hijack the index path by writing directly via the exported helpers
     // (they target ~/.agent/subagents/by-parent/<id>.jsonl)

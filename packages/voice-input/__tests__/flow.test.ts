@@ -1,15 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  mergeTranscript,
-  OrderedAppender,
-  VoiceInputFlow,
-  withTimeout,
-} from "../flow.ts";
 import type { LocalAudioCapture } from "../audio/capture.ts";
-import type {
-  VadPipeline,
-  VadPipelineCallbacks,
-} from "../audio/vad-pipeline.ts";
+import type { VadPipeline, VadPipelineCallbacks } from "../audio/vad-pipeline.ts";
+import { mergeTranscript, OrderedAppender, VoiceInputFlow, withTimeout } from "../flow.ts";
 import type { SttProvider } from "../providers/index.ts";
 import type { VoiceInputConfig } from "../types.ts";
 
@@ -60,22 +52,16 @@ describe("mergeTranscript", () => {
 
 describe("withTimeout", () => {
   it("resolves with the promise value when fast enough", async () => {
-    await expect(withTimeout(Promise.resolve(42), 1000, "Op")).resolves.toBe(
-      42,
-    );
+    await expect(withTimeout(Promise.resolve(42), 1000, "Op")).resolves.toBe(42);
   });
 
   it("rejects with a labeled message on timeout", async () => {
     const slow = new Promise<string>(() => {});
-    await expect(withTimeout(slow, 20, "Transcription")).rejects.toThrow(
-      /Transcription timed out after 20ms/,
-    );
+    await expect(withTimeout(slow, 20, "Transcription")).rejects.toThrow(/Transcription timed out after 20ms/);
   });
 
   it("surfaces the underlying rejection when the promise errors", async () => {
-    await expect(
-      withTimeout(Promise.reject(new Error("boom")), 1000, "Op"),
-    ).rejects.toThrow("boom");
+    await expect(withTimeout(Promise.reject(new Error("boom")), 1000, "Op")).rejects.toThrow("boom");
   });
 });
 
@@ -294,9 +280,7 @@ describe("VoiceInputFlow.finalizeRecording — transcription failure", () => {
   it("aborts transcription after the configured timeout", async () => {
     const recorder = makeFakeRecorder();
     const provider = makeFakeProvider();
-    provider.transcribe.mockImplementationOnce(
-      () => new Promise<string>(() => {}),
-    );
+    provider.transcribe.mockImplementationOnce(() => new Promise<string>(() => {}));
     const { ctx } = makeCtx();
     const flow = new VoiceInputFlow({
       ctx,
@@ -304,9 +288,7 @@ describe("VoiceInputFlow.finalizeRecording — transcription failure", () => {
       provider: provider.asProvider(),
       config: { ...CONFIG, transcribeTimeoutMs: 20 },
     });
-    await expect(flow.finalizeRecording()).rejects.toThrow(
-      /Transcription timed out after 20ms/,
-    );
+    await expect(flow.finalizeRecording()).rejects.toThrow(/Transcription timed out after 20ms/);
     expect(recorder.cleanupCalled).toBe(true);
   });
 });
@@ -332,9 +314,7 @@ describe("VoiceInputFlow — redaction on failure", () => {
   it("does not leak an API key embedded in the transcribe error", async () => {
     const recorder = makeFakeRecorder();
     const provider = makeFakeProvider();
-    provider.transcribe.mockRejectedValueOnce(
-      new Error("Authorization: Bearer sk-leaked-123 failed"),
-    );
+    provider.transcribe.mockRejectedValueOnce(new Error("Authorization: Bearer sk-leaked-123 failed"));
     const { ctx, calls } = makeCtx();
     const flow = new VoiceInputFlow({
       ctx,
@@ -419,9 +399,7 @@ describe("VoiceInputFlow — VAD mode", () => {
     await flow.startRecording();
     expect(pipeline.start).toHaveBeenCalledTimes(1);
     expect(pipeline.setCallbacks).toHaveBeenCalledTimes(1);
-    expect(calls.widgets.at(-1)).toEqual([
-      "🎙 listening (VAD) — /voice-toggle to stop, /voice-cancel to cancel",
-    ]);
+    expect(calls.widgets.at(-1)).toEqual(["🎙 listening (VAD) — /voice-toggle to stop, /voice-cancel to cancel"]);
   });
 
   it("stops, drains pending segments, and clears the widget", async () => {

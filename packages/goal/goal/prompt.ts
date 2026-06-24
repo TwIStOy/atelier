@@ -1,12 +1,8 @@
-import { formatTokens, formatElapsedSeconds } from "@htwang-contrib/common";
+import { formatElapsedSeconds, formatTokens } from "@htwang-contrib/common";
 import type { Goal } from "./types.ts";
 
 function escapeXml(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
 function budgetSection(goal: Goal): string {

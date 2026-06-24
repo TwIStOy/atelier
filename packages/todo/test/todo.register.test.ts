@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { __resetState } from "../state/store.ts";
-import { registerTodoTool } from "../todo.ts";
-import { DEFAULT_PROMPT_GUIDELINES, DEFAULT_PROMPT_SNIPPET } from "../todo.ts";
+import { DEFAULT_PROMPT_GUIDELINES, DEFAULT_PROMPT_SNIPPET, registerTodoTool } from "../todo.ts";
 import type { TaskDetails } from "../tool/types.ts";
 
 function setup() {
@@ -23,10 +22,7 @@ function setup() {
   return { tool };
 }
 
-async function call(
-  tool: Record<string, unknown>,
-  params: Record<string, unknown>,
-) {
+async function call(tool: Record<string, unknown>, params: Record<string, unknown>) {
   const execute = tool.execute as Function;
   return execute("tc", params, undefined, undefined, {});
 }
@@ -51,14 +47,7 @@ describe("registerTodoTool — registration shape", () => {
   it("exposes a typebox parameters schema declaring the six actions", () => {
     const { tool } = setup();
     const raw = JSON.stringify(tool.parameters);
-    for (const action of [
-      "create",
-      "update",
-      "list",
-      "get",
-      "delete",
-      "clear",
-    ]) {
+    for (const action of ["create", "update", "list", "get", "delete", "clear"]) {
       expect(raw).toContain(action);
     }
   });

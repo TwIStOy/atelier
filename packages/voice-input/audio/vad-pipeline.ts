@@ -2,12 +2,12 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Readable } from "node:stream";
+import type { VadConfig } from "../types.ts";
 import { createFramerState, FRAME_MS, pushChunk } from "./framer.ts";
 import { encodeWav, float32ToInt16 } from "./pcm-wav.ts";
-import { StreamCapture } from "./stream-capture.ts";
-import { SileroVad } from "./vad/silero.ts";
-import { VadSegmenter, type ClosedSegment } from "./vad/segmenter.ts";
-import type { VadConfig } from "../types.ts";
+import type { StreamCapture } from "./stream-capture.ts";
+import { type ClosedSegment, VadSegmenter } from "./vad/segmenter.ts";
+import type { SileroVad } from "./vad/silero.ts";
 
 export interface VadPipelineDeps {
   capture: StreamCapture;
@@ -29,10 +29,7 @@ export interface VadPipelineOptions {
   transcribe: (file: string, signal?: AbortSignal) => Promise<string>;
   transcribeTimeoutMs: number;
   callbacks?: VadPipelineCallbacks;
-  segmenterFactory?: (
-    config: VadConfig,
-    callbacks: import("./vad/segmenter.ts").SegmenterCallbacks,
-  ) => VadSegmenter;
+  segmenterFactory?: (config: VadConfig, callbacks: import("./vad/segmenter.ts").SegmenterCallbacks) => VadSegmenter;
 }
 
 export class VadPipeline {
@@ -55,13 +52,10 @@ export class VadPipeline {
     this.transcribe = opts.transcribe;
     this.transcribeTimeoutMs = opts.transcribeTimeoutMs;
     this.callbacks = opts.callbacks ?? { onTranscript: () => {} };
-    this.segmenter = (opts.segmenterFactory ?? defaultSegmenterFactory)(
-      opts.config,
-      {
-        onSpeechStart: () => this.callbacks.onState?.("listening"),
-        onSegment: (segment) => this.emitSegment(segment),
-      },
-    );
+    this.segmenter = (opts.segmenterFactory ?? defaultSegmenterFactory)(opts.config, {
+      onSpeechStart: () => this.callbacks.onState?.("listening"),
+      onSegment: (segment) => this.emitSegment(segment),
+    });
   }
 
   setCallbacks(callbacks: VadPipelineCallbacks): void {
@@ -111,11 +105,7 @@ export class VadPipeline {
 
   private transcribeSegment(index: number, file: string): void {
     const signal = this.abortController?.signal;
-    raceWithTimeout(
-      this.transcribe(file, signal),
-      this.transcribeTimeoutMs,
-      `Segment ${index} transcription`,
-    )
+    raceWithTimeout(this.transcribe(file, signal), this.transcribeTimeoutMs, `Segment ${index} transcription`)
       .then((text) => {
         const trimmed = text?.trim();
         if (trimmed) {
@@ -203,17 +193,10 @@ function flatten(samples: Float32Array[]): Float32Array {
   return out;
 }
 
-function raceWithTimeout<T>(
-  promise: Promise<T>,
-  timeoutMs: number,
-  label: string,
-): Promise<T> {
+function raceWithTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(
-      () => reject(new Error(`${label} timed out after ${timeoutMs}ms`)),
-      timeoutMs,
-    );
+    timer = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs);
   });
   return Promise.race([promise, timeout]).finally(() => {
     if (timer) clearTimeout(timer);

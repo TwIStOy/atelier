@@ -1,16 +1,10 @@
 import type { Input } from "@earendil-works/pi-tui";
-import type {
-  BindingContext,
-  PerTabBindingContext,
-} from "../state/selectors/contract.ts";
+import type { BindingContext, PerTabBindingContext } from "../state/selectors/contract.ts";
 import { selectActivePreviewPaneIndex } from "../state/selectors/derivations.ts";
 import { selectActiveView } from "../state/selectors/focus.ts";
 import type { QuestionnaireState } from "../state/state.ts";
 import type { QuestionData } from "../tool/types.ts";
-import type {
-  BoundGlobalBinding,
-  BoundPerTabBinding,
-} from "./component-binding.ts";
+import type { BoundGlobalBinding, BoundPerTabBinding } from "./component-binding.ts";
 import type { WrappingSelectItem } from "./components/wrapping-select.ts";
 import type { TabComponents } from "./tab-components.ts";
 
@@ -82,12 +76,8 @@ export class QuestionnairePropsAdapter {
   apply(state: QuestionnaireState): void {
     const totalQuestions = this.questions.length;
     const activeView = selectActiveView(state, totalQuestions);
-    const paneIndex = selectActivePreviewPaneIndex(
-      state.currentTab,
-      totalQuestions,
-    );
-    const activePreviewPane =
-      this.tabsByIndex[paneIndex]?.preview ?? this.tabsByIndex[0]!.preview;
+    const paneIndex = selectActivePreviewPaneIndex(state.currentTab, totalQuestions);
+    const activePreviewPane = this.tabsByIndex[paneIndex]?.preview ?? this.tabsByIndex[0]!.preview;
 
     const ctx: BindingContext = {
       questions: this.questions,
