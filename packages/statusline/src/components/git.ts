@@ -70,6 +70,6 @@ export class GitComponent implements StatusLineComponent {
     const marker = this.dirty ? theme.fg("error", "✗") : theme.fg("success", "✓");
     const branchBudget = Math.max(0, width - visibleWidth(marker) - 1);
     const branch = truncateToWidth(this.branch, branchBudget, "…");
-    return [truncateToWidth(theme.fg("muted", branch) + " " + marker, width, "")];
+    return [truncateToWidth(`${theme.fg("muted", branch)} ${marker}`, width, "")];
   }
 }

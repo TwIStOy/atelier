@@ -16,6 +16,6 @@ export class PathComponent implements StatusLineComponent {
     const parent = prefix + tail.slice(0, -1).join("/");
     const current = tail[tail.length - 1];
 
-    return [theme.fg("dim", parent ? parent + "/" : "") + theme.fg("accent", current)];
+    return [theme.fg("dim", parent ? `${parent}/` : "") + theme.fg("accent", current)];
   }
 }
