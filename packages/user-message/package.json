@@ -2,8 +2,8 @@
   "name": "@htwang-contrib/user-message",
   "version": "0.1.0",
   "type": "module",
-  "main": "index.ts",
-  "types": "index.ts",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
   "dependencies": {},
   "devDependencies": {
     "@earendil-works/pi-ai": "^0.79.10",
