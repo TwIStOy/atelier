@@ -1,7 +1,7 @@
 import type { ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { __resetState } from "../state/store.ts";
-import { registerTodosCommand, registerTodoTool } from "../todo.ts";
+import { __resetState } from "../src/state/store.ts";
+import { registerTodosCommand, registerTodoTool } from "../src/todo.ts";
 import { createMockCtx, createMockPi } from "./helpers.ts";
 
 function setup() {

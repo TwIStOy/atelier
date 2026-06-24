@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { isTransitionValid } from "../state/invariants.ts";
-import type { TaskState } from "../state/state.ts";
-import { applyTaskMutation } from "../state/state-reducer.ts";
-import type { Task } from "../tool/types.ts";
+import { isTransitionValid } from "../src/state/invariants.ts";
+import type { TaskState } from "../src/state/state.ts";
+import { applyTaskMutation } from "../src/state/state-reducer.ts";
+import type { Task } from "../src/tool/types.ts";
 
 const emptyState = (): TaskState => ({ tasks: [], nextId: 1 });
 

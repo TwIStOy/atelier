@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { __resetState } from "../state/store.ts";
-import { DEFAULT_PROMPT_GUIDELINES, DEFAULT_PROMPT_SNIPPET, registerTodoTool } from "../todo.ts";
-import type { TaskDetails } from "../tool/types.ts";
+import { __resetState } from "../src/state/store.ts";
+import { DEFAULT_PROMPT_GUIDELINES, DEFAULT_PROMPT_SNIPPET, registerTodoTool } from "../src/todo.ts";
+import type { TaskDetails } from "../src/tool/types.ts";
 
 function setup() {
   __resetState();

@@ -1,8 +1,8 @@
 import type { ExtensionUIContext } from "@earendil-works/pi-coding-agent";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { __resetState } from "../state/store.ts";
-import { registerTodoTool } from "../todo.ts";
-import { TodoOverlay } from "../todo-overlay.ts";
+import { __resetState } from "../src/state/store.ts";
+import { registerTodoTool } from "../src/todo.ts";
+import { TodoOverlay } from "../src/todo-overlay.ts";
 import { createMockPi, createMockUI, identityTheme } from "./helpers.ts";
 
 const WIDGET_KEY = "rpiv-todos";

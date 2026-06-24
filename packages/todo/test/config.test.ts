@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { loadConfig as loadConfigType } from "../config.ts";
+import type { loadConfig as loadConfigType } from "../src/config.ts";
 
 let tmpDir: string;
 let loadConfig: typeof loadConfigType;

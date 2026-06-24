@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { isTaskDetails, replayFromBranch } from "../state/replay.ts";
-import type { Task, TaskDetails } from "../tool/types.ts";
+import { isTaskDetails, replayFromBranch } from "../src/state/replay.ts";
+import type { Task, TaskDetails } from "../src/tool/types.ts";
 
 function buildBranch(snapshots: TaskDetails[]) {
   return snapshots.map((s) => ({

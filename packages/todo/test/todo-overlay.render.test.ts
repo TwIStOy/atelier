@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { __resetState } from "../state/store.ts";
-import { registerTodoTool } from "../todo.ts";
-import { TodoOverlay } from "../todo-overlay.ts";
-import type { TaskAction } from "../tool/types.ts";
+import { __resetState } from "../src/state/store.ts";
+import { registerTodoTool } from "../src/todo.ts";
+import { TodoOverlay } from "../src/todo-overlay.ts";
+import type { TaskAction } from "../src/tool/types.ts";
 import { createMockPi, createMockUI, identityTheme } from "./helpers.ts";
 
 async function setup(actions: Array<{ action: TaskAction; [k: string]: unknown }>) {
