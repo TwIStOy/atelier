@@ -23,22 +23,24 @@ function mockCtx(opts: { sessionFile?: string | null; sessionId?: string; hasUI?
 }
 
 interface MockPi {
-  onHandlers: Record<string, Function>;
-  commands: Record<string, { handler: Function; description?: string }>;
-  on: (event: string, handler: Function) => void;
-  registerCommand: (name: string, options: { handler: Function; description?: string }) => void;
+  onHandlers: Record<string, Handler>;
+  commands: Record<string, { handler: Handler; description?: string }>;
+  on: (event: string, handler: Handler) => void;
+  registerCommand: (name: string, options: { handler: Handler; description?: string }) => void;
 }
 
+type Handler = (...args: unknown[]) => unknown;
+
 function mockPi(): MockPi {
-  const onHandlers: Record<string, Function> = {};
-  const commands: Record<string, { handler: Function; description?: string }> = {};
+  const onHandlers: Record<string, Handler> = {};
+  const commands: Record<string, { handler: Handler; description?: string }> = {};
   return {
     onHandlers,
     commands,
-    on(event: string, handler: Function) {
+    on(event: string, handler: Handler) {
       onHandlers[event] = handler;
     },
-    registerCommand(name: string, options: { handler: Function; description?: string }) {
+    registerCommand(name: string, options: { handler: Handler; description?: string }) {
       commands[name] = options;
     },
   } as unknown as MockPi;
@@ -63,23 +65,23 @@ describe("registerBtw", () => {
     clearGlobalState(BTW_STATE_KEY);
     const pi = mockPi();
     registerBtw(pi as unknown as import("@earendil-works/pi-coding-agent").ExtensionAPI);
-    expect(pi.commands["btw"]).toBeDefined();
-    expect(pi.commands["btw"].handler).toBeInstanceOf(Function);
+    expect(pi.commands.btw).toBeDefined();
+    expect(pi.commands.btw.handler).toBeInstanceOf(Function);
   });
 
   test("registers message_end hook", () => {
     clearGlobalState(BTW_STATE_KEY);
     const pi = mockPi();
     registerBtw(pi as unknown as import("@earendil-works/pi-coding-agent").ExtensionAPI);
-    expect(pi.onHandlers["message_end"]).toBeDefined();
+    expect(pi.onHandlers.message_end).toBeDefined();
   });
 
   test("registers session_compact and session_tree hooks", () => {
     clearGlobalState(BTW_STATE_KEY);
     const pi = mockPi();
     registerBtw(pi as unknown as import("@earendil-works/pi-coding-agent").ExtensionAPI);
-    expect(pi.onHandlers["session_compact"]).toBeDefined();
-    expect(pi.onHandlers["session_tree"]).toBeDefined();
+    expect(pi.onHandlers.session_compact).toBeDefined();
+    expect(pi.onHandlers.session_tree).toBeDefined();
   });
 });
 
@@ -89,7 +91,7 @@ describe("command handler guards", () => {
     const pi = mockPi();
     registerBtw(pi as unknown as import("@earendil-works/pi-coding-agent").ExtensionAPI);
     const ctx = mockCtx({ hasUI: false });
-    await pi.commands["btw"].handler("what?", ctx);
+    await pi.commands.btw.handler("what?", ctx);
     expect(ctx.ui.notify).toHaveBeenCalledWith(expect.stringContaining("interactive terminal"), "warning");
   });
 
@@ -98,7 +100,7 @@ describe("command handler guards", () => {
     const pi = mockPi();
     registerBtw(pi as unknown as import("@earendil-works/pi-coding-agent").ExtensionAPI);
     const ctx = mockCtx();
-    await pi.commands["btw"].handler("  ", ctx);
+    await pi.commands.btw.handler("  ", ctx);
     expect(ctx.ui.notify).toHaveBeenCalledWith(expect.stringContaining("requires a question"), "warning");
   });
 
@@ -107,7 +109,7 @@ describe("command handler guards", () => {
     const pi = mockPi();
     registerBtw(pi as unknown as import("@earendil-works/pi-coding-agent").ExtensionAPI);
     const ctx = mockCtx({ model: undefined });
-    await pi.commands["btw"].handler("what?", ctx);
+    await pi.commands.btw.handler("what?", ctx);
     expect(ctx.ui.notify).toHaveBeenCalledWith(expect.stringContaining("active model"), "warning");
   });
 });

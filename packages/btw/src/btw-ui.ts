@@ -139,7 +139,7 @@ export class BtwOverlayController implements Component {
 
     switch (this.answer.kind) {
       case "pending":
-        lines.push(indent + spinnerGlyph(this.theme) + " Working...");
+        lines.push(`${indent + spinnerGlyph(this.theme)} Working...`);
         break;
       case "answer": {
         const wrapped = wrapTextWithAnsi(this.answer.text, answerWidth);
@@ -156,12 +156,12 @@ export class BtwOverlayController implements Component {
     lines.push("");
 
     const footerParts: string[] = [];
-    footerParts.push(this.theme.fg("dim", "Esc") + " dismiss");
+    footerParts.push(`${this.theme.fg("dim", "Esc")} dismiss`);
     if (this.history.length > 0 && !this.historyCleared) {
-      footerParts.push(this.theme.fg("dim", "x") + " clear history");
+      footerParts.push(`${this.theme.fg("dim", "x")} clear history`);
     }
     if (this.answer.kind !== "pending") {
-      footerParts.push(this.theme.fg("dim", "↑↓") + " scroll");
+      footerParts.push(`${this.theme.fg("dim", "↑↓")} scroll`);
     }
     lines.push(this.theme.fg("dim", footerParts.join("  ")));
 
@@ -171,7 +171,9 @@ export class BtwOverlayController implements Component {
 
 export function showBtwOverlay(params: BtwOverlayParams): BtwOverlayResult {
   let resolveController!: (c: BtwOverlayController) => void;
-  const controllerReady = new Promise<BtwOverlayController>((resolve) => (resolveController = resolve));
+  const controllerReady = new Promise<BtwOverlayController>((resolve) => {
+    resolveController = resolve;
+  });
 
   const overlayPromise = params.ctx.ui.custom<void>(
     (tui, theme, _keybindings, done) => {
@@ -196,7 +198,7 @@ export function showBtwOverlay(params: BtwOverlayParams): BtwOverlayResult {
 function extractShort(msg: UserMessage): string {
   const text = typeof msg.content === "string" ? msg.content : extractMessageText(msg.content);
   const firstLine = text.split("\n")[0] ?? "";
-  return firstLine.length > 60 ? firstLine.slice(0, 57) + "…" : firstLine;
+  return firstLine.length > 60 ? `${firstLine.slice(0, 57)}…` : firstLine;
 }
 
 function extractMessageText(content: UserMessage["content"]): string {
