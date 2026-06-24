@@ -4,7 +4,6 @@
 
 - No comments in code unless explicitly requested.
 - The `pi-self-extension` skill should be loaded when creating or modifying extensions.
-- **Always run `npm run format` after every file change** to keep code style consistent.
 - Keep answers short and concise
 - No emojis in commits, issues, PR comments, or code
 - No fluff or cheerful filler text (e.g., "Thanks @user" not "Thanks so much @user!")
@@ -43,6 +42,7 @@ When migrating or adapting an extension from another project (for example `rpiv-
 
 ## Commands
 
+- **After any code changes (not docs)**: `npm run check` (full output, no tail). Fix all errors, warnings, and infos before committing.
 - If you create or modify a test file, run it and iterate on test or implementation until it passes.
 - For ad-hoc scripts, `write` them to a temp file (e.g. `/tmp`), run, edit if needed, remove when done. Don't embed multi-line scripts in `bash` commands.
 - Never commit unless the user asks.
