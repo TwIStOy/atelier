@@ -99,7 +99,7 @@ export default function initMemory(pi: ExtensionAPI): void {
     }
     const appendix = await generateSystemPrompt();
     return {
-      systemPrompt: event.systemPrompt + "\n\n" + appendix,
+      systemPrompt: `${event.systemPrompt}\n\n${appendix}`,
     };
   });
 }
