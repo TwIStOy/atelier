@@ -1,0 +1,96 @@
+import { throwIfApiError } from "./errors.ts";
+import type { FetchResponse, FullProvider, SearchResponse, SearchResult } from "./types.ts";
+
+const YOUCOM_SEARCH_URL = "https://ydc-index.io/v1/search";
+const YOUCOM_CONTENTS_URL = "https://ydc-index.io/v1/contents";
+
+interface YouComWebResult {
+  url?: string;
+  title?: string;
+  description?: string;
+  snippets?: string[];
+}
+
+interface YouComSearchResponse {
+  results?: { web?: YouComWebResult[] };
+}
+
+interface YouComContentsResponseItem {
+  url: string;
+  title?: string;
+  markdown?: string | null;
+}
+
+function normalizeYouComResults(results: YouComWebResult[]): SearchResult[] {
+  return results.map((r) => ({
+    title: r.title ?? "",
+    url: r.url ?? "",
+    snippet: r.snippets?.[0] ?? r.description ?? "",
+  }));
+}
+
+export class YouComProvider implements FullProvider {
+  readonly name = "youcom";
+  readonly label = "You.com";
+  readonly envVar = "YOUCOM_API_KEY";
+
+  constructor(private readonly apiKey: string) {}
+
+  async search(query: string, maxResults: number, signal?: AbortSignal): Promise<SearchResponse> {
+    if (!this.apiKey) {
+      throw new Error(`${this.envVar} is not set. Use /config to set the API key, or export the env var.`);
+    }
+
+    const res = await fetch(YOUCOM_SEARCH_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-API-Key": this.apiKey,
+      },
+      body: JSON.stringify({ query, count: maxResults }),
+      signal,
+    });
+
+    if (!res.ok) {
+      throwIfApiError(this.name, res.status, await res.text());
+    }
+
+    const raw = (await res.json()) as YouComSearchResponse;
+    return {
+      query,
+      results: normalizeYouComResults(raw.results?.web ?? []),
+    };
+  }
+
+  async fetch(url: string, _raw: boolean, signal?: AbortSignal): Promise<FetchResponse> {
+    if (!this.apiKey) {
+      throw new Error(`${this.envVar} is not set. Use /config to set the API key, or export the env var.`);
+    }
+
+    const res = await fetch(YOUCOM_CONTENTS_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-API-Key": this.apiKey,
+      },
+      body: JSON.stringify({ urls: [url], formats: ["markdown"] }),
+      signal,
+    });
+
+    if (!res.ok) {
+      throwIfApiError(this.name, res.status, await res.text());
+    }
+
+    const raw = (await res.json()) as YouComContentsResponseItem[];
+    const item = raw[0];
+    if (!item?.markdown) {
+      throw new Error(`${this.label} Fetch API error: no content returned for ${url}`);
+    }
+
+    return {
+      text: item.markdown,
+      title: item.title || undefined,
+      contentType: "text/markdown",
+    };
+  }
+}
