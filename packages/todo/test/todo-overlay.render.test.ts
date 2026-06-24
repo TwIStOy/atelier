@@ -10,7 +10,7 @@ async function setup(actions: Array<{ action: TaskAction; [k: string]: unknown }
   const { pi, tools } = createMockPi();
   registerTodoTool(pi);
   const tool = tools.get("todo")!;
-  const execute = tool.execute as Function;
+  const execute = tool.execute as (...args: unknown[]) => Promise<unknown>;
   for (const p of actions) {
     await execute("tc", p, undefined, undefined, {});
   }
@@ -249,7 +249,7 @@ describe("TodoOverlay — width truncation", () => {
     const { widget, tool } = await setup([{ action: "create", subject: "first" }]);
     const out1 = widget.render(200).join("\n");
     expect(out1).toContain("first");
-    const execute = tool.execute as Function;
+    const execute = tool.execute as (...args: unknown[]) => Promise<unknown>;
     await execute("tc", { action: "create", subject: "second" }, undefined, undefined, {});
     const out2 = widget.render(200).join("\n");
     expect(out2).toContain("first");

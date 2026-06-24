@@ -17,7 +17,7 @@ function setup() {
 }
 
 async function seed(tool: Record<string, unknown>, actions: Array<Record<string, unknown>>) {
-  const execute = tool.execute as Function;
+  const execute = tool.execute as (...args: unknown[]) => Promise<unknown>;
   for (const p of actions) {
     await execute("tc", p, undefined, undefined, {});
   }

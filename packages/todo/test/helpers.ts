@@ -1,6 +1,8 @@
 import type { ExtensionAPI, ExtensionContext, ExtensionUIContext, Theme } from "@earendil-works/pi-coding-agent";
 import { vi } from "vitest";
 
+type Handler = (...args: unknown[]) => unknown;
+
 export const identityTheme: Theme = {
   fg: (_c: string, t: string) => t,
   bg: (_c: string, t: string) => t,
@@ -18,22 +20,22 @@ export const identityTheme: Theme = {
 
 export function createMockPi(): {
   tools: Map<string, Record<string, unknown>>;
-  commands: Map<string, { description?: string; handler: Function }>;
-  events: Map<string, Function>;
+  commands: Map<string, { description?: string; handler: Handler }>;
+  events: Map<string, Handler>;
   pi: ExtensionAPI;
 } {
   const tools = new Map<string, Record<string, unknown>>();
-  const commands = new Map<string, { description?: string; handler: Function }>();
-  const events = new Map<string, Function>();
+  const commands = new Map<string, { description?: string; handler: Handler }>();
+  const events = new Map<string, Handler>();
 
   const pi = {
     registerTool(tool: Record<string, unknown>) {
       tools.set(tool.name as string, tool);
     },
-    registerCommand(name: string, options: { description?: string; handler: Function }) {
+    registerCommand(name: string, options: { description?: string; handler: Handler }) {
       commands.set(name, options);
     },
-    on(event: string, handler: Function) {
+    on(event: string, handler: Handler) {
       events.set(event, handler);
     },
   } as unknown as ExtensionAPI;

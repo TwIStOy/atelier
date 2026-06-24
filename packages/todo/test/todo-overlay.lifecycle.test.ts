@@ -10,7 +10,7 @@ const WIDGET_KEY = "rpiv-todos";
 async function seed(tools: Map<string, Record<string, unknown>>, actions: unknown[]) {
   const tool = tools.get("todo");
   if (!tool) throw new Error("todo tool not registered");
-  const execute = tool.execute as Function;
+  const execute = tool.execute as (...args: unknown[]) => Promise<unknown>;
   for (const p of actions) {
     await execute("tc", p, undefined, undefined, {});
   }
@@ -91,7 +91,7 @@ describe("TodoOverlay — lifecycle", () => {
     const { ui, setWidget } = makeCtx();
     overlay.setUICtx(ui);
     overlay.update();
-    const execute = tool.execute as Function;
+    const execute = tool.execute as (...args: unknown[]) => Promise<unknown>;
     await execute("tc", { action: "clear" }, undefined, undefined, {});
     overlay.update();
     expect(setWidget).toHaveBeenCalledTimes(2);
@@ -105,7 +105,7 @@ describe("TodoOverlay — lifecycle", () => {
     const { ui, setWidget } = makeCtx();
     overlay.setUICtx(ui);
     overlay.update();
-    const execute = tool.execute as Function;
+    const execute = tool.execute as (...args: unknown[]) => Promise<unknown>;
     await execute("tc", { action: "clear" }, undefined, undefined, {});
     overlay.update();
     await execute("tc", { action: "create", subject: "b" }, undefined, undefined, {});
@@ -202,7 +202,7 @@ describe("TodoOverlay — lifecycle", () => {
   it("all-deleted todos count as empty (no widget)", async () => {
     const { tools } = registerTool();
     const tool = await seed(tools, [{ action: "create", subject: "a" }]);
-    const execute = tool.execute as Function;
+    const execute = tool.execute as (...args: unknown[]) => Promise<unknown>;
     await execute("tc", { action: "update", id: 1, status: "deleted" }, undefined, undefined, {});
     const overlay = new TodoOverlay();
     const { ui, setWidget } = makeCtx();

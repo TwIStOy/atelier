@@ -23,7 +23,7 @@ function setup() {
 }
 
 async function call(tool: Record<string, unknown>, params: Record<string, unknown>) {
-  const execute = tool.execute as Function;
+  const execute = tool.execute as (...args: unknown[]) => Promise<unknown>;
   return execute("tc", params, undefined, undefined, {});
 }
 
