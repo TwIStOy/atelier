@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { stat as fsStat } from "node:fs/promises";
+import { stat as fsStat, type Stats } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
 import { createInterface } from "node:readline";
@@ -135,7 +135,7 @@ export function registerGlobTool(pi: ExtensionAPI) {
       }
 
       const searchPath = resolveSearchPath(params.path, ctx.cwd);
-      let st;
+      let st: Stats;
       try {
         st = await fsStat(searchPath);
       } catch {
