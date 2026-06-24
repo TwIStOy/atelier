@@ -34,8 +34,8 @@ function readConfigFile(): ConfigFile {
 
 function writeConfigFile(data: ConfigFile): void {
   ensureDir(CONFIG_PATH);
-  const tmp = CONFIG_PATH + `.tmp.${process.pid}.${Date.now()}`;
-  writeFileSync(tmp, JSON.stringify(data, null, 2) + "\n", "utf8");
+  const tmp = `${CONFIG_PATH}.tmp.${process.pid}.${Date.now()}`;
+  writeFileSync(tmp, `${JSON.stringify(data, null, 2)}\n`, "utf8");
   renameSync(tmp, CONFIG_PATH);
 }
 

@@ -24,7 +24,7 @@ const ANSI_RGB_RE = /\x1b\[(?:38|48);2;(\d+);(\d+);(\d+)m/;
 export function extractAnsiRgb(ansi: string): string | null {
   const m = ANSI_RGB_RE.exec(ansi);
   if (!m) return null;
-  return "#" + [m[1], m[2], m[3]].map((n) => parseInt(n).toString(16).padStart(2, "0")).join("");
+  return `#${[m[1], m[2], m[3]].map((n) => parseInt(n, 10).toString(16).padStart(2, "0")).join("")}`;
 }
 
 export function mixAnsiRgb(a: string, ratioA: number, b: string, ratioB: number): string | null {
@@ -32,8 +32,8 @@ export function mixAnsiRgb(a: string, ratioA: number, b: string, ratioB: number)
   const rb = ANSI_RGB_RE.exec(b);
   if (!ra || !rb) return null;
   const total = ratioA + ratioB;
-  const mix = (i: number) => Math.round((parseInt(ra[i + 1]) * ratioA + parseInt(rb[i + 1]) * ratioB) / total);
-  return "#" + [mix(0), mix(1), mix(2)].map((n) => n.toString(16).padStart(2, "0")).join("");
+  const mix = (i: number) => Math.round((parseInt(ra[i + 1], 10) * ratioA + parseInt(rb[i + 1], 10) * ratioB) / total);
+  return `#${[mix(0), mix(1), mix(2)].map((n) => n.toString(16).padStart(2, "0")).join("")}`;
 }
 
 const TABLE_OPTS = {
