@@ -1,6 +1,0 @@
-- Search the web using a configurable provider (Brave, Tavily, etc.)
-- Returns a list of results with titles, URLs, and snippets
-- Use this tool when you need current information beyond your training data — recent events, current library versions, live API documentation
-- Use the current year from "Current date:" in your context when searching for recent information
-- After answering using search results, include a "Sources:" section listing relevant URLs as markdown hyperlinks: [Title](URL)
-- If no API key is configured, ask the user to use /config to set one before proceeding
