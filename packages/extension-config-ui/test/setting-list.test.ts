@@ -2,8 +2,8 @@ import type { Theme } from "@earendil-works/pi-coding-agent";
 import { visibleWidth } from "@earendil-works/pi-tui";
 import type { ConfigItem } from "@htwang-contrib/common";
 import { describe, expect, test } from "vitest";
-import type { SelectingState, SettingRow } from "../src/types.ts";
 import { renderSelectPage } from "../src/render/setting-list.ts";
+import type { SelectingState, SettingRow } from "../src/types.ts";
 
 const PLAIN_THEME: Theme = {
   fg: (_c: string, text: string) => text,
