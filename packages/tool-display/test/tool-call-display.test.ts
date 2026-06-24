@@ -93,6 +93,28 @@ describe("renderToolCall collapsed error reason", () => {
     const joined = lines.join("\n");
     expect(joined).toContain("Read the file before editing it.");
   });
+
+  it("renders the error icon only on the first line when expanded and wrapped", () => {
+    globalToolDisplayRegistry.register("bash", bashAdapter);
+    const reason =
+      "Command timed out after 40 seconds while pinging the NAS host which is a very long reason that must wrap";
+    const lines = renderToolCall(
+      {
+        toolName: "bash",
+        args: { command: "tailscale ping 100.65.0.6" },
+        output: reason,
+        expanded: true,
+        isPartial: false,
+        isError: true,
+        registry: globalToolDisplayRegistry,
+      },
+      PLAIN_THEME,
+    ).render(40);
+    const body = lines.slice(1);
+    const iconCount = body.filter((l) => l.includes("\ue654")).length;
+    expect(iconCount).toBe(1);
+    expect(body[0].includes("\ue654")).toBe(true);
+  });
 });
 
 describe("todo adapter collapsed-content width safety", () => {
