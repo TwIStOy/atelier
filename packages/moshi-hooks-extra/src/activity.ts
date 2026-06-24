@@ -7,7 +7,7 @@ const MAX_TITLE_CHARS = 80;
 export function clipText(text: string, max: number): string {
   const trimmed = text.trim();
   if (trimmed.length <= max) return trimmed;
-  return trimmed.slice(0, max - 1) + "…";
+  return `${trimmed.slice(0, max - 1)}…`;
 }
 
 export function formatUserPrompt(prompt: string): string {
@@ -67,7 +67,7 @@ export class ActivityTracker {
 }
 
 export function sessionKeyFor(sessionID: string | undefined, cwd: string): string {
-  return sessionID && sessionID.length > 0 ? sessionID : "cwd:" + cwd;
+  return sessionID && sessionID.length > 0 ? sessionID : `cwd:${cwd}`;
 }
 
 export interface AskUserQuestionSummary {

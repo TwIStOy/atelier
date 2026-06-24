@@ -141,7 +141,7 @@ describe("sendEnvelopeToSocket", () => {
     const response: DaemonResponse = { type: "approval", decision: "approve" };
     sock.write = () => {
       queueMicrotask(() => {
-        sock.emit("data", Buffer.from(JSON.stringify(response) + "\n"));
+        sock.emit("data", Buffer.from(`${JSON.stringify(response)}\n`));
         sock.emit("end");
       });
       return true;

@@ -129,7 +129,7 @@ describe("pushUsageSnapshot", () => {
     expect(url).toBe("https://api.getmoshi.app/api/v1/hosts/host_abc/usage");
     expect((init as RequestInit).method).toBe("POST");
     const headers = (init as RequestInit).headers as Record<string, string>;
-    expect(headers["Authorization"]).toBe("Bearer secret_xyz");
+    expect(headers.Authorization).toBe("Bearer secret_xyz");
     expect(headers["User-Agent"].length).toBeGreaterThan(0);
     const body = JSON.parse((init as RequestInit).body as string);
     expect(body.snapshots[0].accountId).toBe(ZAI_ACCOUNT_ID);

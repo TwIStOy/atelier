@@ -93,7 +93,7 @@ function clipMessage(text: string): string {
 function clipText(text: string, max: number): string {
   const trimmed = text.trim();
   if (trimmed.length <= max) return trimmed;
-  return trimmed.slice(0, max - 1) + "…";
+  return `${trimmed.slice(0, max - 1)}…`;
 }
 
 export interface SummaryOutcome {

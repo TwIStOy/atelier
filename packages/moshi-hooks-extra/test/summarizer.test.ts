@@ -69,13 +69,13 @@ describe("parseSummary", () => {
   });
 
   test("clips over-long titles", () => {
-    const parsed = parseSummary("x".repeat(120) + "\nshort summary");
+    const parsed = parseSummary(`${"x".repeat(120)}\nshort summary`);
     expect(parsed!.title.length).toBe(80);
     expect(parsed!.title.endsWith("…")).toBe(true);
   });
 
   test("clips over-long messages", () => {
-    const parsed = parseSummary("Title\n" + "y".repeat(300));
+    const parsed = parseSummary(`Title\n${"y".repeat(300)}`);
     expect(parsed!.message.length).toBe(200);
     expect(parsed!.message.endsWith("…")).toBe(true);
   });

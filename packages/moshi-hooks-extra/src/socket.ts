@@ -116,7 +116,7 @@ export function sendEnvelopeToSocket(
 
     sock.once("connect", () => {
       try {
-        sock!.write(JSON.stringify(envelope) + "\n");
+        sock!.write(`${JSON.stringify(envelope)}\n`);
       } catch (e) {
         finish({
           status: "error",
