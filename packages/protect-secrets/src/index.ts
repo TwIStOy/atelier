@@ -7,7 +7,7 @@ const READ_LIKE_TOOLS = new Set(["read", "glob", "grep"]);
 
 function isProtectedPath(p: string): boolean {
   const resolved = p.startsWith("/") ? p : `/${p}`;
-  return resolved === PROTECTED_PREFIX || resolved.startsWith(PROTECTED_PREFIX + "/");
+  return resolved === PROTECTED_PREFIX || resolved.startsWith(`${PROTECTED_PREFIX}/`);
 }
 
 function checkPath(input: Record<string, unknown>): string | null {
