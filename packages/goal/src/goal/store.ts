@@ -41,8 +41,8 @@ function readFile(filePath: string): GoalFile | null {
 
 function writeFile(filePath: string, file: GoalFile): void {
   ensureDir(filePath);
-  const tmp = filePath + ".tmp";
-  fs.writeFileSync(tmp, JSON.stringify(file, null, 2) + "\n", "utf8");
+  const tmp = `${filePath}.tmp`;
+  fs.writeFileSync(tmp, `${JSON.stringify(file, null, 2)}\n`, "utf8");
   fs.renameSync(tmp, filePath);
 }
 
