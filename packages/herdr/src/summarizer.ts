@@ -9,7 +9,6 @@
 import type { Message, Model } from "@earendil-works/pi-ai";
 import type { ModelRegistry, SessionEntry } from "@earendil-works/pi-coding-agent";
 import {
-  assistantMessageText,
   branchToMessages,
   type ExtensionConfigSchema,
   executeSideCall,
@@ -73,7 +72,7 @@ export function firstUserPrompt(branch: SessionEntry[]): string {
 function clip(text: string, max: number): string {
   const trimmed = text.trim().replace(/\s+/g, " ");
   if (trimmed.length <= max) return trimmed;
-  return trimmed.slice(0, max - 1) + "…";
+  return `${trimmed.slice(0, max - 1)}…`;
 }
 
 export function parseSessionTitle(rawAnswer: string): string {
@@ -85,7 +84,7 @@ export function parseSessionTitle(rawAnswer: string): string {
     .replace(/[.:;\s]+$/, "")
     .trim();
   if (cleaned.length === 0) return "";
-  return cleaned.length > TITLE_MAX ? cleaned.slice(0, TITLE_MAX - 1) + "…" : cleaned;
+  return cleaned.length > TITLE_MAX ? `${cleaned.slice(0, TITLE_MAX - 1)}…` : cleaned;
 }
 
 export interface TitleOutcome {

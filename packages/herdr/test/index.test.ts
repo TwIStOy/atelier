@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+type Handler = (...args: unknown[]) => unknown;
+
 // Mock the LLM side-call so the test focuses on the latch + event-retry
 // behavior in index.ts, not on model wiring. Resolves after a short delay
 // so the triggering event's immediate scheduleRender() fires BEFORE the
@@ -40,16 +42,16 @@ let tabGetResponse = JSON.stringify({
 const execCalls: { cmd: string; args: string[] }[] = [];
 
 function buildPi() {
-  const handlers = new Map<string, Function>();
-  const eventHandlers = new Map<string, Function>();
+  const handlers = new Map<string, Handler>();
+  const eventHandlers = new Map<string, Handler>();
   const branch: unknown[] = [];
   const model = { provider: "test", id: "m1" };
   const pi = {
-    on(event: string, handler: Function) {
+    on(event: string, handler: Handler) {
       handlers.set(event, handler);
     },
     events: {
-      on(channel: string, handler: Function) {
+      on(channel: string, handler: Handler) {
         eventHandlers.set(channel, handler);
       },
       emit(channel: string, data: unknown) {

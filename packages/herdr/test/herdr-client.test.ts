@@ -83,7 +83,7 @@ describe("parseHerdrResponse / extractResult", () => {
   });
 
   it("falls back to the first line when multiple lines are present", () => {
-    const raw = JSON.stringify({ id: "x", result: { ok: true } }) + "\nextra noise";
+    const raw = `${JSON.stringify({ id: "x", result: { ok: true } })}\nextra noise`;
     expect(extractResult(parseHerdrResponse(raw))).toEqual({ ok: true });
   });
 });
