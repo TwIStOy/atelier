@@ -1,67 +1,29 @@
-# Project Context
+# Development Rules
 
-This is **hawtian-pi-extensions** -- a collection of [pi](https://github.com/earendil-works/pi) coding agent extensions.
-
-## Project Structure
-
-Monorepo with packages under `packages/`:
-
-- `packages/common/` -- Shared utility functions and types used across all extensions (formatting, terminal helpers).
-- `packages/zai-coding-plan/` -- Z.AI provider (GLM models) + `zai-quota` command. Reads `ZAI_API_KEY` env var.
-- `packages/inference-self-host/` -- Self-hosted proxy provider aggregating models from multiple upstreams (GLM, Qwen, DeepSeek, MiMo, Kimi, MiniMax, etc). Reads `INFERENCE_TWISTOY_API_KEY` env var.
-- `packages/protect-secrets/` -- Blocks read-like tool calls targeting files under `/run/agenix`. Uses `unbash` AST parser to analyze bash commands and distinguish secret exposure (e.g. `cat`) from safe capture (e.g. `VAR=$(cat ...) curl`).
-- `packages/subagents/` -- In-process subagent extension (`subagent`/`subagent_status` tools + `/view-subagents` output viewer + `/subagents-agents` persona inspector). See `docs/subagents/` and `packages/subagents/README.md`.
-- `packages/statusline/` -- Custom status bar widgets for the pi TUI.
-- `packages/tool-display/` -- Tool call rendering adapters for the pi TUI.
-- `packages/todo/` -- 移植自 rpiv-todo 的任务管理扩展,提供 `todo` 工具(create/update/list/get/delete/clear)+ `/todos` 命令 + aboveEditor overlay widget,状态通过 session branch replay 持久化。参考 `docs/todo/`.
-- `packages/user-message/` -- User message handling extension.
-- `packages/voice-input/` -- 语音听写扩展:spawn 跨平台录音(ffmpeg/parecord/sox)+ 云端 OpenAI 兼容 STT(mimo-v2.5 chat 多模态)+ 追加到输入框。命令 `/voice-toggle`/`/voice-cancel`/`/voice-status`,setWidget 浮层状态,密钥脱敏。**可选 VAD 分段**(`vad.enabled`):Silero v5 经 `onnxruntime-web` WASM 流式逐帧检测,按停顿自动切段 + 增量追加(`OrderedAppender` 保序);模型 `models/silero_vad.onnx` 随包分发,VAD 模式 Linux 统一用 ffmpeg(parecord 不支持 stdout)。参考 `docs/pi-vox/DESIGN-VAD.md`.
-- `packages/read-tracker/` -- Per-session read-op tracker + stale-content guard. Records every `read` tool call (wall-clock time, file mtime, size); blocks `edit`/`write` to files not read this session or modified on disk since the last read; refreshes entries after successful writes. `/read-tracker` command renders a table (read age, size, mtime age, ⚠ stale marker); `/read-tracker clear|count` for maintenance. Adapted from `wbelk/pi-behavior-control` `read-tracker.ts`.
-- `packages/user-input-history/` -- Persistent prompt history in `history-store.ts` (`XDG_CACHE_HOME/pi/user-input-history.json`, locked multi-process merge); Ctrl+R panel in `interactive-search.ts` ranks lines with **skim** (`sk --filter`, stdin = history; falls back to built-in fuzzy if `sk` missing); extension entry `index.ts` clears built-in `ctrl+r` on `app.session.rename` via in-memory `getKeybindings().setUserBindings` only (does not edit `keybindings.json`).
-- `packages/extra-tools/` -- Extra LLM tools `grep`, `glob`, and `ls` (prompt bullets in co-located `.txt`; `grep`/`glob` use ripgrep). Same-named tools override pi built-ins when this extension loads.
-- `packages/ask-user-question/` -- `ask_user_question` tool + rpiv-parity **`state/`** / **`view/`** (editor-slot `ctx.ui.custom` only); dev commands **`/auq-phase0`** / **`/auq-phase1`** / **`/auq-phase2`** in **`demo.ts`** (delete with demos when port is done); see `docs/ask-user-question/`.
-- `packages/context-usage/` -- **`/context`** command: estimated context-window usage in the below-editor widget; **Esc** clears it. Adapted from dotpi `context-usage`.
-- `packages/goal/` -- Persistent goal tracking (Codex-style goal mode): `/goal` command, `create_goal`/`update_goal`/`get_goal` tools, automatic continuation prompts, token budget control, statusline integration. See `docs/goal/`.
-- `packages/btw/` -- `/btw` command: one-off side questions answered in a bottom overlay, never entering the main conversation. See `docs/btw/`.
-- `packages/memory/` -- Memory/journal tools (`memory-*`, `journal-*`) + `/self-improve` and `/reorganize-memory` commands for persistent knowledge and reflection.
-- `packages/committer/` -- `/commit` command: generate conventional commits from staged/unstaged changes using an LLM side-call.
-- `packages/extension-config-ui/` -- `/config` command: browse and edit extension configurations in a TUI popup.
-- `prompts/` -- Project-level prompt templates bundled with this repo (registered via `pi.prompts` in root `package.json`).
-- `.agents/skills/pi-self-extension/` -- skill with authoritative guidance for building pi extensions (API reference, compat gotchas, validation checklist).
-
-## Subagents
-
-In-process subagent extension (parallel and background runs, no extra `pi` subprocess). Same design docs as the rest of the repo: [docs/subagents/DESIGN.md](docs/subagents/DESIGN.md), [docs/subagents/STEPS.md](docs/subagents/STEPS.md). Package overview and `~/.agent/subagents/settings.json`: [packages/subagents/README.md](packages/subagents/README.md).
-
-## Architecture
-
-- Each extension is a TypeScript file exporting a default function receiving `ExtensionAPI`.
-- Extensions register providers via `pi.registerProvider()` and commands via `pi.registerCommand()`.
-- No build step -- pi loads `.ts` files directly.
-- Root `tsconfig.json` uses project references pointing at each package's own `tsconfig.json`.
-- ESM (`"type": "module"` in root `package.json`). Use `.ts` extensions in imports.
-- `packages/common` is the shared library (`@htwang-contrib/common`) consumed by other packages.
-- `prompts/` holds project-local prompt templates; packages can declare their own via `pi.prompts` in `package.json`.
-
-## Commands
-
-No build/lint scripts configured. Typecheck with:
-
-```bash
-npx tsc --build
-```
-
-Run tests with:
-
-```bash
-npm test
-```
-
-## Conventions
+## Conversational Style
 
 - No comments in code unless explicitly requested.
 - The `pi-self-extension` skill should be loaded when creating or modifying extensions.
 - **Always run `npm run format` after every file change** to keep code style consistent.
+- Keep answers short and concise
+- No emojis in commits, issues, PR comments, or code
+- No fluff or cheerful filler text (e.g., "Thanks @user" not "Thanks so much @user!")
+- Technical prose only, be direct
+- When the user asks a question, answer it first before making edits or running implementation commands.
+- When responding to user feedback or an analysis, explicitly say whether you agree or disagree before saying what you changed.
+
+## Code Quality
+
+- Read files in full before wide-ranging changes, before editing files you have not fully inspected, and when asked to investigate or audit. Do not rely on search snippets for broad changes.
+- No `any` unless absolutely necessary.
+- Inline single-line helpers that have only one call site.
+- Check node_modules for external API types; don't guess.
+- **No inline imports** (`await import()`, `import("pkg").Type`, dynamic type imports). Top-level imports only.
+- Never remove or downgrade code to fix type errors from outdated deps; upgrade the dep instead.
+- Use only erasable TypeScript syntax (Node strip-only mode) in code checked by the root config (`packages/*/src`, `packages/*/test`, `packages/coding-agent/examples`): no parameter properties, `enum`, `namespace`/`module`, `import =`, `export =`, or other constructs needing JS emit. Use explicit fields with constructor assignments.
+- Always ask before removing functionality or code that appears intentional.
+- Do not preserve backward compatibility unless the user asks for it.
+- Never hardcode key checks (e.g. `matchesKey(keyData, "ctrl+x")`). Add defaults to `DEFAULT_EDITOR_KEYBINDINGS` or `DEFAULT_APP_KEYBINDINGS` so they stay configurable.
 
 ## Tool Naming
 
@@ -78,3 +40,50 @@ When migrating or adapting an extension from another project (for example `rpiv-
 - Upstream remains a **behavior and API reference**, not a vendor drop. The step-by-step checklist lives in [docs/ask-user-question/EXECUTION-STEPS.md](docs/ask-user-question/EXECUTION-STEPS.md); architecture notes in [docs/ask-user-question/PORT-DESIGN.md](docs/ask-user-question/PORT-DESIGN.md).
 
 **Agents: treat the bullets above as mandatory for any port or large adaptation, not optional guidance.**
+
+## Commands
+
+- If you create or modify a test file, run it and iterate on test or implementation until it passes.
+- For ad-hoc scripts, `write` them to a temp file (e.g. `/tmp`), run, edit if needed, remove when done. Don't embed multi-line scripts in `bash` commands.
+- Never commit unless the user asks.
+
+## Git
+
+Multiple pi sessions may be running in this cwd at the same time, each modifying different files. Git operations that touch unstaged, staged, or untracked files outside your own changes will stomp on other sessions' work. Follow these rules:
+
+Committing:
+
+- Only commit files YOU changed in THIS session.
+- Stage explicit paths (`git add <path1> <path2>`); never `git add -A` / `git add .`.
+- Before committing, run `git status` and verify you are only staging your files.
+
+Never run (destroys other agents' work or bypasses checks):
+
+- `git reset --hard`, `git checkout .`, `git clean -fd`, `git stash`, `git add -A`, `git add .`, `git commit --no-verify`.
+
+If rebase conflicts occur:
+
+- Resolve conflicts only in files you modified.
+- If a conflict is in a file you did not modify, abort and ask the user.
+- Never force push.
+
+## Changelog
+
+Location: `packages/*/CHANGELOG.md` (one per package).
+
+Sections under `## [Unreleased]`: `### Breaking Changes` (API changes requiring migration), `### Added`, `### Changed`, `### Fixed`, `### Removed`.
+
+Rules:
+
+- All new entries go under `## [Unreleased]`. Read the full section first and append to existing subsections; never duplicate them.
+- Released version sections (e.g. `## [0.12.2]`) are immutable; never modify them.
+
+Attribution:
+
+- Internal (from issues): `Fixed foo bar ([#123](https://github.com/earendil-works/pi-mono/issues/123))`
+- External contributions: `Added feature X ([#456](https://github.com/earendil-works/pi-mono/pull/456) by [@username](https://github.com/username))`
+
+## User Override
+
+If the user's instructions conflict with any rule in this document, ask for explicit confirmation before overriding. Only then execute their instructions.
+
