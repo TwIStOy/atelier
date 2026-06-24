@@ -15,13 +15,13 @@ function appendMsg(file: string, prevId: string | null, msg: unknown): string {
   const id = crypto.randomBytes(4).toString("hex");
   fs.appendFileSync(
     file,
-    JSON.stringify({
+    `${JSON.stringify({
       type: "message",
       id,
       parentId: prevId,
       timestamp: new Date().toISOString(),
       message: msg,
-    }) + "\n",
+    })}\n`,
   );
   return id;
 }
@@ -37,7 +37,7 @@ function makeChildSession(lines: number): string {
     cwd: tmp,
     parentSession: "test-parent",
   };
-  fs.appendFileSync(file, JSON.stringify(header) + "\n");
+  fs.appendFileSync(file, `${JSON.stringify(header)}\n`);
   // one user message followed by many assistant lines, linked as a chain
   // (each entry's parentId points at the previous entry — buildSessionContext
   // walks leaf→root via parentId, so a flat list with null parents would only
@@ -162,7 +162,7 @@ describe("SubagentViewerOverlay scroll + sticky-bottom", () => {
 
   it("when sticky, appending to the child file keeps the view at the latest line", () => {
     const file = makeChildSession(5);
-    const sessionId = "test-scroll-live-" + crypto.randomBytes(4).toString("hex");
+    const sessionId = `test-scroll-live-${crypto.randomBytes(4).toString("hex")}`;
     recordSubagentStarted(sessionId, {
       parent_session_file: "",
       sub_session_file: file,

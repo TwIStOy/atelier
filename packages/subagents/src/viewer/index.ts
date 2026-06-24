@@ -112,7 +112,7 @@ function trimLabel(text: string, max: number): string {
   const clean = firstLine.trim();
   if (!clean) return "";
   if (clean.length <= max) return clean;
-  return clean.slice(0, Math.max(0, max - 1)) + "…";
+  return `${clean.slice(0, Math.max(0, max - 1))}…`;
 }
 
 export function loadSubagentRuns(parentSessionId: string): SubagentRunSummary[] {

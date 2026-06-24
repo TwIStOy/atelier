@@ -43,7 +43,7 @@ export function normalizeSubagentAgentId(raw: string): string {
 }
 
 function agentIdFromFrontmatter(fm: Record<string, unknown>, defaultId: string): string {
-  const n = fm["name"];
+  const n = fm.name;
   if (typeof n === "string" && n.trim()) {
     const x = normalizeSubagentAgentId(n);
     if (x) return x;
@@ -69,7 +69,7 @@ function parseBooleanField(fm: Record<string, unknown>, key: string): boolean | 
 }
 
 function parseMaxTurnsField(fm: Record<string, unknown>): number | undefined {
-  const v = fm["max_turns"];
+  const v = fm.max_turns;
   if (typeof v !== "number" || !Number.isFinite(v)) return undefined;
   const n = Math.floor(v);
   return n >= 1 ? n : undefined;
@@ -87,7 +87,7 @@ function dedupePreserveOrder(names: string[]): string[] {
 }
 
 function parseToolsField(fm: Record<string, unknown>): string[] | undefined {
-  const v = fm["tools"];
+  const v = fm.tools;
   if (v === undefined) return undefined;
   const norm = (s: string) => s.trim().toLowerCase();
   let names: string[] = [];

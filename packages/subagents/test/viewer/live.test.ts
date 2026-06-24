@@ -45,7 +45,7 @@ describe("subagents live index (running state)", () => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "sub-live-"));
     const subFile = path.join(tmp, "child.jsonl");
     fs.writeFileSync(subFile, "");
-    const sessionId = "test-parent-live-" + crypto.randomBytes(4).toString("hex");
+    const sessionId = `test-parent-live-${crypto.randomBytes(4).toString("hex")}`;
 
     // hijack the index path by writing directly via the exported helpers
     // (they target ~/.agent/subagents/by-parent/<id>.jsonl)
@@ -59,15 +59,15 @@ describe("subagents live index (running state)", () => {
     expect(runs.length).toBe(0);
 
     // append a user message -> now the run appears as running
-    fs.appendFileSync(subFile, makeHeader("h1") + "\n");
-    fs.appendFileSync(subFile, userEntry("h1", "hello") + "\n");
+    fs.appendFileSync(subFile, `${makeHeader("h1")}\n`);
+    fs.appendFileSync(subFile, `${userEntry("h1", "hello")}\n`);
     runs = loadSubagentRuns(sessionId);
     expect(runs.length).toBe(1);
     expect(runs[0]!.running).toBe(true);
     expect(refreshRunRunning(sessionId, subFile).running).toBe(true);
 
     // append an assistant message (still running)
-    fs.appendFileSync(subFile, assistantEntry("h1", "world") + "\n");
+    fs.appendFileSync(subFile, `${assistantEntry("h1", "world")}\n`);
     runs = loadSubagentRuns(sessionId);
     expect(runs[0]!.running).toBe(true);
 
