@@ -66,7 +66,7 @@ function runSkimFilter(lines: string[], filter: string, cwd: string): Promise<Sk
       if (code === 0 || code === 1) finish({ ok: true, lines: out });
       else finish({ ok: false, reason: `exit ${code ?? "?"}` });
     });
-    child.stdin.end(lines.join("\n") + "\n", "utf8");
+    child.stdin.end(`${lines.join("\n")}\n`, "utf8");
   });
 }
 
