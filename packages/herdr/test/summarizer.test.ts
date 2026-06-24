@@ -1,7 +1,7 @@
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it } from "vitest";
-import { firstUserPrompt, parseSessionTitle } from "./summarizer.ts";
+import { firstUserPrompt, parseSessionTitle } from "../src/summarizer.ts";
 
 function msgEntry(message: AgentMessage, id: string): SessionEntry {
   return {

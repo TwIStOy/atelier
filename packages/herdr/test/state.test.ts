@@ -1,6 +1,6 @@
 import type { AskUserPromptPayload } from "@htwang-contrib/common";
 import { describe, expect, it } from "vitest";
-import { type AgentState, buildTabTitle, stateIcon, summarizeAskUserQuestion } from "./state.ts";
+import { type AgentState, buildTabTitle, stateIcon, summarizeAskUserQuestion } from "../src/state.ts";
 
 describe("stateIcon", () => {
   it("maps each state to a distinct glyph", () => {

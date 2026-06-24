@@ -10,7 +10,7 @@ let loadConfig: typeof loadConfigType;
 beforeEach(async () => {
   tmpDir = mkdtempSync(join(tmpdir(), "todo-config-"));
   vi.stubEnv("XDG_CONFIG_HOME", tmpDir);
-  const mod = await import("../config.ts");
+  const mod = await import("../src/config.ts");
   loadConfig = mod.loadConfig;
 });
 

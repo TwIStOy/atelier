@@ -78,7 +78,7 @@ function buildPi() {
 }
 
 async function load() {
-  const mod = await import("./index.ts");
+  const mod = await import("../src/index.ts");
   return mod;
 }
 

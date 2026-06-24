@@ -7,7 +7,7 @@ import {
   parsePaneInfo,
   readHerdrEnv,
   resolveHerdrBinary,
-} from "./herdr-client.ts";
+} from "../src/herdr-client.ts";
 
 describe("readHerdrEnv / isInsideHerdr", () => {
   it("reads injected herdr env vars", () => {
@@ -146,7 +146,7 @@ const PANE_GET_STDOUT = JSON.stringify({
 describe("getOurPane / isActivePane", () => {
   it("does NOT pass --json (herdr prints bare JSON and rejects the flag)", async () => {
     const { pi, calls } = fakePi(PANE_GET_STDOUT);
-    const pane = await (await import("./herdr-client.ts")).getOurPane(pi, "p_2", {});
+    const pane = await (await import("../src/herdr-client.ts")).getOurPane(pi, "p_2", {});
     expect(calls[0]?.args).toEqual(["pane", "get", "p_2"]);
     expect(pane).not.toBeNull();
     expect(pane?.tab_id).toBe("w1:t1");
@@ -154,7 +154,7 @@ describe("getOurPane / isActivePane", () => {
 
   it("isActivePane returns the focused flag from pane get", async () => {
     const focused = fakePi(PANE_GET_STDOUT);
-    expect(await (await import("./herdr-client.ts")).isActivePane(focused.pi, "p_2", {})).toBe(true);
+    expect(await (await import("../src/herdr-client.ts")).isActivePane(focused.pi, "p_2", {})).toBe(true);
 
     const unfocused = fakePi(
       JSON.stringify({
@@ -162,20 +162,20 @@ describe("getOurPane / isActivePane", () => {
         result: { type: "pane_info", pane: { focused: false } },
       }),
     );
-    expect(await (await import("./herdr-client.ts")).isActivePane(unfocused.pi, "p_2", {})).toBe(false);
+    expect(await (await import("../src/herdr-client.ts")).isActivePane(unfocused.pi, "p_2", {})).toBe(false);
   });
 });
 
 describe("resolveTabId", () => {
   it("prefers HERDR_TAB_ID when injected", async () => {
     const { pi } = fakePi("");
-    const tabId = await (await import("./herdr-client.ts")).resolveTabId(pi, "p_2", { HERDR_TAB_ID: "env-tab-1" });
+    const tabId = await (await import("../src/herdr-client.ts")).resolveTabId(pi, "p_2", { HERDR_TAB_ID: "env-tab-1" });
     expect(tabId).toBe("env-tab-1");
   });
 
   it("falls back to tab_id from pane get when the env var is absent", async () => {
     const { pi } = fakePi(PANE_GET_STDOUT);
-    const tabId = await (await import("./herdr-client.ts")).resolveTabId(pi, "p_2", {});
+    const tabId = await (await import("../src/herdr-client.ts")).resolveTabId(pi, "p_2", {});
     expect(tabId).toBe("w1:t1");
   });
 });
@@ -183,24 +183,24 @@ describe("resolveTabId", () => {
 describe("renameTab", () => {
   it("calls tab rename with id + clipped label and no extra flags", async () => {
     const { pi, calls } = fakePi("{}");
-    await (await import("./herdr-client.ts")).renameTab(pi, "w1:t1", "Hi", {});
+    await (await import("../src/herdr-client.ts")).renameTab(pi, "w1:t1", "Hi", {});
     expect(calls[0]?.args).toEqual(["tab", "rename", "w1:t1", "Hi"]);
   });
 
   it("clips labels longer than 80 chars and skips empty labels", async () => {
     const { pi, calls } = fakePi("{}");
     const long = "x".repeat(200);
-    await (await import("./herdr-client.ts")).renameTab(pi, "w1:t1", long, {});
+    await (await import("../src/herdr-client.ts")).renameTab(pi, "w1:t1", long, {});
     expect(calls[0]?.args[3]?.length).toBe(80);
     calls.length = 0;
-    await (await import("./herdr-client.ts")).renameTab(pi, "w1:t1", "   ", {});
+    await (await import("../src/herdr-client.ts")).renameTab(pi, "w1:t1", "   ", {});
     expect(calls).toHaveLength(0);
   });
 });
 
 describe("parseTabInfo / getTabLabel", () => {
   it("parseTabInfo extracts the tab object from a tab.get response", async () => {
-    const { parseTabInfo } = await import("./herdr-client.ts");
+    const { parseTabInfo } = await import("../src/herdr-client.ts");
     const envelope = {
       id: "r",
       result: {
@@ -216,7 +216,7 @@ describe("parseTabInfo / getTabLabel", () => {
   });
 
   it("parseTabInfo returns null on malformed output", async () => {
-    const { parseTabInfo } = await import("./herdr-client.ts");
+    const { parseTabInfo } = await import("../src/herdr-client.ts");
     expect(parseTabInfo(null)).toBeNull();
     expect(parseTabInfo({ id: "r", result: {} })).toBeNull();
     expect(parseTabInfo({ id: "r", error: { code: "x" } })).toBeNull();
@@ -231,7 +231,7 @@ describe("parseTabInfo / getTabLabel", () => {
       },
     });
     const { pi, calls } = fakePi(stdout);
-    const info = await (await import("./herdr-client.ts")).getTabLabel(pi, "w1:t1", {});
+    const info = await (await import("../src/herdr-client.ts")).getTabLabel(pi, "w1:t1", {});
     expect(calls[0]?.args).toEqual(["tab", "get", "w1:t1"]);
     expect(info).toEqual({ tab_id: "w1:t1", label: "My Logs", number: 1 });
   });
