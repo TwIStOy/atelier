@@ -22,8 +22,13 @@ function setup() {
   return { tool };
 }
 
-async function call(tool: Record<string, unknown>, params: Record<string, unknown>) {
-  const execute = tool.execute as (...args: unknown[]) => Promise<unknown>;
+interface TodoCallResult {
+  content: Array<{ type: "text"; text: string }>;
+  details: TaskDetails;
+}
+
+async function call(tool: Record<string, unknown>, params: Record<string, unknown>): Promise<TodoCallResult> {
+  const execute = tool.execute as (...args: unknown[]) => Promise<TodoCallResult>;
   return execute("tc", params, undefined, undefined, {});
 }
 
@@ -67,7 +72,7 @@ describe("registerTodoTool — execute mutates module state", () => {
   it("create → list returns the seeded row", async () => {
     const { tool } = setup();
     const r1 = await call(tool, { action: "create", subject: "first" });
-    expect((r1.details as TaskDetails).action).toBe("create");
+    expect(r1.details.action).toBe("create");
     const r2 = await call(tool, { action: "list" });
     expect(r2.content[0]).toMatchObject({
       text: expect.stringContaining("first"),
@@ -79,7 +84,7 @@ describe("registerTodoTool — execute mutates module state", () => {
     await call(tool, { action: "create", subject: "a" });
     await call(tool, { action: "create", subject: "b" });
     const r = await call(tool, { action: "clear" });
-    const d = r.details as TaskDetails;
+    const d = r.details;
     expect(d.tasks).toEqual([]);
     expect(d.nextId).toBe(1);
   });

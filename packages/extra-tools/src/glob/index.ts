@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
-import { readFileSync } from "node:fs";
-import { stat as fsStat, type Stats } from "node:fs/promises";
+import { readFileSync, type Stats } from "node:fs";
+import { stat as fsStat } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
 import { createInterface } from "node:readline";
