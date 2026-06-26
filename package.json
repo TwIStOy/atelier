@@ -32,7 +32,8 @@
       "packages/working-indicator",
       "packages/todo",
       "packages/moshi-hooks-extra",
-      "packages/herdr"
+      "packages/herdr",
+      "packages/truncate-outputs"
     ],
     "skills": [
       "skills/code-philosophy",
