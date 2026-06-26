@@ -20,6 +20,9 @@
 #   --mainline <branch> Add a branch or glob pattern (e.g. 'release/*') to the
 #                       mainline set (repeatable). Globs expand to local and
 #                       remote refs.
+#   --json              Emit machine-readable JSON instead of the human table.
+#                       With --prune, removal is non-interactive and results
+#                       are included in the output.
 #   -y, --yes           Skip confirmation when pruning.
 #   -h, --help          Show this help.
 #
@@ -33,6 +36,7 @@ set -euo pipefail
 
 PRUNE=0
 ASSUME_YES=0
+JSON_OUTPUT=0
 MAINLINES=()
 
 usage() {
@@ -44,6 +48,7 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --prune)    PRUNE=1; shift ;;
         --mainline) MAINLINES+=("$2"); shift 2 ;;
+        --json)     JSON_OUTPUT=1; shift ;;
         -y|--yes)   ASSUME_YES=1; shift ;;
         -h|--help)  usage ;;
         *) echo "error: unknown option: $1" >&2; exit 2 ;;
@@ -218,7 +223,128 @@ status_of() {
     echo "active"
 }
 
-# ---- report -------------------------------------------------------------
+# Escape a string for inclusion in a JSON string literal: per RFC 8259 escape
+# quote, backslash, and control chars (U+0000..U+001F). Other bytes are passed
+# through unchanged so UTF-8 branch names stay intact.
+json_escape() {
+    local s=$1
+    s=${s//\\/\\\\}
+    s=${s//\"/\\\"}
+    printf '%s' "$s" | LC_ALL=C awk '
+        {
+            out = ""
+            for (i = 1; i <= length($0); i++) {
+                c = substr($0, i, 1)
+                n = index("\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f", c)
+                if (n > 0)
+                    out = out sprintf("\\u%04x", n)
+                else
+                    out = out c
+            }
+            printf "%s", out
+        }'
+}
+
+# Print MAINLINES as a JSON array of quoted strings.
+join_mainlines() {
+    local first=1 m
+    printf '['
+    for m in "${MAINLINES[@]}"; do
+        [[ $first -eq 1 ]] || printf ','
+        printf '"%s"' "$(json_escape "$m")"
+        first=0
+    done
+    printf ']'
+}
+
+# Emit the whole result as one JSON object on stdout. With --prune, removals
+# are performed non-interactively here and their outcomes reported under
+# `pruned`. JSON mode is always non-interactive; -y/--yes is implied.
+emit_json() {
+    local i path branch status removable_flag
+    local pruned_paths=() pruned_ok=() pruned_msg=()
+
+    if [[ $PRUNE -eq 1 ]]; then
+        local p msg ok
+        for p in "${removable[@]}"; do
+            msg="" ok=1
+            if ! git worktree remove "$p" 2>/dev/null; then
+                ok=0
+                msg="dirty or locked"
+            fi
+            pruned_paths+=("$p")
+            pruned_ok+=("$ok")
+            pruned_msg+=("$msg")
+        done
+    fi
+
+    printf '{"mainlines":%s,"worktrees":[' "$(join_mainlines)"
+    for i in "${!RES_PATHS[@]}"; do
+        path="${RES_PATHS[$i]}"
+        branch="${RES_BRANCHES[$i]}"
+        status="${RES_STATUS[$i]}"
+        removable_flag="${RES_REMOVABLE[$i]}"
+        local branch_json='null'
+        [[ -n "$branch" ]] && branch_json="\"$(json_escape "$branch")\""
+        [[ $i -gt 0 ]] && printf ','
+        printf '{"path":"%s","branch":%s,"status":"%s","removable":%s}' \
+            "$(json_escape "$path")" "$branch_json" "$status" "$removable_flag"
+    done
+    printf ']'
+
+    if [[ $PRUNE -eq 1 ]]; then
+        printf ',"pruned":['
+        local j
+        for j in "${!pruned_paths[@]}"; do
+            [[ $j -gt 0 ]] && printf ','
+            printf '{"path":"%s","ok":%s' \
+                "$(json_escape "${pruned_paths[$j]}")" "${pruned_ok[$j]}"
+            if [[ -n "${pruned_msg[$j]}" ]]; then
+                printf ',"error":"%s"' "$(json_escape "${pruned_msg[$j]}")"
+            fi
+            printf '}'
+        done
+        printf ']'
+    fi
+    printf '}\n'
+}
+# ---- collect status ----------------------------------------------------
+
+# Compute status + removability once, into parallel arrays, so the human and
+# JSON renderers share identical results.
+declare -a RES_PATHS=() RES_BRANCHES=() RES_STATUS=() RES_REMOVABLE=()
+for i in "${!WT_PATHS[@]}"; do
+    path="${WT_PATHS[$i]}"
+    branch="${WT_BRANCHES[$i]}"
+    status=$(status_of "$path" "$branch")
+    RES_PATHS+=("$path")
+    RES_BRANCHES+=("${branch:-}")
+    RES_STATUS+=("$status")
+
+    removable=0
+    if [[ "$status" == "merged" || "$status" == "squash-merged" ]]; then
+        # Never offer to remove the worktree we are currently sitting in, nor
+        # the repo root that owns the mainline.
+        if [[ "$path" != "$(pwd)" && "$path" != "$WORKTREE_ROOT" ]]; then
+            removable=1
+        fi
+    fi
+    RES_REMOVABLE+=("$removable")
+done
+
+removable=()
+for i in "${!RES_PATHS[@]}"; do
+    [[ "${RES_REMOVABLE[$i]}" == "1" ]] && removable+=("${RES_PATHS[$i]}")
+done
+
+# ---- render: JSON ------------------------------------------------------
+
+if [[ $JSON_OUTPUT -eq 1 ]]; then
+    emit_json
+    exit 0
+fi
+
+# ---- render: human -----------------------------------------------------
 
 # Column widths sized to content.
 printf '%-2s %-40s %-40s %-14s\n' "" "WORKTREE" "BRANCH" "STATUS"
@@ -227,13 +353,10 @@ printf '%-2s %-40s %-40s %-14s\n' "" \
     "$(printf '%0.s-' {1..40})" \
     "$(printf '%0.s-' {1..14})"
 
-removable=()
-for i in "${!WT_PATHS[@]}"; do
-    path="${WT_PATHS[$i]}"
-    branch="${WT_BRANCHES[$i]}"
-    status=$(status_of "$path" "$branch")
-
-    # Shorten the branch name column for display only.
+for i in "${!RES_PATHS[@]}"; do
+    path="${RES_PATHS[$i]}"
+    branch="${RES_BRANCHES[$i]}"
+    status="${RES_STATUS[$i]}"
     display_branch="$branch"
     [[ -z "$display_branch" ]] && display_branch="(detached)"
     case "$status" in
@@ -242,14 +365,6 @@ for i in "${!WT_PATHS[@]}"; do
         *)                    mark=" " ;;
     esac
     printf '%-2s %-40s %-40s %-14s\n' "$mark" "$path" "$display_branch" "$status"
-
-    if [[ "$status" == "merged" || "$status" == "squash-merged" ]]; then
-        # Never offer to remove the worktree we are currently sitting in, nor
-        # the repo root that owns the mainline.
-        if [[ "$path" != "$(pwd)" && "$path" != "$WORKTREE_ROOT" ]]; then
-            removable+=("$path")
-        fi
-    fi
 done
 
 echo

@@ -35,8 +35,45 @@ X = merged into mainline, safe to remove (- = mainline/at-mainline/detached, bla
 | --- | --- |
 | `--prune` | Remove worktrees detected as merged. |
 | `--mainline <branch\|glob>` | Add a branch or glob pattern to the mainline set. Repeatable. |
+| `--json` | Emit machine-readable JSON instead of the human table. With `--prune`, removal is non-interactive and results are included. |
 | `-y`, `--yes` | Skip confirmation when pruning. |
 | `-h`, `--help` | Show help. |
+
+## JSON output
+
+`--json` switches stdout to a single JSON object for machine consumption
+(piping into `jq`, scripts, etc.). Human-only messages and the table are
+suppressed.
+
+```json
+{
+  "mainlines": ["master", "origin/master"],
+  "worktrees": [
+    {"path": "/home/me/repo", "branch": "master", "status": "mainline", "removable": 0},
+    {"path": "/home/me/repo-8", "branch": "pi/issue/8-x", "status": "squash-merged", "removable": 1}
+  ]
+}
+```
+
+- `status` matches the human values: `mainline`, `at-mainline`, `merged`,
+  `squash-merged`, `active`, `detached`.
+- `removable` is `1` if the worktree is merged and eligible for removal, else `0`.
+  The current worktree and the repo root are always `0`.
+- With `--json --prune`, removal is **non-interactive** (no prompt) and a
+  `pruned` array is appended reporting each removal's outcome:
+
+```json
+{
+  "mainlines": ["master"],
+  "worktrees": [ ... ],
+  "pruned": [
+    {"path": "/home/me/repo-8", "ok": 1},
+    {"path": "/home/me/repo-dirty", "ok": 0, "error": "dirty or locked"}
+  ]
+}
+```
+
+Without `--prune`, the `pruned` key is omitted entirely.
 
 ## Merge detection
 
