@@ -346,12 +346,37 @@ fi
 
 # ---- render: human -----------------------------------------------------
 
-# Column widths sized to content.
-printf '%-2s %-40s %-40s %-14s\n' "" "WORKTREE" "BRANCH" "STATUS"
-printf '%-2s %-40s %-40s %-14s\n' "" \
-    "$(printf '%0.s-' {1..40})" \
-    "$(printf '%0.s-' {1..40})" \
-    "$(printf '%0.s-' {1..14})"
+# Column widths sized to content: each is max(header, longest cell), capped
+# so an abnormally long path or branch can't blow the table out. The mark and
+# gap are fixed; the three data columns are dynamic.
+WORKTREE_HDR=WORKTREE
+BRANCH_HDR=BRANCH
+STATUS_HDR=STATUS
+w_path=${#WORKTREE_HDR}
+w_branch=${#BRANCH_HDR}
+w_status=${#STATUS_HDR}
+for i in "${!RES_PATHS[@]}"; do
+    p="${RES_PATHS[$i]}"
+    b="${RES_BRANCHES[$i]}"
+    [[ -z "$b" ]] && b="(detached)"
+    (( ${#p} > w_path ))   && w_path=${#p}
+    (( ${#b} > w_branch )) && w_branch=${#b}
+    s="${RES_STATUS[$i]}"
+    (( ${#s} > w_status )) && w_status=${#s}
+done
+# Cap so a runaway value doesn't widen the whole table without bound.
+w_cap=50
+(( w_path   > w_cap )) && w_path=$w_cap
+(( w_branch > w_cap )) && w_branch=$w_cap
+
+# Build the printf format once from the computed widths.
+fmt="%-2s %-${w_path}s %-${w_branch}s %-${w_status}s\n"
+rule=$(printf '%0.s-' $(seq 1 "$w_path"))
+rule_b=$(printf '%0.s-' $(seq 1 "$w_branch"))
+rule_s=$(printf '%0.s-' $(seq 1 "$w_status"))
+
+printf "$fmt" "" "$WORKTREE_HDR" "$BRANCH_HDR" "$STATUS_HDR"
+printf "$fmt" "" "$rule" "$rule_b" "$rule_s"
 
 for i in "${!RES_PATHS[@]}"; do
     path="${RES_PATHS[$i]}"
@@ -364,7 +389,7 @@ for i in "${!RES_PATHS[@]}"; do
         mainline|detached|at-mainline) mark="-" ;;
         *)                    mark=" " ;;
     esac
-    printf '%-2s %-40s %-40s %-14s\n' "$mark" "$path" "$display_branch" "$status"
+    printf "$fmt" "$mark" "$path" "$display_branch" "$status"
 done
 
 echo
