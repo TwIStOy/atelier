@@ -151,21 +151,30 @@ is_ancestor_of_mainline() {
     return 1
 }
 
-# Branch's commits are all absorbed by mainline (squash merge), detected by
-# patch-id equivalence. `git cherry` outputs `+` (absent) or `-` (present).
-# An empty result means the branch tip equals mainline (already counted above).
+# Whether the branch's commits are all absorbed by a single mainline (squash
+# merge), detected per-mainline via patch-id equivalence. `git cherry` outputs
+# `+` (commit absent from that mainline) or `-` (present).
+#
+# Evaluated per mainline, not aggregated: a branch is squash-merged if at least
+# one mainline contains every one of its commits. Aggregating across mainlines
+# would be wrong - a commit present in `origin/master` but not yet in local
+# `master` would show a `+` for the latter and mask the match on the former.
 is_squash_merged_into_mainline() {
     local branch="$1"
     local diff
-    diff=$(for m in "${MAINLINES[@]}"; do
-        git cherry -v "${m}^{commit}" "$branch" 2>/dev/null || true
-    done)
-    [[ -n "$diff" ]] || return 0   # no commits differing => absorbed
-    # Any line starting with `+` is a commit not found in any mainline.
-    if printf '%s\n' "$diff" | grep -q '^+'; then
-        return 1
-    fi
-    return 0
+    for m in "${MAINLINES[@]}"; do
+        diff=$(git cherry -v "${m}^{commit}" "$branch" 2>/dev/null || true)
+        # No commits differing from this mainline => tip equals it; already
+        # handled by the at-mainline guard in status_of. Treat as not-a-squash
+        # here so we don't double-count.
+        [[ -n "$diff" ]] || continue
+        # If no commit is marked `+`, every commit of the branch is already in
+        # this mainline => squash-merged.
+        if ! printf '%s\n' "$diff" | grep -q '^+'; then
+            return 0
+        fi
+    done
+    return 1
 }
 
 status_of() {
