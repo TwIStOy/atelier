@@ -186,4 +186,43 @@ describe("bash adapter command display width", () => {
     expect(joined).not.toContain("…");
     expect(joined).toContain(LONG_CMD);
   });
+
+  it("keeps the cwd suffix visible when the command must be truncated to fit the width", () => {
+    globalToolDisplayRegistry.register("bash", bashAdapter);
+    const width = 80;
+    const lines = renderToolCall(
+      {
+        toolName: "bash",
+        args: { command: LONG_CMD, description: "build the package", workdir: "/r" },
+        output: "",
+        expanded: false,
+        isPartial: true,
+        isError: false,
+        registry: globalToolDisplayRegistry,
+      },
+      PLAIN_THEME,
+    ).render(width);
+    const joined = lines.join(" ");
+    expect(joined).toContain("in /r");
+    expect(joined).toContain("build the package");
+    expect(joined).toContain("…");
+    for (const line of lines) {
+      expect(visibleWidth(line)).toBeLessThanOrEqual(width);
+    }
+  });
+
+  it("truncates the command to the available width, not a wide floor that would overflow the line", () => {
+    globalToolDisplayRegistry.register("bash", bashAdapter);
+    const header = bashAdapter.formatCallHeader(
+      { command: LONG_CMD, description: "build", workdir: "/r" },
+      PLAIN_THEME,
+      undefined,
+      false,
+      false,
+      60,
+    );
+    expect(header).toContain("in /r");
+    expect(header).toContain("…");
+    expect(visibleWidth(`◆ ${header}`)).toBeLessThanOrEqual(60);
+  });
 });

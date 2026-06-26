@@ -11,7 +11,7 @@ interface BashArgs {
 }
 
 const HEADER_PREFIX_WIDTH = "◆ Bash ".length;
-const CMD_DELIM_WIDTH = 2;
+const DESC_DELIM_WIDTH = 3;
 const CWD_PREFIX_WIDTH = " in ".length;
 
 function bashCommandDisplayLength(desc: string, cwd: string, width: number | undefined): number {
@@ -20,10 +20,10 @@ function bashCommandDisplayLength(desc: string, cwd: string, width: number | und
 
   const overhead =
     HEADER_PREFIX_WIDTH +
-    (desc ? visibleWidth(desc) + 1 : 0) +
-    CMD_DELIM_WIDTH +
+    (desc ? visibleWidth(desc) + DESC_DELIM_WIDTH : 0) +
     (cwd ? CWD_PREFIX_WIDTH + visibleWidth(shortenPath(cwd)) : 0);
-  return Math.max(floor, width - overhead);
+  const available = Math.max(0, width - overhead);
+  return Math.min(Math.max(floor, available), available);
 }
 
 export const bashAdapter: ToolDisplayAdapter<BashArgs> = {
