@@ -136,38 +136,76 @@ const vm = await VM.create({
 const result = await vm.exec("...");   // string  => /bin/sh -lc "..."
 await vm.exec(["/bin/cat", path]);     // array   => direct exec (no $PATH search)
 
+// First-class guest filesystem API (preferred over shelling out):
+await vm.fs.readFile("/workspace/file.txt", { encoding: "utf8" }); // -> string
+await vm.fs.readFile("/workspace/binary");                          // -> Buffer
+await vm.fs.writeFile("/workspace/out.txt", "content");
+await vm.fs.mkdir("/workspace/dir", { recursive: true });
+await vm.fs.access("/workspace/file");        // throws if absent
+await vm.fs.stat("/workspace/file");          // -> node:fs Stats
+await vm.fs.listDir("/workspace/dir");        // -> string[] of entry names
+
 await vm.close();
 ```
 
-VM supports snapshots (`vm.snapshot()` / `--resume`), ingress gateway
+VM supports checkpoints (`vm.checkpoint(path)` / `--resume`), ingress gateway
 (`vm.enableIngress()`, `--listen`), and host→guest SSH (`vm.enableSsh()`).
+`createHttpHooks(...)` returns a `secretManager` for runtime secret
+add/update/delete after the VM is running.
 
-## 7. Existing upstream Pi integration
+## 7. Official upstream Pi example
 
-The repo ships an example at
-[`host/examples/pi-gondolin.ts`](https://github.com/earendil-works/gondolin/blob/main/host/examples/pi-gondolin.ts).
-It demonstrates the exact pattern relevant to us: it **overrides pi's built-in
-`read`/`write`/`edit`/`bash` tools** so they execute inside the VM instead of
-on the host. Pi exposes injectable operation interfaces for each tool
-(`ReadOperations`, `WriteOperations`, `EditOperations`, `BashOperations`), and
-the example provides VM-backed implementations of each:
+The **pi** repo ships a full reference extension at
+[`packages/coding-agent/examples/extensions/gondolin`](https://github.com/earendil-works/pi/tree/main/packages/coding-agent/examples/extensions/gondolin)
+(`index.ts`, `package.json`, depends on `@earendil-works/gondolin@0.12.0`).
+This is the authoritative reference for our integration — more complete than
+the older `host/examples/pi-gondolin.ts` in the gondolin repo (which only
+overrode 4 tools via shell-out).
 
-- `read` → `cat` the guest path
-- `write` → base64 round-trip into the guest file
-- `edit` → compose of read + write
-- `bash` → `vm.exec(["/bin/bash","-lc",command])` with streamed output,
-  per-command cwd, env, signal, and timeout
-- `user_bash` (the `!` commands) → same VM-backed bash ops
-- `before_agent_start` → rewrites the system-prompt CWD line to show
-  `/workspace` so the model sees the guest path
-- mounts the host CWD read-write at `/workspace` via `RealFSProvider`
+**What it overrides** — **all 7** built-in file/shell tools, by re-registering
+them with VM-backed `*Operations` implementations (pi exposes injectable
+operation interfaces for each):
 
-This example is a **behavior and API reference**, not a drop-in: it lives in
-the gondolin repo, uses inline type fixes (`Record` without type args — a
-stripped artifact of fetching), has no config, no policy hooks, no tests, and
-isn't wired to this monorepo's conventions. The integration plan
-(`INTEGRATION-PLAN.md`) describes how to adapt it into a first-class package
-here.
+| Tool | Ops interface | Implementation |
+| --- | --- | --- |
+| `read` | `ReadOperations` | `vm.fs.readFile` / `vm.fs.access`; image MIME by extension |
+| `write` | `WriteOperations` | `vm.fs.writeFile` / `vm.fs.mkdir({recursive})` |
+| `edit` | `EditOperations` | composes read.`readFile` + read.`access` + write.`writeFile` |
+| `bash` | `BashOperations` | `vm.exec([shell,"-lc",cmd])`, streamed, with cwd/env/signal/timeout |
+| `ls` | `LsOperations` | `vm.fs.exists` / `stat` / `listDir` |
+| `find` | `FindOperations` | TS `walkGuestFiles` + `matchesToolGlob` over `vm.fs` |
+| `grep` | custom executor | TS reimplementation: walks files, line-matches, builds `path:line: text` blocks with context/limit/truncation (no native ripgrep in guest) |
+
+Plus hooks:
+- `user_bash` (the `!` commands) → VM-backed bash ops.
+- `before_agent_start` → rewrites the system-prompt CWD line to `/workspace` so
+  the model sees the guest path.
+- `session_start` → eagerly boots the VM; `session_shutdown` → closes it.
+- `/gondolin` command → show VM id / host<->guest mapping / detected shell.
+
+**Key implementation choices worth reusing**:
+- **`vm.fs` API, not shell-out.** Read/write/ls go through the first-class
+  `vm.fs.*` methods (RPC over virtio-serial), avoiding quoting/encoding bugs
+  the old `cat`/base64 approach had.
+- **Bash probe at boot.** Runs `command -v bash || true`; uses `/bin/bash` if
+  present, else `/bin/sh`. The detected path is reused by every bash exec.
+- **Path mapping passes through** outside-workspace paths instead of rejecting
+  them: `hostPathToGuest` returns the POSIX-normalized absolute path for paths
+  outside the project, so the agent can still read guest system files. Only
+  in-workspace paths are rewritten to under `/workspace`.
+- **Grep/glob reimplemented in TS** because the minimal guest image has no
+  ripgrep; `walkGuestFiles` skips `.git`/`node_modules` and supports a limit.
+- **Singleflight VM start.** `ensureVm` dedups concurrent boot attempts via a
+  shared `vmStarting` promise.
+- Mounts the host CWD read-write at `/workspace` via `RealFSProvider`.
+
+All 19 pi-coding-agent symbols the example imports (`createReadTool` …
+`GrepToolInput`, plus `truncateHead`/`truncateLine`/`formatSize`/
+`DEFAULT_MAX_BYTES`) **exist in our installed `pi-coding-agent@0.80.2`**
+(verified). The example is still a reference, not a drop-in: it has no config,
+no network/secrets policy, no tests, no graceful degradation, and isn't wired
+to this monorepo's conventions. The integration plan (`INTEGRATION-PLAN.md`)
+describes how to adapt it into a first-class package here.
 
 ## 8. Requirements & constraints
 

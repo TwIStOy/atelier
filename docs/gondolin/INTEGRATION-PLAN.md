@@ -23,7 +23,7 @@ disagree.
 
 | # | Decision | Position | Rationale |
 | --- | --- | --- | --- |
-| D1 | Use the SDK directly as a runtime dependency | **Yes**, `@earendil-works/gondolin` in `dependencies` | Matches the repo rule "prefer existing packages over reimplementing". The SDK is the supported public surface. |
+| D1 | Use the SDK directly as a runtime dependency | **Yes**, `@earendil-works/gondolin@^0.12.0` in `dependencies` | Matches the repo rule "prefer existing packages over reimplementing". The SDK is the supported public surface. The official pi example also pins `0.12.0`. |
 | D2 | Backend | **QEMU only** for v1 | `krun` is experimental, needs Zig + Rust + libkrun build, and is Linux-x86 smoke-tested only. QEMU works on our macOS+NixOS targets. |
 | D3 | Mount mode for `/workspace` | **`RealFSProvider(cwd)` read-write** (matches upstream) | The agent needs to actually edit the project. Read-only would defeat the purpose. We rely on network policy + secret non-exposure for safety. |
 | D4 | Network default | **Deny-all** (no `allowedHosts`) until the user/project configures egress | Safe default; agent must request or config the hosts it needs. Opposite of upstream example (which shows allowlists inline). |
@@ -34,34 +34,43 @@ disagree.
 
 ## 3. Package layout
 
-New package at `packages/gondolin/`, following the `web-tools`/`committer` shape:
+New package at `packages/gondolin/`, following the `web-tools`/`committer` shape.
+The structure mirrors the **official pi example** (`packages/coding-agent/examples/extensions/gondolin`),
+which overrides all 7 file/shell tools — not just 4. We split its single
+`index.ts` into modules for testability.
 
 ```
 packages/gondolin/
 ├── package.json
 ├── tsconfig.json
+├── README.md
 ├── src/
-│   ├── index.ts            # default export: registerConfigItems + tools + hooks
-│   ├── vm.ts               # VM lifecycle (create/close/ensure), singleton per session
+│   ├── index.ts            # default export: registerConfigItems + tools + hooks + /gondolin
+│   ├── vm.ts               # VM lifecycle (start/ensure/close), singleflight, bash probe, QEMU-absent fallback
 │   ├── config.ts           # config schema, load/save, registerConfigItems wrapper
-│   ├── paths.ts            # host<->guest path mapping (toGuestPath, shQuote)
+│   ├── paths.ts            # host<->guest path mapping (toGuestPath, hostPathToGuest, matchesToolGlob)
+│   ├── walk.ts             # walkGuestFiles (skips .git/node_modules) reused by find+grep
 │   ├── ops/
-│   │   ├── read.ts         # ReadOperations  backed by vm.exec(cat/file/test)
-│   │   ├── write.ts        # WriteOperations backed by base64 round-trip
-│   │   ├── edit.ts         # EditOperations = read.readFile + write.writeFile + access
-│   │   └── bash.ts         # BashOperations  backed by vm.exec([bash,-lc,cmd])
+│   │   ├── read.ts         # ReadOperations   via vm.fs.readFile/access + ext-based MIME
+│   │   ├── write.ts        # WriteOperations  via vm.fs.writeFile/mkdir({recursive})
+│   │   ├── edit.ts         # EditOperations   = read.readFile + read.access + write.writeFile
+│   │   ├── bash.ts         # BashOperations   via vm.exec([shell,"-lc",cmd]) streamed
+│   │   ├── ls.ts           # LsOperations     via vm.fs.exists/stat/listDir
+│   │   ├── find.ts         # FindOperations   via walkGuestFiles + matchesToolGlob
+│   │   └── grep.ts         # grep executor    TS line-match with context/limit/truncation
 │   ├── policy/
 │   │   ├── http.ts         # build createHttpHooks({allowedHosts, secrets, blockInternalRanges})
-│   │   └── secrets.ts      # resolve secret values from host env, build secrets map
+│   │   └── secrets.ts      # resolve secret values from host env, build secrets map + SecretManager
 │   └── hooks.ts            # before_agent_start (rewrite CWD), user_bash, session lifecycle
 ├── test/
-│   ├── paths.test.ts       # toGuestPath edge cases (escapes, separators)
+│   ├── paths.test.ts       # toGuestPath / hostPathToGuest / glob matching (no QEMU needed)
+│   ├── walk.test.ts        # walkGuestFiles skip rules + limit (mocked vm.fs)
 │   ├── policy.test.ts      # allowedHosts matching, internal-range blocking
-│   └── ops.test.ts         # ops wiring (mocked VM), if feasible without QEMU
-└── README.md
+│   └── grep.test.ts        # line matcher, context window, match-limit formatting
+└── ...
 ```
 
-`packages/gondolin/package.json` (sketch):
+`packages/gondolin/package.json` (sketch — matches the example's dep pin + our peer pattern):
 
 ```jsonc
 {
@@ -72,7 +81,7 @@ packages/gondolin/
   "types": "src/index.ts",
   "pi": { "extensions": ["./index.ts"] },
   "dependencies": {
-    "@earendil-works/gondolin": "^<latest>",
+    "@earendil-works/gondolin": "^0.12.0",
     "@htwang-contrib/common": "*"
   },
   "peerDependencies": {
@@ -93,9 +102,11 @@ Then register it in the root `package.json` under `pi.extensions`.
 
 ## 4. Wiring into pi
 
-The extension overrides the four built-in tools by re-registering them with
-VM-backed operations, exactly as the upstream example does. Pi supports this:
-each `createXTool(cwd, { operations })` accepts an injectable ops object.
+The extension overrides the **seven** built-in file/shell tools by
+re-registering them with VM-backed operations, exactly as the official example
+does. Pi supports this: each `createXTool(cwd, { operations })` accepts an
+injectable ops object, and the tool's own `execute` is reused. `grep` is the
+exception — it has no ops injection, so its executor is reimplemented in TS.
 
 ```ts
 export default function (pi: ExtensionAPI): void {
@@ -104,28 +115,50 @@ export default function (pi: ExtensionAPI): void {
   pi.on("session_start", async (_e, ctx) => { if (enabled()) await ensureVm(ctx); });
   pi.on("session_shutdown", async (_e, ctx) => { await closeVm(ctx); });
   pi.on("before_agent_start", rewriteCwdHook);   // show /workspace in prompt
-  pi.on("user_bash", (_e, _ctx) => vmBashOpsIfActive());
+  pi.on("user_bash", (_e, ctx) => vmBashOpsIfActive());
 
-  // re-register read/write/edit/bash with VM-backed ops when active
-  registerGondolinTools(pi);
-  pi.registerCommand("gondolin", gondolinCommand); // status / toggle / allow
+  registerGondolinTools(pi);  // re-registers read/write/edit/bash/ls/find/grep
+  pi.registerCommand("gondolin", gondolinCommand); // status (+ allow, in our version)
 }
 ```
 
-Tool override approach (per upstream): spread the stock tool definition and
-replace `execute` so it lazily ensures the VM, then delegates to a tool built
-with `{ operations: vmBackedOps }`. When the extension is **disabled**, we do
-nothing — the stock host tools remain in place untouched.
+Tool override approach (per official example): spread the stock tool definition
+(`name`, `description`, `inputSchema`, `render` …) and replace `execute` so it
+lazily `ensureVm`s, then delegates to a tool built with
+`{ operations: vmBackedOps }` and `cwd: GUEST_WORKSPACE`. Each re-registered
+execute calls the underlying tool's `execute(id, params, signal, onUpdate)` —
+no reimplementation of the tool's own rendering/truncation logic. When the
+extension is **disabled**, we do nothing — the stock host tools remain in place
+untouched.
+
+### Why `vm.fs` instead of shell-out
+
+The official example reads/writes via the **`vm.fs` API**
+(`readFile`/`writeFile`/`mkdir`/`access`/`stat`/`listDir`) rather than
+shelling out (`vm.exec(["cat", ...])` / base64 round-trip). This is RPC over
+virtio-serial to `sandboxfs`, avoids shell quoting/encoding bugs, and supports
+streaming. We follow it.
+
+### Why grep/find are reimplemented in TS
+
+The minimal Alpine guest has no ripgrep, and `vm.fs` has no search primitive.
+So the example walks files in TS (`walkGuestFiles`, skipping `.git`/
+`node_modules`) and line-matches in JS. We reuse this; it also keeps these ops
+unit-testable without QEMU.
 
 ## 5. Path mapping (`paths.ts`)
 
 The agent thinks in host paths (the CWD it was started in). Inside the VM the
-project lives at `/workspace`. Map strictly:
+project lives at `/workspace`. We follow the official example's **passthrough**
+semantics (not the old example's reject-on-escape):
 
-- `toGuestPath(hostCwd, p)`: `path.relative(hostCwd, p)`; reject anything that
-  escapes (`..` or absolute outside the project) with a clear error.
-- Normalize separators to POSIX for the Linux guest.
-- `shQuote`: POSIX single-quote wrapping for safe `cat`/`mkdir`/`test` args.
+- `hostPathToGuest(hostCwd, hostPath)`: if the path is inside `hostCwd`, rewrite
+  to `/workspace/<rel>`; otherwise return the POSIX-normalized absolute path
+  unchanged (so the agent can still read guest system files like `/etc/...`).
+- `toGuestPath(hostCwd, inputPath)`: handles `@`-prefixed paths, empty input,
+  and absolute-vs-relative inputs; resolves relatives against `/workspace`.
+- `toPosix`: convert platform separators to POSIX for the Linux guest.
+- `matchesToolGlob`: glob matching with `**/` prefix fallback for bare patterns.
 
 This is the most bug-prone piece (host macOS path semantics vs guest Linux), so
 it gets dedicated unit tests independent of QEMU.
@@ -135,12 +168,16 @@ it gets dedicated unit tests independent of QEMU.
 - `createHttpHooks({ allowedHosts, secrets, blockInternalRanges: true })`.
 - **Default `allowedHosts: []`** → all egress blocked. Surfaced as a status line
   ("Gondolin: egress denied (no allowed hosts)") so the agent/user understands
-  failures.
+  failures. (Note: omitting `allowedHosts` entirely means allow-all; we pass an
+  explicit empty array for deny-all.)
 - `allowedHosts` is configurable (config item + `/gondolin allow <host>`).
 - Secrets: config maps a logical name to a **host env var**; the host reads
   `process.env[VAR]` at VM create and passes the value to `createHttpHooks`.
   The guest only ever sees the placeholder. We never mount `~/.config`,
   `~/.aws`, `.env`, or agenix paths into the guest.
+- `createHttpHooks` returns a **`secretManager`** (list/update/delete) so we can
+  rotate a secret at runtime after the VM is up without recreating it — useful
+  for `/gondolin secret set NAME=VAR` without a full VM restart.
 
 ## 7. Graceful degradation
 
@@ -172,12 +209,14 @@ This is an explicit deviation from upstream, which lets the error propagate.
 
 ## 9. Phased rollout
 
+Phases track the module groups. Each phase is independently testable.
+
 | Phase | Scope | Exit criteria |
 | --- | --- | --- |
-| **P0 — Skeleton** | package scaffold, config items (enabled, allowedHosts, image), register in root `package.json`, `npm run check` clean | loads in pi without error when disabled |
-| **P1 — VM lifecycle + paths** | `vm.ts`, `paths.ts` + tests, `session_start`/`shutdown` hooks, status line, QEMU-absent fallback | a session boots a VM on a QEMU machine; `toGuestPath` tests pass |
-| **P2 — Tool overrides** | `ops/*`, re-register read/write/edit/bash + `user_bash`, `before_agent_start` CWD rewrite | agent can read/edit/write/bash inside `/workspace`; host files outside project are unreachable |
-| **P3 — Policy** | `policy/http.ts`, `policy/secrets.ts`, deny-by-default egress, `/gondolin allow <host>`, secret mapping config | guest cannot curl a denied host; can curl an allowed host with header-injected secret |
+| **P0 — Skeleton** | package scaffold (`package.json`/`tsconfig.json`), config items (enabled, allowedHosts, image), register in root `package.json`, `npm run check` clean | loads in pi without error when disabled |
+| **P1 — VM lifecycle + paths** | `vm.ts` (start/ensure/close, singleflight, bash probe, QEMU-absent fallback), `paths.ts` + tests, `walk.ts` + tests, `session_start`/`shutdown` hooks, status line | a session boots a VM on a QEMU machine; `toGuestPath`/`hostPathToGuest`/`matchesToolGlob`/`walkGuestFiles` tests pass |
+| **P2 — 7 tool overrides** | `ops/{read,write,edit,bash,ls,find,grep}.ts` via `vm.fs` + TS grep, re-register all 7 + `user_bash`, `before_agent_start` CWD rewrite, `/gondolin` status | agent can read/edit/write/bash/ls/find/grep inside `/workspace`; host files outside project are reachable only as guest system paths (passthrough) |
+| **P3 — Policy** | `policy/http.ts`, `policy/secrets.ts`, deny-by-default egress, `/gondolin allow <host>`, secret mapping config, runtime `secretManager` updates | guest cannot curl a denied host; can curl an allowed host with header-injected secret; secret rotate works without VM restart |
 | **P4 — Hardening** | error paths, timeouts, streaming correctness, `committer`/`web-tools` composition tests, README, CHANGELOG `[Unreleased]` | full `npm run check` + `npm test` green; manual run-through on macOS+NixOS |
 
 Snapshots, ingress, SSH egress, and the `krun` backend are explicitly **out of
@@ -199,8 +238,12 @@ scope** for v1.
 
 - **QEMU dependency** is heavy and not universally present; mitigated by D6
   (off by default) and §7 (fallback).
-- **Path-mapping bugs** (host↔guest) could let the agent write outside the
-  project or fail to read; mitigated by strict `toGuestPath` + unit tests.
+- **Path-mapping bugs** (host↔guest) could misroute reads/writes; mitigated by
+  the passthrough semantics proven in the official example + dedicated unit
+  tests for `toGuestPath`/`hostPathToGuest`/`matchesToolGlob`.
+- **TS grep is slower** than native ripgrep for large repos; the official
+  example accepts this tradeoff (minimal guest has no ripgrep). `walkGuestFiles`
+  skips `.git`/`node_modules` to bound work. Flag for users who grep huge trees.
 - **Cold-start latency** (~1s boot + asset download on first use) may surprise
   users; mitigated by eager `session_start` boot and clear status messaging.
 - **MITM CA trust**: the guest trusts Gondolin's injected CA. The host CA key
