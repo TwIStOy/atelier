@@ -17,9 +17,17 @@
 #
 # Flags:
 #   --prune             Remove worktrees detected as merged.
-#   --mainline <branch> Add a branch to the mainline set (repeatable).
+#   --mainline <branch> Add a branch or glob pattern (e.g. 'release/*') to the
+#                       mainline set (repeatable). Globs expand to local and
+#                       remote refs.
 #   -y, --yes           Skip confirmation when pruning.
 #   -h, --help          Show this help.
+#
+# Persistent config (optional, set once per repo):
+#   git config worktree-merged.mainline develop
+#   git config --add  worktree-merged.mainline 'release/*'
+# Entries are read at startup and merged with --mainline flags and the
+# master/main defaults.
 
 set -euo pipefail
 
@@ -50,13 +58,39 @@ GIT_DIR=$(git rev-parse --git-common-dir 2>/dev/null) || {
 GIT_DIR=$(cd "$GIT_DIR" && pwd)
 WORKTREE_ROOT=$(cd "$GIT_DIR/.." && pwd)
 
+# Collect mainline entries from three sources, all merged:
+#   1. git config worktree-merged.mainline (repeatable via `git config --add`)
+#   2. --mainline flags (repeatable)
+#   3. hardcoded defaults: master/main, local then remote
+CONFIG_MAINLINE_LIST=()
+while IFS= read -r line; do
+    [[ -n "$line" ]] && CONFIG_MAINLINE_LIST+=("$line")
+done < <(git config --get-all worktree-merged.mainline 2>/dev/null || true)
+
+CANDIDATES=("master" "main" "origin/master" "origin/main" "${CONFIG_MAINLINE_LIST[@]:-}" "${MAINLINES[@]}")
+
+# Expand any glob patterns (anything containing * ? [) into concrete refs via
+# `git for-each-ref`, matching both local heads and all remotes. Literal names
+# pass through untouched. Ref names cannot contain these characters, so the
+# glob-vs-literal distinction is unambiguous.
+expand_glob() {
+    local pat="$1"
+    # Match local heads and all remotes; %(refname:short) yields `develop`,
+    # `origin/release/1`, etc. - exactly the shape our resolver expects.
+    git for-each-ref --format='%(refname:short)' \
+        "refs/heads/$pat" "refs/remotes/*/$pat" 2>/dev/null
+}
+
 # Build the mainline candidate set. Defaults to master/main (local then remote),
 # plus any --mainline additions. Missing branches are dropped after resolution.
-CANDIDATES=("master" "main" "origin/master" "origin/main" "${MAINLINES[@]}")
 MAINLINES=()
 for c in "${CANDIDATES[@]}"; do
     [[ -z "$c" ]] && continue
-    if git rev-parse --verify --quiet "$c^{commit}" >/dev/null 2>&1; then
+    if [[ "$c" == *[\*\?\[]* ]]; then
+        while IFS= read -r expanded; do
+            [[ -n "$expanded" ]] && MAINLINES+=("$expanded")
+        done < <(expand_glob "$c")
+    elif git rev-parse --verify --quiet "$c^{commit}" >/dev/null 2>&1; then
         MAINLINES+=("$c")
     fi
 done
@@ -66,7 +100,8 @@ if [[ ${#MAINLINES[@]} -eq 0 ]]; then
     exit 1
 fi
 
-# De-duplicate by resolved SHA so remote+local pairs count once.
+# De-duplicate by resolved SHA so remote+local pairs and glob expansions that
+# hit the same ref all count once.
 dedup_mainlines() {
     declare -A seen
     local out=()
