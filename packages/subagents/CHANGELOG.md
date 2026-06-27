@@ -4,7 +4,8 @@
 
 ### Added
 
-- Added `scout` subagent persona: read-only agent for external docs and dependency research. Investigates third-party libraries, upstream repositories, and external documentation by cloning repositories into a managed cache (via the dedicated `git_clone` tool) or reading docs with `web_search`/`web_fetch`. Counterpart to the local `explore` agent.
+- Added `git_clone` tool (child-session only): clones a remote Git repository (HTTPS or git protocol only) into a managed cache under `/tmp/scout-cache/<owner>-<repo>`. Shallow by default (`--depth 1`); reuses an existing cache as-is. Rejects `file://`, `git+ssh://`, and `ssh://` URLs and runs with `GIT_TERMINAL_PROMPT=0` (no interactive auth). Registered only inside child (subagent) sessions via `CHILD_SESSION_EXTENSION_FACTORIES`, so the primary agent never exposes it.
+- Added `scout` subagent persona: read-only agent for external docs and dependency research. Investigates third-party libraries, upstream repositories, and external documentation by cloning repositories into the managed cache (via `git_clone`) or reading docs with `web_search`/`web_fetch`. Counterpart to the local `explore` agent. Runs `isolated: true` with an explicit tool allowlist.
 
 ### Changed
 

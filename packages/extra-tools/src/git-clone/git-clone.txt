@@ -1,6 +1,0 @@
-- Clone a remote Git repository into a managed cache (NOT the workspace) so its source can be inspected read-only.
-- Clones are shallow by default (--depth 1) to save time and disk.
-- The destination is always under the OS temp dir, at `<tmp>/scout-cache/<owner>-<repo>` (derived from the repo URL), never inside the project working directory.
-- If the cache directory already exists and is non-empty, it is reused as-is (no re-clone). Call `git -C <cache> pull` via `bash` if you need updates; this tool will not mutate an existing clone.
-- Use `branch` to checkout a specific branch, tag, or commit after cloning a new repo (ignored when reusing an existing cache).
-- Use this to read upstream dependency source, compare local code against an external repo, or inspect library implementations. Pair with `grep`/`glob`/`read` over the returned `cache_path`.
