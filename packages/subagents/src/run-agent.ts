@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import * as fs from "node:fs";
 import type { AgentMessage, ThinkingLevel } from "@earendil-works/pi-agent-core";
 import type { TextContent } from "@earendil-works/pi-ai";
-import type { ExtensionContext, ExtensionFactory } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext, ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import {
   type AgentSession,
   type AgentSessionEvent,
@@ -27,9 +27,14 @@ import {
   subagentSystemPromptFromCatalog,
 } from "./agent-catalog.ts";
 import { resolveChildToolNames } from "./child-tools.ts";
+import { registerGitCloneTool } from "./git-clone/index.ts";
 import { appendSubagentLinkRecord, recordSubagentStarted, SUBAGENT_SESSION_DIR } from "./paths.ts";
 
-const CHILD_SESSION_EXTENSION_FACTORIES: ExtensionFactory[] = [protectSecrets, extraTools, webTools];
+const gitCloneExtension = (pi: ExtensionAPI) => {
+  registerGitCloneTool(pi);
+};
+
+const CHILD_SESSION_EXTENSION_FACTORIES: ExtensionFactory[] = [protectSecrets, extraTools, webTools, gitCloneExtension];
 
 const THINKING_LEVELS = new Set<string>(["off", "minimal", "low", "medium", "high", "xhigh"]);
 
