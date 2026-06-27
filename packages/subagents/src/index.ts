@@ -2,6 +2,7 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import { buildSubagentAgentCatalog, subagentsPersonasSystemPromptXml } from "./agent-catalog.ts";
 import { runSubagentsAgentsCommand } from "./agents-inspect.ts";
 import { shouldInjectSubagentsParentSystemPrompt, subagentsFeatureSystemPrompt } from "./feature-system-prompt.ts";
+import { registerGitCloneTool } from "./git-clone/index.ts";
 import { registerSubagentStatusTool, registerSubagentTool } from "./tool.ts";
 import { runSubagentViewerCommand } from "./viewer/command.ts";
 
@@ -34,4 +35,8 @@ export default function (pi: ExtensionAPI) {
       systemPrompt: [event.systemPrompt, subagentsFeatureSystemPrompt(), block].join("\n\n"),
     };
   });
+}
+
+export function gitCloneExtension(pi: ExtensionAPI) {
+  registerGitCloneTool(pi);
 }
