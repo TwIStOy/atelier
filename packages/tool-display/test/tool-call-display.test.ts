@@ -146,7 +146,7 @@ describe("bash adapter command display width", () => {
   const LONG_CMD =
     "nix build .#default --print-build-logs --fallback --extra-experimental-features 'nix-command flakes ca-derivations' --cores 8 --max-jobs 4";
 
-  it("truncates the command on a narrow terminal", () => {
+  it("wraps the command onto continuation lines on a narrow terminal instead of truncating", () => {
     globalToolDisplayRegistry.register("bash", bashAdapter);
     const lines = renderToolCall(
       {
@@ -164,10 +164,29 @@ describe("bash adapter command display width", () => {
       expect(visibleWidth(line)).toBeLessThanOrEqual(40);
     }
     const joined = lines.join(" ");
-    expect(joined).toContain("…");
+    expect(joined).not.toContain("…");
+    expect(joined.replace(/\s+/g, " ")).toContain(LONG_CMD);
   });
 
-  it("shows more than the old 60-char cap on a wide terminal", () => {
+  it("produces multiple header lines when the command is wider than the terminal", () => {
+    globalToolDisplayRegistry.register("bash", bashAdapter);
+    const lines = renderToolCall(
+      {
+        toolName: "bash",
+        args: { command: LONG_CMD },
+        output: "",
+        expanded: false,
+        isPartial: true,
+        isError: false,
+        registry: globalToolDisplayRegistry,
+      },
+      PLAIN_THEME,
+    ).render(40);
+    expect(lines.length).toBeGreaterThan(1);
+    expect(lines[0]).toContain("Bash");
+  });
+
+  it("fits on one line with no ellipsis on a wide terminal", () => {
     globalToolDisplayRegistry.register("bash", bashAdapter);
     const width = 200;
     const lines = renderToolCall(
@@ -187,7 +206,7 @@ describe("bash adapter command display width", () => {
     expect(joined).toContain(LONG_CMD);
   });
 
-  it("keeps the cwd suffix visible when the command must be truncated to fit the width", () => {
+  it("keeps the description and cwd suffix visible when the command wraps", () => {
     globalToolDisplayRegistry.register("bash", bashAdapter);
     const width = 80;
     const lines = renderToolCall(
@@ -205,14 +224,14 @@ describe("bash adapter command display width", () => {
     const joined = lines.join(" ");
     expect(joined).toContain("in /r");
     expect(joined).toContain("build the package");
-    expect(joined).toContain("…");
+    expect(joined).not.toContain("…");
+    expect(joined.replace(/\s+/g, " ")).toContain(LONG_CMD);
     for (const line of lines) {
       expect(visibleWidth(line)).toBeLessThanOrEqual(width);
     }
   });
 
-  it("truncates the command to the available width, not a wide floor that would overflow the line", () => {
-    globalToolDisplayRegistry.register("bash", bashAdapter);
+  it("wraps the command within the available width and never overflows the line", () => {
     const header = bashAdapter.formatCallHeader(
       { command: LONG_CMD, description: "build", workdir: "/r" },
       PLAIN_THEME,
@@ -222,7 +241,9 @@ describe("bash adapter command display width", () => {
       60,
     );
     expect(header).toContain("in /r");
-    expect(header).toContain("…");
-    expect(visibleWidth(`◆ ${header}`)).toBeLessThanOrEqual(60);
+    expect(header).not.toContain("…");
+    for (const line of header.split("\n")) {
+      expect(visibleWidth(`◆ ${line}`)).toBeLessThanOrEqual(60);
+    }
   });
 });
