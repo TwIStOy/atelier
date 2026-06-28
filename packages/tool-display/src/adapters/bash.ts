@@ -1,6 +1,5 @@
-import { visibleWidth } from "@earendil-works/pi-tui";
-import { shortenPath, truncateDisplay } from "@htwang-contrib/common";
-import { loadConfig } from "../config.ts";
+import { visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
+import { shortenPath } from "@htwang-contrib/common";
 import type { ToolDisplayAdapter } from "../types.ts";
 import { formatExpandedToolOutputLines, formatLineCount } from "./shared.ts";
 
@@ -10,41 +9,57 @@ interface BashArgs {
   workdir?: string;
 }
 
-const HEADER_PREFIX_WIDTH = "◆ Bash ".length;
-const DESC_DELIM_WIDTH = 3;
-const CWD_PREFIX_WIDTH = " in ".length;
+const TITLE = "Bash";
+const STATUS_PREFIX_WIDTH = 2;
+const CONTINUATION_INDENT_WIDTH = 4;
 
-function bashCommandDisplayLength(desc: string, cwd: string, width: number | undefined): number {
-  const floor = loadConfig().bashCommandDisplayLength;
-  if (width === undefined) return floor;
+function firstLinePrefixWidth(desc: string): number {
+  return visibleWidth(TITLE) + 1 + (desc ? visibleWidth(desc) + 2 : 0);
+}
 
-  const overhead =
-    HEADER_PREFIX_WIDTH +
-    (desc ? visibleWidth(desc) + DESC_DELIM_WIDTH : 0) +
-    (cwd ? CWD_PREFIX_WIDTH + visibleWidth(shortenPath(cwd)) : 0);
-  const available = Math.max(0, width - overhead);
-  return Math.min(Math.max(floor, available), available);
+function lastLineSuffixWidth(desc: string, cwd: string): number {
+  return (desc ? 1 : 0) + (cwd ? visibleWidth(` in ${shortenPath(cwd)}`) : 0);
+}
+
+function singleLineBudget(desc: string, cwd: string, width: number): number {
+  return Math.max(1, width - STATUS_PREFIX_WIDTH - firstLinePrefixWidth(desc) - lastLineSuffixWidth(desc, cwd));
+}
+
+function continuationWrapWidth(desc: string, cwd: string, width: number): number {
+  const first = width - STATUS_PREFIX_WIDTH - firstLinePrefixWidth(desc);
+  const middle = width - CONTINUATION_INDENT_WIDTH;
+  const last = width - CONTINUATION_INDENT_WIDTH - lastLineSuffixWidth(desc, cwd);
+  return Math.max(1, Math.min(first, middle, last));
 }
 
 export const bashAdapter: ToolDisplayAdapter<BashArgs> = {
   formatCallHeader(args, theme, _details?: unknown, _isPartial?: boolean, _expanded?: boolean, width?: number) {
     const cmd = args?.command ?? "";
-    const desc = args?.description;
-    const cwd = args?.workdir;
+    const desc = args?.description ?? "";
+    const cwd = args?.workdir ?? "";
 
-    const cmdDisplay = truncateDisplay(cmd, bashCommandDisplayLength(desc ?? "", cwd ?? "", width));
-    const header = desc
-      ? theme.fg("toolTitle", theme.bold("Bash")) +
-        " " +
-        theme.fg("dim", desc) +
-        " " +
-        theme.fg("muted", `(${cmdDisplay})`)
-      : `${theme.fg("toolTitle", theme.bold("Bash"))} ${theme.fg("muted", cmdDisplay)}`;
+    const titlePart = `${theme.fg("toolTitle", theme.bold(TITLE))} `;
+    const descPart = desc ? `${theme.fg("dim", desc)} ` : "";
+    const openParen = desc ? theme.fg("muted", "(") : "";
+    const closeParen = desc ? theme.fg("muted", ")") : "";
+    const cwdPart = cwd ? ` ${theme.fg("dim", `in ${shortenPath(cwd)}`)}` : "";
 
-    if (cwd) {
-      return `${header} ${theme.fg("dim", `in ${shortenPath(cwd)}`)}`;
+    if (width === undefined || visibleWidth(cmd) <= singleLineBudget(desc, cwd, width)) {
+      const styledCmd = theme.fg("muted", cmd);
+      return `${titlePart}${descPart}${openParen}${styledCmd}${closeParen}${cwdPart}`;
     }
-    return header;
+
+    const wrapWidth = continuationWrapWidth(desc, cwd, width);
+    const lines = wrapTextWithAnsi(cmd, wrapWidth).map((line) => theme.fg("muted", line));
+
+    if (lines.length === 1) {
+      return `${titlePart}${descPart}${openParen}${lines[0]}${closeParen}${cwdPart}`;
+    }
+
+    const firstLine = `${titlePart}${descPart}${openParen}${lines[0]}`;
+    const middle = lines.slice(1, -1);
+    const lastLine = `${lines[lines.length - 1]}${closeParen}${cwdPart}`;
+    return [firstLine, ...middle, lastLine].join("\n");
   },
 
   formatCollapsedContent(_args, output, theme, _width, _details?: unknown, _isPartial?: boolean, _spinAt?: number) {

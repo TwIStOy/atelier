@@ -5,7 +5,6 @@ export interface ToolDisplayConfig {
   previewLines: number;
   diffMode: "auto" | "unified" | "side-by-side";
   splitDiffMinWidth: number;
-  bashCommandDisplayLength: number;
 }
 
 const CONFIG_NAME = "tool-display";
@@ -15,7 +14,6 @@ const CONFIG_SCHEMA: ExtensionConfigSchema<ToolDisplayConfig> = {
     previewLines: 3,
     diffMode: "auto",
     splitDiffMinWidth: 100,
-    bashCommandDisplayLength: 60,
   },
 };
 
@@ -65,18 +63,6 @@ export function registerToolDisplayConfigItems(): void {
       order: 2,
       min: 40,
       max: 400,
-    },
-    {
-      key: "bashCommandDisplayLength",
-      type: "number",
-      label: "Bash Command Display Length",
-      value: () => loadConfig().bashCommandDisplayLength,
-      description:
-        "Minimum characters shown for bash commands in the tool header (default 60). Wide terminals use the full available line width; this only caps the floor on narrow screens.",
-      extensionLabel: "Tool Display",
-      order: 3,
-      min: 20,
-      max: 500,
     },
   ]);
 }
