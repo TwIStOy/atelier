@@ -12,9 +12,17 @@ import {
 import { GoalAlreadyExistsError, GoalNotFoundError } from "./goal/errors.ts";
 import { formatGoalForTool, formatGoalToolResponse } from "./goal/format.ts";
 import { buildBudgetLimitedPrompt, buildContinuationPrompt } from "./goal/prompt.ts";
-import { accountGoalUsage, clearGoal, createGoal, type GoalStoreRef, readGoal, updateGoal } from "./goal/store.ts";
+import {
+  accountGoalUsage,
+  clearGoal,
+  createGoal,
+  type GoalStoreRef,
+  readGoal,
+  reopenActiveInterval,
+  updateGoal,
+} from "./goal/store.ts";
 import type { Goal, TokenUsageSnapshot } from "./goal/types.ts";
-import { GOAL_WIDGET_KEY, GOAL_WIDGET_OPTIONS, renderGoalWidget } from "./goal/ui.ts";
+import { GOAL_WIDGET_KEY, GOAL_WIDGET_OPTIONS, makeGoalWidget } from "./goal/ui.ts";
 import { validateObjective, validateTokenBudget } from "./goal/validation.ts";
 import { verifyGoalCompletion } from "./goal/verify.ts";
 
@@ -23,11 +31,6 @@ function getStoreRef(ctx: ExtensionContext): GoalStoreRef {
   const threadId = ctx.sessionManager.getSessionId();
   return { baseDir: sessionDir, threadId };
 }
-
-type GoalAccounting = {
-  goalId: string;
-  measuredFromMilliseconds: number;
-};
 
 function extractAssistantUsage(messages: unknown[]): TokenUsageSnapshot {
   let input = 0;
@@ -54,8 +57,6 @@ function extractAssistantUsage(messages: unknown[]): TokenUsageSnapshot {
 }
 
 export default function initGoal(pi: ExtensionAPI): void {
-  let agentTurnInProgress = false;
-  let goalAccounting: GoalAccounting | null = null;
   let currentGoalForWidget: Goal | null = null;
   let widgetCtx: ExtensionContext | null = null;
 
@@ -68,12 +69,7 @@ export default function initGoal(pi: ExtensionAPI): void {
     }
     widgetCtx.ui.setWidget(
       GOAL_WIDGET_KEY,
-      (_tui, theme) => ({
-        render(width: number): string[] {
-          return renderGoalWidget(currentGoalForWidget, theme, width);
-        },
-        invalidate() {},
-      }),
+      makeGoalWidget(() => currentGoalForWidget),
       GOAL_WIDGET_OPTIONS,
     );
   }
@@ -85,31 +81,6 @@ export default function initGoal(pi: ExtensionAPI): void {
 
   function queueHiddenGoalPrompt(customType: string, content: string): void {
     pi.sendMessage({ customType, content, display: false }, { triggerTurn: true, deliverAs: "followUp" });
-  }
-
-  function startAccounting(goal: Goal): void {
-    goalAccounting = {
-      goalId: goal.id,
-      measuredFromMilliseconds: Date.now(),
-    };
-  }
-
-  function stopAccounting(): void {
-    goalAccounting = null;
-  }
-
-  function finalizeAccounting(ctx: ExtensionContext, usage: TokenUsageSnapshot): void {
-    if (!goalAccounting) return;
-    const ref = getStoreRef(ctx);
-    const elapsedMs = Date.now() - goalAccounting.measuredFromMilliseconds;
-    const elapsedSeconds = elapsedMs / 1000;
-    try {
-      const goal = accountGoalUsage(ref, usage, elapsedSeconds, "shutdown");
-      emitGoalUpdate(goal);
-    } catch {
-      // goal may have been cleared mid-turn
-    }
-    stopAccounting();
   }
 
   registerGoalConfigItems();
@@ -136,10 +107,11 @@ export default function initGoal(pi: ExtensionAPI): void {
       refreshGoalWidget(goal);
 
       if (goal.status === "active") {
-        startAccounting(goal);
+        const rebased = reopenActiveInterval(ref);
+        const liveGoal = rebased ?? goal;
 
-        if (shouldQueueGoalContinuationWhenIdle(goal, ctx.isIdle(), ctx.hasPendingMessages())) {
-          queueHiddenGoalPrompt("pi-goal-continuation", buildContinuationPrompt(goal));
+        if (shouldQueueGoalContinuationWhenIdle(liveGoal, ctx.isIdle(), ctx.hasPendingMessages())) {
+          queueHiddenGoalPrompt("pi-goal-continuation", buildContinuationPrompt(liveGoal));
         }
       }
 
@@ -150,7 +122,6 @@ export default function initGoal(pi: ExtensionAPI): void {
         ]);
         if (choice === "Resume") {
           const updated = updateGoal(ref, { status: "active" });
-          startAccounting(updated);
           emitGoalUpdate(updated);
           ctx.ui.notify(`Goal resumed: ${updated.objective}`, "info");
         }
@@ -161,61 +132,40 @@ export default function initGoal(pi: ExtensionAPI): void {
     }
   });
 
-  pi.on("agent_start", (_event, ctx) => {
-    agentTurnInProgress = true;
-
-    try {
-      const ref = getStoreRef(ctx);
-      const goal = readGoal(ref);
-      if (goal && goal.status === "active") {
-        startAccounting(goal);
-      }
-    } catch {
-      // ignore
-    }
-  });
-
   pi.on("agent_end", (event, ctx) => {
     const usage = extractAssistantUsage(event.messages);
 
-    if (goalAccounting) {
-      const elapsedMs = Date.now() - goalAccounting.measuredFromMilliseconds;
-      const elapsedSeconds = elapsedMs / 1000;
+    try {
+      const ref = getStoreRef(ctx);
+      const goal = accountGoalUsage(ref, usage, "agentEnd");
 
-      try {
-        const ref = getStoreRef(ctx);
-        const goal = accountGoalUsage(ref, usage, elapsedSeconds, "agentEnd");
+      emitGoalUpdate(goal);
 
-        emitGoalUpdate(goal);
-
-        if (shouldQueueBudgetLimitedPrompt(goal)) {
-          queueHiddenGoalPrompt("pi-goal-budget-limit", buildBudgetLimitedPrompt(goal));
-        } else if (shouldQueueGoalContinuationAfterAgentEnd(goal, ctx.hasPendingMessages())) {
-          queueHiddenGoalPrompt("pi-goal-continuation", buildContinuationPrompt(goal));
-        }
-      } catch (e) {
-        if (isStaleCtxError(e)) return;
-        // goal may have been cleared during the turn
+      if (shouldQueueBudgetLimitedPrompt(goal)) {
+        queueHiddenGoalPrompt("pi-goal-budget-limit", buildBudgetLimitedPrompt(goal));
+      } else if (shouldQueueGoalContinuationAfterAgentEnd(goal, ctx.hasPendingMessages())) {
+        queueHiddenGoalPrompt("pi-goal-continuation", buildContinuationPrompt(goal));
       }
+    } catch (e) {
+      if (isStaleCtxError(e)) return;
+      // goal may have been cleared during the turn
     }
-
-    agentTurnInProgress = false;
-    stopAccounting();
   });
 
   pi.on("session_shutdown", (_event, ctx) => {
     widgetCtx = null;
-    if (goalAccounting) {
-      finalizeAccounting(ctx, {
-        input: 0,
-        output: 0,
-        cacheRead: 0,
-        cacheWrite: 0,
-        totalTokens: 0,
-      });
+    try {
+      const ref = getStoreRef(ctx);
+      const goal = accountGoalUsage(
+        ref,
+        { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0 },
+        "shutdown",
+      );
+      emitGoalUpdate(goal);
+    } catch (e) {
+      if (isStaleCtxError(e)) return;
+      // goal may have been cleared before shutdown
     }
-    agentTurnInProgress = false;
-    stopAccounting();
   });
 
   // --- Command ---
@@ -249,9 +199,6 @@ export default function initGoal(pi: ExtensionAPI): void {
             clearGoal(ref);
           }
           const goal = createGoal(ref, objective, null);
-          if (agentTurnInProgress) {
-            startAccounting(goal);
-          }
           ctx.ui.notify(`Goal set: ${goal.objective}`, "info");
           emitGoalUpdate(goal);
           if (shouldQueueGoalContinuationWhenIdle(goal, ctx.isIdle(), ctx.hasPendingMessages())) {
@@ -275,11 +222,6 @@ export default function initGoal(pi: ExtensionAPI): void {
             return;
           }
           const updated = updateGoal(ref, { status: cmd.status });
-          if (cmd.status === "active" && agentTurnInProgress) {
-            startAccounting(updated);
-          } else if (cmd.status === "paused") {
-            stopAccounting();
-          }
           const label = cmd.status === "paused" ? "paused" : "resumed";
           ctx.ui.notify(`Goal ${label}: ${updated.objective}`, "info");
           emitGoalUpdate(updated);
@@ -299,7 +241,6 @@ export default function initGoal(pi: ExtensionAPI): void {
             return;
           }
           clearGoal(ref);
-          stopAccounting();
           ctx.ui.notify("Goal cleared.", "info");
           emitGoalUpdate(null);
           return;
@@ -333,9 +274,6 @@ export default function initGoal(pi: ExtensionAPI): void {
 
       try {
         const goal = createGoal(ref, objective, tokenBudget);
-        if (agentTurnInProgress) {
-          startAccounting(goal);
-        }
         emitGoalUpdate(goal);
         return {
           content: [
@@ -417,7 +355,6 @@ ${verification.reasoning}`,
 
       try {
         const goal = updateGoal(ref, { status: params.status });
-        stopAccounting();
         emitGoalUpdate(goal);
         return {
           content: [

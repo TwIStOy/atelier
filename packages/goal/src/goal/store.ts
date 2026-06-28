@@ -105,14 +105,24 @@ export function updateGoal(ref: GoalStoreRef, update: GoalUpdate): Goal {
   return goal;
 }
 
+function closeActiveInterval(goal: Goal, now: string): void {
+  if (goal.status !== "active" || goal.lastStartedAt === null) return;
+  const startedAt = Date.parse(goal.lastStartedAt);
+  const elapsedSeconds = (Date.parse(now) - startedAt) / 1000;
+  if (elapsedSeconds > 0) {
+    goal.timeUsedSeconds += elapsedSeconds;
+  }
+  goal.lastStartedAt = null;
+}
+
 function transitionStatus(goal: Goal, next: Goal["status"], now: string): void {
   const current = goal.status;
 
   switch (next) {
     case "paused":
       if (current === "active") {
+        closeActiveInterval(goal, now);
         goal.status = "paused";
-        goal.lastStartedAt = null;
       }
       break;
     case "active":
@@ -123,18 +133,29 @@ function transitionStatus(goal: Goal, next: Goal["status"], now: string): void {
       break;
     case "complete":
       if (current === "active" || current === "paused" || current === "budgetLimited") {
+        closeActiveInterval(goal, now);
         goal.status = "complete";
         goal.completedAt = now;
-        goal.lastStartedAt = null;
       }
       break;
     case "budgetLimited":
       if (current === "active") {
+        closeActiveInterval(goal, now);
         goal.status = "budgetLimited";
-        goal.lastStartedAt = null;
       }
       break;
   }
+}
+
+export function reopenActiveInterval(ref: GoalStoreRef): Goal | null {
+  const goal = readGoal(ref);
+  if (!goal) return null;
+  if (goal.status !== "active") return goal;
+  const now = new Date().toISOString();
+  goal.lastStartedAt = now;
+  goal.updatedAt = now;
+  writeGoal(ref, goal);
+  return goal;
 }
 
 export function clearGoal(ref: GoalStoreRef): void {
@@ -145,24 +166,22 @@ export function clearGoal(ref: GoalStoreRef): void {
 
 export type AccountUsageMode = "agentEnd" | "shutdown";
 
-export function accountGoalUsage(
-  ref: GoalStoreRef,
-  usage: TokenUsageSnapshot,
-  elapsedSeconds: number,
-  _mode: AccountUsageMode,
-): Goal {
+export function accountGoalUsage(ref: GoalStoreRef, usage: TokenUsageSnapshot, mode: AccountUsageMode): Goal {
   const goal = readGoal(ref);
   if (!goal) {
     throw new GoalNotFoundError(ref.threadId);
   }
 
   goal.tokensUsed += usage.totalTokens;
-  goal.timeUsedSeconds += elapsedSeconds;
   goal.updatedAt = new Date().toISOString();
 
   if (goal.status === "active" && goal.tokenBudget !== null && goal.tokensUsed >= goal.tokenBudget) {
+    closeActiveInterval(goal, goal.updatedAt);
     goal.status = "budgetLimited";
-    goal.lastStartedAt = null;
+  }
+
+  if (mode === "shutdown") {
+    closeActiveInterval(goal, goal.updatedAt);
   }
 
   writeGoal(ref, goal);
