@@ -44,6 +44,9 @@
       "skills/write-a-skill"
     ],
     "themes": [
+      "themes/ayu-dark.json",
+      "themes/ayu-light.json",
+      "themes/ayu-mirage.json",
       "themes/catppuccin-mocha.json"
     ],
     "prompts": [
