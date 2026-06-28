@@ -34,6 +34,7 @@ X = merged into mainline, safe to remove (- = mainline/at-mainline/detached, bla
 | Flag | Description |
 | --- | --- |
 | `--prune` | Remove worktrees detected as merged. |
+| `--force` | When pruning, pass `--force` to `git worktree remove`, discarding uncommitted changes in a dirty worktree instead of skipping it. |
 | `--mainline <branch\|glob>` | Add a branch or glob pattern to the mainline set. Repeatable. |
 | `--json` | Emit machine-readable JSON instead of the human table. With `--prune`, removal is non-interactive and results are included. |
 | `-y`, `--yes` | Skip confirmation when pruning. |
@@ -140,7 +141,8 @@ via version control. Set them per clone.
 - Never removes the mainline branch's worktree, a detached-HEAD worktree, or
   the worktree the script is run from.
 - `--prune` prompts before removing unless `-y` is passed.
-- `git worktree remove` runs **without** `--force`: a dirty or locked worktree
-  is skipped rather than having uncommitted work discarded. A failed removal
-  means the branch was merged but the worktree has local changes worth
-  reviewing.
+- By default `git worktree remove` runs **without** `--force`: a dirty or locked
+  worktree is skipped rather than having uncommitted work discarded. A failed
+  removal means the branch was merged but the worktree has local changes worth
+  reviewing. Pass `--force` to discard those changes and remove the worktree
+  anyway.

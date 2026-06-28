@@ -17,6 +17,9 @@
 #
 # Flags:
 #   --prune             Remove worktrees detected as merged.
+#   --force             When pruning, pass --force to `git worktree remove`,
+#                       discarding uncommitted changes in a dirty worktree
+#                       instead of skipping it.
 #   --mainline <branch> Add a branch or glob pattern (e.g. 'release/*') to the
 #                       mainline set (repeatable). Globs expand to local and
 #                       remote refs.
@@ -35,6 +38,7 @@
 set -euo pipefail
 
 PRUNE=0
+FORCE=0
 ASSUME_YES=0
 JSON_OUTPUT=0
 MAINLINES=()
@@ -47,6 +51,7 @@ usage() {
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --prune)    PRUNE=1; shift ;;
+        --force)    FORCE=1; shift ;;
         --mainline) MAINLINES+=("$2"); shift 2 ;;
         --json)     JSON_OUTPUT=1; shift ;;
         -y|--yes)   ASSUME_YES=1; shift ;;
@@ -266,9 +271,11 @@ emit_json() {
 
     if [[ $PRUNE -eq 1 ]]; then
         local p msg ok
+        local remove_args=()
+        [[ $FORCE -eq 1 ]] && remove_args+=("--force")
         for p in "${removable[@]}"; do
             msg="" ok=1
-            if ! git worktree remove "$p" 2>/dev/null; then
+            if ! git worktree remove "${remove_args[@]}" "$p" 2>/dev/null; then
                 ok=0
                 msg="dirty or locked"
             fi
@@ -424,11 +431,13 @@ if [[ $ASSUME_YES -eq 0 ]]; then
     esac
 fi
 
+remove_args=()
+[[ $FORCE -eq 1 ]] && remove_args+=("--force")
 for p in "${removable[@]}"; do
-    # `git worktree remove` refuses dirty trees by default; --force would discard
-    # uncommitted work. We deliberately do NOT force: a failed removal means the
-    # branch's tip was merged but the worktree has local changes worth reviewing.
-    if git worktree remove "$p"; then
+    # Without --force, `git worktree remove` refuses dirty or locked trees
+    # rather than discarding uncommitted work; a failure then means the branch
+    # was merged but the worktree had local changes worth reviewing.
+    if git worktree remove "${remove_args[@]}" "$p"; then
         echo "removed: $p"
     else
         echo "SKIPPED (dirty or locked): $p" >&2
