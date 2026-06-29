@@ -244,12 +244,14 @@ async function fetchEndpoint(url: string, apiKey: string, queryParams?: string):
   return json.data ?? json;
 }
 
-function formatResetClock(resetTime?: number): string {
+function formatResetDateTime(resetTime?: number): string {
   if (!resetTime) return "";
   const d = new Date(resetTime);
+  const MM = String(d.getMonth() + 1).padStart(2, "0");
+  const DD = String(d.getDate()).padStart(2, "0");
   const hh = String(d.getHours()).padStart(2, "0");
   const mm = String(d.getMinutes()).padStart(2, "0");
-  return `${hh}:${mm}`;
+  return `${MM}-${DD} ${hh}:${mm}`;
 }
 
 function formatUsageOutput(
@@ -270,7 +272,7 @@ function formatUsageOutput(
       const pct = limit.percentage;
       const remaining = Math.max(0, Math.round(100 - pct));
       const bar = formatProgressBar(pct, barWidth);
-      const reset = formatResetClock(limit.nextResetTime);
+      const reset = formatResetDateTime(limit.nextResetTime);
       const resetSuffix = reset ? ` (resets ${reset})` : "";
       const line = `${`${label}:`.padEnd(30)}${bar} ${remaining}% left${resetSuffix}`;
       parts.push(line.slice(0, tw));
