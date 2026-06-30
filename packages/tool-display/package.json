@@ -10,7 +10,7 @@
   "devDependencies": {
     "@earendil-works/pi-coding-agent": "latest",
     "@earendil-works/pi-tui": "latest",
-    "@types/node": "^26.0.0",
+    "@types/node": "^26.0.1",
     "diff": "^9.0.0",
     "typescript": "^6.0.0"
   }
