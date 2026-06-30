@@ -1,4 +1,4 @@
-import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { buildReorganizeMemoryPrompt } from "./commands/reorganize-memory-template.js";
 import { buildSelfImprovePrompt } from "./commands/self-improve-template.js";
 import { buildMemoryStatusReport } from "./memory-status.js";
@@ -7,15 +7,6 @@ import { generateSystemPrompt } from "./system-prompt.js";
 import { registerJournalTools, registerMemoryTools } from "./tools/index.js";
 
 const INSTALL_GUARD = Symbol.for("pi.memory.installed");
-
-let toolsRegistered = false;
-
-function ensureToolsRegistered(pi: ExtensionAPI, ctx: ExtensionContext): void {
-  if (toolsRegistered) return;
-  toolsRegistered = true;
-  registerMemoryTools(pi);
-  registerJournalTools(pi, () => ctx.cwd);
-}
 
 export default function initMemory(pi: ExtensionAPI): void {
   const guard = pi as unknown as Record<symbol, boolean>;
@@ -85,18 +76,24 @@ export default function initMemory(pi: ExtensionAPI): void {
 
   if (isDisabledByEnv()) return;
 
+  // Register tools at init (per ExtensionAPI via INSTALL_GUARD), not lazily on
+  // session_start/before_agent_start. A module-level "already registered" flag
+  // skipped re-registration when Pi rebuilt the session with a new ExtensionAPI
+  // in the same process — prompt still injected, tools missing.
+  let sessionCwd = process.cwd();
+  registerMemoryTools(pi);
+  registerJournalTools(pi, () => sessionCwd);
+
   pi.on("session_start", async (_event, ctx) => {
+    sessionCwd = ctx.cwd;
     if (!isMemoryEnabled(ctx)) return;
     setSessionNamespace(getNamespace(ctx));
-    ensureToolsRegistered(pi, ctx);
   });
 
   pi.on("before_agent_start", async (event, ctx) => {
     if (!isMemoryEnabled(ctx)) return;
+    sessionCwd = ctx.cwd;
     setSessionNamespace(getNamespace(ctx));
-    if (!toolsRegistered) {
-      ensureToolsRegistered(pi, ctx);
-    }
     const appendix = await generateSystemPrompt();
     return {
       systemPrompt: `${event.systemPrompt}\n\n${appendix}`,
