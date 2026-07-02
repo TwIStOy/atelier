@@ -8,6 +8,18 @@
 ![[Note Name#^block-id]]
 ```
 
+## Resolution Rules
+
+Embeds and wikilinks resolve by **note filename across the whole vault**, not by
+folder — `![[AI Speech CPU]]` finds that file no matter where it lives. Keep
+filenames unique; if two notes share a name, Obsidian prompts to disambiguate.
+
+- `![[Note]]` — embeds the full note.
+- `![[Note#Heading]]` — embeds from that heading to the next. The heading text
+  must **match exactly** (case- and punctuation-sensitive), so preserve a note's
+  H1 verbatim if something embeds it by heading.
+- `![[Note#^block-id]]` — embeds the block with that ID.
+
 ## Embed Images
 
 ```markdown
