@@ -276,7 +276,7 @@ function formatCollapsedSubagentSummary(
   }
 
   const tasks = args.tasks;
-  if (Array.isArray(tasks) && tasks.length > 1 && isPartial && (!d || !d.batch?.length)) {
+  if (Array.isArray(tasks) && tasks.length > 1 && isPartial && !d?.batch?.length) {
     const n = tasks.length;
     if (d?.task_total !== undefined && d.task_total !== n) return null;
     const per = d?.per_task_tool_calls;
