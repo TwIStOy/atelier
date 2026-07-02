@@ -54,9 +54,9 @@
     ]
   },
   "devDependencies": {
-    "@earendil-works/pi-ai": "^0.79.10",
+    "@earendil-works/pi-ai": "^0.80.2",
     "@earendil-works/pi-coding-agent": "latest",
-    "@earendil-works/pi-tui": "^0.79.10",
+    "@earendil-works/pi-tui": "^0.80.2",
     "@eslint/js": "^10.0.1",
     "@types/node": "^26.0.1",
     "@biomejs/biome": "2.5.1",
