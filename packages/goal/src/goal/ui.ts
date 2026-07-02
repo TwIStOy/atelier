@@ -64,7 +64,7 @@ export function makeGoalWidget(
     const tick = (): void => {
       if (disposed) return;
       const goal = getGoal();
-      if (!goal || goal.status !== "active") return;
+      if (goal?.status !== "active") return;
       tui.requestRender();
     };
 
