@@ -59,8 +59,6 @@ import { registerWebFetchTool } from "./fetch/index.ts";
 import { buildInterceptors } from "./interceptors/index.ts";
 import { registerWebSearchTool } from "./search/index.ts";
 
-export { registerWebSearchTool, registerWebFetchTool };
-
 export {
   GitHubInterceptor,
   type GitHubInterceptorOptions,
@@ -68,6 +66,7 @@ export {
   type UrlInterceptor,
 } from "./interceptors/index.ts";
 export { ProviderError, throwIfApiError } from "./providers/errors.ts";
+export { registerWebFetchTool, registerWebSearchTool };
 
 export default function (pi: ExtensionAPI): void {
   registerWebToolsConfigItems();
