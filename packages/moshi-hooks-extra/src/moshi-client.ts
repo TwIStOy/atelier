@@ -202,6 +202,5 @@ export function sendPayload(payload: MoshiPayload, options: SendOptions = {}): v
   spawnPayload(binary, payload, spawnFn);
 }
 
-export { buildMoshiPayload, type MoshiPayload };
-export { EMPTY_TERMINAL_CONTEXT, getCachedTerminalContext };
 export type { TerminalContext };
+export { buildMoshiPayload, EMPTY_TERMINAL_CONTEXT, getCachedTerminalContext, type MoshiPayload };
