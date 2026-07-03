@@ -37,14 +37,14 @@ export const journalSearch = {
       }),
     ),
   }),
-  execute: async (_id: string, args: Record<string, unknown>) => {
+  execute: async (_id: string, args: Record<string, unknown>, signal?: AbortSignal) => {
     try {
       const cliArgs = ["journal", "search"];
       if (args.text) cliArgs.push("--text", args.text as string);
       if ((args.tags as string[])?.length) cliArgs.push("--tags", (args.tags as string[]).join(","));
       if (args.limit !== undefined) cliArgs.push("--limit", String(args.limit));
       if (args.offset !== undefined) cliArgs.push("--offset", String(args.offset));
-      const result = await runHat(cliArgs);
+      const result = await runHat(cliArgs, { signal });
       const items = parseListResult(result).map((e: Record<string, unknown>) => ({
         id: String(e.id ?? e.timestamp ?? ""),
         title: String(e.title ?? ""),

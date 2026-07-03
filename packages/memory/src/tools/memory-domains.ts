@@ -16,9 +16,9 @@ export const memoryDomains = {
   label: "Memory domains",
   description: "List all memory domains with their node counts.",
   parameters: Type.Object({}),
-  execute: async () => {
+  execute: async (_id: string, _args: Record<string, unknown>, signal?: AbortSignal) => {
     try {
-      const result = await runHat(["memory", "domains"]);
+      const result = await runHat(["memory", "domains"], { signal });
       const items = parseListResult(result).map((d: unknown) => {
         if (typeof d === "string") return d;
         const item = d as Record<string, unknown>;

@@ -11,9 +11,9 @@ export const memoryDelete = {
       description: "Node URI in domain://path format (e.g. 'core://agent/identity').",
     }),
   }),
-  execute: async (_id: string, args: Record<string, unknown>) => {
+  execute: async (_id: string, args: Record<string, unknown>, signal?: AbortSignal) => {
     try {
-      const result = await runHat(["memory", "delete", args.uri as string]);
+      const result = await runHat(["memory", "delete", args.uri as string], { signal });
       return jsonResult(result, { uri: args.uri });
     } catch (e) {
       return jsonError(e);

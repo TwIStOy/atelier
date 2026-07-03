@@ -22,11 +22,11 @@ export const memorySearch = {
     }),
     limit: Type.Optional(Type.Number({ description: "Max results (default 10)." })),
   }),
-  execute: async (_id: string, args: Record<string, unknown>) => {
+  execute: async (_id: string, args: Record<string, unknown>, signal?: AbortSignal) => {
     try {
       const cliArgs = ["memory", "search", args.query as string];
       if (args.limit !== undefined) cliArgs.push("--limit", String(args.limit));
-      const result = await runHat(cliArgs);
+      const result = await runHat(cliArgs, { signal });
       const items = parseListResult(result).map((r: Record<string, unknown>) => ({
         uri: r.uri ?? r.path ?? "",
         snippet: String(r.snippet ?? r.content ?? "")

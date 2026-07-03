@@ -22,12 +22,12 @@ export const memoryTriggers = {
       }),
     ),
   }),
-  execute: async (_id: string, args: Record<string, unknown>) => {
+  execute: async (_id: string, args: Record<string, unknown>, signal?: AbortSignal) => {
     try {
       const cliArgs = ["memory", "triggers", args.uri as string];
       if ((args.add as string[])?.length) cliArgs.push("--add", (args.add as string[]).join(","));
       if ((args.remove as string[])?.length) cliArgs.push("--remove", (args.remove as string[]).join(","));
-      const result = await runHat(cliArgs);
+      const result = await runHat(cliArgs, { signal });
       return jsonResult(result, {
         uri: args.uri,
         added: (args.add as string[])?.length ?? 0,

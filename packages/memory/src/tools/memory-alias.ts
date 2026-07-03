@@ -34,10 +34,10 @@ export const memoryAlias = {
       }),
     ),
   }),
-  execute: async (_id: string, args: Record<string, unknown>) => {
+  execute: async (_id: string, args: Record<string, unknown>, signal?: AbortSignal) => {
     try {
       if (args.remove_uri) {
-        const result = await runHat(["memory", "alias", "--remove-uri", args.remove_uri as string]);
+        const result = await runHat(["memory", "alias", "--remove-uri", args.remove_uri as string], { signal });
         return jsonResult(result, {
           is_remove: true,
           uri: args.remove_uri,
@@ -58,7 +58,7 @@ export const memoryAlias = {
       ];
       if (args.priority !== undefined) cliArgs.push("--priority", String(args.priority));
       if (args.disclosure) cliArgs.push("--disclosure", args.disclosure as string);
-      const result = await runHat(cliArgs);
+      const result = await runHat(cliArgs, { signal });
       return jsonResult(result, {
         is_remove: false,
         uri: args.new_uri,

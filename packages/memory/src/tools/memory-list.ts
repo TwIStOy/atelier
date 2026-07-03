@@ -13,11 +13,11 @@ export const memoryList = {
       }),
     ),
   }),
-  execute: async (_id: string, args: Record<string, unknown>) => {
+  execute: async (_id: string, args: Record<string, unknown>, signal?: AbortSignal) => {
     try {
       const cliArgs = ["memory", "list"];
       if (args.domain) cliArgs.push(args.domain as string);
-      const result = await runHat(cliArgs);
+      const result = await runHat(cliArgs, { signal });
       return jsonResult(result, {
         domain: args.domain ?? "",
       });

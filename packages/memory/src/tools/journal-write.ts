@@ -20,7 +20,7 @@ export const journalWrite = (getCwd: () => string) => ({
       }),
     ),
   }),
-  execute: async (_id: string, args: Record<string, unknown>) => {
+  execute: async (_id: string, args: Record<string, unknown>, signal?: AbortSignal) => {
     try {
       const cliArgs = [
         "journal",
@@ -33,7 +33,7 @@ export const journalWrite = (getCwd: () => string) => ({
         getCwd(),
       ];
       if ((args.tags as string[])?.length) cliArgs.push("--tags", (args.tags as string[]).join(","));
-      const result = await runHat(cliArgs);
+      const result = await runHat(cliArgs, { signal });
       return jsonResult(result, { title: args.title });
     } catch (e) {
       return jsonError(e);

@@ -11,9 +11,9 @@ export const journalRead = {
       description: 'Timestamp ID of the entry (e.g., "20260310-143025-001").',
     }),
   }),
-  execute: async (_id: string, args: Record<string, unknown>) => {
+  execute: async (_id: string, args: Record<string, unknown>, signal?: AbortSignal) => {
     try {
-      const result = await runHat(["journal", "read", args.id as string]);
+      const result = await runHat(["journal", "read", args.id as string], { signal });
       if (!result) {
         return jsonResult({
           error: `Journal entry "${args.id}" not found.`,

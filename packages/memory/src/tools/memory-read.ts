@@ -12,9 +12,9 @@ export const memoryRead = {
       description: "Memory URI (e.g. 'core://agent/identity') or system URI (e.g. 'system://boot').",
     }),
   }),
-  execute: async (_id: string, args: Record<string, unknown>) => {
+  execute: async (_id: string, args: Record<string, unknown>, signal?: AbortSignal) => {
     try {
-      const result = await runHat(["memory", "read", args.uri as string]);
+      const result = await runHat(["memory", "read", args.uri as string], { signal });
       const content =
         result &&
         typeof result === "object" &&

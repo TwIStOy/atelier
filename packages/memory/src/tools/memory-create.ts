@@ -29,13 +29,13 @@ export const memoryCreate = {
       }),
     ),
   }),
-  execute: async (_id: string, args: Record<string, unknown>) => {
+  execute: async (_id: string, args: Record<string, unknown>, signal?: AbortSignal) => {
     try {
       const cliArgs = ["memory", "create", args.parent_uri as string, args.content as string];
       if (args.priority !== undefined) cliArgs.push("--priority", String(args.priority));
       if (args.title) cliArgs.push("--title", args.title as string);
       if (args.disclosure) cliArgs.push("--disclosure", args.disclosure as string);
-      const result = await runHat(cliArgs);
+      const result = await runHat(cliArgs, { signal });
       return jsonResult(result, {
         parent_uri: args.parent_uri,
         title: args.title ?? "",
