@@ -8,7 +8,7 @@
     "@htwang-contrib/common": "*"
   },
   "devDependencies": {
-    "@earendil-works/pi-agent-core": "^0.80.2",
+    "@earendil-works/pi-agent-core": "^0.80.3",
     "@earendil-works/pi-ai": "*",
     "@earendil-works/pi-coding-agent": "*",
     "@earendil-works/pi-tui": "*",
