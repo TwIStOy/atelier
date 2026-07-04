@@ -54,12 +54,12 @@
     ]
   },
   "devDependencies": {
-    "@earendil-works/pi-ai": "^0.80.2",
+    "@earendil-works/pi-ai": "^0.80.3",
     "@earendil-works/pi-coding-agent": "latest",
-    "@earendil-works/pi-tui": "^0.80.2",
+    "@earendil-works/pi-tui": "^0.80.3",
     "@eslint/js": "^10.0.1",
-    "@types/node": "^26.0.1",
-    "@biomejs/biome": "2.5.1",
+    "@types/node": "^26.1.0",
+    "@biomejs/biome": "2.5.2",
     "eslint": "^10.6.0",
     "prettier": "^3.9.4",
     "typescript": "^6.0.0",
