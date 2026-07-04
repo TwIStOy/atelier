@@ -1,10 +1,5 @@
-import {
-  type AssistantMessage,
-  completeSimple,
-  type Message,
-  type Model,
-  type StopReason,
-} from "@earendil-works/pi-ai";
+import type { AssistantMessage, Message, Model, StopReason } from "@earendil-works/pi-ai";
+import { completeSimple } from "@earendil-works/pi-ai/compat";
 import type { ModelRegistry } from "@earendil-works/pi-coding-agent";
 import { assistantMessageText } from "./message-text.ts";
 

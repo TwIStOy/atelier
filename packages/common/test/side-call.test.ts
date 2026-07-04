@@ -1,15 +1,15 @@
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import { describe, expect, test, vi } from "vitest";
 
-vi.mock("@earendil-works/pi-ai", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@earendil-works/pi-ai")>();
+vi.mock("@earendil-works/pi-ai/compat", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@earendil-works/pi-ai/compat")>();
   return {
     ...actual,
     completeSimple: vi.fn(),
   };
 });
 
-import { completeSimple } from "@earendil-works/pi-ai";
+import { completeSimple } from "@earendil-works/pi-ai/compat";
 import { executeSideCall } from "../src/side-call.ts";
 
 const model = { provider: "test", id: "m1" } as unknown as Parameters<typeof executeSideCall>[0]["model"];
