@@ -93,35 +93,51 @@ function valueColor(
   return (t) => theme.fg("muted", t);
 }
 
+export interface RenderedList {
+  lines: string[];
+  selectedVisible: boolean;
+}
+
 export function renderSettingList(
   rows: SettingRow[],
   selected: number,
   scroll: number,
-  listRows: number,
+  maxLines: number,
   width: number,
   theme: Theme,
   editing?: InlineEditState,
-): string[] {
+): RenderedList {
   const lines: string[] = [];
-  const visible = rows.slice(scroll, scroll + listRows);
+  const budget = Math.max(1, maxLines);
+  const indicatorReserve = 2;
+  const contentBudget = Math.max(1, budget - indicatorReserve);
 
-  if (visible.length === 0) {
+  if (rows.length === 0) {
     lines.push(theme.fg("muted", "No matching settings."));
-    return lines;
+    return { lines, selectedVisible: false };
   }
 
-  let lastExtension = "";
+  let lastExtension = scroll > 0 ? (rows[scroll - 1]?.extensionLabel ?? "") : "";
+  let lastVisibleIndex = scroll - 1;
+  let selectedVisible = false;
 
-  for (const [visibleIndex, row] of visible.entries()) {
-    const index = scroll + visibleIndex;
-    const isSelected = index === selected;
+  for (let i = scroll; i < rows.length; i++) {
+    if (lines.length >= contentBudget) break;
+    const row = rows[i]!;
+    const isSelected = i === selected;
     const isEditing = editing?.rowId === row.id;
 
     if (row.extensionLabel !== lastExtension) {
-      if (lastExtension) lines.push("");
-      lines.push(theme.fg("accent", theme.bold(row.extensionLabel)));
+      if (lastExtension && lines.length < contentBudget) lines.push("");
+      if (lines.length < contentBudget) {
+        lines.push(theme.fg("accent", theme.bold(row.extensionLabel)));
+      } else {
+        break;
+      }
       lastExtension = row.extensionLabel;
     }
+
+    if (lines.length >= contentBudget) break;
 
     const labelText = row.item.label ?? row.item.key;
     const label = isSelected
@@ -144,23 +160,28 @@ export function renderSettingList(
     const rowText = truncateToWidth(`${itemPad}${label}${" ".repeat(gap)}${valueText}`, width, "…");
 
     lines.push(isSelected ? theme.bg("selectedBg", pad(rowText, width)) : rowText);
+    lastVisibleIndex = i;
+    if (isSelected) selectedVisible = true;
 
     if (isSelected && !isEditing && row.item.description) {
-      const descLines = wrapLine(row.item.description, Math.max(1, width - 4));
-      for (const dl of descLines.slice(0, 2)) {
-        lines.push(theme.fg("muted", `    ${dl}`));
+      const descLines = wrapLine(row.item.description, Math.max(1, width - 4)).slice(0, 2);
+      for (const dl of descLines) {
+        if (lines.length < contentBudget) lines.push(theme.fg("muted", `    ${dl}`));
+        else break;
       }
     }
   }
 
   const moreBefore = scroll > 0 ? `↑ ${scroll}` : "";
-  const moreAfter = scroll + listRows < rows.length ? `↓ ${rows.length - scroll - listRows}` : "";
-  if (moreBefore || moreAfter) {
+  const moreAfter = lastVisibleIndex < rows.length - 1 ? `↓ ${rows.length - 1 - lastVisibleIndex}` : "";
+  if ((moreBefore || moreAfter) && lines.length < budget) {
     lines.push("");
-    lines.push(theme.fg("dim", [moreBefore, moreAfter].filter(Boolean).join(glyphs().dot)));
+    if (lines.length < budget) {
+      lines.push(theme.fg("dim", [moreBefore, moreAfter].filter(Boolean).join(glyphs().dot)));
+    }
   }
 
-  return lines;
+  return { lines, selectedVisible };
 }
 
 export function renderSelectPage(
