@@ -1,6 +1,6 @@
 ---
 name: write-a-skill
-description: Create new agent skills with proper structure, progressive disclosure, and bundled resources. Use when user wants to create, write, or build a new skill.
+description: Create and refine agent skills with proper structure, progressive disclosure, and bundled resources. Use when user wants to create, write, build, or refine a skill.
 ---
 
 # Writing Skills
@@ -115,6 +115,10 @@ Each file in `references/` should:
 - Be self-contained (readable without loading other reference files)
 - Have a descriptive, ALL_CAPS file name matching its topic
 
+## Skill Qualities & Vocabulary
+
+Once structure is right, refine a skill's *behaviour* with the vocabulary of predictability: leading words, completion criteria, the two invocation loads, and named failure modes. See [Skill Vocabulary & Qualities](references/SKILL_VOCABULARY.md).
+
 ## Review Checklist
 
 After drafting, verify:
@@ -125,3 +129,5 @@ After drafting, verify:
 - [ ] Consistent terminology
 - [ ] Concrete examples included
 - [ ] References one level deep
+- [ ] No no-op lines (each instruction changes behaviour vs the model's default)
+- [ ] A leading word anchors the core behaviour, or restatements collapsed into one
