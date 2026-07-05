@@ -37,10 +37,14 @@
     ],
     "skills": [
       "skills/code-philosophy",
+      "skills/code-review",
       "skills/design-an-interface",
+      "skills/diagnosing-bugs",
+      "skills/domain-modeling",
       "skills/grilling",
       "skills/obsidian-bases",
       "skills/obsidian-markdown",
+      "skills/tdd",
       "skills/todoist",
       "skills/write-a-skill"
     ],
