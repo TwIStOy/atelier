@@ -9,9 +9,14 @@
       "./index.ts"
     ]
   },
+  "dependencies": {
+    "@htwang-contrib/common": "*"
+  },
   "devDependencies": {
+    "@earendil-works/pi-ai": "^0.80.3",
     "@earendil-works/pi-coding-agent": "latest",
     "@types/node": "^26.1.0",
-    "typescript": "^6.0.0"
+    "typescript": "^6.0.0",
+    "vitest": "^4.1.9"
   }
 }
