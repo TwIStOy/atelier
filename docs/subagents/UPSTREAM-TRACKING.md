@@ -8,6 +8,12 @@ diffing from a known point each session instead of re-auditing from scratch.
 - **Design notes:** [`DESIGN.md`](./DESIGN.md) · step checklist: [`STEPS.md`](./STEPS.md)
 - **Last upstream audit before this port:** **2026-06-01** (see `DESIGN.md` revision log)
 
+> **Decision (2026-07-05): the maintainer reviewed the full diff and declined
+> every borrowable item.** See
+> [§ Not borrowing — user-declined](#not-borrowing--user-declined-2026-07-05).
+> Future audits: update the commit pointers and change log only. **Do not
+> re-propose declined items** unless the maintainer explicitly reopens one.
+
 ## Commit pointers
 
 | Role | SHA | Date (UTC+2) | Subject |
@@ -21,7 +27,8 @@ diffing from a known point each session instead of re-auditing from scratch.
 ## What changed upstream (2026-06-01 → HEAD)
 
 Only substantive commits are listed (version bumps, README-only, and pure test
-scaffolding are omitted). Grouped by theme.
+scaffolding are omitted). Grouped by theme. This section is **reference
+material**, not a to-do list.
 
 ### A. New agent frontmatter keys
 
@@ -78,71 +85,84 @@ scaffolding are omitted). Grouped by theme.
 
 ## Comparison with our port
 
-Legend: ✅ already have / diverge-by-design · ⚠️ gap · ➕ net-new capability.
+Legend: ✅ already have / diverge-by-design · ⚠️ upstream-only capability.
+
+> The **Verdict** column documents the audit finding only. **All "borrow"
+> recommendations were declined by the maintainer on 2026-07-05** (see the
+> decision section below). Treat any ⚠️ row as "upstream has it, we do not, and
+> we are keeping it that way" unless that decision is explicitly reopened.
 
 ### Functionality
 
 | Upstream feature | Our state | Verdict |
 | --- | --- | --- |
-| 3 tools: `Agent` / `get_subagent_result` / `steer_subagent` | We ship **2**: `subagent` / `subagent_status`. No steer tool. | ⚠️ **Gap — borrow the steer tool.** |
-| `AgentManager.steer(id, message)` centralization | No `AgentManager`; orchestration in `orchestrate-single.ts` / `orchestrate-batch.ts` / `background-jobs.ts`. We only call `session.steer()` internally for the `max_turns` soft-landing. | ⚠️ **Borrow a steer entry point** at the orchestration layer (see run-agent `forwardAbort` for the signal pattern). |
-| Inline steer composer in viewer (`Enter`) | Our `viewer/overlay.ts` has scroll / prev-next / `t` / `e` / `G` / `Tab` / `Esc`. No composer. | ⚠️ **Borrow** — cheap once steer exists. |
-| Two-press `x` stop in viewer | No viewer stop; `subagent_status` is read-only. | ⚠️ Minor borrow (ties into steer/abort plumbing). |
-| Foreground lifecycle events + `.output` JSONL | We always persist the child session file under `~/.agent/subagents/session` and index it per parent (`paths.ts` `appendSubagentLinkRecord` / `recordSubagentStarted`), which the viewer already tails. We emit `subagent:complete` from `background-finish.ts` only. | ✅ Persisted transcripts already superior; optionally emit lifecycle events for foreground for parity. |
-| `SpawnOptions.cwd` / `configCwd` split | We always run at `ctx.cwd`. | ⚠️ Medium-value borrow for monorepo subdir / scout use cases. |
-| Forgiving model resolution (`.`≡`-`, date suffix, provider fallback) | `@htwang-contrib/common` `resolveModel` has tiered matching + signal scoring + version compare, but **not** separator equivalence, date-suffix stripping, or provider fallback. | ⚠️ **Borrow into `packages/common`** — shared win for every package. |
-| `exclude_extensions` frontmatter | Child loader uses a fixed `CHILD_SESSION_EXTENSION_FACTORIES = [protectSecrets, extraTools, webTools, gitClone]`. Personas cannot tune extensions. | ⚠️ Medium-value borrow; our set is curated so impact is smaller than upstream. |
-| `persist_session` / `session_dir` frontmatter | We **always** persist (intentional — the viewer needs the file). Upstream defaults to in-memory. | ✅ Diverge-by-design; skip. |
-| `disableDefaultAgents` | We always surface shipped agents. | Low value; skip unless requested. |
-| `toolDescriptionMode` (full/compact/custom) | Static tool description + compact catalog XML. | Low value; the `{{typeList}}` placeholder idea is nice but our prompt shape differs. Skip. |
-| FleetView `belowEditor` navigator | We use an **on-demand** `/view-subagents` popup (picker + 80%×80% overlay) plus `/subagents-agents`. No persistent widget. | ✅ Diverge-by-design; our model is cleaner for this monorepo. Skip. |
-| `widgetMode` / above-editor status widget | We have no persistent status widget (we render live rows via `@htwang-contrib/tool-display`). | ✅ Diverge-by-design; skip. |
-| Worktree isolation (`baseSha`, `workPath`, `--no-verify`) | Explicitly out of scope (`DESIGN.md` §1.3). | ✅ Skip. |
-| `tui.select.*` keybinding honoring in viewer | Our overlay hardcodes `Key.up/down/...` via `matchesKey`. | Low-medium value; borrow if we want emacs-style `ctrl+p/n`. |
-| `/agents → Agent types` redesign with model-availability flags | Our `/subagents-agents` opens a read-only inspect editor with resolved model. | Already covered conceptually; the "model unavailable" flag is a nice touch. Low value. |
+| 3 tools: `Agent` / `get_subagent_result` / `steer_subagent` | We ship **2**: `subagent` / `subagent_status`. No steer tool. | ⚠️ Upstream-only; declined. |
+| `AgentManager.steer(id, message)` centralization | No `AgentManager`; orchestration in `orchestrate-single.ts` / `orchestrate-batch.ts` / `background-jobs.ts`. We only call `session.steer()` internally for the `max_turns` soft-landing. | ⚠️ Upstream-only; declined. |
+| Inline steer composer in viewer (`Enter`) | Our `viewer/overlay.ts` has scroll / prev-next / `t` / `e` / `G` / `Tab` / `Esc`. No composer. | ⚠️ Upstream-only; declined. |
+| Two-press `x` stop in viewer | No viewer stop; `subagent_status` is read-only. | ⚠️ Upstream-only; declined. |
+| Foreground lifecycle events + `.output` JSONL | We always persist the child session file under `~/.agent/subagents/session` and index it per parent (`paths.ts` `appendSubagentLinkRecord` / `recordSubagentStarted`), which the viewer already tails. We emit `subagent:complete` from `background-finish.ts` only. | ✅ Persisted transcripts already superior to upstream. |
+| `SpawnOptions.cwd` / `configCwd` split | We always run at `ctx.cwd`. | ⚠️ Upstream-only; declined. |
+| Forgiving model resolution (`.`≡`-`, date suffix, provider fallback) | `@htwang-contrib/common` `resolveModel` has tiered matching + signal scoring + version compare, but **not** separator equivalence, date-suffix stripping, or provider fallback. | ⚠️ Upstream-only; declined. |
+| `exclude_extensions` frontmatter | Child loader uses a fixed `CHILD_SESSION_EXTENSION_FACTORIES = [protectSecrets, extraTools, webTools, gitClone]`. Personas cannot tune extensions. | ⚠️ Upstream-only; declined. |
+| `persist_session` / `session_dir` frontmatter | We **always** persist (intentional — the viewer needs the file). Upstream defaults to in-memory. | ✅ Diverge-by-design. |
+| `disableDefaultAgents` | We always surface shipped agents. | ⚠️ Upstream-only; declined (low value). |
+| `toolDescriptionMode` (full/compact/custom) | Static tool description + compact catalog XML. | ⚠️ Upstream-only; declined (low value). |
+| FleetView `belowEditor` navigator | We use an **on-demand** `/view-subagents` popup (picker + 80%×80% overlay) plus `/subagents-agents`. No persistent widget. | ✅ Diverge-by-design. |
+| `widgetMode` / above-editor status widget | We have no persistent status widget (we render live rows via `@htwang-contrib/tool-display`). | ✅ Diverge-by-design. |
+| Worktree isolation (`baseSha`, `workPath`, `--no-verify`) | Explicitly out of scope (`DESIGN.md` §1.3). | ✅ Out of scope. |
+| `tui.select.*` keybinding honoring in viewer | Our overlay hardcodes `Key.up/down/...` via `matchesKey`. | ⚠️ Upstream-only; declined. |
+| `/agents → Agent types` redesign with model-availability flags | Our `/subagents-agents` opens a read-only inspect editor with resolved model. | ✅ Covered conceptually; the model-unavailable flag is a minor nicety we skipped. |
 
 ### Settings parity (`settings.ts`)
 
 We support: `max_concurrent`, `max_total`, `timeout_ms`, `defaults_by_agent_type`.
-Upstream additionally has: `disableDefaultAgents`, `toolDescriptionMode`, `fleetView`,
-`widgetMode`. See recommendations above for which to take.
+Upstream additionally has `disableDefaultAgents`, `toolDescriptionMode`,
+`fleetView`, `widgetMode` — all **declined** (see decision below).
 
-## Recommended borrowable backlog (prioritized)
+## Not borrowing — user-declined (2026-07-05)
 
-1. **Steer tool + central steer entry point** (`c32beeb`, `e55d391`).
-   - Add a `steer_subagent`-equivalent tool (our naming: likely `subagent_steer`
-     to match our `subagent_status` convention, or reuse `subagent` with a
-     `steer` mode).
-   - Expose a `steer(id, message)` entry alongside the orchestration layer
-     (background jobs already track ids in `background-jobs.ts`; foreground needs
-     a handle to the live `AgentSession`).
-   - Use the same signal-forwarding shape as `forwardAbort` in `run-agent.ts`.
-   - Wire the inline composer (`Enter`) and two-press `x` stop into
-     `viewer/overlay.ts` (`onSteer`, `onStop` callbacks like upstream).
-2. **Forgiving model resolution in `@htwang-contrib/common`** (`6235f40`).
-   - Extend `packages/common/src/model-resolve.ts` with separator equivalence
-     (`.` ≡ `-`), optional trailing `^\d{8}$` date stamp, and a provider-fallback
-     pass. Every package using `resolveModel` benefits.
-3. **`SpawnOptions.cwd` / `configCwd` split** (`30bfed0`).
-   - Let a single or batch run target a different directory while keeping config
-     discovery on the parent project. Add `assertValidSpawnCwd()`. Useful for
-     monorepo subdirs and a future scout-in-worktree flow.
-4. **`exclude_extensions` frontmatter** (`d761e11`).
-   - Parse `exclude_extensions` in `agent-catalog.ts`; apply in `run-agent.ts`
-     against `CHILD_SESSION_EXTENSION_FACTORIES`. Emit a warning for unknown ids.
-5. **Viewer `tui.select.*` keybindings** (`ceba678`) — cheap quality-of-life if
-   we want emacs-style navigation.
+On 2026-07-05 the maintainer reviewed the full 2026-06-01 → HEAD diff and
+**declined every borrowable item**. The absence of each feature below is
+intentional. **Do not re-propose these on future audits** unless the maintainer
+explicitly reopens one.
 
-### Explicitly not borrowing
+- **Steer tool / central steer entry point / viewer steer composer / two-press
+  `x` stop** (`c32beeb`, `e55d391`). We keep exactly the two tools `subagent` +
+  `subagent_status`; the parent cannot redirect a running subagent.
+- **Forgiving model resolution** (`.`≡`-`, date suffix, provider fallback,
+  `6235f40`). `@htwang-contrib/common`'s `resolveModel` keeps its current tiered
+  + signal + version matching.
+- **`SpawnOptions.cwd` / `configCwd` split** (`30bfed0`). Runs always use
+  `ctx.cwd`.
+- **`exclude_extensions` frontmatter** (`d761e11`). The child loader keeps its
+  fixed `CHILD_SESSION_EXTENSION_FACTORIES = [protectSecrets, extraTools,
+  webTools, gitClone]`.
+- **Viewer `tui.select.*` keybindings** (`ceba678`). The overlay keeps its
+  hardcoded `Key.*` via `matchesKey`.
+- **FleetView, `widgetMode`, above-editor status widget** (`5889ab0`,
+  `c32e8e0`). We deliberately use an on-demand `/view-subagents` popup instead
+  of a persistent widget.
+- **Worktree isolation** (`d26ad64`, `30bfed0`). Out of scope per `DESIGN.md`
+  §1.3.
+- **`persist_session` / `session_dir` frontmatter** (`d2027ac`). We
+  intentionally always persist (the viewer depends on the session file).
+- **`disableDefaultAgents`** (`f5c5805`) and **`toolDescriptionMode`**
+  (`d9a3c4f`). Low value for our setup.
 
-- FleetView, `widgetMode`, above-editor status widget — we deliberately chose an
-  on-demand popup (`/view-subagents`) over a persistent widget.
-- Worktree isolation — out of scope per `DESIGN.md`.
-- `persist_session` / `session_dir` — we intentionally always persist.
-- `disableDefaultAgents`, `toolDescriptionMode` — low value for our setup.
+### What future audits should touch
+
+Only:
+
+1. The **HEAD row** in *Commit pointers* (advance it after a fresh
+   `git log <old-head>..origin/main`).
+2. A new **revision-log** line below.
+3. Optionally new rows in the *What changed upstream* change log if a commit
+   looks material enough to record for context.
+
+The decision section above is **not** a re-evaluation queue.
 
 ## Revision log
 
 | Date | Note |
 | --- | --- |
-| 2026-07-05 | First upstream-tracking audit. Baseline `4b8f45a` → HEAD `8405e55` (v0.13.0). Identified steer + model-resolution + cwd + exclude_extensions as borrowable. |
+| 2026-07-05 | First upstream-tracking audit. Baseline `4b8f45a` → HEAD `8405e55` (v0.13.0). Change log recorded. Maintainer reviewed the full diff and **declined every borrowable item**; future audits advance pointers + change log only unless an item is explicitly reopened. |
