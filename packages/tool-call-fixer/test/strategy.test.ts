@@ -1,8 +1,8 @@
 import * as assert from "node:assert/strict";
 import { describe, it } from "vitest";
-import { applyStrategies, DEFAULT_CONFIG, type Strategy, type StrategyConfig } from "../src/strategy.ts";
+import { applyStrategies, DEFAULT_CONFIG, type Strategy, type ToolCallFixerConfig } from "../src/strategy.ts";
 
-const baseConfig: StrategyConfig = { ...DEFAULT_CONFIG };
+const baseConfig: ToolCallFixerConfig = { ...DEFAULT_CONFIG };
 
 const swapStrategy: Strategy = {
   id: "swap-bad-for-good",

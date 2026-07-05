@@ -12,9 +12,9 @@ import {
   wrapBareStringAsArray,
   wrapRootStringAsObject,
 } from "../src/strategies/shape-repair-rules.ts";
-import { applyStrategies, DEFAULT_CONFIG, type StrategyConfig } from "../src/strategy.ts";
+import { applyStrategies, DEFAULT_CONFIG, type ToolCallFixerConfig } from "../src/strategy.ts";
 
-const enabledConfig: StrategyConfig = { ...DEFAULT_CONFIG, enabled: true };
+const enabledConfig: ToolCallFixerConfig = { ...DEFAULT_CONFIG, enabled: true };
 
 function makeCtx(overrides: Partial<RepairContext> = {}): RepairContext {
   return {

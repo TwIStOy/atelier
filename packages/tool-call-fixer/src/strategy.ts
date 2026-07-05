@@ -1,13 +1,19 @@
-export interface StrategyConfig {
+export interface ToolCallFixerConfig {
   enabled: boolean;
   notifyOnStrategy: boolean;
+  grammarRepairEnabled: boolean;
+  grammarRepairMode: "recover" | "strip";
+  grammarRepairRequireKnownTool: boolean;
 }
 
 export const CONFIG_ID = "tool-call-fixer";
 
-export const DEFAULT_CONFIG: StrategyConfig = {
+export const DEFAULT_CONFIG: ToolCallFixerConfig = {
   enabled: true,
   notifyOnStrategy: false,
+  grammarRepairEnabled: false,
+  grammarRepairMode: "recover",
+  grammarRepairRequireKnownTool: true,
 };
 
 export interface StrategyResult {
@@ -29,7 +35,7 @@ export interface StrategyOutcome {
 export function applyStrategies(
   toolName: string,
   input: Record<string, unknown>,
-  config: StrategyConfig,
+  config: ToolCallFixerConfig,
   strategies: readonly Strategy[],
 ): StrategyOutcome {
   if (!config.enabled) {
