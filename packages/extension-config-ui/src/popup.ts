@@ -29,7 +29,7 @@ function makeInitialUiState(): UiState {
   return { tab: TAB_ALL, search: "", selected: 0, scroll: 0 };
 }
 
-const MAX_POPUP_BODY_ROWS = 40;
+const MAX_POPUP_BODY_ROWS = 26;
 const MIN_POPUP_BODY_ROWS = 8;
 
 export function computeLayout(terminalRows: number): PopupLayout {
@@ -39,12 +39,11 @@ export function computeLayout(terminalRows: number): PopupLayout {
   return { bodyRows, innerRows: bodyRows, listRows };
 }
 
-function syncViewport(ui: UiState, itemCount: number, listRows: number): void {
-  const rows = Math.max(1, listRows);
-  ui.selected = Math.max(0, Math.min(ui.selected, Math.max(0, itemCount - 1)));
+function syncViewport(ui: UiState, itemCount: number): void {
+  const maxIndex = Math.max(0, itemCount - 1);
+  ui.selected = Math.max(0, Math.min(ui.selected, maxIndex));
   if (ui.selected < ui.scroll) ui.scroll = ui.selected;
-  else if (ui.selected >= ui.scroll + rows) ui.scroll = ui.selected - rows + 1;
-  ui.scroll = Math.max(0, Math.min(ui.scroll, Math.max(0, itemCount - rows)));
+  ui.scroll = Math.max(0, Math.min(ui.scroll, maxIndex));
 }
 
 function findRowById(rows: SettingRow[], id: string): SettingRow | undefined {
@@ -65,10 +64,9 @@ function createConfigComponent(
   const filtered = () => filterRows(rows, ui.search, ui.tab);
 
   const clamp = (): void => {
-    const layout = getLayout();
     if (!tabs.some((t) => t.id === ui.tab)) ui.tab = TAB_ALL;
     const count = filtered().length;
-    syncViewport(ui, count, layout.listRows);
+    syncViewport(ui, count);
   };
 
   const selectedRow = (): SettingRow | undefined => {
@@ -456,9 +454,9 @@ function createConfigComponent(
     const availableRows = Math.max(1, layout.bodyRows - lines.length - footerLines.length);
 
     const currentFiltered = filtered();
-    syncViewport(ui, currentFiltered.length, availableRows);
+    syncViewport(ui, currentFiltered.length);
 
-    const listLines = renderSettingList(
+    let listResult = renderSettingList(
       currentFiltered,
       ui.selected,
       ui.scroll,
@@ -467,7 +465,28 @@ function createConfigComponent(
       theme,
       ui.editing,
     );
-    lines.push(...listLines);
+    if (currentFiltered.length > 0 && !listResult.selectedVisible) {
+      let bestScroll = Math.max(0, ui.selected);
+      for (let s = Math.max(0, ui.selected - 1); s >= 0; s -= 1) {
+        const trial = renderSettingList(currentFiltered, ui.selected, s, availableRows, safeWidth, theme, ui.editing);
+        if (trial.selectedVisible) {
+          bestScroll = s;
+        } else {
+          break;
+        }
+      }
+      ui.scroll = bestScroll;
+      listResult = renderSettingList(
+        currentFiltered,
+        ui.selected,
+        ui.scroll,
+        availableRows,
+        safeWidth,
+        theme,
+        ui.editing,
+      );
+    }
+    lines.push(...listResult.lines);
     lines.push(...footerLines);
 
     return lines;
