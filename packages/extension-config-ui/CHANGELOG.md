@@ -4,4 +4,9 @@
 
 ### Fixed
 
-- The `/config` popup now caps its height at 85% of the terminal (the existing `DEFAULT_MAX_HEIGHT` constant), instead of ignoring it and growing to `terminalRows - 2`. On short terminals the popup previously grew tall enough to push its title row off the top of the viewport; the title and footer now stay visible. The 85% value is derived from a single `DEFAULT_MAX_HEIGHT_PCT` source so future tuning changes take effect.
+- The `/config` popup no longer overflows the terminal and clips its title. The setting list previously ignored its row budget: group headers (one per extension), the selected row's description, and the scroll indicators were all rendered on top of the budgeted rows, so the popup grew to `bodyRows + N` and its top was pushed off-screen. The list now treats its budget as a hard physical-line cap (headers, description, and indicators all count against it), and the scroll position re-anchors so the selected row stays visible.
+- The popup height now actually honors the configured maximum. `computeLayout` previously ignored `DEFAULT_MAX_HEIGHT` and used `terminalRows - 2`, leaving the constant as dead code; it now derives the height from a single `DEFAULT_MAX_HEIGHT_PCT` source of truth.
+
+### Changed
+
+- The default max popup height is now ~50% of the terminal (capped at 26 rows), down from ~85% / 40 rows, so the popup no longer fills the screen. Tunable via `DEFAULT_MAX_HEIGHT_PCT` (`packages/extension-config-ui/src/types.ts`).
