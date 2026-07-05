@@ -23,16 +23,18 @@ import { renderSearchBar } from "./render/search-bar.ts";
 import { renderSelectPage, renderSettingList } from "./render/setting-list.ts";
 import { renderTabBar } from "./render/tab-bar.ts";
 import type { PopupLayout, SelectingState, SettingRow, TabDef, UiState } from "./types.ts";
-import { SELECT_PAGE_SIZE, TAB_ALL } from "./types.ts";
+import { DEFAULT_MAX_HEIGHT_PCT, SELECT_PAGE_SIZE, TAB_ALL } from "./types.ts";
 
 function makeInitialUiState(): UiState {
   return { tab: TAB_ALL, search: "", selected: 0, scroll: 0 };
 }
 
 const MAX_POPUP_BODY_ROWS = 40;
+const MIN_POPUP_BODY_ROWS = 8;
 
-function computeLayout(terminalRows: number): PopupLayout {
-  const bodyRows = Math.max(8, Math.min(MAX_POPUP_BODY_ROWS, terminalRows - 2));
+export function computeLayout(terminalRows: number): PopupLayout {
+  const maxHeight = Math.floor((terminalRows * DEFAULT_MAX_HEIGHT_PCT) / 100);
+  const bodyRows = Math.max(MIN_POPUP_BODY_ROWS, Math.min(MAX_POPUP_BODY_ROWS, maxHeight));
   const listRows = Math.max(4, bodyRows - 7);
   return { bodyRows, innerRows: bodyRows, listRows };
 }

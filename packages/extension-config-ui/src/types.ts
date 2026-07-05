@@ -1,9 +1,12 @@
+import type { SizeValue } from "@earendil-works/pi-tui";
 import type { ConfigItem } from "@htwang-contrib/common";
 
 export const TAB_ALL = "all";
 export const PACKAGE_TAB_PREFIX = "pkg:";
-export const DEFAULT_WIDTH_PERCENT = "92%";
-export const DEFAULT_MAX_HEIGHT = "85%";
+export const DEFAULT_WIDTH_PCT = 92;
+export const DEFAULT_MAX_HEIGHT_PCT = 85;
+export const DEFAULT_WIDTH_PERCENT: SizeValue = `${DEFAULT_WIDTH_PCT}%`;
+export const DEFAULT_MAX_HEIGHT: SizeValue = `${DEFAULT_MAX_HEIGHT_PCT}%`;
 export const SELECT_PAGE_SIZE = 10;
 
 export interface SettingRow {
