@@ -29,7 +29,10 @@
 - Use `snake_case` for tool names (the identifier used in code and API calls).
 - Use `CamelCase` for display names (shown in terminal UI, logs, and user-facing output).
 
-## Porting upstream code — reuse this repo first (重要)
+## Documentation
+
+- All documentation lives under the repo-root `docs/` directory, organized as `docs/<topic>/...` (typically `<topic>` matches the package name, e.g. `docs/goal/`, `docs/herdr/`).
+- Do **not** create per-package `docs/` directories (`packages/*/docs/`). Keep docs out of `packages/`.
 
 When migrating or adapting an extension from another project (for example `rpiv-ask-user-question` under `docs/ask-user-question/`):
 
