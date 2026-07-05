@@ -1,7 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { registerConfigItems } from "@htwang-contrib/common";
-import { CONFIG_ID, loadConfig } from "./config.ts";
 import { handleHideModels } from "./command.ts";
+import { CONFIG_ID, loadConfig } from "./config.ts";
 import { buildHideRuleOptions, captureRegistry, installPatch, setSuppress } from "./model-patch.ts";
 
 const EXTENSION_LABEL = "Experience";
