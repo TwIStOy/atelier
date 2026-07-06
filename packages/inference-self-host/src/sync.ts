@@ -1,3 +1,7 @@
+import { createLogger } from "@htwang-contrib/common";
+
+const logger = createLogger("inference-self-host");
+
 type ModelsDevCost = {
   input?: number;
   output?: number;
@@ -221,7 +225,7 @@ export async function fetchModels(): Promise<ProviderModelConfig[]> {
       }
     }
     if (!raw) {
-      console.warn(`Model "${source.modelId}" not found in provider "${source.provider}"`);
+      logger.warn(`Model "${source.modelId}" not found in provider "${source.provider}"`);
       continue;
     }
     models.push(toModelConfig(localId, raw, source));

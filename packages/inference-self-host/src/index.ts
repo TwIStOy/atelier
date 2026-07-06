@@ -1,4 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { createLogger } from "@htwang-contrib/common";
+
+const logger = createLogger("inference-self-host");
 
 const zaiCompat = {
   supportsDeveloperRole: false,
@@ -24,6 +27,7 @@ const qwenCompat = {
 };
 
 export default function (pi: ExtensionAPI) {
+  logger.info("extension loaded");
   pi.registerProvider("inference-self-host", {
     name: "Inference(Self Host)",
     baseUrl: "https://inference.twistoy.cn/v1",
