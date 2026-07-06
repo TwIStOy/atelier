@@ -3,6 +3,7 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import {
   ASK_USER_PROMPT_EVENT,
   type AskUserPromptPayload,
+  createLogger,
   MODAL_ACTIVE_EVENT,
   registerConfigItems,
 } from "@htwang-contrib/common";
@@ -15,11 +16,12 @@ import {
   resolveTabId,
   type TabId,
 } from "./herdr-client.ts";
-import { logDebug } from "./log.ts";
 import { type AgentState, buildTabTitle, summarizeAskUserQuestion } from "./state.ts";
 import { loadConfig, resolveSummaryModel, summarizeSessionTitle } from "./summarizer.ts";
 
 type AnyModel = Model<any>;
+
+const logger = createLogger("herdr");
 
 let cachedModels: Array<{ label: string; value: string }> = [];
 
@@ -30,6 +32,7 @@ export function setCachedModels(models: Array<{ label: string; value: string }>)
 const DEFAULT_TITLE = "Pi";
 
 export default function herdrExtension(pi: ExtensionAPI): void {
+  logger.info("extension loaded");
   // Config items are registered unconditionally so users can pre-set the
   // summary model from /config even when pi is not running inside herdr.
   // The herdr-only *behavior* is gated below.
@@ -98,7 +101,7 @@ export default function herdrExtension(pi: ExtensionAPI): void {
     if (titleGenerated) return;
     const config = loadConfig();
     if (!config.enabled) {
-      logDebug("ensureSessionTitle: disabled, skipping");
+      logger.debug("ensureSessionTitle: disabled, skipping");
       sessionTitle = DEFAULT_TITLE;
       titleGenerated = true;
       return;
@@ -106,7 +109,7 @@ export default function herdrExtension(pi: ExtensionAPI): void {
 
     const model = resolveSummaryModel(ctx.modelRegistry, config) ?? (ctx.model as AnyModel | undefined);
     const branch = ctx.sessionManager.getBranch();
-    logDebug(
+    logger.debug(
       `ensureSessionTitle: model=${model ? `${model.provider}/${model.id}` : "(none)"} branchLen=${branch.length} firstPromptLen=${firstPrompt.length} titleGenerated=${titleGenerated}`,
     );
     try {
@@ -118,7 +121,7 @@ export default function herdrExtension(pi: ExtensionAPI): void {
         fallbackTitle: sessionTitle,
         signal: renderAbort.signal,
       });
-      logDebug(`ensureSessionTitle: outcome fromModel=${outcome.fromModel} title=${JSON.stringify(outcome.title)}`);
+      logger.debug(`ensureSessionTitle: outcome fromModel=${outcome.fromModel} title=${JSON.stringify(outcome.title)}`);
       // Only latch when the model actually produced a title. A missing first
       // prompt (early session_start before the prompt is appended) or a failed
       // side-call returns a fallback with fromModel:false — leave
@@ -126,14 +129,14 @@ export default function herdrExtension(pi: ExtensionAPI): void {
       if (outcome.fromModel && outcome.title) {
         sessionTitle = outcome.title;
         titleGenerated = true;
-        logDebug(`ensureSessionTitle: summary latched = ${outcome.title}`);
+        logger.debug(`ensureSessionTitle: summary latched = ${outcome.title}`);
         // The side-call is async (LLM latency). The render scheduled by the
         // triggering event ran BEFORE we had the title — re-render now so the
         // new title is pushed to the tab as soon as it lands.
         scheduleRender(0);
       }
     } catch (e) {
-      logDebug(`ensureSessionTitle: threw ${String(e).slice(0, 120)}`);
+      logger.debug(`ensureSessionTitle: threw ${String(e).slice(0, 120)}`);
       // Keep the previous title and leave unlatched; retry on the next event.
     }
   }
@@ -151,7 +154,7 @@ export default function herdrExtension(pi: ExtensionAPI): void {
     if (!tabId) {
       tabId = await safeResolveTabId();
       if (!tabId) {
-        logDebug("renderNow: no tabId, aborting");
+        logger.debug("renderNow: no tabId, aborting");
         return; // can't rename without a tab id
       }
     }
@@ -171,9 +174,9 @@ export default function herdrExtension(pi: ExtensionAPI): void {
     // side-call resolving after the user switched panes) is lost forever.
     try {
       await renameTab(pi, tabId, title);
-      logDebug(`renderNow: rename OK -> ${title}`);
+      logger.debug(`renderNow: rename OK -> ${title}`);
     } catch (e) {
-      logDebug(`renderNow: rename threw ${String(e).slice(0, 120)}`);
+      logger.debug(`renderNow: rename threw ${String(e).slice(0, 120)}`);
       // Swallow herdr CLI failures — never break the agent turn.
     }
   }
@@ -255,7 +258,7 @@ export default function herdrExtension(pi: ExtensionAPI): void {
     // (which is why reading the branch at this point used to return "").
     if (!firstPrompt && event.prompt) {
       firstPrompt = event.prompt;
-      logDebug(`before_agent_start: captured firstPrompt len=${firstPrompt.length}`);
+      logger.debug(`before_agent_start: captured firstPrompt len=${firstPrompt.length}`);
     }
     currentState = "running";
     pendingQuestion = null;

@@ -10,6 +10,7 @@ import type { Message, Model } from "@earendil-works/pi-ai";
 import type { ModelRegistry, SessionEntry } from "@earendil-works/pi-coding-agent";
 import {
   branchToMessages,
+  createLogger,
   type ExtensionConfigSchema,
   executeSideCall,
   extractMessageText,
@@ -17,9 +18,10 @@ import {
   resolveModel,
   type SideCallResult,
 } from "@htwang-contrib/common";
-import { logDebug } from "./log.ts";
 
 type AnyModel = Model<any>;
+
+const logger = createLogger("herdr");
 
 const CONFIG_NAME = "herdr";
 
@@ -117,10 +119,10 @@ export async function summarizeSessionTitle(opts: {
 
   const promptText = (opts.firstPrompt ?? "").trim() || (branch ? firstUserPrompt(branch) : "");
   if (!promptText || !model) {
-    logDebug(`summarizeSessionTitle: skipping (promptLen=${promptText.length} hasModel=${!!model})`);
+    logger.debug(`summarizeSessionTitle: skipping (promptLen=${promptText.length} hasModel=${!!model})`);
     return { title: fallbackTitle, fromModel: false };
   }
-  logDebug(
+  logger.debug(
     `summarizeSessionTitle: calling side-call model=${model.provider}/${model.id} promptLen=${promptText.length}`,
   );
 
@@ -146,19 +148,19 @@ export async function summarizeSessionTitle(opts: {
       commandName: "herdr-title",
     });
   } catch (e) {
-    logDebug(`summarizeSessionTitle: executeSideCall threw ${String(e).slice(0, 300)}`);
+    logger.debug(`summarizeSessionTitle: executeSideCall threw ${String(e).slice(0, 300)}`);
     return { title: fallbackTitle, fromModel: false };
   }
 
   if (!result.ok) {
     const reason = "aborted" in result ? "aborted" : result.error;
-    logDebug(`summarizeSessionTitle: side-call failed: ${String(reason).slice(0, 300)}`);
+    logger.debug(`summarizeSessionTitle: side-call failed: ${String(reason).slice(0, 300)}`);
     return { title: fallbackTitle, fromModel: false };
   }
 
   const parsed = parseSessionTitle(result.answer);
   if (!parsed) {
-    logDebug(
+    logger.debug(
       `summarizeSessionTitle: could not parse title from answer: ${JSON.stringify(result.answer).slice(0, 200)}`,
     );
     return { title: fallbackTitle, fromModel: false };
