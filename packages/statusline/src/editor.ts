@@ -7,6 +7,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import type { EditorTheme, TUI } from "@earendil-works/pi-tui";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import type { EditorHintPayload } from "@htwang-contrib/common";
 
 const MIN_BODY_LINES = 1;
 
@@ -61,6 +62,8 @@ function getSessionCost(ctx: ExtensionContext): number {
 }
 
 export class MyEditor extends CustomEditor {
+  private readonly hints = new Map<string, { text: string; color: ThemeColor }>();
+
   constructor(
     tui: TUI,
     theme: EditorTheme,
@@ -70,6 +73,25 @@ export class MyEditor extends CustomEditor {
   ) {
     super(tui, theme, keybindings, { paddingX: 1 });
     this.borderColor = (s: string) => this.fg("border", s);
+  }
+
+  applyHint(payload: EditorHintPayload): void {
+    if (!payload || typeof payload.source !== "string") return;
+    if (payload.text == null || payload.text === "") {
+      if (!this.hints.has(payload.source)) return;
+      this.hints.delete(payload.source);
+    } else {
+      const color = payload.color ?? "warning";
+      this.hints.delete(payload.source);
+      this.hints.set(payload.source, { text: payload.text, color });
+    }
+    this.tui.requestRender();
+  }
+
+  private activeHint(): { text: string; color: ThemeColor } | null {
+    let last: { text: string; color: ThemeColor } | null = null;
+    for (const v of this.hints.values()) last = v;
+    return last;
   }
 
   private get ctx(): ExtensionContext {
@@ -95,9 +117,10 @@ export class MyEditor extends CustomEditor {
     const leftTop = this.getUsageLabel();
     const rightTop = this.getModelLabel(Math.max(8, Math.floor(innerWidth * 0.48)));
     const cwdLabel = this.getCwdLabel();
+    const hint = this.activeHint();
 
     return [
-      this.borderWithLabels(width, leftTop, rightTop),
+      this.borderWithLabels(width, leftTop, rightTop, hint),
       ...body.map((line) => this.wrapBody(line, innerWidth)),
       this.borderWithRightLabel(width, cwdLabel),
       ...this.wrapPopupBlock(popupLines, width),
@@ -157,15 +180,32 @@ export class MyEditor extends CustomEditor {
     });
   }
 
-  private borderWithLabels(width: number, leftLabel: string, rightLabel: string): string {
+  private borderWithLabels(
+    width: number,
+    leftLabel: string,
+    rightLabel: string,
+    hint: { text: string; color: ThemeColor } | null,
+  ): string {
     const innerWidth = Math.max(0, width - 2);
     const maxLeft = Math.max(0, Math.floor(innerWidth * 0.44));
     const maxRight = Math.max(0, innerWidth - maxLeft - 2);
     const left = this.fg("muted", truncateToWidth(leftLabel, maxLeft, "…"));
     const right = truncateToWidth(rightLabel, maxRight, "…");
-    const used = visibleWidth(left) + visibleWidth(right);
-    const fill = Math.max(0, innerWidth - used);
-    return this.borderColor("╭") + left + this.borderColor("─".repeat(fill)) + right + this.borderColor("╮");
+    return this.borderColor("╭") + left + this.topMiddle(innerWidth, left, right, hint) + right + this.borderColor("╮");
+  }
+
+  private topMiddle(
+    innerWidth: number,
+    left: string,
+    right: string,
+    hint: { text: string; color: ThemeColor } | null,
+  ): string {
+    const remaining = Math.max(0, innerWidth - visibleWidth(left) - visibleWidth(right));
+    if (!hint) return this.borderColor("─".repeat(remaining));
+    const colored = this.fg(hint.color, truncateToWidth(hint.text, Math.max(0, remaining - 2), "…"));
+    if (visibleWidth(colored) === 0) return this.borderColor("─".repeat(remaining));
+    const dashes = Math.max(0, remaining - visibleWidth(colored) - 2);
+    return ` ${colored} ${this.borderColor("─".repeat(dashes))}`;
   }
 
   private sideBorder(): string {
