@@ -1,3 +1,5 @@
+import type { ThemeColor } from "@earendil-works/pi-coding-agent";
+
 export const ZAI_CODING_PLAN_EVENTS = {
   USAGE_UPDATE: "pi-extensions:zai-coding-plan:usage-update",
   RAW_USAGE_UPDATE: "pi-extensions:zai-coding-plan:raw-usage-update",
@@ -52,4 +54,28 @@ export type AskUserPromptQuestion = {
 
 export type AskUserPromptPayload = {
   questions: ReadonlyArray<AskUserPromptQuestion>;
+};
+
+/**
+ * Cross-extension channel for transient hint messages rendered inside the
+ * input editor's border (e.g. "esc again to abort").
+ *
+ * Producers (e.g. `experience/double-escape`) emit via `pi.events.emit` with a
+ * payload describing the hint to show. The editor-owning extension (e.g.
+ * `statusline`'s MyEditor) subscribes and renders the most recent active hint
+ * into its own border, so the hint composes with whatever custom editor is
+ * active instead of being clobbered by or clobbering the editor.
+ *
+ * Payload: `EditorHintPayload`. Emit with `text: null` (or `undefined` / empty
+ * string) to clear the hint previously set for the given `source`.
+ */
+export const EDITOR_HINT_EVENT = "pi-extensions:ui:editor-hint" as const;
+
+export type EditorHintPayload = {
+  /** Stable id of the hint producer. Hints are tracked per-source; the most recently set non-empty hint is rendered. */
+  source: string;
+  /** Hint text to display, or null/undefined/empty to clear the hint for this source. */
+  text: string | null | undefined;
+  /** Optional theme color name for the hint text. Defaults to "warning". */
+  color?: ThemeColor;
 };
