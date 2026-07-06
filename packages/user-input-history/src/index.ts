@@ -1,17 +1,10 @@
-import {
-  CustomEditor,
-  type ExtensionAPI,
-  type ExtensionContext,
-  type KeybindingsManager,
-} from "@earendil-works/pi-coding-agent";
-import type { EditorComponent, EditorTheme, KeybindingsConfig, KeyId, TUI } from "@earendil-works/pi-tui";
+import { CustomEditor, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { EditorComponent, KeybindingsConfig, KeyId } from "@earendil-works/pi-tui";
 import { getKeybindings, Key } from "@earendil-works/pi-tui";
+import { chainEditorFactory } from "@htwang-contrib/common";
 import { loadHistoryTextsNewestFirst, MAX_ENTRIES, persistHistoryMergedWithDisk } from "./history-store.ts";
 import { InteractiveHistorySearch } from "./interactive-search.ts";
 
-type EditorFactory = (tui: TUI, theme: EditorTheme, keybindings: KeybindingsManager) => EditorComponent;
-
-const PRIOR_KEY = "__userInputHistoryPriorFactory" as const;
 const SESSION_RENAME_KEY = "app.session.rename";
 
 function isCtrlRKey(key: string): boolean {
@@ -51,20 +44,6 @@ function detachBuiltinSessionRenameCtrlR(): void {
     ...kb.getUserBindings(),
     [SESSION_RENAME_KEY]: next,
   } as KeybindingsConfig);
-}
-
-type PriorMarked = EditorFactory & { [PRIOR_KEY]?: EditorFactory };
-
-function unwrapBaseFactory(factory: EditorFactory | undefined): EditorFactory | undefined {
-  const seen = new Set<EditorFactory>();
-  let cur: EditorFactory | undefined = factory;
-  while (cur) {
-    const next = (cur as PriorMarked)[PRIOR_KEY];
-    if (!next || seen.has(cur)) break;
-    seen.add(cur);
-    cur = next;
-  }
-  return cur;
 }
 
 type EditorWithHistory = EditorComponent & {
@@ -148,18 +127,15 @@ export default function userInputHistoryExtension(pi: ExtensionAPI): void {
     // built-in vs extension shortcut diagnostics (load-time detach can hit a stale KB).
     detachBuiltinSessionRenameCtrlR();
     if (!ctx.hasUI) return;
-    const prior = unwrapBaseFactory(ctx.ui.getEditorComponent());
-    const wrapped: PriorMarked = Object.assign(
-      (tui: TUI, theme: EditorTheme, keybindings: KeybindingsManager) => {
+    ctx.ui.setEditorComponent(
+      chainEditorFactory(ctx.ui.getEditorComponent(), (prior) => (tui, theme, keybindings) => {
         const inner = prior ? prior(tui, theme, keybindings) : new CustomEditor(tui, theme, keybindings);
         const ed = asHistoryEditor(inner);
         applyDiskHistory(ed);
         patchAddToHistory(ed);
         return inner;
-      },
-      { [PRIOR_KEY]: prior },
+      }),
     );
-    ctx.ui.setEditorComponent(wrapped);
   });
 
   pi.registerShortcut(Key.ctrl("r"), {
