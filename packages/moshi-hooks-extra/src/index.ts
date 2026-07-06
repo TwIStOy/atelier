@@ -201,7 +201,7 @@ export default function moshiHooksExtra(pi: ExtensionAPI): void {
     if (!credentials) return;
     const payload = data as { usage?: CodingPlanRawUsage } | undefined;
     const usage = payload?.usage;
-    if (!usage || usage.windows.length === 0) return;
+    if (!usage?.windows.some((window) => window.kind === "tokens")) return;
     lastRawUsage = usage;
     const now = Date.now();
     if (usagePushInFlight || now - lastUsagePushAt < USAGE_PUSH_MIN_INTERVAL_MS) {

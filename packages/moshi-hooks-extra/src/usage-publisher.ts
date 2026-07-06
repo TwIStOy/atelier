@@ -65,11 +65,13 @@ export function buildZaiSnapshot(
   credentials: MoshiCredentials,
   now: Date = new Date(),
 ): MoshiUsageSnapshot {
-  const windows: MoshiUsageWindow[] = usage.limits.map((limit) => ({
-    label: windowLabelFor(limit.window),
-    usedPercentage: clampPercent(limit.percentage),
-    resetsAt: resetIso(limit.nextResetTime),
-  }));
+  const windows: MoshiUsageWindow[] = usage.limits
+    .filter((limit) => limit.window !== "monthly")
+    .map((limit) => ({
+      label: windowLabelFor(limit.window),
+      usedPercentage: clampPercent(limit.percentage),
+      resetsAt: resetIso(limit.nextResetTime),
+    }));
 
   return finalizeSnapshot(windows, usage.level, credentials, now);
 }
@@ -79,11 +81,13 @@ export function buildZaiRawSnapshot(
   credentials: MoshiCredentials,
   now: Date = new Date(),
 ): MoshiUsageSnapshot {
-  const windows: MoshiUsageWindow[] = usage.windows.map((window) => ({
-    label: labelForRawWindow(window),
-    usedPercentage: clampPercent(window.usedPercentage),
-    resetsAt: resetIso(window.nextResetTime),
-  }));
+  const windows: MoshiUsageWindow[] = usage.windows
+    .filter((window) => window.kind === "tokens")
+    .map((window) => ({
+      label: labelForRawWindow(window),
+      usedPercentage: clampPercent(window.usedPercentage),
+      resetsAt: resetIso(window.nextResetTime),
+    }));
 
   return finalizeSnapshot(windows, usage.level, credentials, now);
 }

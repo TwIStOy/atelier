@@ -55,12 +55,11 @@ describe("buildZaiSnapshot", () => {
     expect(snapshot.capturedAt).toBe("2026-06-23T07:50:00.000Z");
   });
 
-  test("maps windows, clamps percentages, formats resetsAt", () => {
+  test("maps token windows, clamps percentages, formats resetsAt", () => {
     expect(snapshot.windows).toEqual([
       { label: "5h", usedPercentage: 30, resetsAt: "2026-02-02T02:40:00.000Z" },
       { label: "Weekly", usedPercentage: 42.5 },
       { label: "1h", usedPercentage: 0 },
-      { label: "Monthly", usedPercentage: 100 },
     ]);
   });
 
@@ -101,16 +100,15 @@ describe("buildZaiRawSnapshot", () => {
     expect(snapshot.accountLabel).toBe("Z.AI Coding Plan (Max)");
   });
 
-  test("renders one window per raw window with kind-aware labels", () => {
-    expect(snapshot.windows.map((w) => w.label)).toEqual(["weekly tools", "5h tokens", "weekly tokens"]);
+  test("publishes only token windows with kind-aware labels", () => {
+    expect(snapshot.windows.map((w) => w.label)).toEqual(["5h tokens", "weekly tokens"]);
   });
 
   test("passes through real resetsAt and clamps percentages", () => {
-    expect(snapshot.windows[0].resetsAt).toBe("2026-06-30T07:28:16.992Z");
-    expect(snapshot.windows[0].usedPercentage).toBe(6);
-    expect(snapshot.windows[1].resetsAt).toBe("2026-06-23T13:41:52.875Z");
-    expect(snapshot.windows[2].usedPercentage).toBe(100);
-    expect(snapshot.windows[2].resetsAt).toBeUndefined();
+    expect(snapshot.windows[0].resetsAt).toBe("2026-06-23T13:41:52.875Z");
+    expect(snapshot.windows[0].usedPercentage).toBe(1);
+    expect(snapshot.windows[1].usedPercentage).toBe(100);
+    expect(snapshot.windows[1].resetsAt).toBeUndefined();
   });
 });
 
