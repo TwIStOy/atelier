@@ -61,6 +61,12 @@ export {
   usagePercentStressLevel,
 } from "./format.ts";
 export { clearGlobalState, getGlobalState } from "./global-state.ts";
+export type { CreateLoggerOptions, Logger, LogLevel } from "./log.ts";
+export {
+  createLogger,
+  getExtensionsLogPath,
+  resolveStateDir,
+} from "./log.ts";
 export type { McpClientInfo, McpSession } from "./mcp.ts";
 export { mcpCall, mcpInit } from "./mcp.ts";
 export {
