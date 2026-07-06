@@ -4,6 +4,7 @@ import {
   type AskUserPromptPayload,
   type CodingPlanRawUsage,
   type CodingPlanUsage,
+  createLogger,
   MODAL_ACTIVE_EVENT,
   registerConfigItems,
   ZAI_CODING_PLAN_EVENTS,
@@ -30,6 +31,8 @@ import { buildZaiRawSnapshot, buildZaiSnapshot, pushUsageSnapshot } from "./usag
 const IDLE_TITLE_FALLBACK = "Thinking next step...";
 const USAGE_PUSH_MIN_INTERVAL_MS = 60_000;
 
+const logger = createLogger("moshi-hooks-extra");
+
 let cachedModels: Array<{ label: string; value: string }> = [];
 
 export function setCachedModels(models: Array<{ label: string; value: string }>): void {
@@ -37,6 +40,7 @@ export function setCachedModels(models: Array<{ label: string; value: string }>)
 }
 
 export default function moshiHooksExtra(pi: ExtensionAPI): void {
+  logger.info("extension loaded");
   if (!isMoshiHookAvailable()) {
     return;
   }

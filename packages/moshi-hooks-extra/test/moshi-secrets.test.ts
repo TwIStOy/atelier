@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { readMoshiSecretsFromFile, resolveStateDir } from "../src/moshi-secrets.ts";
+import { readMoshiSecretsFromFile } from "../src/moshi-secrets.ts";
 
 function makeFs(files: Record<string, string>) {
   return {
@@ -81,15 +81,5 @@ describe("readMoshiSecretsFromFile", () => {
       }),
     });
     expect(creds?.hostId).toBe("host_abc");
-  });
-});
-
-describe("resolveStateDir", () => {
-  test("prefers XDG_STATE_HOME", () => {
-    expect(resolveStateDir({ XDG_STATE_HOME: "/xdg/state" })).toBe("/xdg/state");
-  });
-
-  test("falls back to HOME/.local/state", () => {
-    expect(resolveStateDir({ HOME: "/home/u" }, "/home/u")).toBe("/home/u/.local/state");
   });
 });

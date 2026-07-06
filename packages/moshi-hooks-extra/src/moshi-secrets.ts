@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { resolveStateDir } from "@htwang-contrib/common";
 
 export interface MoshiCredentials {
   hostId: string;
@@ -30,13 +31,6 @@ function fileSecretsPaths(opts: Required<Pick<MoshiSecretsOptions, "stateDir" | 
   }
   candidates.push(join(opts.stateDir, "moshi", "secrets.json"));
   return candidates;
-}
-
-export function resolveStateDir(env: NodeJS.ProcessEnv = process.env, home = homedir()): string {
-  const xdg = env.XDG_STATE_HOME;
-  if (xdg && xdg.length > 0) return xdg;
-  if (env.HOME && env.HOME.length > 0) return join(env.HOME, ".local", "state");
-  return join(home, ".local", "state");
 }
 
 export function readMoshiSecretsFromFile(options: MoshiSecretsOptions = {}): MoshiCredentials | null {
