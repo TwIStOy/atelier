@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-06
+
 ### Added
 
 - `experience` extension scaffold (empty entry point reserved for upcoming experience-related tooling).

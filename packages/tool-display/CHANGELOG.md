@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-06
+
 ### Breaking Changes
 
 - Removed the `bashCommandDisplayLength` config item from the Tool Display extension. It only controlled the floor for command *truncation*, and the Bash header now wraps the command onto continuation lines instead of truncating, so the knob no longer has any effect ([#11](https://github.com/TwIStOy/pi-extensions/issues/11)).

@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-06
+
 ### Fixed
 
 - The `/config` popup no longer overflows the terminal and clips its title. The setting list previously ignored its row budget: group headers (one per extension), the selected row's description, and the scroll indicators were all rendered on top of the budgeted rows, so the popup grew to `bodyRows + N` and its top was pushed off-screen. The list now treats its budget as a hard physical-line cap (headers, description, and indicators all count against it), and the scroll position re-anchors so the selected row stays visible.

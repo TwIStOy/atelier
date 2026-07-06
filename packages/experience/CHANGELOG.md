@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-06
+
 ### Added
 
 - Double-Escape to Abort streaming. While the LLM is streaming, the first Escape arms a debounce window and shows an `esc again to abort` hint instead of aborting; a second Escape within the window aborts the response. If the window expires the hint clears and Escape resets. While not streaming, Escape aborts immediately (no debounce), and autocomplete dismissal always takes a single Escape. The hint is published on the shared `EDITOR_HINT_EVENT` channel (`@htwang-contrib/common`) so the editor-owning extension (e.g. `statusline`) renders it into its own border; the intercept itself monkey-patches the inner editor's `handleInput` to catch the `app.interrupt` keybinding. Toggle via `/config` -> experience (`Double-Escape to Abort`) and tune the window via `Double-Escape Window (ms)` (200-2000, default 600).

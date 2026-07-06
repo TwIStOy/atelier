@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-06
+
 ### Fixed
 
 - The Goal status bar running time now ticks live while a goal is active instead of staying frozen between turns. The widget recomputes elapsed time from `lastStartedAt` on every render and requests a re-render once per second.
