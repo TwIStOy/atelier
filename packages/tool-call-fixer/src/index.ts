@@ -1,6 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { type ExtensionConfigSchema, isStaleCtxError, readConfig, registerConfigItems } from "@htwang-contrib/common";
-import { repairAssistantMessageGrammarLeaks } from "./grammar-repair.ts";
+import { repairAssistantMessageGrammarLeaks } from "./grammar-repair/index.ts";
 import { normalizePhantomToolUse } from "./phantom-tool-use.ts";
 import { STRATEGIES } from "./strategies/index.ts";
 import { wrapRootStringAsObject } from "./strategies/shape-repair-rules.ts";

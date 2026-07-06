@@ -1,7 +1,13 @@
 import * as assert from "node:assert/strict";
 import type { AssistantMessage, TextContent, ToolCall } from "@earendil-works/pi-ai";
 import { describe, it } from "vitest";
-import { type GrammarRepairConfig, parseGlm, repairAssistantMessageGrammarLeaks } from "../src/grammar-repair.ts";
+import {
+  type GrammarRepairConfig,
+  parseGlm,
+  parseKimi,
+  parseQwen,
+  repairAssistantMessageGrammarLeaks,
+} from "../src/grammar-repair/index.ts";
 
 function makeMessage(text: string, overrides: Partial<AssistantMessage> = {}): AssistantMessage {
   const textBlock: TextContent = { type: "text", text };
@@ -134,5 +140,96 @@ describe("repairAssistantMessageGrammarLeaks", () => {
     assert.equal(result.changed, true);
     assert.equal(result.recoveredCalls.length, 0);
     assert.notEqual(result.message.stopReason, "toolUse");
+  });
+});
+
+describe("parseQwen (JSON variant)", () => {
+  const QWEN_READ = '<tool_call>{"name":"read","arguments":{"path":"/etc/hosts"}}</tool_call>';
+
+  it("parses a single object tool call", () => {
+    const calls = parseQwen(QWEN_READ);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].name, "read");
+    assert.deepEqual(calls[0].arguments, { path: "/etc/hosts" });
+    assert.equal(calls[0].grammar, "qwen");
+  });
+
+  it("parses an array of tool calls", () => {
+    const text =
+      '<tool_call>[{"name":"read","arguments":{"path":"/a"}},{"name":"bash","arguments":{"command":"ls"}}]</tool_call>';
+    const calls = parseQwen(text);
+    assert.equal(calls.length, 2);
+    assert.equal(calls[0].name, "read");
+    assert.equal(calls[1].name, "bash");
+  });
+
+  it("parses the <tools> wrapper", () => {
+    const text = '<tools>{"name":"read","arguments":{"path":"/x"}}</tools>';
+    assert.equal(parseQwen(text)[0]?.name, "read");
+  });
+
+  it("unwraps a tool call wrapped in a markdown fence", () => {
+    const text = '<tool_call>```json\n{"name":"read","arguments":{"path":"/x"}}\n```</tool_call>';
+    assert.equal(parseQwen(text)[0]?.name, "read");
+  });
+
+  it("returns [] for a GLM-style body (no JSON)", () => {
+    assert.deepEqual(parseQwen(GLM_READ), []);
+  });
+});
+
+describe("parseKimi", () => {
+  const KIMI_READ =
+    "<|tool_calls_section_begin|>\n" +
+    '<|tool_call_begin|>functions.read:1<|tool_call_argument_begin|>{"path":"/etc/hosts"}<|tool_call_end|>\n' +
+    "<|tool_calls_section_end|>";
+
+  it("parses a canonical functions.<name>:<n> tool call", () => {
+    const calls = parseKimi(KIMI_READ);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].name, "read");
+    assert.deepEqual(calls[0].arguments, { path: "/etc/hosts" });
+    assert.equal(calls[0].grammar, "kimi");
+  });
+
+  it("parses a relaxed bare-name id", () => {
+    const text =
+      "<|tool_calls_section_begin|>" +
+      '<|tool_call_begin|>bash:2<|tool_call_argument_begin|>{"command":"ls"}<|tool_call_end|>' +
+      "<|tool_calls_section_end|>";
+    assert.equal(parseKimi(text)[0]?.name, "bash");
+  });
+
+  it("rejects a call_<n> id", () => {
+    const text =
+      "<|tool_calls_section_begin|>" +
+      '<|tool_call_begin|>call_123<|tool_call_argument_begin|>{"path":"/x"}<|tool_call_end|>' +
+      "<|tool_calls_section_end|>";
+    assert.deepEqual(parseKimi(text), []);
+  });
+
+  it("returns [] for plain text", () => {
+    assert.deepEqual(parseKimi("no kimi markers here"), []);
+  });
+});
+
+describe("repairAssistantMessageGrammarLeaks: qwen + kimi recovery", () => {
+  it("recovers a leaked Qwen JSON tool call", () => {
+    const text = '<tool_call>{"name":"read","arguments":{"path":"/a"}}</tool_call>';
+    const result = repairAssistantMessageGrammarLeaks(makeMessage(text), recoverOn, new Set(["read"]));
+    assert.equal(result.recoveredCalls.length, 1);
+    assert.equal(result.recoveredCalls[0].name, "read");
+    assert.equal(result.message.stopReason, "toolUse");
+  });
+
+  it("recovers a leaked Kimi tool call", () => {
+    const text =
+      "<|tool_calls_section_begin|>" +
+      '<|tool_call_begin|>functions.read:1<|tool_call_argument_begin|>{"path":"/a"}<|tool_call_end|>' +
+      "<|tool_calls_section_end|>";
+    const result = repairAssistantMessageGrammarLeaks(makeMessage(text), recoverOn, new Set(["read"]));
+    assert.equal(result.recoveredCalls.length, 1);
+    assert.equal(result.recoveredCalls[0].name, "read");
+    assert.equal(result.message.stopReason, "toolUse");
   });
 });
