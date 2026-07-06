@@ -1,17 +1,20 @@
+import { fileURLToPath } from "node:url";
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { isStaleCtxError } from "@htwang-contrib/common";
 import { Type } from "@sinclair/typebox";
 import { parseGoalCommand } from "./goal/command.ts";
-import { registerGoalConfigItems, setCachedModelOptions } from "./goal/config.ts";
+import { loadGoalConfig, registerGoalConfigItems, setCachedModelOptions } from "./goal/config.ts";
 import {
   shouldQueueBudgetLimitedPrompt,
   shouldQueueGoalContinuationAfterAgentEnd,
   shouldQueueGoalContinuationWhenIdle,
 } from "./goal/continuation.ts";
+import { createContinuationGuard } from "./goal/continuation-guard.ts";
 import { GoalAlreadyExistsError, GoalNotFoundError } from "./goal/errors.ts";
 import { formatGoalForTool, formatGoalToolResponse } from "./goal/format.ts";
 import { buildBudgetLimitedPrompt, buildContinuationPrompt } from "./goal/prompt.ts";
+import { createRecoveryState, noteRecoveryError, type RecoveryState, resetRecovery } from "./goal/recovery.ts";
 import {
   accountGoalUsage,
   clearGoal,
@@ -25,6 +28,8 @@ import type { Goal, TokenUsageSnapshot } from "./goal/types.ts";
 import { GOAL_WIDGET_KEY, GOAL_WIDGET_OPTIONS, makeGoalWidget } from "./goal/ui.ts";
 import { validateObjective, validateTokenBudget } from "./goal/validation.ts";
 import { verifyGoalCompletion } from "./goal/verify.ts";
+
+const PROMPTS_DIR = fileURLToPath(new URL("../prompts", import.meta.url));
 
 function getStoreRef(ctx: ExtensionContext): GoalStoreRef {
   const sessionDir = ctx.sessionManager.getSessionDir();
@@ -56,9 +61,23 @@ function extractAssistantUsage(messages: unknown[]): TokenUsageSnapshot {
   };
 }
 
+function lastAssistantStopReason(messages: unknown[]): { stopReason: string; errorMessage?: string } | null {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i] as Record<string, unknown>;
+    if (m.role !== "assistant") continue;
+    const stopReason = typeof m.stopReason === "string" ? (m.stopReason as string) : "stop";
+    const errorMessage = typeof m.errorMessage === "string" ? (m.errorMessage as string) : undefined;
+    return { stopReason, errorMessage };
+  }
+  return null;
+}
+
 export default function initGoal(pi: ExtensionAPI): void {
   let currentGoalForWidget: Goal | null = null;
   let widgetCtx: ExtensionContext | null = null;
+  const recoveryState: RecoveryState = createRecoveryState();
+  const continuationGuard = createContinuationGuard();
+  let budgetPromptSentFor: string | null = null;
 
   function refreshGoalWidget(goal: Goal | null): void {
     currentGoalForWidget = goal;
@@ -79,11 +98,49 @@ export default function initGoal(pi: ExtensionAPI): void {
     refreshGoalWidget(goal);
   }
 
-  function queueHiddenGoalPrompt(customType: string, content: string): void {
-    pi.sendMessage({ customType, content, display: false }, { triggerTurn: true, deliverAs: "followUp" });
+  function clearContinuationState(): void {
+    continuationGuard.clear();
+    budgetPromptSentFor = null;
+  }
+
+  function resetGoalRuntime(): void {
+    resetRecovery(recoveryState);
+    clearContinuationState();
+  }
+
+  function queueContinuation(goal: Goal): void {
+    if (!continuationGuard.shouldQueue(goal.id)) return;
+    continuationGuard.markQueued(goal.id);
+    pi.sendMessage(
+      {
+        customType: "pi-goal-continuation",
+        content: buildContinuationPrompt(goal),
+        display: false,
+        details: { goalId: goal.id },
+      },
+      { triggerTurn: true, deliverAs: "followUp" },
+    );
+  }
+
+  function queueBudgetLimited(goal: Goal): void {
+    if (budgetPromptSentFor === goal.id) return;
+    budgetPromptSentFor = goal.id;
+    pi.sendMessage(
+      {
+        customType: "pi-goal-budget-limit",
+        content: buildBudgetLimitedPrompt(goal),
+        display: false,
+        details: { goalId: goal.id },
+      },
+      { triggerTurn: true, deliverAs: "followUp" },
+    );
   }
 
   registerGoalConfigItems();
+
+  // --- Resources ---
+
+  pi.on("resources_discover", () => ({ promptPaths: [PROMPTS_DIR] }));
 
   // --- Events ---
 
@@ -99,6 +156,7 @@ export default function initGoal(pi: ExtensionAPI): void {
 
   pi.on("session_start", async (event, ctx) => {
     widgetCtx = ctx;
+    resetGoalRuntime();
     try {
       const ref = getStoreRef(ctx);
       const goal = readGoal(ref);
@@ -111,7 +169,7 @@ export default function initGoal(pi: ExtensionAPI): void {
         const liveGoal = rebased ?? goal;
 
         if (shouldQueueGoalContinuationWhenIdle(liveGoal, ctx.isIdle(), ctx.hasPendingMessages())) {
-          queueHiddenGoalPrompt("pi-goal-continuation", buildContinuationPrompt(liveGoal));
+          queueContinuation(liveGoal);
         }
       }
 
@@ -132,19 +190,63 @@ export default function initGoal(pi: ExtensionAPI): void {
     }
   });
 
+  pi.on("turn_start", () => {
+    continuationGuard.clear();
+  });
+
+  pi.on("input", () => {
+    resetRecovery(recoveryState);
+  });
+
   pi.on("agent_end", (event, ctx) => {
     const usage = extractAssistantUsage(event.messages);
 
     try {
       const ref = getStoreRef(ctx);
-      const goal = accountGoalUsage(ref, usage, "agentEnd");
+      let goal: Goal | null = readGoal(ref);
+      if (goal) {
+        goal = accountGoalUsage(ref, usage, "agentEnd");
+        emitGoalUpdate(goal);
+      }
 
-      emitGoalUpdate(goal);
+      const last = lastAssistantStopReason(event.messages);
+
+      if (last?.stopReason === "error") {
+        noteRecoveryError(recoveryState, last.errorMessage ?? "unknown provider error");
+        const cfg = loadGoalConfig();
+        const count = recoveryState.consecutiveErrors;
+        if (goal && goal.status === "active" && count >= cfg.maxConsecutiveErrors) {
+          const paused = updateGoal(ref, { status: "paused" });
+          emitGoalUpdate(paused);
+          resetRecovery(recoveryState);
+          ctx.ui.notify(
+            `Goal paused after ${count} consecutive errors. Last: ${last.errorMessage ?? "unknown"}. Use /goal resume to retry.`,
+            "warning",
+          );
+          return;
+        }
+        ctx.ui.notify(
+          `Goal hit a provider error (${count}/${cfg.maxConsecutiveErrors}): ${last.errorMessage ?? "unknown"}. Auto-continuation paused; the host may still retry.`,
+          "warning",
+        );
+        return;
+      }
+
+      if (last?.stopReason === "aborted") {
+        return;
+      }
+
+      resetRecovery(recoveryState);
+
+      if (!goal) return;
 
       if (shouldQueueBudgetLimitedPrompt(goal)) {
-        queueHiddenGoalPrompt("pi-goal-budget-limit", buildBudgetLimitedPrompt(goal));
-      } else if (shouldQueueGoalContinuationAfterAgentEnd(goal, ctx.hasPendingMessages())) {
-        queueHiddenGoalPrompt("pi-goal-continuation", buildContinuationPrompt(goal));
+        queueBudgetLimited(goal);
+        return;
+      }
+
+      if (shouldQueueGoalContinuationAfterAgentEnd(goal, ctx.hasPendingMessages())) {
+        queueContinuation(goal);
       }
     } catch (e) {
       if (isStaleCtxError(e)) return;
@@ -154,6 +256,7 @@ export default function initGoal(pi: ExtensionAPI): void {
 
   pi.on("session_shutdown", (_event, ctx) => {
     widgetCtx = null;
+    clearContinuationState();
     try {
       const ref = getStoreRef(ctx);
       const goal = accountGoalUsage(
@@ -198,11 +301,12 @@ export default function initGoal(pi: ExtensionAPI): void {
             }
             clearGoal(ref);
           }
+          resetGoalRuntime();
           const goal = createGoal(ref, objective, null);
           ctx.ui.notify(`Goal set: ${goal.objective}`, "info");
           emitGoalUpdate(goal);
           if (shouldQueueGoalContinuationWhenIdle(goal, ctx.isIdle(), ctx.hasPendingMessages())) {
-            queueHiddenGoalPrompt("pi-goal-continuation", buildContinuationPrompt(goal));
+            queueContinuation(goal);
           }
           return;
         }
@@ -225,11 +329,11 @@ export default function initGoal(pi: ExtensionAPI): void {
           const label = cmd.status === "paused" ? "paused" : "resumed";
           ctx.ui.notify(`Goal ${label}: ${updated.objective}`, "info");
           emitGoalUpdate(updated);
-          if (
-            cmd.status === "active" &&
-            shouldQueueGoalContinuationWhenIdle(updated, ctx.isIdle(), ctx.hasPendingMessages())
-          ) {
-            queueHiddenGoalPrompt("pi-goal-continuation", buildContinuationPrompt(updated));
+          if (cmd.status === "active") {
+            resetGoalRuntime();
+            if (shouldQueueGoalContinuationWhenIdle(updated, ctx.isIdle(), ctx.hasPendingMessages())) {
+              queueContinuation(updated);
+            }
           }
           return;
         }
@@ -241,6 +345,7 @@ export default function initGoal(pi: ExtensionAPI): void {
             return;
           }
           clearGoal(ref);
+          clearContinuationState();
           ctx.ui.notify("Goal cleared.", "info");
           emitGoalUpdate(null);
           return;
@@ -274,6 +379,7 @@ export default function initGoal(pi: ExtensionAPI): void {
 
       try {
         const goal = createGoal(ref, objective, tokenBudget);
+        resetGoalRuntime();
         emitGoalUpdate(goal);
         return {
           content: [
@@ -355,6 +461,7 @@ ${verification.reasoning}`,
 
       try {
         const goal = updateGoal(ref, { status: params.status });
+        clearContinuationState();
         emitGoalUpdate(goal);
         return {
           content: [

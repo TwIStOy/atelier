@@ -6,18 +6,21 @@ export interface GoalConfig {
   verifierModel: string;
   verifierMaxTurns: number;
   verifierMaxRetries: number;
+  maxConsecutiveErrors: number;
 }
 
 const CONFIG_ID = "goal";
 
 const DEFAULT_VERIFIER_MAX_TURNS = 15;
 const DEFAULT_VERIFIER_MAX_RETRIES = 2;
+const DEFAULT_MAX_CONSECUTIVE_ERRORS = 3;
 
 const CONFIG_SCHEMA: ExtensionConfigSchema<GoalConfig> = {
   defaults: {
     verifierModel: "",
     verifierMaxTurns: DEFAULT_VERIFIER_MAX_TURNS,
     verifierMaxRetries: DEFAULT_VERIFIER_MAX_RETRIES,
+    maxConsecutiveErrors: DEFAULT_MAX_CONSECUTIVE_ERRORS,
   },
 };
 
@@ -27,6 +30,7 @@ export function loadGoalConfig(): GoalConfig {
     verifierModel: raw.verifierModel,
     verifierMaxTurns: Number(raw.verifierMaxTurns),
     verifierMaxRetries: Math.max(0, Number(raw.verifierMaxRetries)),
+    maxConsecutiveErrors: Math.max(1, Number(raw.maxConsecutiveErrors)),
   };
 }
 
@@ -72,6 +76,17 @@ export function registerGoalConfigItems(): void {
       extensionLabel: "Goal",
       order: 2,
       min: 0,
+    },
+    {
+      key: "maxConsecutiveErrors",
+      type: "number",
+      label: "Goal Max Consecutive Errors",
+      value: () => loadGoalConfig().maxConsecutiveErrors,
+      description:
+        "Number of consecutive provider errors at agent_end before an active goal is auto-paused (use /goal resume to retry). Absorbs the host's own retries.",
+      extensionLabel: "Goal",
+      order: 3,
+      min: 1,
     },
   ]);
 }
