@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Added
+
+- `/create-goal <task>` prompt template that expands a plain task into a strict evidence-based completion contract (outcome, verification evidence, constraints, iteration policy, completion audit, blocked-stop) before calling `create_goal`.
+- Error recovery: an active goal now auto-pauses after a configurable number of consecutive provider errors at `agent_end` (`maxConsecutiveErrors`, default 3) instead of looping forever. Auto-continuation is suppressed on error turns and resumed on success or user input.
+- Stale-continuation guard: hidden goal continuation prompts are debounced per goal and cleared on turn start and goal transitions, preventing pile-ups and stale re-fires after a goal is replaced, cleared, or completed. Budget-limit prompts are now sent once per budget-limited episode.
+- Continuation and budget prompts are wrapped in a `<pi_goal_continuation goal_id="...">` marker and carry the goal id in their message details.
+
+### Changed
+
+- The continuation prompt now requires a full completion audit (requirement-to-evidence checklist) and reminds the agent that `update_goal` launches an independent verification agent.
+
 ## [0.2.1] - 2026-07-06
 
 ## [0.2.0] - 2026-07-06
