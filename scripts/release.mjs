@@ -22,6 +22,7 @@
 //   node scripts/release.mjs <version>            # cut the release
 //   node scripts/release.mjs <version> --dry-run  # preview without writing
 //   node scripts/release.mjs <version> --force    # skip the clean-tree check
+//   node scripts/release.mjs <version> --no-sign  # do not GPG/SSH sign
 //
 // Flags:
 //   --dry-run   Print every planned action without modifying files, committing,
@@ -29,6 +30,9 @@
 //   --force     Run even when the working tree is dirty. By default the script
 //               aborts on a dirty tree so it never stomps concurrent work from
 //               other sessions.
+//   --no-sign   Override tag.gpgSign / commit.gpgSign for this run only, so the
+//               release commit and tag are created unsigned. Use on a machine
+//               whose signing key or agent is unavailable.
 //
 // Versioning model: unified. Every package shares one version and ships
 // together under a single v<version> tag.
@@ -44,25 +48,36 @@ const SEMVER = /^\d+\.\d+\.\d+$/;
 const args = process.argv.slice(2);
 let dryRun = false;
 let force = false;
+let noSign = false;
 const positional = [];
 for (const a of args) {
   if (a === "--dry-run") dryRun = true;
   else if (a === "--force") force = true;
+  else if (a === "--no-sign") noSign = true;
   else positional.push(a);
 }
 
 const version = positional[0];
 if (!version || !SEMVER.test(version)) {
-  console.error("Usage: node scripts/release.mjs <X.Y.Z> [--dry-run] [--force]");
+  console.error(
+    "Usage: node scripts/release.mjs <X.Y.Z> [--dry-run] [--force] [--no-sign]",
+  );
   process.exit(2);
 }
+
+const gitConfig = noSign
+  ? ["-c", "tag.gpgSign=false", "-c", "commit.gpgSign=false"]
+  : [];
 
 const TAG = `v${version}`;
 const today = new Date().toISOString().slice(0, 10);
 const VERSION_HEADER = `## [${version}] - ${today}`;
 
 function git(...params) {
-  return execFileSync("git", params, { cwd: ROOT, encoding: "utf8" }).trim();
+  return execFileSync("git", [...gitConfig, ...params], {
+    cwd: ROOT,
+    encoding: "utf8",
+  }).trim();
 }
 
 function fail(msg) {
@@ -163,8 +178,14 @@ ${VERSION_HEADER}
 - Initial release.
 `;
 
+const flags = [
+  dryRun && "DRY RUN",
+  noSign && "NO SIGN",
+  force && "FORCE",
+].filter(Boolean);
+const tagSuffix = flags.length ? ` (${flags.join(", ")})` : "";
 console.log(
-  `Releasing ${toBump.length - 1} packages${dryRun ? " (DRY RUN)" : ""}: ${version} (${today})`,
+  `Releasing ${toBump.length - 1} packages${tagSuffix}: ${version} (${today})`,
 );
 
 for (const { dir, name, prev } of toBump) {

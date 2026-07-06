@@ -11,12 +11,13 @@ does **not** push to git.
 node scripts/release.mjs <version>            # cut the release
 node scripts/release.mjs <version> --dry-run  # preview without writing
 node scripts/release.mjs <version> --force    # skip the clean-tree check
+node scripts/release.mjs <version> --no-sign  # do not GPG/SSH sign
 ```
 
 Sample output:
 
 ```
-Releasing 29 packages: 0.2.0 (2026-07-06)
+Releasing 29 packages (DRY RUN, NO SIGN): 0.2.0 (2026-07-06)
   bump  @htwang-contrib/common   0.1.0 -> 0.2.0
   bump  @htwang-contrib/memory   0.1.0 -> 0.2.0
   ...
@@ -33,6 +34,8 @@ Not pushed. When ready:
   git push origin master
   git push origin v0.2.0
 ```
+
+The parenthesized flags echo what is active: `DRY RUN`, `NO SIGN`, `FORCE`.
 
 ## What it does
 
@@ -65,6 +68,10 @@ git push origin v0.2.0
 - `--force` — run even when the working tree is dirty. By default the script
   aborts on a dirty tree so it never accidentally bundles or stomps concurrent
   work from other sessions.
+- `--no-sign` — override `tag.gpgSign` / `commit.gpgSign` for this run only,
+  creating the release commit and tag unsigned. Use on a machine whose signing
+  key or SSH agent is unavailable. The override is scoped to this invocation
+  via `git -c ...`; it does not touch your global or repo git config.
 
 ## Versioning model
 
