@@ -68,10 +68,10 @@ const TOOL = {
 } as const;
 
 describe("describeRawLimit", () => {
-  test("TIME_LIMIT unit=5 number=1 -> tool_calls / weekly", () => {
+  test("TIME_LIMIT unit=5 number=1 -> tool_calls / monthly", () => {
     expect(describeRawLimit({ type: "TIME_LIMIT", unit: 5, number: 1 })).toEqual({
       kind: "tool_calls",
-      period: "weekly",
+      period: "monthly",
     });
   });
 
@@ -118,7 +118,7 @@ describe("buildRawUsage", () => {
     expect(raw?.windows).toHaveLength(3);
     const [toolWin, fiveHour, weekly] = raw!.windows;
     expect(toolWin.kind).toBe("tool_calls");
-    expect(toolWin.period).toBe("weekly");
+    expect(toolWin.period).toBe("monthly");
     expect(toolWin.usedPercentage).toBe(6);
     expect(toolWin.nextResetTime).toBe(1782804496992);
     expect(fiveHour.kind).toBe("tokens");

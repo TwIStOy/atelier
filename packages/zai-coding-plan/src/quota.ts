@@ -26,9 +26,10 @@ const MONITOR_ENDPOINTS = {
   toolUsage: "https://api.z.ai/api/monitor/usage/tool-usage",
 } as const;
 
-const RAW_WINDOW_MAP: Record<string, CodingPlanUsageWindow> = {
-  "3_5": "5_hours",
-  "6_1": "weekly",
+const PERIOD_TO_WINDOW: Record<CodingPlanLimitPeriod, CodingPlanUsageWindow> = {
+  "5h": "5_hours",
+  weekly: "weekly",
+  monthly: "monthly",
 };
 
 const WINDOW_ORDER: Record<CodingPlanUsageWindow, number> = {
@@ -38,20 +39,15 @@ const WINDOW_ORDER: Record<CodingPlanUsageWindow, number> = {
   monthly: 3,
 };
 
-const WINDOW_LABELS: Record<CodingPlanUsageWindow, string> = {
-  hour: "1h limit",
-  "5_hours": "5h limit",
+const PERIOD_LABELS: Record<CodingPlanLimitPeriod, string> = {
+  "5h": "5h limit",
   weekly: "Weekly limit",
   monthly: "Monthly limit",
 };
 
 function classifyWindow(raw: Record<string, unknown>): CodingPlanUsageWindow | null {
-  if (raw.type === "TIME_LIMIT") return "monthly";
-  if (raw.type === "TOKENS_LIMIT") {
-    const key = `${raw.unit}_${raw.number}`;
-    return RAW_WINDOW_MAP[key as string] ?? null;
-  }
-  return null;
+  const descriptor = describeRawLimit(raw);
+  return descriptor ? PERIOD_TO_WINDOW[descriptor.period] : null;
 }
 
 function parseUsageLimits(raw: Record<string, unknown>): CodingPlanUsageLimit[] {
@@ -87,11 +83,11 @@ interface RawLimitDescriptor {
 // Z.AI monitor encodes the quota window as (type, unit, number):
 //   TIME_LIMIT    -> tool-call window (carries usageDetails with model codes)
 //   TOKENS_LIMIT  -> token window
-// unit/number pin down the rolling period. Values below are taken from the
-// live api.z.ai responses (verified reset times: ~5h for 3_5, ~7d for the
-// rest on a Max plan).
-const RAW_LIMIT_DESCRIPTOR: Record<string, RawLimitDescriptor> = {
-  TIME_LIMIT_5_1: { kind: "tool_calls", period: "weekly" },
+// The (type, unit, number) -> period mapping is fixed by the Z.AI API. This
+// table is the single source of truth shared by describeRawLimit and
+// classifyWindow so the two views never diverge.
+const RAW_LIMIT_TABLE: Record<string, RawLimitDescriptor> = {
+  TIME_LIMIT_5_1: { kind: "tool_calls", period: "monthly" },
   TOKENS_LIMIT_3_5: { kind: "tokens", period: "5h" },
   TOKENS_LIMIT_6_1: { kind: "tokens", period: "weekly" },
 };
@@ -103,7 +99,7 @@ export function describeRawLimit(raw: Record<string, unknown>): RawLimitDescript
   const number = raw.number;
   if (typeof unit !== "number" || typeof number !== "number") return null;
   const key = `${type}_${unit}_${number}`;
-  const exact = RAW_LIMIT_DESCRIPTOR[key];
+  const exact = RAW_LIMIT_TABLE[key];
   if (exact) return exact;
   if (type === "TIME_LIMIT") return { kind: "tool_calls", period: "monthly" };
   return null;
@@ -254,66 +250,86 @@ function formatResetDateTime(resetTime?: number): string {
   return `${MM}-${DD} ${hh}:${mm}`;
 }
 
+function formatWindowBar(window: CodingPlanUsageWindowRaw, barWidth: number): string {
+  const label = PERIOD_LABELS[window.period];
+  const remaining = Math.max(0, Math.round(100 - window.usedPercentage));
+  const bar = formatProgressBar(window.usedPercentage, barWidth);
+  const reset = formatResetDateTime(window.nextResetTime);
+  const resetSuffix = reset ? ` (resets ${reset})` : "";
+  const line = `${`${label}:`.padEnd(30)}${bar} ${remaining}% left${resetSuffix}`;
+  return line.slice(0, terminalWidth());
+}
+
 function formatUsageOutput(
-  usage: CodingPlanUsage | null,
+  rawUsage: CodingPlanRawUsage | null,
   model: Record<string, unknown> | null,
   tool: Record<string, unknown> | null,
 ): string {
   const parts: string[] = [];
 
-  const level = usage?.level ? ` (${usage.level.charAt(0).toUpperCase()}${usage.level.slice(1)})` : "";
+  const level = rawUsage?.level ? ` (${rawUsage.level.charAt(0).toUpperCase()}${rawUsage.level.slice(1)})` : "";
   parts.push(`Z.AI Coding Plan Usage${level}`, "");
 
-  if (usage && usage.limits.length > 0) {
-    const barWidth = 20;
-    const tw = terminalWidth();
-    for (const limit of usage.limits) {
-      const label = WINDOW_LABELS[limit.window];
-      const pct = limit.percentage;
-      const remaining = Math.max(0, Math.round(100 - pct));
-      const bar = formatProgressBar(pct, barWidth);
-      const reset = formatResetDateTime(limit.nextResetTime);
-      const resetSuffix = reset ? ` (resets ${reset})` : "";
-      const line = `${`${label}:`.padEnd(30)}${bar} ${remaining}% left${resetSuffix}`;
-      parts.push(line.slice(0, tw));
-    }
-    parts.push("");
-  }
+  const windows = rawUsage?.windows ?? [];
+  const periodRank = (p: CodingPlanLimitPeriod) => WINDOW_ORDER[PERIOD_TO_WINDOW[p]];
+  const tokenWindows = windows
+    .filter((w) => w.kind === "tokens")
+    .sort((a, b) => periodRank(a.period) - periodRank(b.period));
+  const toolCallWindows = windows
+    .filter((w) => w.kind === "tool_calls")
+    .sort((a, b) => periodRank(a.period) - periodRank(b.period));
+  const barWidth = 20;
 
-  if (model?.totalUsage) {
-    const u = model.totalUsage as Record<string, unknown>;
-    const widths = fitColWidths(2, 22, 14);
-    const t = makeTable(["Metric", "Value"], widths);
-    if (typeof u.totalTokensUsage === "number") {
-      t.push(["Total Tokens", formatNumber(u.totalTokensUsage)]);
+  if (tokenWindows.length > 0 || model?.totalUsage) {
+    parts.push("Model Usage", "");
+    for (const window of tokenWindows) {
+      parts.push(formatWindowBar(window, barWidth));
     }
-    if (typeof u.totalModelCallCount === "number") {
-      t.push(["Total Calls", formatNumber(u.totalModelCallCount)]);
-    }
-    if (Array.isArray(u.modelSummaryList)) {
-      for (const m of u.modelSummaryList as Array<Record<string, unknown>>) {
-        if (typeof m.modelName === "string" && typeof m.totalTokens === "number") {
-          t.push([`${m.modelName} Tokens`, formatNumber(m.totalTokens)]);
+    if (tokenWindows.length > 0) parts.push("");
+
+    if (model?.totalUsage) {
+      const u = model.totalUsage as Record<string, unknown>;
+      const widths = fitColWidths(2, 22, 14);
+      const t = makeTable(["Metric", "Value"], widths);
+      if (typeof u.totalTokensUsage === "number") {
+        t.push(["Total Tokens", formatNumber(u.totalTokensUsage)]);
+      }
+      if (typeof u.totalModelCallCount === "number") {
+        t.push(["Total Calls", formatNumber(u.totalModelCallCount)]);
+      }
+      if (Array.isArray(u.modelSummaryList)) {
+        for (const m of u.modelSummaryList as Array<Record<string, unknown>>) {
+          if (typeof m.modelName === "string" && typeof m.totalTokens === "number") {
+            t.push([`${m.modelName} Tokens`, formatNumber(m.totalTokens)]);
+          }
         }
       }
+      parts.push(t.toString(), "");
     }
-    parts.push("Model Usage", "", t.toString(), "");
   }
 
-  if (tool?.totalUsage) {
-    const u = tool.totalUsage as Record<string, unknown>;
-    const widths = fitColWidths(2, 20, 14);
-    const t = makeTable(["Tool", "Count"], widths);
-    if (typeof u.totalNetworkSearchCount === "number") {
-      t.push(["Network Searches", formatNumber(u.totalNetworkSearchCount)]);
+  if (toolCallWindows.length > 0 || tool?.totalUsage) {
+    parts.push("Tool Usage", "");
+    for (const window of toolCallWindows) {
+      parts.push(formatWindowBar(window, barWidth));
     }
-    if (typeof u.totalWebReadMcpCount === "number") {
-      t.push(["Web Reads", formatNumber(u.totalWebReadMcpCount)]);
+    if (toolCallWindows.length > 0) parts.push("");
+
+    if (tool?.totalUsage) {
+      const u = tool.totalUsage as Record<string, unknown>;
+      const widths = fitColWidths(2, 20, 14);
+      const t = makeTable(["Tool", "Count"], widths);
+      if (typeof u.totalNetworkSearchCount === "number") {
+        t.push(["Network Searches", formatNumber(u.totalNetworkSearchCount)]);
+      }
+      if (typeof u.totalWebReadMcpCount === "number") {
+        t.push(["Web Reads", formatNumber(u.totalWebReadMcpCount)]);
+      }
+      if (typeof u.totalZreadMcpCount === "number") {
+        t.push(["ZRead Calls", formatNumber(u.totalZreadMcpCount)]);
+      }
+      parts.push(t.toString(), "");
     }
-    if (typeof u.totalZreadMcpCount === "number") {
-      t.push(["ZRead Calls", formatNumber(u.totalZreadMcpCount)]);
-    }
-    parts.push("Tool Usage", "", t.toString(), "");
   }
 
   return parts.join("\n");
@@ -356,5 +372,5 @@ export async function queryUsage(pi: ExtensionAPI, apiKey: string): Promise<stri
     });
   }
 
-  return formatUsageOutput(usage, model, tool);
+  return formatUsageOutput(rawUsage, model, tool);
 }
