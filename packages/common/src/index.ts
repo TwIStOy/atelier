@@ -30,13 +30,19 @@ export {
   updateConfig,
   writeConfig,
 } from "./config/index.ts";
+export {
+  chainEditorFactory,
+  getEditorFactoryParent,
+} from "./editor-chain.ts";
 export type {
   AskUserPromptOption,
   AskUserPromptPayload,
   AskUserPromptQuestion,
+  EditorHintPayload,
 } from "./events.ts";
 export {
   ASK_USER_PROMPT_EVENT,
+  EDITOR_HINT_EVENT,
   MODAL_ACTIVE_EVENT,
   ZAI_CODING_PLAN_EVENTS,
 } from "./events.ts";
