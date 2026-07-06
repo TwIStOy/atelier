@@ -5,14 +5,14 @@
   "main": "src/index.ts",
   "types": "src/index.ts",
   "dependencies": {
-    "@htwang-contrib/common": "*"
+    "@htwang-contrib/common": "*",
+    "@sinclair/typebox": "^0.34.0"
   },
   "devDependencies": {
     "@earendil-works/pi-agent-core": "^0.80.3",
     "@earendil-works/pi-ai": "*",
     "@earendil-works/pi-coding-agent": "*",
     "@earendil-works/pi-tui": "*",
-    "@sinclair/typebox": "^0.34.0",
     "@types/node": "^26.1.0",
     "typescript": "^6.0.0",
     "vitest": "^4.1.9"
