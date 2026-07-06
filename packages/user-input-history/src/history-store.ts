@@ -1,7 +1,10 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
+import { createLogger } from "@htwang-contrib/common";
 import lockfile from "proper-lockfile";
+
+const logger = createLogger("user-input-history");
 
 export const MAX_ENTRIES = 1000;
 
@@ -163,6 +166,6 @@ export function persistHistoryMergedWithDisk(memory: string[]): void {
     })
     .catch((err: unknown) => {
       const message = err instanceof Error ? err.message : String(err);
-      console.error(`[user-input-history] persist failed: ${message}`);
+      logger.error(`persist failed: ${message}`);
     });
 }

@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Added
+
+- Emits an `extension loaded` log line when the extension initializes.
+
+### Changed
+
+- History persist failures now use the shared logger (`createLogger("user-input-history")`, `logger.error`) instead of `console.error`, which corrupts the pi TUI.
+
 ## [0.2.1] - 2026-07-06
 
 ## [0.2.0] - 2026-07-06
