@@ -12,8 +12,11 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { extname, join, sep as pathSep, resolve as resolvePath } from "node:path";
+import { createLogger } from "@htwang-contrib/common";
 import type { FetchResponse } from "../providers/types.ts";
 import type { UrlInterceptor } from "./types.ts";
+
+const logger = createLogger("web-tools");
 
 export const GITHUB_TOKEN_ENV_VAR = "GITHUB_TOKEN";
 
@@ -296,7 +299,7 @@ export class GitHubInterceptor implements UrlInterceptor {
   private showGhHint(): void {
     if (!this.ghHintShown) {
       this.ghHintShown = true;
-      console.error("[web-tools] Install `gh` CLI for better GitHub repo access including private repos.");
+      logger.warn("Install `gh` CLI for better GitHub repo access including private repos.");
     }
   }
 

@@ -54,10 +54,13 @@ export { YouComProvider } from "./providers/youcom.ts";
 export { ZaiProvider } from "./providers/zai.ts";
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { createLogger } from "@htwang-contrib/common";
 import { registerWebToolsConfigItems } from "./config.ts";
 import { registerWebFetchTool } from "./fetch/index.ts";
 import { buildInterceptors } from "./interceptors/index.ts";
 import { registerWebSearchTool } from "./search/index.ts";
+
+const logger = createLogger("web-tools");
 
 export {
   GitHubInterceptor,
@@ -69,6 +72,7 @@ export { ProviderError, throwIfApiError } from "./providers/errors.ts";
 export { registerWebFetchTool, registerWebSearchTool };
 
 export default function (pi: ExtensionAPI): void {
+  logger.info("extension loaded");
   registerWebToolsConfigItems();
   buildInterceptors();
   registerWebSearchTool(pi);
