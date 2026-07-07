@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-07-07
+
 ### Added
 
 - Depends on `@htwang-contrib/common`. Emits an `extension loaded` log line when the extension initializes.

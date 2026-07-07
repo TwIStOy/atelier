@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-07-07
+
 ### Added
 
 - Unified file-based logger for extensions: `createLogger(name)` returns a namespaced `Logger` (`debug`/`info`/`warn`/`error`) that appends to `$XDG_STATE_HOME/pi/extensions.log` (default `~/.local/state/pi/extensions.log`). Never touches stdout/stderr (those corrupt the pi TUI); all IO failures are swallowed so diagnostics never break an agent turn. Supports an optional `minLevel` filter. Lines are formatted `ISO [name] LEVEL message`; concurrent appenders below `PIPE_BUF` stay atomic without a lock.

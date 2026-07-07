@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-07-07
+
 ### Added
 
 - `/create-goal <task>` prompt template that expands a plain task into a strict evidence-based completion contract (outcome, verification evidence, constraints, iteration policy, completion audit, blocked-stop) before calling `create_goal`.

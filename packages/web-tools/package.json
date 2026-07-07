@@ -1,6 +1,6 @@
 {
   "name": "@htwang-contrib/web-tools",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Pi extension. Web search and fetch tools with pluggable providers (Brave, Tavily, Serper, Exa, You.com, Jina, Firecrawl, Perplexity).",
   "keywords": [
     "pi-package",
