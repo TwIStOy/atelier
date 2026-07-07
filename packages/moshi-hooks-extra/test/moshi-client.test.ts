@@ -1,6 +1,12 @@
 import { EventEmitter } from "node:events";
 import { describe, expect, test } from "vitest";
-import { buildEnvelope, isMoshiHookAvailable, resolveTransportMode, sendEnvelope } from "../src/moshi-client.ts";
+import {
+  buildEnvelope,
+  isMoshiHookAvailable,
+  resolveTransportMode,
+  sendEnvelope,
+  snapshotCtx,
+} from "../src/moshi-client.ts";
 import { getCachedTerminalContext, resetTerminalContextCache } from "../src/terminal-context.ts";
 
 const HERDR_PAYLOAD = JSON.stringify({
@@ -61,6 +67,47 @@ describe("resolveTransportMode", () => {
       throw new Error("ENOENT");
     }) as never;
     expect(resolveTransportMode({ statSync, spawnSync: spawnSync as never })).toBe("none");
+  });
+});
+
+describe("snapshotCtx", () => {
+  test("resolves guarded getters into a plain snapshot", () => {
+    const ctx = {
+      cwd: "/x",
+      model: { id: "m" },
+      get sessionManager() {
+        return { getSessionFile: () => "file" };
+      },
+    };
+    const snap = snapshotCtx(ctx);
+    expect(snap.cwd).toBe("/x");
+    expect(snap.model).toEqual({ id: "m" });
+    expect((snap.sessionManager as { getSessionFile: () => string }).getSessionFile()).toBe("file");
+  });
+
+  test("returns undefineds when getters throw (stale ctx)", () => {
+    const staleCtx = {
+      get cwd() {
+        throw new Error("stale");
+      },
+      get model() {
+        throw new Error("stale");
+      },
+      get sessionManager() {
+        throw new Error("stale");
+      },
+    };
+    const snap = snapshotCtx(staleCtx);
+    expect(snap.cwd).toBeUndefined();
+    expect(snap.model).toBeUndefined();
+    expect(snap.sessionManager).toBeUndefined();
+  });
+
+  test("handles non-object ctx", () => {
+    const snap = snapshotCtx(null);
+    expect(snap.cwd).toBeUndefined();
+    expect(snap.model).toBeUndefined();
+    expect(snap.sessionManager).toBeUndefined();
   });
 });
 
@@ -297,5 +344,32 @@ describe("sendEnvelope dispatch", () => {
       { preferSocket: true, statSync, spawnSync: spawnSync as never },
     );
     expect(result.outcome.transport).toBe("none");
+  });
+
+  test("does not reject when ctx getters throw (stale ctx) on spawn path", async () => {
+    const statSync = (() => {
+      throw new Error("ENOENT");
+    }) as never;
+    const spawnSync = (() => ({ status: 0 })) as never;
+    const spawn = ((_binary: string, _args: string[]) => ({
+      stdin: { end: () => {} },
+      unref: () => {},
+    })) as never;
+    const staleCtx = {
+      get cwd() {
+        throw new Error("stale");
+      },
+      get model() {
+        throw new Error("stale");
+      },
+      get sessionManager() {
+        throw new Error("stale");
+      },
+    };
+    const result = await sendEnvelope(
+      { eventName: "x", event: {}, ctx: staleCtx },
+      { preferSocket: true, statSync, spawnSync: spawnSync as never, spawn },
+    );
+    expect(result.outcome.transport).toBe("spawn");
   });
 });

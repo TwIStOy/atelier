@@ -103,6 +103,32 @@ function firstNonEmpty(...values: unknown[]): string {
   return "";
 }
 
+export interface CtxSnapshot {
+  cwd: unknown;
+  model: unknown;
+  sessionManager: unknown;
+}
+
+function readCtxField<T>(read: () => T): T | undefined {
+  try {
+    return read();
+  } catch {
+    return undefined;
+  }
+}
+
+export function snapshotCtx(ctx: unknown): CtxSnapshot {
+  if (!ctx || typeof ctx !== "object") {
+    return { cwd: undefined, model: undefined, sessionManager: undefined };
+  }
+  const obj = ctx as { cwd?: unknown; model?: unknown; sessionManager?: unknown };
+  return {
+    cwd: readCtxField(() => obj.cwd),
+    model: readCtxField(() => obj.model),
+    sessionManager: readCtxField(() => obj.sessionManager),
+  };
+}
+
 export function buildEnvelope(
   args: BuildEnvelopeArgs,
   options: Pick<DispatchOptions, "env"> = {},
@@ -131,8 +157,10 @@ export async function sendEnvelope(args: BuildEnvelopeArgs, options: DispatchOpt
   const preferSocket = options.preferSocket ?? true;
   const env = options.env ?? process.env;
 
+  const snapshotArgs: BuildEnvelopeArgs = { ...args, ctx: snapshotCtx(args.ctx) };
+
   if (preferSocket && socketFileExists({ statSync: options.statSync, env })) {
-    const envelope = buildEnvelope(args, { env });
+    const envelope = buildEnvelope(snapshotArgs, { env });
     const status = await sendEnvelopeToSocket(envelope, {
       wait: options.wait,
       waitTimeoutMs: options.waitTimeoutMs,
@@ -140,13 +168,13 @@ export async function sendEnvelope(args: BuildEnvelopeArgs, options: DispatchOpt
       setTimeout: options.setTimeout,
     });
     if (status.status === "connect-failed") {
-      const outcome = dispatchViaSpawn(args, options);
+      const outcome = dispatchViaSpawn(snapshotArgs, options);
       return { outcome, fallbackFromSocket: true };
     }
     return { outcome: { transport: "socket", status } };
   }
 
-  return { outcome: dispatchViaSpawn(args, options) };
+  return { outcome: dispatchViaSpawn(snapshotArgs, options) };
 }
 
 function dispatchViaSpawn(args: BuildEnvelopeArgs, options: DispatchOptions): DispatchOutcome {

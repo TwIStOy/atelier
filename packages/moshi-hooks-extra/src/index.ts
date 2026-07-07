@@ -17,7 +17,7 @@ import {
   summarizeAskUserQuestion,
 } from "./activity.ts";
 import { previewContent } from "./envelope.ts";
-import { isMoshiHookAvailable, resolveTransportMode, sendEnvelope } from "./moshi-client.ts";
+import { isMoshiHookAvailable, resolveTransportMode, sendEnvelope, snapshotCtx } from "./moshi-client.ts";
 import { type MoshiCredentials, readMoshiSecretsFromFile } from "./moshi-secrets.ts";
 import {
   lastAssistantMessage,
@@ -147,13 +147,14 @@ export default function moshiHooksExtra(pi: ExtensionAPI): void {
     const config = loadSummaryConfig();
     const lastAssistant = lastAssistantMessage(event.messages);
     const contextPercent = contextPercentFromCtx(ctx);
+    const ctxSnapshot = snapshotCtx(ctx);
 
     const sendEnd = (title: string, message: string): void => {
       void sendEnvelope(
         {
           eventName: "agent_end",
           event,
-          ctx,
+          ctx: ctxSnapshot,
           extra: {
             category: "task_complete",
             title,
