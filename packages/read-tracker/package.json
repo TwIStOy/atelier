@@ -12,6 +12,6 @@
     "@types/node": "^26.1.0",
     "cli-table3": "^0.6.5",
     "typescript": "^6.0.0",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.10"
   }
 }

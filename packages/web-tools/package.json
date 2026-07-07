@@ -42,6 +42,6 @@
     "@earendil-works/pi-tui": "latest",
     "@types/node": "^26.1.0",
     "typescript": "^6.0.0",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.10"
   }
 }
