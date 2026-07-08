@@ -73,7 +73,7 @@ pi -e packages/todo/index.ts
 
 1. create,不传 subject(或传空字符串)——测 subject 必填
 2. update id=999,subject="x"——测 id 不存在
-3. update id=1——不传任何可变字段,测 "至少一个可变字段"
+3. update id=1——不传任何可变字段(只传 id),现在会默认标记为 in_progress(测 bare-update 默认行为)
 4. 先 update id=1 status="completed",再 update id=1 status="in_progress"——测非法转换(completed 不能回 in_progress)
 5. update id=1 addBlockedBy=[1]——测自指
 6. update id=2 addBlockedBy=[1],再 update id=1 addBlockedBy=[2]——测成环
@@ -90,7 +90,7 @@ pi -e packages/todo/index.ts
 |---|---|---|
 | 1 | create 无 subject | `Error: subject required for create` |
 | 2 | update #999 | `Error: #999 not found` |
-| 3 | update 无可变字段 | `Error: update requires at least one mutable field` |
+| 3 | update 仅 id(无可变字段) | `Updated #1 (pending → in_progress)`(默认行为,不再是错误) |
 | 4 | completed→in_progress | `Error: illegal transition completed → in_progress` |
 | 5 | addBlockedBy=[1] on #1 | `Error: cannot block #1 on itself` |
 | 6 | 互依赖成环 | 第二步返回 `Error: addBlockedBy would create a cycle in the blockedBy graph` |
@@ -98,7 +98,7 @@ pi -e packages/todo/index.ts
 | 8 | get #999 | `Error: #999 not found` |
 | 9 | delete #999 | `Error: #999 not found` |
 
-**关键对照点**:最后 `list` 必须仍显示基线任务 A、B(且 A 如果在第 4 步被改成了 completed,它应是 completed 态——错误调用不回滚已成功的状态,这是符合预期的)。如果基线任务数量变了或 nextId 错乱,说明 error 路径意外改了 state,是 bug。
+**关键对照点**:最后 `list` 必须仍显示基线任务 A、B(第 3 步的 bare-update 会把 A 改成 in_progress,第 4 步再改成 completed——这些都是成功调用,符合预期;错误调用不回滚已成功的状态)。如果基线任务数量变了或 nextId 错乱,说明 error 路径意外改了 state,是 bug。
 
 ---
 

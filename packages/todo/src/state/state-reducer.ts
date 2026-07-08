@@ -67,23 +67,24 @@ export function applyTaskMutation(state: TaskState, action: TaskAction, params: 
         params.metadata !== undefined ||
         (params.addBlockedBy && params.addBlockedBy.length > 0) ||
         (params.removeBlockedBy && params.removeBlockedBy.length > 0);
-      if (!hasMutation) return errorResult(state, "update requires at least one mutable field");
+
+      const effective: TaskMutationParams = hasMutation ? params : { ...params, status: "in_progress" };
 
       let newStatus = current.status;
-      if (params.status !== undefined) {
-        if (!isTransitionValid(current.status, params.status)) {
-          return errorResult(state, `illegal transition ${current.status} → ${params.status}`);
+      if (effective.status !== undefined) {
+        if (!isTransitionValid(current.status, effective.status)) {
+          return errorResult(state, `illegal transition ${current.status} → ${effective.status}`);
         }
-        newStatus = params.status;
+        newStatus = effective.status;
       }
 
       let newBlockedBy = current.blockedBy ? [...current.blockedBy] : [];
-      if (params.removeBlockedBy?.length) {
-        const toRemove = new Set(params.removeBlockedBy);
+      if (effective.removeBlockedBy?.length) {
+        const toRemove = new Set(effective.removeBlockedBy);
         newBlockedBy = newBlockedBy.filter((dep) => !toRemove.has(dep));
       }
-      if (params.addBlockedBy?.length) {
-        for (const dep of params.addBlockedBy) {
+      if (effective.addBlockedBy?.length) {
+        for (const dep of effective.addBlockedBy) {
           if (dep === current.id) return errorResult(state, `cannot block #${current.id} on itself`);
           const depTask = state.tasks.find((t) => t.id === dep);
           if (!depTask) return errorResult(state, `addBlockedBy: #${dep} not found`);
@@ -96,9 +97,9 @@ export function applyTaskMutation(state: TaskState, action: TaskAction, params: 
       }
 
       let newMetadata = current.metadata;
-      if (params.metadata !== undefined) {
+      if (effective.metadata !== undefined) {
         const merged: Record<string, unknown> = { ...(current.metadata ?? {}) };
-        for (const [k, v] of Object.entries(params.metadata)) {
+        for (const [k, v] of Object.entries(effective.metadata)) {
           if (v === null) delete merged[k];
           else merged[k] = v;
         }
@@ -106,10 +107,10 @@ export function applyTaskMutation(state: TaskState, action: TaskAction, params: 
       }
 
       const updated: Task = { ...current, status: newStatus };
-      if (params.subject !== undefined) updated.subject = params.subject;
-      if (params.description !== undefined) updated.description = params.description;
-      if (params.activeForm !== undefined) updated.activeForm = params.activeForm;
-      if (params.owner !== undefined) updated.owner = params.owner;
+      if (effective.subject !== undefined) updated.subject = effective.subject;
+      if (effective.description !== undefined) updated.description = effective.description;
+      if (effective.activeForm !== undefined) updated.activeForm = effective.activeForm;
+      if (effective.owner !== undefined) updated.owner = effective.owner;
       if (newBlockedBy.length) updated.blockedBy = newBlockedBy;
       else delete updated.blockedBy;
       if (newMetadata === undefined) delete updated.metadata;

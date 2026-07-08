@@ -69,12 +69,90 @@ describe("applyTaskMutation — create", () => {
 });
 
 describe("applyTaskMutation — update", () => {
-  it("rejects id-only update", () => {
-    const state = stateWith(task({ id: 1, subject: "x" }));
-    const result = applyTaskMutation(state, "update", { id: 1 });
-    expect(result.op).toEqual({
-      kind: "error",
-      message: "update requires at least one mutable field",
+  describe("bare update (no mutable field) defaults to in_progress", () => {
+    it("marks a pending task in_progress", () => {
+      const state = stateWith(task({ id: 1, subject: "x" }));
+      const result = applyTaskMutation(state, "update", { id: 1 });
+      expect(result.op).toEqual({
+        kind: "update",
+        id: 1,
+        fromStatus: "pending",
+        toStatus: "in_progress",
+      });
+      expect(result.state.tasks[0].status).toBe("in_progress");
+    });
+
+    it("ignores list-only includeDeleted:false noise (session repro)", () => {
+      const state = stateWith(task({ id: 1, subject: "x" }));
+      const result = applyTaskMutation(state, "update", { id: 1, includeDeleted: false });
+      expect(result.op).toEqual({
+        kind: "update",
+        id: 1,
+        fromStatus: "pending",
+        toStatus: "in_progress",
+      });
+      expect(result.state.tasks[0].status).toBe("in_progress");
+    });
+
+    it("is idempotent when already in_progress", () => {
+      const state = stateWith(task({ id: 1, subject: "x", status: "in_progress" }));
+      const result = applyTaskMutation(state, "update", { id: 1 });
+      expect(result.op).toEqual({
+        kind: "update",
+        id: 1,
+        fromStatus: "in_progress",
+        toStatus: "in_progress",
+      });
+      expect(result.state.tasks[0].status).toBe("in_progress");
+    });
+
+    it("rejects illegal transition when completed", () => {
+      const state = stateWith(task({ id: 1, subject: "x", status: "completed" }));
+      const result = applyTaskMutation(state, "update", { id: 1 });
+      expect(result.op).toEqual({
+        kind: "error",
+        message: "illegal transition completed → in_progress",
+      });
+    });
+
+    it("rejects illegal transition when deleted", () => {
+      const state = stateWith(task({ id: 1, subject: "x", status: "deleted" }));
+      const result = applyTaskMutation(state, "update", { id: 1 });
+      expect(result.op).toEqual({
+        kind: "error",
+        message: "illegal transition deleted → in_progress",
+      });
+    });
+
+    it("still fails on missing id", () => {
+      const state = stateWith(task({ id: 1, subject: "x" }));
+      const result = applyTaskMutation(state, "update", {});
+      expect(result.op).toEqual({
+        kind: "error",
+        message: "id required for update",
+      });
+    });
+
+    it("still fails on unknown id", () => {
+      const state = stateWith(task({ id: 1, subject: "x" }));
+      const result = applyTaskMutation(state, "update", { id: 999 });
+      expect(result.op).toEqual({
+        kind: "error",
+        message: "#999 not found",
+      });
+    });
+
+    it("does not force in_progress when only a non-status field is mutated", () => {
+      const state = stateWith(task({ id: 1, subject: "x", status: "pending" }));
+      const result = applyTaskMutation(state, "update", { id: 1, subject: "renamed" });
+      expect(result.op).toEqual({
+        kind: "update",
+        id: 1,
+        fromStatus: "pending",
+        toStatus: "pending",
+      });
+      expect(result.state.tasks[0].subject).toBe("renamed");
+      expect(result.state.tasks[0].status).toBe("pending");
     });
   });
 

@@ -265,8 +265,8 @@ export function loadConfig(): TodoConfig {
 
 ### `state/state-reducer.ts` — Pure Reducer
 
-**Does:** `applyTaskMutation(state, action, params): { state, op }`. Validates inline (subject required for create, id + a mutable field for update, legal transitions, blockedBy existence, cycle detection). On error returns `{ state: currentState, op: { kind: "error", message } }` — state is **not** mutated.
-**Changes:** none — pure port (imports from `../tool/types.ts`).
+**Does:** `applyTaskMutation(state, action, params): { state, op }`. Validates inline (subject required for create, id for update, legal transitions, blockedBy existence, cycle detection). On error returns `{ state: currentState, op: { kind: "error", message } }` — state is **not** mutated. A bare `update {id}` with no mutable field defaults `status` to `in_progress` (explicit fields always win).
+**Changes:** default empty `update` mutation to `in_progress` instead of erroring (see `packages/todo/CHANGELOG.md`).
 
 ### `state/invariants.ts` — State Machine Rules
 

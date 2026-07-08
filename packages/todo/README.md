@@ -21,6 +21,8 @@
 | `clear`  | 清空所有任务(重置 state)                                   | 无                                                                                                                |
 
 > 任务状态四态:`pending` / `in_progress` / `completed` / `deleted`。状态转换受 `VALID_TRANSITIONS` 表约束,`addBlockedBy` 会做依赖成环检测。
+>
+> **bare update 默认**:`update` 只传 `id` 而不带任何可变字段时,默认把任务标记为 `in_progress`(显式字段始终优先)。
 
 ## `/todos` 命令
 

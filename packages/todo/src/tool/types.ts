@@ -97,7 +97,8 @@ export const TodoParamsSchema = Type.Object({
   ),
   includeDeleted: Type.Optional(
     Type.Boolean({
-      description: "If true, list action returns deleted (tombstoned) tasks as well. Default: false.",
+      description:
+        "List-only flag: if true, the list action returns deleted (tombstoned) tasks as well. Default: false. Do not pass on create/update/get/delete.",
     }),
   ),
 });
