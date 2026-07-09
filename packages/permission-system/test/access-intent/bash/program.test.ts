@@ -1,24 +1,21 @@
-// Ported from @gotgenes/pi-permission-system test/access-intent/bash/program.test.ts
-//
-// The `commands()` describe block is ACTIVE and runs against the Step 1
-// implementation (command enumeration over tree-sitter-bash). These tests
-// pin the core bash bypass catalog (chains, substitutions, subshells, env
-// prefixes, opaque wrappers).
-//
-// The `pathRuleCandidates` and `externalPaths` describe blocks are `.skip`-ed
-// because they depend on the cd-aware PathNormalizer + AccessPath +
-// BashPathResolver layer, which is Step 2 work. They are preserved verbatim
-// (adapted to relative imports) so Step 2 implements against the exact same
-// acceptance bar. Unskip them once the path layer lands.
+// Ported from @gotgenes/pi-permission-system test/access-intent/bash/program.test.ts.
+// All three describe blocks (commands, pathRuleCandidates, externalPaths) run
+// against the cd-aware PathNormalizer + AccessPath + BashPathResolver layer.
 
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+// Mock node:fs so realpathSync (used by canonicalizePath) is controllable.
+// Default is identity so all lexical tests are unaffected.
+const realpathSync = vi.hoisted(() => vi.fn<(path: string) => string>((p) => p));
+vi.mock("node:fs", () => ({
+  realpathSync,
+  default: { realpathSync },
+}));
 
 import { BashProgram } from "../../../src/access-intent/bash/program.ts";
+import { PathNormalizer } from "../../../src/path-normalizer.ts";
 
-// Step 2 will provide a real PathNormalizer; for now the path tests pass
-// `undefined` through parse() (which ignores it). The `winNormalizer` literal
-// below is only referenced inside the skipped blocks.
-const normalizer = undefined as unknown;
+const normalizer = new PathNormalizer(process.platform, "/projects/my-app");
 
 describe("BashProgram — commands()", () => {
   it("returns a single-element list for a lone command", async () => {
@@ -182,24 +179,300 @@ describe("BashProgram — commands()", () => {
   });
 });
 
-// ── Step 2: path-analysis surface ──────────────────────────────────────────
-// These blocks are preserved verbatim (adapted to relative imports) but
-// skipped. They depend on PathNormalizer + AccessPath + cd-aware
-// BashPathResolver, which land in Step 2. Unskip when the path layer ships.
-//
-// NOTE: the skipped blocks are intentionally NOT transcribed here in full to
-// avoid bit-rot; they live in docs/permission-system/RESEARCH.md §3 and the
-// upstream test file. Transcribe + unskip during Step 2 implementation so the
-// acceptance bar matches upstream exactly.
+// ── path-analysis surface (cd-aware PathNormalizer + AccessPath + resolver) ──
 
-describe.skip("BashProgram — pathRuleCandidates (Step 2)", () => {
-  it("placeholder — see RESEARCH.md §3 and upstream program.test.ts", () => {
-    expect(true).toBe(true);
+describe("BashProgram — pathRuleCandidates", () => {
+  const cwd = "/projects/my-app";
+  const normalizer = new PathNormalizer(process.platform, cwd);
+
+  beforeEach(() => {
+    realpathSync.mockReset();
+    realpathSync.mockImplementation((p: string) => p);
+  });
+
+  it("adds absolute and relative policy values for relative tokens", async () => {
+    const program = await BashProgram.parse("cat src/foo.ts", normalizer);
+    const candidates = program.pathRuleCandidates();
+    expect(candidates.map(({ token }) => token)).toEqual(["src/foo.ts"]);
+    expect(candidates[0]?.path.matchValues()).toEqual(["/projects/my-app/src/foo.ts", "src/foo.ts"]);
+    expect(candidates[0]?.path.value()).toBe("/projects/my-app/src/foo.ts");
+  });
+
+  it("resolves tokens after literal cd against the effective directory", async () => {
+    const program = await BashProgram.parse("cd nested && cat src/file.txt", normalizer);
+    const fileCandidate = program.pathRuleCandidates().find((candidate) => candidate.token === "src/file.txt");
+    expect(fileCandidate?.path.matchValues()).toEqual([
+      "/projects/my-app/nested/src/file.txt",
+      "nested/src/file.txt",
+      "src/file.txt",
+    ]);
+    expect(fileCandidate?.path.value()).toBe("/projects/my-app/nested/src/file.txt");
+  });
+
+  it("adds the canonical alias for a symlinked token (#486)", async () => {
+    realpathSync.mockImplementation((p: string) => (p === "/projects/my-app/src/foo.ts" ? "/vault/foo.ts" : p));
+    const program = await BashProgram.parse("cat src/foo.ts", normalizer);
+    const candidate = program.pathRuleCandidates()[0]!;
+    expect(candidate.path.matchValues()).toEqual(["/projects/my-app/src/foo.ts", "src/foo.ts", "/vault/foo.ts"]);
+  });
+
+  it("does not absolute-allow relative tokens after unknown cd", async () => {
+    const program = await BashProgram.parse('cd "$DIR" && cat src/foo.ts', normalizer);
+    const fileCandidate = program.pathRuleCandidates().find((candidate) => candidate.token === "src/foo.ts");
+    expect(fileCandidate?.path.matchValues()).toEqual(["src/foo.ts"]);
+    expect(fileCandidate?.path.value()).toBe("src/foo.ts");
+  });
+
+  it("keeps an unknown-cd token literal-only even when it would resolve a symlink (#393)", async () => {
+    realpathSync.mockImplementation(() => "/somewhere/else");
+    const program = await BashProgram.parse('cd "$DIR" && cat src/foo.ts', normalizer);
+    const fileCandidate = program.pathRuleCandidates().find((candidate) => candidate.token === "src/foo.ts");
+    expect(fileCandidate?.path.matchValues()).toEqual(["src/foo.ts"]);
+    expect(fileCandidate?.path.boundaryValue()).toBe("");
+  });
+
+  describe("rule-driven bare-token promotion (#509)", () => {
+    it("promotes a bare token when the matcher says it is promotable", async () => {
+      const isPromotable = (token: string): boolean => token === "id_rsa";
+      const program = await BashProgram.parse("cat id_rsa", normalizer, isPromotable);
+      const candidates = program.pathRuleCandidates();
+      expect(candidates.map(({ token }) => token)).toEqual(["id_rsa"]);
+      expect(candidates[0]?.path.matchValues()).toEqual(["/projects/my-app/id_rsa", "id_rsa"]);
+    });
+
+    it("does not promote a bare token the matcher rejects", async () => {
+      const isPromotable = (token: string): boolean => token === "id_rsa";
+      const program = await BashProgram.parse("git status", normalizer, isPromotable);
+      expect(program.pathRuleCandidates()).toHaveLength(0);
+    });
+
+    it("does not promote any bare token with the default no-op matcher", async () => {
+      const program = await BashProgram.parse("cat id_rsa", normalizer);
+      expect(program.pathRuleCandidates()).toHaveLength(0);
+    });
+
+    it("keeps a promoted token literal-only after an unknown cd (#393)", async () => {
+      const isPromotable = (token: string): boolean => token === "id_rsa";
+      const program = await BashProgram.parse('cd "$DIR" && cat id_rsa', normalizer, isPromotable);
+      const candidate = program.pathRuleCandidates().find((c) => c.token === "id_rsa");
+      expect(candidate?.path.matchValues()).toEqual(["id_rsa"]);
+    });
+
+    it("does not double-promote a token the shape gate already accepts", async () => {
+      const isPromotable = (): boolean => true;
+      const program = await BashProgram.parse("cat ./id_rsa", normalizer, isPromotable);
+      expect(program.pathRuleCandidates()).toHaveLength(1);
+    });
   });
 });
 
-describe.skip("BashProgram — externalPaths (Step 2)", () => {
-  it("placeholder — see RESEARCH.md §3 and upstream program.test.ts", () => {
-    expect(true).toBe(true);
+describe("BashProgram — externalPaths", () => {
+  const cwd = "/projects/my-app";
+  const normalizer = new PathNormalizer(process.platform, cwd);
+
+  beforeEach(() => {
+    realpathSync.mockReset();
+    realpathSync.mockImplementation((p: string) => p);
   });
+
+  it("returns absolute paths resolving outside cwd", async () => {
+    const program = await BashProgram.parse("cat /etc/hosts", normalizer);
+    expect(program.externalPaths().map((p) => p.value())).toContain("/etc/hosts");
+  });
+
+  it("excludes paths within cwd", async () => {
+    const program = await BashProgram.parse("cat src/index.ts", normalizer);
+    expect(program.externalPaths()).toHaveLength(0);
+  });
+
+  describe("win32 projection", () => {
+    const winNormalizer = new PathNormalizer("win32", "C:\\Projects\\App");
+
+    it("keeps a non-mount POSIX absolute literal (Git Bash semantics)", async () => {
+      const program = await BashProgram.parse("cat /etc/hosts", winNormalizer);
+      expect(program.externalPaths().map((p) => p.value())).toEqual(["/etc/hosts"]);
+    });
+
+    it("keeps a non-mount POSIX absolute as a literal rule candidate", async () => {
+      const program = await BashProgram.parse("cat /tmp/foo", winNormalizer);
+      const candidate = program.pathRuleCandidates()[0]!;
+      expect(candidate.path.matchValues()).toEqual(["/tmp/foo", "\\tmp\\foo"]);
+    });
+
+    it("folds a drive-mount cd so a following traversal resolves under it", async () => {
+      const program = await BashProgram.parse("cd /c/Other && cat ../x", winNormalizer);
+      expect(program.externalPaths().map((p) => p.value())).toEqual(["c:\\other", "c:\\x"]);
+    });
+
+    it("degrades a non-mount POSIX absolute cd to a conservative unknown base", async () => {
+      const program = await BashProgram.parse("cd /tmp && cat ../x", winNormalizer);
+      expect(program.externalPaths().map((p) => p.value())).toEqual(["/tmp", "c:\\projects\\x"]);
+    });
+
+    it("flags a ..-traversal escaping cwd under win32 rules", async () => {
+      const program = await BashProgram.parse("cat ../sibling/x", winNormalizer);
+      expect(program.externalPaths().map((p) => p.value())).toEqual(["c:\\projects\\sibling\\x"]);
+    });
+
+    it("folds a current-shell cd so an in-cwd ..-traversal is not flagged", async () => {
+      const program = await BashProgram.parse("cd sub && cat ../x", winNormalizer);
+      expect(program.externalPaths()).toHaveLength(0);
+    });
+
+    it("recognizes a backslash-relative token as a path rule candidate (#520)", async () => {
+      const program = await BashProgram.parse("cat dir\\file", winNormalizer);
+      const candidate = program.pathRuleCandidates()[0]!;
+      expect(candidate.token).toBe("dir\\file");
+    });
+
+    it("resolves a backslash-relative token to the same win32 aliases its forward-slash equivalent matches (#520)", async () => {
+      const backslashProgram = await BashProgram.parse("cat dir\\file", winNormalizer);
+      const forwardSlashProgram = await BashProgram.parse("cat dir/file", winNormalizer);
+      const backslashAliases = backslashProgram.pathRuleCandidates()[0]!.path.matchValues();
+      expect(backslashAliases).toEqual(["c:\\projects\\app\\dir\\file", "dir\\file"]);
+      const forwardSlashAliases = forwardSlashProgram.pathRuleCandidates()[0]!.path.matchValues();
+      for (const alias of backslashAliases) {
+        expect(forwardSlashAliases).toContain(alias);
+      }
+    });
+  });
+
+  describe("posix backslash-relative tokens stay bare (#520)", () => {
+    it("does not treat a backslash-relative token as a path rule candidate on posix", async () => {
+      const program = await BashProgram.parse("cat dir\\file", normalizer);
+      expect(program.pathRuleCandidates()).toHaveLength(0);
+    });
+  });
+
+  describe("effective working directory projection", () => {
+    it("folds a sequence of current-shell cd commands", async () => {
+      const program = await BashProgram.parse("cd a && cd b && cat ../c", normalizer);
+      expect(program.externalPaths()).toHaveLength(0);
+    });
+
+    it("catches an escape masked by a later cd that the single-base model missed", async () => {
+      const program = await BashProgram.parse("cd nested/deep && cd .. && cat ../../etc/passwd", normalizer);
+      expect(program.externalPaths().map((p) => p.value())).toContain("/projects/etc/passwd");
+    });
+
+    it("folds a cd that is not the first command", async () => {
+      const program = await BashProgram.parse("mkdir d && cd a && cat ../b", normalizer);
+      expect(program.externalPaths()).toHaveLength(0);
+    });
+
+    it("does not fold a backgrounded cd", async () => {
+      const program = await BashProgram.parse("cd a & cat ../b", normalizer);
+      expect(program.externalPaths().map((p) => p.value())).toContain("/projects/b");
+    });
+
+    it("does not fold a cd inside a pipeline", async () => {
+      const program = await BashProgram.parse("cd nested | cat ../b", normalizer);
+      expect(program.externalPaths().map((p) => p.value())).toContain("/projects/b");
+    });
+
+    it("folds a cd inside a subshell for paths within that subshell", async () => {
+      const program = await BashProgram.parse("( cd sub && cat ../x )", normalizer);
+      expect(program.externalPaths()).toHaveLength(0);
+    });
+
+    it("does not leak a subshell cd to following commands", async () => {
+      const program = await BashProgram.parse("( cd sub ) && cat ../y", normalizer);
+      expect(program.externalPaths().map((p) => p.value())).toContain("/projects/y");
+    });
+
+    it("persists a cd inside a brace group to later commands in the group", async () => {
+      const program = await BashProgram.parse("{ cd sub; cat ../x; }", normalizer);
+      expect(program.externalPaths()).toHaveLength(0);
+    });
+
+    it("persists a brace-group cd to following sibling commands", async () => {
+      const program = await BashProgram.parse("{ cd sub; } && cat ../x", normalizer);
+      expect(program.externalPaths()).toHaveLength(0);
+    });
+
+    it("conservatively flags a relative path inside a command substitution", async () => {
+      const program = await BashProgram.parse("echo $(cd q && cat ../r)", normalizer);
+      expect(program.externalPaths().map((p) => p.value())).toContain("/projects/r");
+    });
+
+    it("flags relative paths conservatively after a non-literal cd", async () => {
+      const program = await BashProgram.parse('cd "$DIR" && cat ../x', normalizer);
+      expect(program.externalPaths().map((p) => p.value())).toContain("/projects/x");
+    });
+
+    it("flags even a within-cwd relative path after a non-literal cd", async () => {
+      const program = await BashProgram.parse('cd "$DIR" && cat src/../within.txt', normalizer);
+      expect(program.externalPaths().map((p) => p.value())).toContain("/projects/my-app/within.txt");
+    });
+
+    it("still resolves an absolute path normally after a non-literal cd", async () => {
+      const program = await BashProgram.parse('cd "$DIR" && cat /projects/my-app/x.txt', normalizer);
+      expect(program.externalPaths()).toHaveLength(0);
+    });
+
+    it("treats `cd -` as an unknown effective directory", async () => {
+      const program = await BashProgram.parse("cd - && cat ../x", normalizer);
+      expect(program.externalPaths().map((p) => p.value())).toContain("/projects/x");
+    });
+
+    it("recovers a known base when a later cd is absolute", async () => {
+      const program = await BashProgram.parse('cd "$DIR" && cd /projects/my-app/src && cat ../x', normalizer);
+      expect(program.externalPaths()).toHaveLength(0);
+    });
+
+    it("folds a leading current-shell cd across a redirect-then-pipe", async () => {
+      const program = await BashProgram.parse("cd a && pnpm x 2>&1 | tail ; cat ../b", normalizer);
+      expect(program.externalPaths()).toHaveLength(0);
+    });
+
+    it("persists the fold past a redirect-then-pipe to a later cd", async () => {
+      const program = await BashProgram.parse("cd a/b && pnpm x 2>&1 | tail ; cd .. && cd ..", normalizer);
+      expect(program.externalPaths()).toHaveLength(0);
+    });
+
+    it("does not fold the terminal piped command of the first stage", async () => {
+      const program = await BashProgram.parse("cd a && cd b 2>&1 | tail ; cat ../../x", normalizer);
+      expect(program.externalPaths().map((p) => p.value())).toContain("/projects/x");
+    });
+
+    it("resolves a downstream pipe stage against the folded base", async () => {
+      const program = await BashProgram.parse("cd a && pnpm x 2>&1 | cat ../foo", normalizer);
+      expect(program.externalPaths()).toHaveLength(0);
+    });
+  });
+
+  it("flags an absolute in-cwd path that resolves externally via a symlink, returning the typed form", async () => {
+    realpathSync.mockImplementation((p: string) => {
+      if (p === "/projects/my-app/link/hosts") return "/etc/hosts";
+      return p;
+    });
+    const program = await BashProgram.parse("cat /projects/my-app/link/hosts", normalizer);
+    const external = program.externalPaths().map((p) => p.value());
+    expect(external).toContain("/projects/my-app/link/hosts");
+    expect(external).not.toContain("/etc/hosts");
+  });
+
+  it("does not flag a token that resolves within a symlinked cwd", async () => {
+    const symlinkCwd = "/private/tmp";
+    realpathSync.mockImplementation((p: string) => {
+      if (p === "/tmp") return "/private/tmp";
+      if (p.startsWith("/tmp/")) return `/private/tmp${p.slice(4)}`;
+      return p;
+    });
+    const program = await BashProgram.parse(
+      "cat /tmp/workspace/file.ts",
+      new PathNormalizer(process.platform, symlinkCwd),
+    );
+    expect(program.externalPaths()).toHaveLength(0);
+  });
+});
+
+it("derives both slices from a single parse", async () => {
+  const cwd = "/projects/my-app";
+  const normalizer = new PathNormalizer(process.platform, cwd);
+  const program = await BashProgram.parse("cat .env /etc/hosts", normalizer);
+  expect(program.pathRuleCandidates().map(({ token }) => token)).toEqual([".env", "/etc/hosts"]);
+  const external = program.externalPaths().map((p) => p.value());
+  expect(external).toContain("/etc/hosts");
+  expect(external).not.toContain(".env");
 });
