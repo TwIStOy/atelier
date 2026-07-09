@@ -85,16 +85,31 @@ test under "Build order" below.
 > `describeBashExternalDirectoryGate`), which are Step 3 work, not the path
 > layer itself. Step 2's acceptance bar is the unskipped `program.test.ts`.
 
-### Step 3 — The three gates + runner
+### Step 3 — Gate state functions (DONE — trimmed to v1 scope)
 
-- [ ] `src/handlers/gates/tool.ts` + test (per-tool wildcard on toolName)
-- [ ] Wire `bash-command.ts` into the gate pipeline
-- [ ] `src/handlers/gates/bash-path.ts` + test (path surface over bash tokens + redirects)
-- [ ] Port + pass `bash-path.test.ts` (moved from Step 2 — tests `describeBashPathGate`)
-- [ ] `src/handlers/gates/path.ts` + test (path surface over read/write/edit/find/grep/ls)
-- [ ] `src/handlers/gates/external-directory.ts` + `bash-external-directory.ts` + test (CWD boundary)
-- [ ] Port + pass `bash-external-directory.test.ts` (moved from Step 2 — tests `describeBashExternalDirectoryGate`)
-- [ ] `src/handlers/gates/runner.ts` + test (compose: path → external_directory → tool → bash)
+v1 scope: each gate returns `{ state: 'allow'|'ask'|'deny'; reason? } | null`
+(null = gate does not apply). Nothing else — no prompt copy, no session-approval
+suggestions, no audit-log context, no decision events. Those are Step 5/6
+concerns and will be designed then, not inherited from upstream's
+`GateDescriptor`.
+
+- [x] `types.ts`: `GateResult` ({ state, action, trigger, reason? }), `ToolAction` (read|write|execute|delete — delete reserved), `GateTrigger` discriminated union (path|command|none), `ToolCallContext` (slim), `AccessIntent`
+- [x] `path-surfaces.ts`: `actionFromTool(toolName)` helper
+- [x] Gate helpers: `value-guards`, `tool-input-path`, `candidate-check`, `external-directory-policy` (pure logic, kept)
+- [x] `handlers/gates/path.ts` — describePathGate → { state, reason? } | null
+- [x] `handlers/gates/bash-path.ts` — describeBashPathGate (most-restrictive across tokens)
+- [x] `handlers/gates/external-directory.ts` — describeExternalDirectoryGate (infra-read bypass stubbed → Step 5)
+- [x] `handlers/gates/bash-external-directory.ts` — describeBashExternalDirectoryGate
+- [x] `handlers/gates/tool.ts` — describeToolGate (wraps a pre-computed check)
+- [x] Port + pass `bash-path.test.ts` + `bash-external-directory.test.ts` (assert state + action + trigger shape)
+- [x] Deleted (out of v1 scope): `descriptor.ts`, `session-approval.ts`, `session-rules.ts`, `denial-messages.ts`, `external-directory-messages.ts`
+- [x] Fixed pre-existing `findLast` tsc error in wildcard-matcher (ES2022 compat); `npx tsc --build` clean
+
+> **Deferred to Step 5:** the pipeline (ordered gate assembly + single
+> `BashProgram.parse`) and the `tool_call` handler that interprets the
+> `{state, reason?}` results (ask → `ui.confirm`, deny → block with reason).
+> Upstream's `GateRunner` mechanical check→log→emit→approve cycle is NOT
+> being ported — Step 5 designs its own composition from the slim gate results.
 
 ### Step 4 — Config
 
@@ -106,6 +121,7 @@ test under "Build order" below.
 
 ### Step 5 — Extension wiring
 
+- [ ] `src/handlers/gates/tool-call-gate-pipeline.ts` (moved from Step 3 — ordered gate assembly + single `BashProgram.parse`; composes the 5 gates' `{state,reason?}|null` results: null→skip, deny→block, ask→confirm, else proceed)
 - [ ] `src/index.ts` factory: session_start (load config), tool_call (run pipeline, ui.confirm on ask, block on deny), session_shutdown
 - [ ] Headless fail-closed: `ctx.hasUI === false` → ask resolves to deny
 - [ ] Register in root `package.json` `pi.extensions`
