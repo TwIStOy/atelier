@@ -97,6 +97,12 @@ export class PathNormalizer {
     return isPathOutsideWorkingDirectory(canonicalPath, this.canonicalCwd, this.platform);
   }
 
+  /** Canonical (symlink-resolved) outside-cwd test against the baked cwd. */
+  isOutsideWorkingDirectory(pathValue: string): boolean {
+    const canonicalPath = canonicalNormalizePathForComparison(pathValue, this.cwd, this.platform);
+    return isPathOutsideWorkingDirectory(canonicalPath, this.canonicalCwd, this.platform);
+  }
+
   comparableValue(pathValue: string): string {
     return normalizePathForComparison(pathValue, this.cwd, this.platform);
   }
