@@ -26,8 +26,12 @@ export function textFromMessage(value: unknown): string {
   const message = value as Record<string, unknown>;
   return firstString(
     textFromContent(message.content),
-    textFromContent((message.message as Record<string, unknown> | undefined)?.content),
-    textFromContent((message.entry as Record<string, unknown> | undefined)?.content),
+    textFromContent(
+      (message.message as Record<string, unknown> | undefined)?.content,
+    ),
+    textFromContent(
+      (message.entry as Record<string, unknown> | undefined)?.content,
+    ),
   );
 }
 
@@ -70,7 +74,13 @@ export function sessionID(event: MoshiHookEvent, ctx: MoshiHookCtx): string {
       sessionFile = "";
     }
   }
-  return firstString(event.session_id as string, event.sessionId as string, sessionFile, ctx.cwd as string, "pi");
+  return firstString(
+    event.session_id as string,
+    event.sessionId as string,
+    sessionFile,
+    ctx.cwd as string,
+    "pi",
+  );
 }
 
 export function buildMoshiPayload(
@@ -79,7 +89,8 @@ export function buildMoshiPayload(
   ctx: unknown,
   extra: Record<string, unknown> = {},
 ): MoshiPayload {
-  const eventObj = event && typeof event === "object" ? (event as MoshiHookEvent) : {};
+  const eventObj =
+    event && typeof event === "object" ? (event as MoshiHookEvent) : {};
   const ctxObj = ctx && typeof ctx === "object" ? (ctx as MoshiHookCtx) : {};
   return {
     hook_event_name: hookEventName,

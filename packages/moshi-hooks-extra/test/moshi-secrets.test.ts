@@ -1,5 +1,8 @@
 import { describe, expect, test } from "vitest";
-import { readMoshiSecretsFromFile } from "../src/moshi-secrets.ts";
+import {
+  readMoshiSecrets,
+  readMoshiSecretsFromFile,
+} from "../src/moshi-secrets.ts";
 
 function makeFs(files: Record<string, string>) {
   return {
@@ -81,5 +84,75 @@ describe("readMoshiSecretsFromFile", () => {
       }),
     });
     expect(creds?.hostId).toBe("host_abc");
+  });
+});
+
+describe("readMoshiSecrets dispatcher", () => {
+  const keychainRead = (
+    service: string,
+    account: string,
+  ): string | undefined => {
+    if (service !== "app.getmoshi.hook") return undefined;
+    const map: Record<string, string> = {
+      "host-id": "host_kc",
+      "host-secret": "secret_kc",
+      "host-display-name": "kc-host",
+    };
+    const v = map[account];
+    return v === undefined ? undefined : `${v}\n`;
+  };
+
+  test("on darwin prefers the keychain over the file", () => {
+    const stateDir = "/home/u/.local/state";
+    const creds = readMoshiSecrets({
+      platform: "darwin",
+      stateDir,
+      homeDir: "/home/u",
+      readKeychain: keychainRead,
+      ...makeFs({ [`${stateDir}/moshi/secrets.json`]: SECRETS }),
+    });
+    expect(creds?.hostId).toBe("host_kc");
+    expect(creds?.hostSecret).toBe("secret_kc");
+    expect(creds?.hostName).toBe("kc-host");
+  });
+
+  test("on darwin falls back to the file when the keychain is empty", () => {
+    const stateDir = "/home/u/.local/state";
+    const creds = readMoshiSecrets({
+      platform: "darwin",
+      stateDir,
+      homeDir: "/home/u",
+      readKeychain: () => undefined,
+      ...makeFs({ [`${stateDir}/moshi/secrets.json`]: SECRETS }),
+    });
+    expect(creds?.hostId).toBe("host_abc");
+  });
+
+  test("on linux never consults the keychain", () => {
+    const stateDir = "/home/u/.local/state";
+    let keychainTouched = false;
+    const creds = readMoshiSecrets({
+      platform: "linux",
+      stateDir,
+      homeDir: "/home/u",
+      readKeychain: () => {
+        keychainTouched = true;
+        return "unused";
+      },
+      ...makeFs({ [`${stateDir}/moshi/secrets.json`]: SECRETS }),
+    });
+    expect(keychainTouched).toBe(false);
+    expect(creds?.hostId).toBe("host_abc");
+  });
+
+  test("returns null on darwin when neither keychain nor file has credentials", () => {
+    const creds = readMoshiSecrets({
+      platform: "darwin",
+      stateDir: "/nope",
+      homeDir: "/nope",
+      readKeychain: () => undefined,
+      ...makeFs({}),
+    });
+    expect(creds).toBeNull();
   });
 });

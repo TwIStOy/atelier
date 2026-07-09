@@ -7,7 +7,10 @@ import {
   sendEnvelope,
   snapshotCtx,
 } from "../src/moshi-client.ts";
-import { getCachedTerminalContext, resetTerminalContextCache } from "../src/terminal-context.ts";
+import {
+  getCachedTerminalContext,
+  resetTerminalContextCache,
+} from "../src/terminal-context.ts";
 
 const HERDR_PAYLOAD = JSON.stringify({
   kind: "herdr",
@@ -48,7 +51,9 @@ describe("resolveTransportMode", () => {
   test("socket when socket file present", () => {
     const statSync = (() => ({ isSocket: () => true })) as never;
     const spawnSync = (() => ({ status: 0 })) as never;
-    expect(resolveTransportMode({ statSync, spawnSync: spawnSync as never })).toBe("socket");
+    expect(
+      resolveTransportMode({ statSync, spawnSync: spawnSync as never }),
+    ).toBe("socket");
   });
 
   test("spawn when socket absent but binary ok", () => {
@@ -56,7 +61,9 @@ describe("resolveTransportMode", () => {
       throw new Error("ENOENT");
     }) as never;
     const spawnSync = (() => ({ status: 0 })) as never;
-    expect(resolveTransportMode({ statSync, spawnSync: spawnSync as never })).toBe("spawn");
+    expect(
+      resolveTransportMode({ statSync, spawnSync: spawnSync as never }),
+    ).toBe("spawn");
   });
 
   test("none when socket absent and binary missing", () => {
@@ -66,7 +73,9 @@ describe("resolveTransportMode", () => {
     const spawnSync = (() => {
       throw new Error("ENOENT");
     }) as never;
-    expect(resolveTransportMode({ statSync, spawnSync: spawnSync as never })).toBe("none");
+    expect(
+      resolveTransportMode({ statSync, spawnSync: spawnSync as never }),
+    ).toBe("none");
   });
 });
 
@@ -82,7 +91,11 @@ describe("snapshotCtx", () => {
     const snap = snapshotCtx(ctx);
     expect(snap.cwd).toBe("/x");
     expect(snap.model).toEqual({ id: "m" });
-    expect((snap.sessionManager as { getSessionFile: () => string }).getSessionFile()).toBe("file");
+    expect(
+      (
+        snap.sessionManager as { getSessionFile: () => string }
+      ).getSessionFile(),
+    ).toBe("file");
   });
 
   test("returns undefineds when getters throw (stale ctx)", () => {
@@ -264,7 +277,12 @@ describe("sendEnvelope dispatch", () => {
       sock.removeAllListeners();
     };
     const createConnection = () => {
-      queueMicrotask(() => sock.emit("error", Object.assign(new Error("no"), { code: "ECONNREFUSED" })));
+      queueMicrotask(() =>
+        sock.emit(
+          "error",
+          Object.assign(new Error("no"), { code: "ECONNREFUSED" }),
+        ),
+      );
       return sock;
     };
     const statSync = (() => ({ isSocket: () => true })) as never;

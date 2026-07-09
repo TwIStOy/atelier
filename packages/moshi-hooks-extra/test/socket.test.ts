@@ -1,6 +1,11 @@
 import { EventEmitter } from "node:events";
 import { describe, expect, test } from "vitest";
-import { type DaemonResponse, resolveSocketPath, sendEnvelopeToSocket, socketFileExists } from "../src/socket.ts";
+import {
+  type DaemonResponse,
+  resolveSocketPath,
+  sendEnvelopeToSocket,
+  socketFileExists,
+} from "../src/socket.ts";
 
 describe("resolveSocketPath", () => {
   test("honors MOSHI_SOCKET_PATH override above all", () => {
@@ -17,7 +22,9 @@ describe("resolveSocketPath", () => {
       platform: "darwin",
       homedir: "/Users/test",
     });
-    expect(path).toBe("/Users/test/Library/Application Support/Moshi/moshi-hook.sock");
+    expect(path).toBe(
+      "/Users/test/Library/Application Support/Moshi/moshi-hook.sock",
+    );
   });
 
   test("linux uses XDG_RUNTIME_DIR when present", () => {
@@ -42,14 +49,20 @@ describe("socketFileExists", () => {
     const statSync = () => {
       throw new Error("ENOENT");
     };
-    expect(socketFileExists({ statSync: statSync as never, env: {} })).toBe(false);
+    expect(socketFileExists({ statSync: statSync as never, env: {} })).toBe(
+      false,
+    );
   });
 
   test("returns true only for socket filetype", () => {
     const socket = { isSocket: () => true };
     const file = { isSocket: () => false };
-    expect(socketFileExists({ statSync: () => socket as never, env: {} })).toBe(true);
-    expect(socketFileExists({ statSync: () => file as never, env: {} })).toBe(false);
+    expect(socketFileExists({ statSync: () => socket as never, env: {} })).toBe(
+      true,
+    );
+    expect(socketFileExists({ statSync: () => file as never, env: {} })).toBe(
+      false,
+    );
   });
 });
 
@@ -109,7 +122,12 @@ describe("sendEnvelopeToSocket", () => {
   test("connect ENOENT maps to connect-failed so caller can fall back", async () => {
     const sock = makeFakeSocket();
     const createConnection = () => {
-      queueMicrotask(() => sock.emit("error", Object.assign(new Error("connect ENOENT"), { code: "ENOENT" })));
+      queueMicrotask(() =>
+        sock.emit(
+          "error",
+          Object.assign(new Error("connect ENOENT"), { code: "ENOENT" }),
+        ),
+      );
       return sock;
     };
     const status = await sendEnvelopeToSocket(
@@ -122,7 +140,12 @@ describe("sendEnvelopeToSocket", () => {
   test("ECONNREFUSED maps to connect-failed", async () => {
     const sock = makeFakeSocket();
     const createConnection = () => {
-      queueMicrotask(() => sock.emit("error", Object.assign(new Error("refused"), { code: "ECONNREFUSED" })));
+      queueMicrotask(() =>
+        sock.emit(
+          "error",
+          Object.assign(new Error("refused"), { code: "ECONNREFUSED" }),
+        ),
+      );
       return sock;
     };
     const status = await sendEnvelopeToSocket(

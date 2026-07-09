@@ -3,6 +3,7 @@ import type {
   CodingPlanUsage,
   CodingPlanUsageWindow,
   CodingPlanUsageWindowRaw,
+  Logger,
 } from "@htwang-contrib/common";
 import type { MoshiCredentials } from "./moshi-secrets.ts";
 
@@ -25,6 +26,8 @@ export interface MoshiUsagePushOptions {
   fetch?: typeof fetch;
   now?: () => Date;
   signal?: AbortSignal;
+  /** When provided, the push attempt and its outcome are written to this logger. */
+  logger?: Logger;
 }
 
 // Moshi's usage API (POST /hosts/:hostId/usage) validates `agent` against a
@@ -98,7 +101,9 @@ function finalizeSnapshot(
   credentials: MoshiCredentials,
   now: Date,
 ): MoshiUsageSnapshot {
-  const label = level ? `${ZAI_ACCOUNT_LABEL} (${capitalize(level)})` : ZAI_ACCOUNT_LABEL;
+  const label = level
+    ? `${ZAI_ACCOUNT_LABEL} (${capitalize(level)})`
+    : ZAI_ACCOUNT_LABEL;
 
   return {
     accountId: ZAI_ACCOUNT_ID,
@@ -122,7 +127,11 @@ export async function pushUsageSnapshot(
   options: MoshiUsagePushOptions = {},
 ): Promise<UsagePushResult> {
   const fetchFn = options.fetch ?? fetch;
+  const log = options.logger;
   const url = `${credentials.baseUrl}/hosts/${encodeURIComponent(credentials.hostId)}/usage`;
+  log?.info(
+    `sending usage snapshot host=${snapshot.hostName} account=${snapshot.accountId} windows=${snapshot.windows.length} agent=${snapshot.agent}`,
+  );
   try {
     const resp = await fetchFn(url, {
       method: "POST",
@@ -135,14 +144,28 @@ export async function pushUsageSnapshot(
       signal: options.signal,
     });
     const body = await resp.text();
+    const summary = `status=${resp.status} body=${truncateBody(body)}`;
+    if (resp.ok) {
+      log?.info(`usage push responded ${summary}`);
+    } else {
+      log?.warn(`usage push rejected ${summary}`);
+    }
     return { ok: resp.ok, status: resp.status, body };
   } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    log?.error(`usage push failed: ${message}`);
     return {
       ok: false,
       status: 0,
-      body: e instanceof Error ? e.message : String(e),
+      body: message,
     };
   }
+}
+
+function truncateBody(body: string): string {
+  const MAX = 500;
+  if (body.length <= MAX) return body;
+  return `${body.slice(0, MAX)}…(+${body.length - MAX} chars)`;
 }
 
 function clampPercent(value: number): number {
