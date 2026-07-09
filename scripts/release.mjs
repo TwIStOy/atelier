@@ -8,8 +8,9 @@
 //      packages/*/package.json to the target version.
 //   2. Updates changelogs: turns the current "## [Unreleased]" section into a
 //      dated "## [<version>] - <date>" section and opens a fresh empty
-//      "## [Unreleased]" above it. Creates a CHANGELOG.md for any package that
-//      does not have one yet.
+//      "## [Unreleased]" above it. Packages whose "## [Unreleased]" section is
+//      empty are left untouched, so no empty version section is ever added.
+//      Creates a CHANGELOG.md for any package that does not have one yet.
 //   3. Stages the changed files and creates a single release commit.
 //   4. Creates one annotated git tag v<version> on that commit.
 //
@@ -109,6 +110,7 @@ const rootPkg = readPkg(ROOT);
 const toBump = [{ dir: ROOT, name: rootPkg.name, prev: rootPkg.version }];
 const changelogModified = [];
 const changelogCreated = [];
+const changelogSkipped = [];
 
 for (const name of pkgNames) {
   const dir = join(ROOT, "packages", name);
@@ -124,14 +126,22 @@ for (const name of pkgNames) {
   if (content.includes(`## [${version}]`)) {
     fail(`${rel(cl)} already contains a [${version}] section.`);
   }
-  changelogModified.push(cl);
+  if (unreleasedHasContent(content)) {
+    changelogModified.push(cl);
+  } else {
+    changelogSkipped.push(cl);
+  }
 }
 
 const rootCl = join(ROOT, "CHANGELOG.md");
 if (existsSync(rootCl)) {
   const content = readFileSync(rootCl, "utf8");
-  if (!content.includes(`## [${version}]`)) {
+  if (content.includes(`## [${version}]`)) {
+    // already released; leave as-is
+  } else if (unreleasedHasContent(content)) {
     changelogModified.push(rootCl);
+  } else {
+    changelogSkipped.push(rootCl);
   }
 }
 
@@ -147,6 +157,16 @@ function bumpPackageJson(dir, ver) {
   json.version = ver;
   const trailing = raw.endsWith("\n") ? "\n" : "";
   return { file, prev, out: JSON.stringify(json, null, 2) + trailing };
+}
+
+function unreleasedHasContent(content) {
+  const header = "## [Unreleased]";
+  const idx = content.indexOf(header);
+  if (idx === -1) return false;
+  const after = content.slice(idx + header.length);
+  const next = after.indexOf("\n## ");
+  const body = next === -1 ? after : after.slice(0, next);
+  return body.trim() !== "";
 }
 
 function releaseChangelog(content) {
@@ -198,6 +218,9 @@ for (const cl of changelogModified) {
 }
 for (const cl of changelogCreated) {
   console.log(`  changelog (create)  ${rel(cl)}`);
+}
+for (const cl of changelogSkipped) {
+  console.log(`  changelog (skip)    ${rel(cl)}`);
 }
 
 if (dryRun) {
