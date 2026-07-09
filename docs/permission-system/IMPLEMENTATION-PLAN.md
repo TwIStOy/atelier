@@ -66,25 +66,34 @@ test under "Build order" below.
 - [x] `src/handlers/gates/bash-command.ts` + `test/.../bash-command.test.ts` (18) + `bash-command-metamorphic.test.ts` (5)
 - [x] `npm run check` clean · vitest 233 passed / 2 skipped
 
-### Step 2 — Path-analysis layer (unblock skipped tests)
+### Step 2 — Path-analysis layer (DONE — unblocked skipped tests)
 
-- [ ] `src/path-containment.ts` + test (isPathWithinDirectory / isPathOutsideWorkingDirectory)
-- [ ] `src/access-intent/path-normalization.ts` + test (canonical + comparison + policy-literal)
-- [ ] `src/access-intent/access-path.ts` + test (AccessPath: forPath/forLiteral/forDevice, matchValues/value/boundaryValue)
-- [ ] `src/path-normalizer.ts` (collaborator: forBashToken MSYS-aware, cdTarget, usesWindowsSeparators)
-- [ ] `src/access-intent/bash/bash-path-resolver.ts` (cd-folding: subshell/pipeline/brace-group scoping, unknown-cd conservatism)
-- [ ] Wire real resolution into `program.ts`; drop `unknown`-typed PathNormalizer export
-- [ ] Unskip `program.test.ts` `pathRuleCandidates` + `externalPaths` blocks (~40 cases pass)
-- [ ] Port + pass `bash-path.test.ts`
-- [ ] Port + pass `bash-external-directory.test.ts`
+- [x] `src/safe-system-paths.ts` (SAFE_SYSTEM_PATHS + isSafeSystemPath)
+- [x] `src/canonicalize-path.ts` (symlink-resolve best-effort)
+- [x] `src/path-containment.ts` (isPathWithinDirectory / isPathOutsideWorkingDirectory)
+- [x] `src/access-intent/path-normalization.ts` (canonical + comparison + policy-literal + getPathPolicyValues)
+- [x] `src/access-intent/access-path.ts` (AccessPath: forPath/forLiteral/forDevice, matchValues/value/boundaryValue/resolvedAlias)
+- [x] `src/path-normalizer.ts` (collaborator: forBashToken MSYS-aware, interpretBashCdTarget, resolveBase/joinBase, isAbsolute, usesWindowsSeparators, isBoundaryOutsideWorkingDirectory)
+- [x] `src/access-intent/bash/bash-path-resolver.ts` (cd-folding: subshell/pipeline/brace-group scoping, unknown-cd conservatism, redirect-then-pipe #454)
+- [x] Wire real resolution into `program.ts`; drop `unknown`-typed PathNormalizer export
+- [x] Unskip `program.test.ts` `pathRuleCandidates` + `externalPaths` blocks (~43 cases pass)
+- [x] Update `bash-command-metamorphic.test.ts` to construct a real PathNormalizer
+- [x] Port unit tests for the pure layers (`path-containment.test.ts`, `canonicalize-path.test.ts`, `path-normalization.test.ts`, `access-path.test.ts`) — locks each layer's contract independently
+
+> Porting `bash-path.test.ts` and `bash-external-directory.test.ts` moved to
+> Step 3 — they test the gate-descriptor functions (`describeBashPathGate`,
+> `describeBashExternalDirectoryGate`), which are Step 3 work, not the path
+> layer itself. Step 2's acceptance bar is the unskipped `program.test.ts`.
 
 ### Step 3 — The three gates + runner
 
 - [ ] `src/handlers/gates/tool.ts` + test (per-tool wildcard on toolName)
 - [ ] Wire `bash-command.ts` into the gate pipeline
 - [ ] `src/handlers/gates/bash-path.ts` + test (path surface over bash tokens + redirects)
+- [ ] Port + pass `bash-path.test.ts` (moved from Step 2 — tests `describeBashPathGate`)
 - [ ] `src/handlers/gates/path.ts` + test (path surface over read/write/edit/find/grep/ls)
 - [ ] `src/handlers/gates/external-directory.ts` + `bash-external-directory.ts` + test (CWD boundary)
+- [ ] Port + pass `bash-external-directory.test.ts` (moved from Step 2 — tests `describeBashExternalDirectoryGate`)
 - [ ] `src/handlers/gates/runner.ts` + test (compose: path → external_directory → tool → bash)
 
 ### Step 4 — Config
