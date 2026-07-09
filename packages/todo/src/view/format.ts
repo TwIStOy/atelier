@@ -1,16 +1,29 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import type { Task, TaskStatus } from "../tool/types.ts";
 
+export function statusGlyph(status: TaskStatus): string {
+  switch (status) {
+    case "pending":
+      return "\u{F0131}"; // nf-md-checkbox_blank_outline
+    case "in_progress":
+      return "\u{F0856}"; // nf-md-checkbox_intermediate
+    case "completed":
+      return "\u{F0132}"; // nf-md-checkbox_marked
+    case "deleted":
+      return "\u{F0157}"; // nf-md-close_box
+  }
+}
+
 export function overlayStatusGlyph(status: TaskStatus, theme: Theme): string {
   switch (status) {
     case "pending":
-      return theme.fg("dim", "○");
+      return theme.fg("dim", statusGlyph(status));
     case "in_progress":
-      return theme.fg("warning", "◐");
+      return theme.fg("warning", statusGlyph(status));
     case "completed":
-      return theme.fg("success", "✓");
+      return theme.fg("success", statusGlyph(status));
     case "deleted":
-      return theme.fg("error", "✗");
+      return theme.fg("error", statusGlyph(status));
   }
 }
 

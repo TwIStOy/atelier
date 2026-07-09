@@ -3,6 +3,7 @@ import { __resetState } from "../src/state/store.ts";
 import { registerTodoTools } from "../src/todo.ts";
 import { TodoOverlay } from "../src/todo-overlay.ts";
 import type { TaskAction } from "../src/tool/types.ts";
+import { statusGlyph } from "../src/view/format.ts";
 import { createMockPi, createMockUI, dispatchTodoAction, identityTheme } from "./helpers.ts";
 
 async function setup(actions: Array<{ action: TaskAction; [k: string]: unknown }>) {
@@ -85,19 +86,19 @@ describe("TodoOverlay — natural-order rendering (no overflow)", () => {
 });
 
 describe("TodoOverlay — per-task formatting", () => {
-  it("pending task uses '○' glyph", async () => {
+  it("pending task uses the checkbox_blank_outline glyph", async () => {
     const { widget } = await setup([{ action: "create", subject: "pending-task" }]);
-    expect(widget.render(200)[1]).toContain("○");
+    expect(widget.render(200)[1]).toContain(statusGlyph("pending"));
     expect(widget.render(200)[1]).toContain("pending-task");
   });
 
-  it("in_progress task uses '◐' glyph and appends (activeForm)", async () => {
+  it("in_progress task uses the checkbox_intermediate glyph and appends (activeForm)", async () => {
     const { widget } = await setup([
       { action: "create", subject: "do it", activeForm: "Doing it" },
       { action: "update", id: 1, status: "in_progress" },
     ]);
     const line = widget.render(200)[1];
-    expect(line).toContain("◐");
+    expect(line).toContain(statusGlyph("in_progress"));
     expect(line).toContain("do it");
     expect(line).toContain("(Doing it)");
   });
@@ -108,7 +109,7 @@ describe("TodoOverlay — per-task formatting", () => {
       { action: "update", id: 1, status: "completed" },
     ]);
     const firstRender = widget.render(200);
-    expect(firstRender[1]).toContain("✓");
+    expect(firstRender[1]).toContain(statusGlyph("completed"));
     expect(firstRender[1]).toContain("done");
     expect(widget.render(200)[1]).toContain("done");
     overlay.hideCompletedTasksFromPreviousTurn();

@@ -24,7 +24,7 @@ import {
   TODO_UPDATE,
   UpdateTodoSchema,
 } from "./tool/types.ts";
-import { formatCommandTaskLine } from "./view/format.ts";
+import { formatCommandTaskLine, statusGlyph } from "./view/format.ts";
 
 const SECTION_PENDING = "── Pending ──";
 const SECTION_IN_PROGRESS = "── In Progress ──";
@@ -152,15 +152,15 @@ export function registerTodosCommand(pi: ExtensionAPI): void {
       const lines: string[] = [header.join(" · ")];
       if (groups.pending.length > 0) {
         lines.push(SECTION_PENDING);
-        for (const task of groups.pending) lines.push(formatCommandTaskLine(task, "○"));
+        for (const task of groups.pending) lines.push(formatCommandTaskLine(task, statusGlyph("pending")));
       }
       if (groups.inProgress.length > 0) {
         lines.push(SECTION_IN_PROGRESS);
-        for (const task of groups.inProgress) lines.push(formatCommandTaskLine(task, "◐"));
+        for (const task of groups.inProgress) lines.push(formatCommandTaskLine(task, statusGlyph("in_progress")));
       }
       if (groups.completed.length > 0) {
         lines.push(SECTION_COMPLETED);
-        for (const task of groups.completed) lines.push(formatCommandTaskLine(task, "✓"));
+        for (const task of groups.completed) lines.push(formatCommandTaskLine(task, statusGlyph("completed")));
       }
 
       ctx.ui.notify(lines.join("\n"), "info");

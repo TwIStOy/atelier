@@ -2,6 +2,7 @@ import type { ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { __resetState } from "../src/state/store.ts";
 import { registerTodosCommand, registerTodoTools } from "../src/todo.ts";
+import { statusGlyph } from "../src/view/format.ts";
 import { createMockCtx, createMockPi, dispatchTodoAction } from "./helpers.ts";
 
 function setup() {
@@ -76,18 +77,18 @@ describe("/todos command — grouped output", () => {
     return text as string;
   }
 
-  it("renders 'Pending' group with ○ glyph and task id", async () => {
+  it("renders 'Pending' group with the checkbox_blank_outline glyph and task id", async () => {
     const { tools, cmd } = setup();
     await seed(tools, [{ action: "create", subject: "research" }]);
     const ctx = makeCtx();
     await cmd.handler("", ctx);
     const out = grabOutput(ctx);
     expect(out).toContain("── Pending ──");
-    expect(out).toContain("○ #1 research");
+    expect(out).toContain(`${statusGlyph("pending")} #1 research`);
     expect(out).toContain("1 pending");
   });
 
-  it("renders 'In Progress' group with ◐ glyph and activeForm suffix", async () => {
+  it("renders 'In Progress' group with the checkbox_intermediate glyph and activeForm suffix", async () => {
     const { tools, cmd } = setup();
     await seed(tools, [
       { action: "create", subject: "build", activeForm: "Building" },
@@ -97,11 +98,11 @@ describe("/todos command — grouped output", () => {
     await cmd.handler("", ctx);
     const out = grabOutput(ctx);
     expect(out).toContain("── In Progress ──");
-    expect(out).toContain("◐ #1 build (Building)");
+    expect(out).toContain(`${statusGlyph("in_progress")} #1 build (Building)`);
     expect(out).toContain("1 in_progress");
   });
 
-  it("renders 'Completed' group with ✓ glyph and 'N/M completed' header", async () => {
+  it("renders 'Completed' group with the checkbox_marked glyph and 'N/M completed' header", async () => {
     const { tools, cmd } = setup();
     await seed(tools, [
       { action: "create", subject: "ship" },
@@ -111,7 +112,7 @@ describe("/todos command — grouped output", () => {
     await cmd.handler("", ctx);
     const out = grabOutput(ctx);
     expect(out).toContain("── Completed ──");
-    expect(out).toContain("✓ #1 ship");
+    expect(out).toContain(`${statusGlyph("completed")} #1 ship`);
     expect(out).toContain("1/1 completed");
   });
 
