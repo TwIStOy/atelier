@@ -1,0 +1,86 @@
+import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
+import type { TUI } from "@earendil-works/pi-tui";
+import { visibleWidth } from "@earendil-works/pi-tui";
+import { afterEach, describe, expect, test, vi } from "vitest";
+
+let showGitBranch = true;
+let gitInstances = 0;
+
+vi.mock("../src/config.ts", () => ({
+  loadConfig: () => ({ showGitBranch }),
+}));
+
+vi.mock("../src/components/git.ts", () => {
+  return {
+    GitComponent: class {
+      constructor() {
+        gitInstances++;
+      }
+      bindRender() {}
+      dispose() {}
+      render(_width: number, _theme: Theme): string[] {
+        return ["main \u2713"];
+      }
+    },
+  };
+});
+
+const { makeFooter } = await import("../src/footer.ts");
+
+function stripAnsi(s: string): string {
+  return s.replace(/\x1b\[[0-9;]*m/g, "");
+}
+
+function fakeTheme(): Theme {
+  return {
+    fg: (_color: string, text: string) => text,
+  } as unknown as Theme;
+}
+
+function fakeCtx(): ExtensionContext {
+  return {
+    cwd: process.cwd(),
+    model: { provider: "other", id: "m" },
+    sessionManager: { getBranch: () => [] },
+  } as unknown as ExtensionContext;
+}
+
+function fakePi(): ExtensionAPI {
+  return {
+    events: { on: () => () => {} },
+  } as unknown as ExtensionAPI;
+}
+
+function fakeTui(): TUI {
+  return { requestRender: () => {} } as unknown as TUI;
+}
+
+afterEach(() => {
+  showGitBranch = true;
+  gitInstances = 0;
+});
+
+describe("makeFooter git branch toggle", () => {
+  test("creates the git component when enabled", () => {
+    showGitBranch = true;
+    const factory = makeFooter(fakeCtx(), fakePi());
+    const comp = factory(fakeTui(), fakeTheme());
+    expect(gitInstances).toBe(1);
+    const lines = comp.render(80, fakeTheme());
+    expect(stripAnsi(lines.join(" "))).toContain("\u2713");
+    comp.dispose?.();
+  });
+
+  test("does not create the git component when disabled", () => {
+    showGitBranch = false;
+    const factory = makeFooter(fakeCtx(), fakePi());
+    const comp = factory(fakeTui(), fakeTheme());
+    expect(gitInstances).toBe(0);
+    const lines = comp.render(80, fakeTheme());
+    for (const line of lines) {
+      expect(visibleWidth(line)).toBeLessThanOrEqual(80);
+      expect(stripAnsi(line)).not.toMatch(/[\u2713\u2717]/);
+    }
+    comp.dispose?.();
+  });
+});

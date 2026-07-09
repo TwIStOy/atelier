@@ -1,5 +1,6 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { EDITOR_HINT_EVENT, type EditorHintPayload } from "@htwang-contrib/common";
+import { registerStatuslineConfigItems } from "./config.ts";
 import { MyEditor } from "./editor.ts";
 import { makeFooter } from "./footer.ts";
 
@@ -7,6 +8,8 @@ export default function (pi: ExtensionAPI) {
   let activeCtx: ExtensionContext | undefined;
   let activeEditor: MyEditor | undefined;
   let unsubscribeHint: (() => void) | undefined;
+
+  registerStatuslineConfigItems();
 
   pi.on("session_start", async (_event, ctx) => {
     if (!ctx.hasUI) return;
