@@ -111,17 +111,30 @@ concerns and will be designed then, not inherited from upstream's
 > Upstream's `GateRunner` mechanical check→log→emit→approve cycle is NOT
 > being ported — Step 5 designs its own composition from the slim gate results.
 
-### Step 4 — Config
+### Step 4 — Config + resolver (DONE — trimmed to v1 scope)
 
-- [ ] `src/config-paths.ts` (getAgentDir global + project resolution)
-- [ ] `src/config-schema.ts` (zod single-source) + `scripts/generate-schema.ts` → `schemas/permissions.schema.json`
-- [ ] `src/config-loader.ts` + test (load + deep-merge global→project→defaults; dev-friendly defaults baked in)
-- [ ] `detectPermissiveBashFallback` + test (warn when `*: allow` leaves bash ungated)
-- [ ] Port + pass `config-loader.test.ts`, `config-schema.test.ts`
+v1 scope: load JSONC config files, validate via zod (single source), deep-merge
+global→project, apply dev-friendly defaults, and a `PermissionResolver` that
+compiles the merged config to a ruleset and answers the gates' `resolve(intent)`.
+Trimmed from upstream: no legacy paths, no yoloMode/modal-UI/preview-limits/
+infra-read-paths/frontmatter, no JSON-Schema generation script yet.
+
+- [x] `src/config-paths.ts` — getGlobalConfigPath(agentDir) + getProjectConfigPath(cwd)
+- [x] `src/config-schema.ts` — zod single source (permissionState/denyWithReason/patternValue/permissionMap/permission + unifiedConfig); FlatPermissionConfig/PatternValue/DenyWithReason types
+- [x] `src/rule.ts` — Rule/Ruleset, normalizeFlatConfig (config→rules), evaluate (last-match-wins, win32 path-surface folding), evaluateMostRestrictive
+- [x] `src/config-loader.ts` — stripJsonComments (JSONC), validateUnifiedConfig, mergeFlatPermissions, mergeUnifiedConfigs, DEFAULT_PERMISSION_CONFIG (dev-friendly), applyDefaults, detectPermissiveBashFallback, loadAndMergeConfigs, loadUnifiedConfig
+- [x] `src/permission-resolver.ts` — PermissionResolver implements ScopedPermissionResolver (resolve tool/access-path intents; matchedPattern undefined when only synthesized fallback fires)
+- [x] types.ts: FlatPermissionConfig/PatternValue/DenyWithReason re-exported from config-schema (single source)
+- [x] `test/config-loader.test.ts` (35 cases: stripJsonComments, validate, merge, defaults, detectPermissiveBashFallback)
+- [x] `test/permission-resolver.test.ts` (end-to-end config→decision for tool + path surfaces, project-overrides-global)
+
+> **Deferred:** JSON-Schema generation script (`scripts/generate-schema.ts` →
+> `schemas/permissions.schema.json` for editor autocomplete) — nice-to-have,
+> not blocking. Step 5 loads the merged permission map directly.
 
 ### Step 5 — Extension wiring
 
-- [ ] `src/handlers/gates/tool-call-gate-pipeline.ts` (moved from Step 3 — ordered gate assembly + single `BashProgram.parse`; composes the 5 gates' `{state,reason?}|null` results: null→skip, deny→block, ask→confirm, else proceed)
+- [ ] `src/handlers/gates/tool-call-gate-pipeline.ts` (moved from Step 3 — ordered gate assembly + single `BashProgram.parse`; composes the 5 gates' `{state,action,trigger,reason?}|null` results: null→skip, deny→block, ask→confirm, else proceed). Uses PermissionResolver from Step 4 + loadAndMergeConfigs(getAgentDir(), cwd).
 - [ ] `src/index.ts` factory: session_start (load config), tool_call (run pipeline, ui.confirm on ask, block on deny), session_shutdown
 - [ ] Headless fail-closed: `ctx.hasUI === false` → ask resolves to deny
 - [ ] Register in root `package.json` `pi.extensions`
