@@ -20,9 +20,7 @@ export function makeFooter(
   const git = showGit ? new GitComponent(ctx.cwd) : null;
   const codingPlan = new CodingPlanUsageComponent(ctx, pi);
 
-  const components: StatusLineComponent[] = [git, codingPlan, new TokensComponent(ctx)].filter(
-    (c): c is StatusLineComponent => c !== null,
-  );
+  const components: StatusLineComponent[] = [...(git ? [git] : []), codingPlan, new TokensComponent(ctx)];
 
   return (tui, theme) => {
     git?.bindRender(() => tui.requestRender());

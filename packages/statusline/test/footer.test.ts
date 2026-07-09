@@ -1,4 +1,9 @@
-import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
+import type {
+  ExtensionAPI,
+  ExtensionContext,
+  ReadonlyFooterDataProvider,
+  Theme,
+} from "@earendil-works/pi-coding-agent";
 import type { TUI } from "@earendil-works/pi-tui";
 import { visibleWidth } from "@earendil-works/pi-tui";
 import { afterEach, describe, expect, test, vi } from "vitest";
@@ -51,6 +56,15 @@ function fakePi(): ExtensionAPI {
   } as unknown as ExtensionAPI;
 }
 
+function fakeFooterData(): ReadonlyFooterDataProvider {
+  return {
+    getGitBranch: () => null,
+    getExtensionStatuses: () => new Map(),
+    getAvailableProviderCount: () => 0,
+    onBranchChange: () => () => {},
+  } as unknown as ReadonlyFooterDataProvider;
+}
+
 function fakeTui(): TUI {
   return { requestRender: () => {} } as unknown as TUI;
 }
@@ -64,9 +78,9 @@ describe("makeFooter git branch toggle", () => {
   test("creates the git component when enabled", () => {
     showGitBranch = true;
     const factory = makeFooter(fakeCtx(), fakePi());
-    const comp = factory(fakeTui(), fakeTheme());
+    const comp = factory(fakeTui(), fakeTheme(), fakeFooterData());
     expect(gitInstances).toBe(1);
-    const lines = comp.render(80, fakeTheme());
+    const lines = comp.render(80);
     expect(stripAnsi(lines.join(" "))).toContain("\u2713");
     comp.dispose?.();
   });
@@ -74,9 +88,9 @@ describe("makeFooter git branch toggle", () => {
   test("does not create the git component when disabled", () => {
     showGitBranch = false;
     const factory = makeFooter(fakeCtx(), fakePi());
-    const comp = factory(fakeTui(), fakeTheme());
+    const comp = factory(fakeTui(), fakeTheme(), fakeFooterData());
     expect(gitInstances).toBe(0);
-    const lines = comp.render(80, fakeTheme());
+    const lines = comp.render(80);
     for (const line of lines) {
       expect(visibleWidth(line)).toBeLessThanOrEqual(80);
       expect(stripAnsi(line)).not.toMatch(/[\u2713\u2717]/);
