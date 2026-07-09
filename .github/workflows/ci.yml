@@ -1,10 +1,22 @@
 name: CI
 
+# Skip directives in the commit message ([skip ci], [ci skip], [no ci],
+# [skip actions], [actions skip]) are honored natively by GitHub Actions.
 on:
   push:
     branches: [master]
+    paths-ignore: &non-code-paths
+      - 'docs/**'
+      - 'scripts/**'
+      - 'skills/**'
+      - 'themes/**'
+      - 'prompts/**'
+      - '.agents/**'
+      - '**/*.md'
+      - 'justfile'
   pull_request:
     branches: [master]
+    paths-ignore: *non-code-paths
 
 # Cancel in-progress runs for the same ref when a new commit is pushed.
 concurrency:
