@@ -61,13 +61,14 @@
     ]
   },
   "devDependencies": {
+    "@biomejs/biome": "2.5.2",
     "@earendil-works/pi-ai": "^0.80.3",
     "@earendil-works/pi-coding-agent": "latest",
     "@earendil-works/pi-tui": "^0.80.3",
     "@eslint/js": "^10.0.1",
     "@types/node": "^26.1.0",
-    "@biomejs/biome": "2.5.2",
     "eslint": "^10.6.0",
+    "fallow": "^3.2.0",
     "prettier": "^3.9.4",
     "typescript": "^6.0.0",
     "typescript-eslint": "^8.63.0",
@@ -76,6 +77,11 @@
   "scripts": {
     "test": "vitest run",
     "fmt": "biome check --write --error-on-warnings .",
-    "check": "biome check --error-on-warnings ."
+    "check": "biome check --error-on-warnings .",
+    "fallow": "fallow",
+    "fallow:audit": "fallow audit",
+    "fallow:health": "fallow health --score --hotspots --targets",
+    "fallow:dead-code": "fallow dead-code",
+    "fallow:dupes": "fallow dupes"
   }
 }
