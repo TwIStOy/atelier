@@ -37,6 +37,7 @@
 位于编辑器上方(`placement: "aboveEditor"`)的实时面板:
 
 - **Heading** —— `Todos (completed/total)`,有 `in_progress` 任务时显示实心 `●` 高亮,否则空心 `○` 暗淡
+- **状态图标** —— `pending` / `in_progress` / `completed` 分别用 Nerd Font v3 的 `nf-md-checkbox_blank_outline` / `nf-md-checkbox_intermediate` / `nf-md-checkbox_marked`。终端需安装 Nerd Font v3,否则显示为缺字符方框
 - **折叠行为** —— `agent_start` 时把上一轮展示过的 completed 任务收起;超出 `MAX_WIDGET_LINES`(12)时显示 `+N more (X completed, Y pending)` 摘要行
 - **空注销** —— 没有可见任务时自动注销 widget
 
