@@ -1,5 +1,16 @@
 import { vi } from "vitest";
-import type { PermissionCheckResult, ScopedPermissionResolver } from "../../src/types.ts";
+import type { PermissionCheckResult, ScopedPermissionResolver, ToolCallContext } from "../../src/types.ts";
+
+/** Tool-call context factory with bash defaults. */
+export function makeTcc(overrides: Partial<ToolCallContext> = {}): ToolCallContext {
+  return {
+    toolName: "bash",
+    agentName: null,
+    input: { command: "cat .env" },
+    cwd: "/test/project",
+    ...overrides,
+  };
+}
 
 export function makeResolver(defaultCheck?: PermissionCheckResult) {
   const resolve = vi.fn<ScopedPermissionResolver["resolve"]>();
