@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Footer git branch/dirty status can now be disabled via `/config` -> Statusline -> "Show Git Branch" (default on). Useful in large repos where `git status` slows down the footer.
+
 ## [0.2.3] - 2026-07-09
 
 ## [0.2.2] - 2026-07-07

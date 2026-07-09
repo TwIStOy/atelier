@@ -10,23 +10,27 @@ import type { StatusLineComponent } from "./components/base.ts";
 import { CodingPlanUsageComponent } from "./components/coding-plan-usage.ts";
 import { GitComponent } from "./components/git.ts";
 import { TokensComponent } from "./components/tokens.ts";
+import { loadConfig } from "./config.ts";
 
 export function makeFooter(
   ctx: ExtensionContext,
   pi: ExtensionAPI,
 ): (tui: TUI, theme: Theme, _footerData: ReadonlyFooterDataProvider) => Component & { dispose?(): void } {
-  const git = new GitComponent(ctx.cwd);
+  const showGit = loadConfig().showGitBranch;
+  const git = showGit ? new GitComponent(ctx.cwd) : null;
   const codingPlan = new CodingPlanUsageComponent(ctx, pi);
 
-  const components: StatusLineComponent[] = [git, codingPlan, new TokensComponent(ctx)];
+  const components: StatusLineComponent[] = [git, codingPlan, new TokensComponent(ctx)].filter(
+    (c): c is StatusLineComponent => c !== null,
+  );
 
   return (tui, theme) => {
-    git.bindRender(() => tui.requestRender());
+    git?.bindRender(() => tui.requestRender());
     codingPlan.bindRender(() => tui.requestRender());
 
     return {
       dispose() {
-        git.dispose();
+        git?.dispose();
         codingPlan.dispose();
       },
       render(width: number): string[] {
