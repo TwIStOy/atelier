@@ -1,4 +1,4 @@
-import type { PermissionState } from "../types.ts";
+import type { PermissionState } from "./types.ts";
 
 export const ARITY: Record<string, number> = {
   git: 2,
