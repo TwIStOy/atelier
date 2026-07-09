@@ -45,7 +45,7 @@ When migrating or adapting an extension from another project (for example `rpiv-
 
 ## Commands
 
-- **After any code changes (not docs)**: `npm run check` (full output, no tail). Fix all errors, warnings, and infos before committing.
+- **After any code changes (not docs)**: run `npm run fmt` to apply biome formatting, then `npm run check` (full output, no tail) and ensure it is clean. Fix all errors, warnings, and infos before committing. CI enforces biome formatting, so this is mandatory.
 - If you create or modify a test file, run it and iterate on test or implementation until it passes.
 - For ad-hoc scripts, `write` them to a temp file (e.g. `/tmp`), run, edit if needed, remove when done. Don't embed multi-line scripts in `bash` commands.
 - Never commit unless the user asks.

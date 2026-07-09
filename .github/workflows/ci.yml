@@ -41,6 +41,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Lint & Format
+        run: npm run check
+
       - name: Typecheck (tsc --build)
         run: npx tsc --build
 

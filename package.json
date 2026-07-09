@@ -75,6 +75,7 @@
   },
   "scripts": {
     "test": "vitest run",
-    "check": "biome check --write --error-on-warnings ."
+    "fmt": "biome check --write --error-on-warnings .",
+    "check": "biome check --error-on-warnings ."
   }
 }
