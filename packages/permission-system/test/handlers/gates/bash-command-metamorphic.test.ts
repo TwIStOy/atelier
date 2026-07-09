@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BashProgram } from "../../../src/access-intent/bash/program.ts";
 import { resolveBashCommandCheck } from "../../../src/handlers/gates/bash-command.ts";
+import { PathNormalizer } from "../../../src/path-normalizer.ts";
 import type { PermissionState, ScopedPermissionResolver } from "../../../src/types.ts";
 
 import { makeCheckResult } from "../../helpers/gate-fixtures.ts";
@@ -23,7 +24,7 @@ function makeKeyedResolver(rules: { match: string; state: PermissionState }[]): 
 }
 
 async function decide(command: string, resolver: ScopedPermissionResolver): Promise<PermissionState> {
-  const program = await BashProgram.parse(command);
+  const program = await BashProgram.parse(command, new PathNormalizer(process.platform, "/cwd"));
   return resolveBashCommandCheck(command, program.commands(), undefined, resolver).state;
 }
 
