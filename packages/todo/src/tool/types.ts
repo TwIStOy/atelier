@@ -1,11 +1,25 @@
 import { type Static, Type } from "@sinclair/typebox";
 
-export const TOOL_NAME = "todo";
-export const TOOL_LABEL = "Todo";
 export const COMMAND_NAME = "todos";
 
 export const ERR_REQUIRES_INTERACTIVE = "/todos requires interactive mode";
 export const MSG_NO_TODOS = "No todos yet. Ask the agent to add some!";
+
+export const TODO_CREATE = "todo_create";
+export const TODO_UPDATE = "todo_update";
+export const TODO_LIST = "todo_list";
+export const TODO_GET = "todo_get";
+export const TODO_DELETE = "todo_delete";
+export const TODO_CLEAR = "todo_clear";
+
+export const TODO_TOOL_NAMES = [TODO_CREATE, TODO_UPDATE, TODO_LIST, TODO_GET, TODO_DELETE, TODO_CLEAR] as const;
+
+const LEGACY_TODO_TOOL_NAME = "todo";
+
+export function isTodoToolName(name: string | undefined): boolean {
+  if (!name) return false;
+  return name === LEGACY_TODO_TOOL_NAME || (TODO_TOOL_NAMES as readonly string[]).includes(name);
+}
 
 export type TaskStatus = "pending" | "in_progress" | "completed" | "deleted";
 
@@ -45,62 +59,77 @@ export interface TaskMutationParams {
   includeDeleted?: boolean;
 }
 
-export const TodoParamsSchema = Type.Object({
-  action: Type.Union([
-    Type.Literal("create"),
-    Type.Literal("update"),
-    Type.Literal("list"),
-    Type.Literal("get"),
-    Type.Literal("delete"),
-    Type.Literal("clear"),
-  ]),
-  subject: Type.Optional(Type.String({ description: "Task subject line (required for create)" })),
-  description: Type.Optional(Type.String({ description: "Long-form task description" })),
-  activeForm: Type.Optional(
-    Type.String({
-      description: "Present-continuous spinner label shown while status is in_progress (e.g. 'writing tests')",
-    }),
-  ),
+const taskStatusLiterals = [
+  Type.Literal("pending"),
+  Type.Literal("in_progress"),
+  Type.Literal("completed"),
+  Type.Literal("deleted"),
+];
+
+const taskDescription = Type.Optional(Type.String({ description: "Long-form task description" }));
+const taskActiveForm = Type.Optional(
+  Type.String({
+    description: "Present-continuous spinner label shown while status is in_progress (e.g. 'writing tests')",
+  }),
+);
+const taskOwner = Type.Optional(Type.String({ description: "Agent/owner assigned to this task" }));
+
+export const CreateTodoSchema = Type.Object({
+  subject: Type.String({ description: "Task subject line (short and imperative)" }),
+  description: taskDescription,
+  activeForm: taskActiveForm,
+  blockedBy: Type.Optional(Type.Array(Type.Number(), { description: "Initial blockedBy task ids" })),
+  owner: taskOwner,
+  metadata: Type.Optional(Type.Record(Type.String(), Type.Unknown(), { description: "Arbitrary metadata" })),
+});
+
+export const UpdateTodoSchema = Type.Object({
+  id: Type.Number({ description: "Task id to update" }),
+  subject: Type.Optional(Type.String({ description: "New task subject line" })),
+  description: taskDescription,
+  activeForm: taskActiveForm,
   status: Type.Optional(
-    Type.Union(
-      [Type.Literal("pending"), Type.Literal("in_progress"), Type.Literal("completed"), Type.Literal("deleted")],
-      {
-        description: "Target status (update) or list filter (list)",
-      },
-    ),
-  ),
-  blockedBy: Type.Optional(
-    Type.Array(Type.Number(), {
-      description: "Initial blockedBy ids (create only)",
+    Type.Union(taskStatusLiterals, {
+      description:
+        "Target status. Sending it explicitly is preferred; an update with only an id (no other field) defaults to in_progress",
     }),
   ),
   addBlockedBy: Type.Optional(
-    Type.Array(Type.Number(), {
-      description: "Task ids to add to blockedBy (update only, additive merge)",
-    }),
+    Type.Array(Type.Number(), { description: "Task ids to add to blockedBy (additive merge)" }),
   ),
   removeBlockedBy: Type.Optional(
-    Type.Array(Type.Number(), {
-      description: "Task ids to remove from blockedBy (update only, additive merge)",
-    }),
+    Type.Array(Type.Number(), { description: "Task ids to remove from blockedBy (additive merge)" }),
   ),
-  owner: Type.Optional(Type.String({ description: "Agent/owner assigned to this task" })),
+  owner: taskOwner,
   metadata: Type.Optional(
     Type.Record(Type.String(), Type.Unknown(), {
-      description: "Arbitrary metadata; pass null value for a key to delete that key on update",
-    }),
-  ),
-  id: Type.Optional(
-    Type.Number({
-      description: "Task id (required for update, get, delete)",
-    }),
-  ),
-  includeDeleted: Type.Optional(
-    Type.Boolean({
-      description:
-        "List-only flag: if true, the list action returns deleted (tombstoned) tasks as well. Default: false. Do not pass on create/update/get/delete.",
+      description: "Arbitrary metadata; pass a null value for a key to delete that key",
     }),
   ),
 });
 
-export type TodoParams = Static<typeof TodoParamsSchema>;
+export const ListTodoSchema = Type.Object({
+  status: Type.Optional(Type.Union(taskStatusLiterals, { description: "Filter tasks to a single status" })),
+  includeDeleted: Type.Optional(
+    Type.Boolean({
+      description: "If true, include deleted (tombstoned) tasks. Default: false",
+    }),
+  ),
+});
+
+export const GetTodoSchema = Type.Object({
+  id: Type.Number({ description: "Task id to fetch" }),
+});
+
+export const DeleteTodoSchema = Type.Object({
+  id: Type.Number({ description: "Task id to soft-delete" }),
+});
+
+export const ClearTodoSchema = Type.Object({});
+
+export type CreateTodoParams = Static<typeof CreateTodoSchema>;
+export type UpdateTodoParams = Static<typeof UpdateTodoSchema>;
+export type ListTodoParams = Static<typeof ListTodoSchema>;
+export type GetTodoParams = Static<typeof GetTodoSchema>;
+export type DeleteTodoParams = Static<typeof DeleteTodoSchema>;
+export type ClearTodoParams = Static<typeof ClearTodoSchema>;

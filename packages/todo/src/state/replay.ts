@@ -1,4 +1,4 @@
-import type { TaskDetails } from "../tool/types.ts";
+import { isTodoToolName, type TaskDetails } from "../tool/types.ts";
 import { EMPTY_STATE, type TaskState } from "./state.ts";
 
 export function isTaskDetails(value: unknown): value is TaskDetails {
@@ -19,7 +19,7 @@ export function replayFromBranch(ctx: { sessionManager: { getBranch(): Iterable<
     };
     if (e.type !== "message") continue;
     const msg = e.message;
-    if (msg?.role !== "toolResult" || msg.toolName !== "todo") continue;
+    if (msg?.role !== "toolResult" || !isTodoToolName(msg.toolName)) continue;
     if (!isTaskDetails(msg.details)) continue;
     result = {
       tasks: msg.details.tasks.map((t) => ({ ...t })),

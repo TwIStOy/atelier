@@ -1,25 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { __resetState } from "../src/state/store.ts";
-import { DEFAULT_PROMPT_GUIDELINES, DEFAULT_PROMPT_SNIPPET, registerTodoTool } from "../src/todo.ts";
-import type { TaskDetails } from "../src/tool/types.ts";
+import { registerTodoTools } from "../src/todo.ts";
+import { type TaskDetails, TODO_TOOL_NAMES } from "../src/tool/types.ts";
+import { createMockPi, dispatchTodoAction } from "./helpers.ts";
 
 function setup() {
   __resetState();
-  const { pi, tools } = (() => {
-    const captured: Record<string, unknown>[] = [];
-    const mockPi = {
-      registerTool(tool: Record<string, unknown>) {
-        captured.push(tool);
-      },
-      registerCommand: () => {},
-      on: () => {},
-    };
-    return { pi: mockPi as never, tools: captured };
-  })();
-  registerTodoTool(pi);
-  const tool = tools[0];
-  if (!tool) throw new Error("tool not registered");
-  return { tool };
+  const { pi, tools } = createMockPi();
+  registerTodoTools(pi);
+  return { tools };
 }
 
 interface TodoCallResult {
@@ -27,9 +16,16 @@ interface TodoCallResult {
   details: TaskDetails;
 }
 
-async function call(tool: Record<string, unknown>, params: Record<string, unknown>): Promise<TodoCallResult> {
-  const execute = tool.execute as (...args: unknown[]) => Promise<TodoCallResult>;
-  return execute("tc", params, undefined, undefined, {});
+async function dispatch(
+  tools: Map<string, Record<string, unknown>>,
+  call: { action: string } & Record<string, unknown>,
+): Promise<TodoCallResult> {
+  return (await dispatchTodoAction(tools, call)) as TodoCallResult;
+}
+
+function requiredOf(tool: Record<string, unknown>): string[] {
+  const params = tool.parameters as { required?: string[] };
+  return [...(params.required ?? [])];
 }
 
 beforeEach(() => {
@@ -39,51 +35,65 @@ afterEach(() => {
   __resetState();
 });
 
-describe("registerTodoTool — registration shape", () => {
-  it("registers under the tool name 'todo' with the expected label and guidelines", () => {
-    const { tool } = setup();
-    expect(tool.name).toBe("todo");
-    expect(tool.label).toBe("Todo");
-    expect(tool.promptSnippet).toContain("task list");
-    expect(Array.isArray(tool.promptGuidelines)).toBe(true);
-    expect((tool.promptGuidelines as string[]).length).toBeGreaterThan(0);
+describe("registerTodoTools — registration shape", () => {
+  it("registers exactly the six per-action tools under todo_<action> names", () => {
+    const { tools } = setup();
+    expect([...tools.keys()].sort()).toEqual([...TODO_TOOL_NAMES].sort());
   });
 
-  it("exposes a typebox parameters schema declaring the six actions", () => {
-    const { tool } = setup();
-    const raw = JSON.stringify(tool.parameters);
-    for (const action of ["create", "update", "list", "get", "delete", "clear"]) {
-      expect(raw).toContain(action);
+  it("uses CamelCase labels and an empty-object schema for todo_clear", () => {
+    const { tools } = setup();
+    expect(tools.get("todo_create")?.label).toBe("Todo Create");
+    expect(tools.get("todo_update")?.label).toBe("Todo Update");
+    expect(tools.get("todo_list")?.label).toBe("Todo List");
+    expect(tools.get("todo_get")?.label).toBe("Todo Get");
+    expect(tools.get("todo_delete")?.label).toBe("Todo Delete");
+    expect(tools.get("todo_clear")?.label).toBe("Todo Clear");
+  });
+
+  it("each tool exposes a promptSnippet and a promptGuidelines array", () => {
+    const { tools } = setup();
+    for (const name of TODO_TOOL_NAMES) {
+      const tool = tools.get(name);
+      if (!tool) throw new Error(`${name} not registered`);
+      expect(typeof tool.promptSnippet).toBe("string");
+      expect((tool.promptSnippet as string).length).toBeGreaterThan(0);
+      expect(Array.isArray(tool.promptGuidelines)).toBe(true);
     }
   });
 
-  it("promptSnippet defaults to DEFAULT_PROMPT_SNIPPET when no config", () => {
-    const { tool } = setup();
-    expect(tool.promptSnippet).toBe(DEFAULT_PROMPT_SNIPPET);
+  it("declares the correct required field per action", () => {
+    const { tools } = setup();
+    expect(requiredOf(tools.get("todo_create")!)).toEqual(["subject"]);
+    expect(requiredOf(tools.get("todo_update")!)).toEqual(["id"]);
+    expect(requiredOf(tools.get("todo_get")!)).toEqual(["id"]);
+    expect(requiredOf(tools.get("todo_delete")!)).toEqual(["id"]);
+    expect(requiredOf(tools.get("todo_list")!)).toEqual([]);
+    expect(requiredOf(tools.get("todo_clear")!)).toEqual([]);
   });
 
-  it("promptGuidelines default to DEFAULT_PROMPT_GUIDELINES when no config", () => {
-    const { tool } = setup();
-    expect(tool.promptGuidelines).toEqual(DEFAULT_PROMPT_GUIDELINES);
+  it("carries the legacy 'todo' toolName only via isTodoToolName (no tool named 'todo' is registered)", () => {
+    const { tools } = setup();
+    expect(tools.has("todo")).toBe(false);
   });
 });
 
-describe("registerTodoTool — execute mutates module state", () => {
-  it("create → list returns the seeded row", async () => {
-    const { tool } = setup();
-    const r1 = await call(tool, { action: "create", subject: "first" });
+describe("registerTodoTools — execute mutates module state", () => {
+  it("create -> list returns the seeded row", async () => {
+    const { tools } = setup();
+    const r1 = await dispatch(tools, { action: "create", subject: "first" });
     expect(r1.details.action).toBe("create");
-    const r2 = await call(tool, { action: "list" });
+    const r2 = await dispatch(tools, { action: "list" });
     expect(r2.content[0]).toMatchObject({
       text: expect.stringContaining("first"),
     });
   });
 
   it("clear resets module state and nextId", async () => {
-    const { tool } = setup();
-    await call(tool, { action: "create", subject: "a" });
-    await call(tool, { action: "create", subject: "b" });
-    const r = await call(tool, { action: "clear" });
+    const { tools } = setup();
+    await dispatch(tools, { action: "create", subject: "a" });
+    await dispatch(tools, { action: "create", subject: "b" });
+    const r = await dispatch(tools, { action: "clear" });
     const d = r.details;
     expect(d.tasks).toEqual([]);
     expect(d.nextId).toBe(1);

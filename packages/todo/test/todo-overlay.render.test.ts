@@ -1,18 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { __resetState } from "../src/state/store.ts";
-import { registerTodoTool } from "../src/todo.ts";
+import { registerTodoTools } from "../src/todo.ts";
 import { TodoOverlay } from "../src/todo-overlay.ts";
 import type { TaskAction } from "../src/tool/types.ts";
-import { createMockPi, createMockUI, identityTheme } from "./helpers.ts";
+import { createMockPi, createMockUI, dispatchTodoAction, identityTheme } from "./helpers.ts";
 
 async function setup(actions: Array<{ action: TaskAction; [k: string]: unknown }>) {
   __resetState();
   const { pi, tools } = createMockPi();
-  registerTodoTool(pi);
-  const tool = tools.get("todo")!;
-  const execute = tool.execute as (...args: unknown[]) => Promise<unknown>;
+  registerTodoTools(pi);
   for (const p of actions) {
-    await execute("tc", p, undefined, undefined, {});
+    await dispatchTodoAction(tools, p as { action: string } & Record<string, unknown>);
   }
   const { ui, setWidget } = createMockUI();
   const overlay = new TodoOverlay();
@@ -23,7 +21,7 @@ async function setup(actions: Array<{ action: TaskAction; [k: string]: unknown }
     theme: typeof identityTheme,
   ) => { render: (w: number) => string[]; invalidate: () => void };
   const widget = factory({ requestRender: vi.fn() }, identityTheme);
-  return { widget, tool, ui, overlay };
+  return { widget, tools, ui, overlay };
 }
 
 beforeEach(() => {
@@ -246,11 +244,10 @@ describe("TodoOverlay — width truncation", () => {
   });
 
   it("re-renders reflect live state changes without re-registering", async () => {
-    const { widget, tool } = await setup([{ action: "create", subject: "first" }]);
+    const { widget, tools } = await setup([{ action: "create", subject: "first" }]);
     const out1 = widget.render(200).join("\n");
     expect(out1).toContain("first");
-    const execute = tool.execute as (...args: unknown[]) => Promise<unknown>;
-    await execute("tc", { action: "create", subject: "second" }, undefined, undefined, {});
+    await dispatchTodoAction(tools, { action: "create", subject: "second" });
     const out2 = widget.render(200).join("\n");
     expect(out2).toContain("first");
     expect(out2).toContain("second");

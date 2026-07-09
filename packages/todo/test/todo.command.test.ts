@@ -1,25 +1,22 @@
 import type { ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { __resetState } from "../src/state/store.ts";
-import { registerTodosCommand, registerTodoTool } from "../src/todo.ts";
-import { createMockCtx, createMockPi } from "./helpers.ts";
+import { registerTodosCommand, registerTodoTools } from "../src/todo.ts";
+import { createMockCtx, createMockPi, dispatchTodoAction } from "./helpers.ts";
 
 function setup() {
   __resetState();
   const { pi, tools, commands } = createMockPi();
-  registerTodoTool(pi);
+  registerTodoTools(pi);
   registerTodosCommand(pi);
-  const tool = tools.get("todo");
-  if (!tool) throw new Error("tool not registered");
   const cmd = commands.get("todos");
   if (!cmd) throw new Error("command not registered");
-  return { tool, cmd };
+  return { tools, cmd };
 }
 
-async function seed(tool: Record<string, unknown>, actions: Array<Record<string, unknown>>) {
-  const execute = tool.execute as (...args: unknown[]) => Promise<unknown>;
+async function seed(tools: Map<string, Record<string, unknown>>, actions: Array<Record<string, unknown>>) {
   for (const p of actions) {
-    await execute("tc", p, undefined, undefined, {});
+    await dispatchTodoAction(tools, p as { action: string } & Record<string, unknown>);
   }
 }
 
@@ -59,8 +56,8 @@ describe("/todos command — guard branches", () => {
   });
 
   it("treats all-deleted tasks as empty (info notify, not group render)", async () => {
-    const { tool, cmd } = setup();
-    await seed(tool, [
+    const { tools, cmd } = setup();
+    await seed(tools, [
       { action: "create", subject: "a" },
       { action: "update", id: 1, status: "deleted" },
     ]);
@@ -80,8 +77,8 @@ describe("/todos command — grouped output", () => {
   }
 
   it("renders 'Pending' group with ○ glyph and task id", async () => {
-    const { tool, cmd } = setup();
-    await seed(tool, [{ action: "create", subject: "research" }]);
+    const { tools, cmd } = setup();
+    await seed(tools, [{ action: "create", subject: "research" }]);
     const ctx = makeCtx();
     await cmd.handler("", ctx);
     const out = grabOutput(ctx);
@@ -91,8 +88,8 @@ describe("/todos command — grouped output", () => {
   });
 
   it("renders 'In Progress' group with ◐ glyph and activeForm suffix", async () => {
-    const { tool, cmd } = setup();
-    await seed(tool, [
+    const { tools, cmd } = setup();
+    await seed(tools, [
       { action: "create", subject: "build", activeForm: "Building" },
       { action: "update", id: 1, status: "in_progress" },
     ]);
@@ -105,8 +102,8 @@ describe("/todos command — grouped output", () => {
   });
 
   it("renders 'Completed' group with ✓ glyph and 'N/M completed' header", async () => {
-    const { tool, cmd } = setup();
-    await seed(tool, [
+    const { tools, cmd } = setup();
+    await seed(tools, [
       { action: "create", subject: "ship" },
       { action: "update", id: 1, status: "completed" },
     ]);
@@ -119,8 +116,8 @@ describe("/todos command — grouped output", () => {
   });
 
   it("emits the header parts in 'completed · in_progress · pending' order", async () => {
-    const { tool, cmd } = setup();
-    await seed(tool, [
+    const { tools, cmd } = setup();
+    await seed(tools, [
       { action: "create", subject: "p" },
       { action: "create", subject: "ip" },
       { action: "update", id: 2, status: "in_progress" },
@@ -140,8 +137,8 @@ describe("/todos command — grouped output", () => {
   });
 
   it("appends '⛓ #deps' suffix for tasks with blockedBy", async () => {
-    const { tool, cmd } = setup();
-    await seed(tool, [
+    const { tools, cmd } = setup();
+    await seed(tools, [
       { action: "create", subject: "base" },
       { action: "create", subject: "follow-up", blockedBy: [1] },
     ]);
@@ -152,8 +149,8 @@ describe("/todos command — grouped output", () => {
   });
 
   it("omits deleted tombstones from the grouped output", async () => {
-    const { tool, cmd } = setup();
-    await seed(tool, [
+    const { tools, cmd } = setup();
+    await seed(tools, [
       { action: "create", subject: "keep" },
       { action: "create", subject: "drop" },
       { action: "update", id: 2, status: "deleted" },

@@ -1,20 +1,17 @@
 import type { ExtensionUIContext } from "@earendil-works/pi-coding-agent";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { __resetState } from "../src/state/store.ts";
-import { registerTodoTool } from "../src/todo.ts";
+import { registerTodoTools } from "../src/todo.ts";
 import { TodoOverlay } from "../src/todo-overlay.ts";
-import { createMockPi, createMockUI, identityTheme } from "./helpers.ts";
+import { createMockPi, createMockUI, dispatchTodoAction, identityTheme } from "./helpers.ts";
 
 const WIDGET_KEY = "rpiv-todos";
 
 async function seed(tools: Map<string, Record<string, unknown>>, actions: unknown[]) {
-  const tool = tools.get("todo");
-  if (!tool) throw new Error("todo tool not registered");
-  const execute = tool.execute as (...args: unknown[]) => Promise<unknown>;
   for (const p of actions) {
-    await execute("tc", p, undefined, undefined, {});
+    await dispatchTodoAction(tools, p as { action: string } & Record<string, unknown>);
   }
-  return tool;
+  return tools;
 }
 
 function makeCtx(): {
@@ -27,7 +24,7 @@ function makeCtx(): {
 
 function registerTool() {
   const { pi, tools } = createMockPi();
-  registerTodoTool(pi);
+  registerTodoTools(pi);
   return { tools };
 }
 
@@ -86,13 +83,12 @@ describe("TodoOverlay — lifecycle", () => {
 
   it("transition non-empty → empty unregisters the widget", async () => {
     const { tools } = registerTool();
-    const tool = await seed(tools, [{ action: "create", subject: "a" }]);
+    await seed(tools, [{ action: "create", subject: "a" }]);
     const overlay = new TodoOverlay();
     const { ui, setWidget } = makeCtx();
     overlay.setUICtx(ui);
     overlay.update();
-    const execute = tool.execute as (...args: unknown[]) => Promise<unknown>;
-    await execute("tc", { action: "clear" }, undefined, undefined, {});
+    await dispatchTodoAction(tools, { action: "clear" });
     overlay.update();
     expect(setWidget).toHaveBeenCalledTimes(2);
     expect(setWidget.mock.calls[1]).toEqual([WIDGET_KEY, undefined]);
@@ -100,15 +96,14 @@ describe("TodoOverlay — lifecycle", () => {
 
   it("empty → non-empty after empty transition re-registers", async () => {
     const { tools } = registerTool();
-    const tool = await seed(tools, [{ action: "create", subject: "a" }]);
+    await seed(tools, [{ action: "create", subject: "a" }]);
     const overlay = new TodoOverlay();
     const { ui, setWidget } = makeCtx();
     overlay.setUICtx(ui);
     overlay.update();
-    const execute = tool.execute as (...args: unknown[]) => Promise<unknown>;
-    await execute("tc", { action: "clear" }, undefined, undefined, {});
+    await dispatchTodoAction(tools, { action: "clear" });
     overlay.update();
-    await execute("tc", { action: "create", subject: "b" }, undefined, undefined, {});
+    await dispatchTodoAction(tools, { action: "create", subject: "b" });
     overlay.update();
     expect(setWidget).toHaveBeenCalledTimes(3);
     expect(typeof setWidget.mock.calls[2][1]).toBe("function");
@@ -201,9 +196,8 @@ describe("TodoOverlay — lifecycle", () => {
 
   it("all-deleted todos count as empty (no widget)", async () => {
     const { tools } = registerTool();
-    const tool = await seed(tools, [{ action: "create", subject: "a" }]);
-    const execute = tool.execute as (...args: unknown[]) => Promise<unknown>;
-    await execute("tc", { action: "update", id: 1, status: "deleted" }, undefined, undefined, {});
+    await seed(tools, [{ action: "create", subject: "a" }]);
+    await dispatchTodoAction(tools, { action: "update", id: 1, status: "deleted" });
     const overlay = new TodoOverlay();
     const { ui, setWidget } = makeCtx();
     overlay.setUICtx(ui);

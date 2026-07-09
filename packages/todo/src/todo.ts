@@ -1,17 +1,28 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { TObject } from "@sinclair/typebox";
 import { loadConfig } from "./config.ts";
 import { selectTasksByStatus, selectTodoCounts, selectVisibleTasks } from "./state/selectors.ts";
 import { applyTaskMutation } from "./state/state-reducer.ts";
 import { commitState, getState } from "./state/store.ts";
 import { buildToolResult } from "./tool/response-envelope.ts";
 import {
+  ClearTodoSchema,
   COMMAND_NAME,
+  CreateTodoSchema,
+  DeleteTodoSchema,
   ERR_REQUIRES_INTERACTIVE,
+  GetTodoSchema,
+  ListTodoSchema,
   MSG_NO_TODOS,
+  type TaskAction,
   type TaskMutationParams,
-  TOOL_LABEL,
-  TOOL_NAME,
-  TodoParamsSchema,
+  TODO_CLEAR,
+  TODO_CREATE,
+  TODO_DELETE,
+  TODO_GET,
+  TODO_LIST,
+  TODO_UPDATE,
+  UpdateTodoSchema,
 } from "./tool/types.ts";
 import { formatCommandTaskLine } from "./view/format.ts";
 
@@ -19,35 +30,101 @@ const SECTION_PENDING = "── Pending ──";
 const SECTION_IN_PROGRESS = "── In Progress ──";
 const SECTION_COMPLETED = "── Completed ──";
 
-export const DEFAULT_PROMPT_SNIPPET = "Manage a task list to track multi-step progress";
-export const DEFAULT_PROMPT_GUIDELINES: string[] = [
-  "Use `todo` for complex work with 3+ steps, when the user gives you a list of tasks, or immediately after receiving new instructions to capture requirements. Skip it for single trivial tasks and purely conversational requests.",
-  "When starting any task, mark it in_progress BEFORE beginning work. Mark it completed IMMEDIATELY when done — never batch completions. Exactly one task should be in_progress at a time.",
-  "Never mark a task completed if tests are failing, the implementation is partial, or you hit unresolved errors — keep it in_progress and create a new task for the blocker instead.",
-  "Task status is a 4-state machine: pending → in_progress → completed, plus deleted as a tombstone. Pass activeForm (present-continuous label, e.g. 'researching existing tool') when marking in_progress.",
-  "When updating, prefer sending `status` explicitly: `update id status=in_progress activeForm=...` to start work, `update id status=completed` to finish. A bare `update {id}` with no mutable field defaults to marking the task in_progress, but send `status` explicitly when you can.",
-  "Use blockedBy to express dependencies (A is blocked by B). On create, pass blockedBy as the initial set. On update, use addBlockedBy / removeBlockedBy (additive merge — do not resend the full array). Cycles are rejected.",
-  "list hides tombstoned (deleted) tasks by default; pass includeDeleted:true to see them. Pass status to filter by a single status.",
-  "Subject must be short and imperative (e.g. 'Research existing tool'); description is for long-form detail. activeForm is a present-continuous label shown while in_progress.",
+interface TodoToolSpec {
+  action: TaskAction;
+  name: string;
+  label: string;
+  description: string;
+  snippet: string;
+  guidelines: string[];
+  parameters: TObject;
+}
+
+const TODO_TOOL_SPECS: TodoToolSpec[] = [
+  {
+    action: "create",
+    name: TODO_CREATE,
+    label: "Todo Create",
+    description: "Create a new task in the todo list. New tasks start with status 'pending'.",
+    snippet: "Create a new task to track a step of multi-step work",
+    guidelines: [
+      "Use the todo tools for complex work with 3+ steps, or when the user gives a list of tasks or new instructions to capture requirements. Skip them for single trivial tasks and purely conversational requests.",
+      "Subject must be short and imperative (e.g. 'Research existing tool'); description is for long-form detail; activeForm is a present-continuous label shown while in_progress.",
+    ],
+    parameters: CreateTodoSchema,
+  },
+  {
+    action: "update",
+    name: TODO_UPDATE,
+    label: "Todo Update",
+    description:
+      "Update a task's fields, status, or dependencies. Status is a 4-state machine: pending -> in_progress -> completed, plus deleted as a tombstone; illegal transitions are rejected.",
+    snippet: "Update a task's status, fields, or dependencies",
+    guidelines: [
+      "Mark a task in_progress BEFORE beginning work and completed IMMEDIATELY when done — never batch completions. Keep exactly one task in_progress at a time.",
+      "Never mark a task completed if tests are failing, the implementation is partial, or you hit unresolved errors — keep it in_progress and create a task for the blocker instead.",
+      "Prefer sending status explicitly. A bare todo_update with only an id (no other field) defaults to in_progress; explicit fields always take precedence.",
+      "Express dependencies with addBlockedBy / removeBlockedBy (additive merge — do not resend the full array). Self-blocks and cycles are rejected.",
+    ],
+    parameters: UpdateTodoSchema,
+  },
+  {
+    action: "list",
+    name: TODO_LIST,
+    label: "Todo List",
+    description: "List all tasks, optionally filtered by a single status. Hides deleted (tombstoned) tasks by default.",
+    snippet: "List tasks, optionally filtered by status",
+    guidelines: [
+      "list hides tombstoned (deleted) tasks by default; pass includeDeleted:true to see them, and status to filter to a single status.",
+    ],
+    parameters: ListTodoSchema,
+  },
+  {
+    action: "get",
+    name: TODO_GET,
+    label: "Todo Get",
+    description: "Get a single task's details, including its blockedBy dependencies and the reverse blocks list.",
+    snippet: "Get details of a single task",
+    guidelines: [],
+    parameters: GetTodoSchema,
+  },
+  {
+    action: "delete",
+    name: TODO_DELETE,
+    label: "Todo Delete",
+    description: "Soft-delete a task (status -> deleted). The tombstone is kept so dependency validation still works.",
+    snippet: "Soft-delete a task",
+    guidelines: [],
+    parameters: DeleteTodoSchema,
+  },
+  {
+    action: "clear",
+    name: TODO_CLEAR,
+    label: "Todo Clear",
+    description: "Clear all tasks and reset the task list (nextId returns to 1).",
+    snippet: "Clear all tasks and reset the list",
+    guidelines: [],
+    parameters: ClearTodoSchema,
+  },
 ];
 
-export function registerTodoTool(pi: ExtensionAPI): void {
+export function registerTodoTools(pi: ExtensionAPI): void {
   const guidance = loadConfig().guidance;
-  pi.registerTool({
-    name: TOOL_NAME,
-    label: TOOL_LABEL,
-    description:
-      "Manage a task list for tracking multi-step progress. Actions: create (new task), update (change status/fields/dependencies), list (all tasks, optionally filtered by status), get (single task details), delete (tombstone), clear (reset all). Status: pending → in_progress → completed, plus deleted tombstone. Use this to plan and track multi-step work like research, design, and implementation.",
-    promptSnippet: guidance?.promptSnippet ?? DEFAULT_PROMPT_SNIPPET,
-    promptGuidelines: guidance?.promptGuidelines ?? DEFAULT_PROMPT_GUIDELINES,
-    parameters: TodoParamsSchema,
-
-    async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
-      const result = applyTaskMutation(getState(), params.action, params as TaskMutationParams);
-      commitState(result.state);
-      return buildToolResult(params.action, params as TaskMutationParams, result.state, result.op);
-    },
-  });
+  for (const spec of TODO_TOOL_SPECS) {
+    pi.registerTool({
+      name: spec.name,
+      label: spec.label,
+      description: spec.description,
+      promptSnippet: guidance?.promptSnippet ?? spec.snippet,
+      promptGuidelines: guidance?.promptGuidelines ?? spec.guidelines,
+      parameters: spec.parameters,
+      async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
+        const result = applyTaskMutation(getState(), spec.action, params as TaskMutationParams);
+        commitState(result.state);
+        return buildToolResult(spec.action, params as TaskMutationParams, result.state, result.op);
+      },
+    });
+  }
 }
 
 export function registerTodosCommand(pi: ExtensionAPI): void {

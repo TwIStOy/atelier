@@ -88,6 +88,17 @@ export function createMockUI(opts: { requestRender?: () => void } = {}): {
   return { setWidget, notify, requestRender, ui };
 }
 
+export async function dispatchTodoAction(
+  tools: Map<string, Record<string, unknown>>,
+  call: { action: string } & Record<string, unknown>,
+): Promise<unknown> {
+  const { action, ...params } = call;
+  const tool = tools.get(`todo_${action}`);
+  if (!tool) throw new Error(`todo_${action} tool not registered`);
+  const execute = tool.execute as (...args: unknown[]) => Promise<unknown>;
+  return execute("tc", params, undefined, undefined, {});
+}
+
 export function createMockCtx(
   opts: { hasUI?: boolean; ui?: ExtensionUIContext; branch?: Iterable<unknown> } = {},
 ): ExtensionContext {

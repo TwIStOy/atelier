@@ -2,13 +2,13 @@ import { describe, expect, it } from "vitest";
 import { isTaskDetails, replayFromBranch } from "../src/state/replay.ts";
 import type { Task, TaskDetails } from "../src/tool/types.ts";
 
-function buildBranch(snapshots: TaskDetails[]) {
+function buildBranch(snapshots: TaskDetails[], toolName = "todo") {
   return snapshots.map((s) => ({
     type: "message",
     message: {
       role: "toolResult",
       toolCallId: "call-todo",
-      toolName: "todo",
+      toolName,
       content: [{ type: "text", text: "ok" }],
       details: s,
       isError: false,
@@ -180,6 +180,35 @@ describe("replayFromBranch", () => {
     const fresh = replayFromBranch(ctx2);
     expect(fresh.tasks).toEqual([]);
     expect(fresh.nextId).toBe(1);
+  });
+
+  it("replays snapshots emitted by any todo_<action> tool (split-tool replay)", () => {
+    const ctx = {
+      sessionManager: {
+        getBranch: () =>
+          buildBranch(
+            [
+              {
+                action: "create",
+                params: {},
+                tasks: [taskFixture(1, "via-create")],
+                nextId: 2,
+              },
+              {
+                action: "update",
+                params: {},
+                tasks: [taskFixture(1, "via-update", { status: "completed" })],
+                nextId: 2,
+              },
+            ],
+            "todo_update",
+          ),
+      },
+    };
+    const state = replayFromBranch(ctx);
+    expect(state.tasks).toHaveLength(1);
+    expect(state.tasks[0]?.subject).toBe("via-update");
+    expect(state.tasks[0]?.status).toBe("completed");
   });
 
   it("skips non-todo toolResults", () => {
