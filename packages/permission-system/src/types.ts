@@ -104,7 +104,8 @@ export type AccessIntent =
       agentName?: string;
     };
 
-export interface FlatPermissionConfig {
-  "*": PermissionState;
-  [key: string]: unknown;
-}
+export type {
+  DenyWithReason,
+  FlatPermissionConfig,
+  PatternValue,
+} from "./config-schema.ts";
