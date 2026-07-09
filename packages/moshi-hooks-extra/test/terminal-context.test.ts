@@ -105,8 +105,7 @@ describe("probeTerminalContext", () => {
 describe("cache", () => {
   test("getCachedTerminalContext returns cached value across calls", async () => {
     resetTerminalContextCache();
-    const { getCachedTerminalContext } =
-      await import("../src/terminal-context.ts");
+    const { getCachedTerminalContext } = await import("../src/terminal-context.ts");
     let calls = 0;
     const spawnSync = (() => {
       calls++;

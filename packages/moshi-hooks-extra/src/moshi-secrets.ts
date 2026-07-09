@@ -34,11 +34,7 @@ export interface MoshiSecretsOptions {
   readKeychain?: ReadKeychainFn;
 }
 
-function fileSecretsPaths(
-  opts: Required<
-    Pick<MoshiSecretsOptions, "stateDir" | "homeDir" | "platform">
-  >,
-): string[] {
+function fileSecretsPaths(opts: Required<Pick<MoshiSecretsOptions, "stateDir" | "homeDir" | "platform">>): string[] {
   const candidates: string[] = [];
   if (opts.platform === "darwin") {
     candidates.push(join(opts.homeDir, ".config", "moshi", "secrets.json"));
@@ -47,16 +43,12 @@ function fileSecretsPaths(
   return candidates;
 }
 
-export function readMoshiSecretsFromFile(
-  options: MoshiSecretsOptions = {},
-): MoshiCredentials | null {
+export function readMoshiSecretsFromFile(options: MoshiSecretsOptions = {}): MoshiCredentials | null {
   const platform = options.platform ?? process.platform;
   const stateDir = options.stateDir ?? resolveStateDir();
   const homeDir = options.homeDir ?? homedir();
   const exists = options.existsSync ?? ((p) => existsSync(p));
-  const readFile =
-    options.readFileSync ??
-    ((p, enc) => readFileSync(p, enc as BufferEncoding));
+  const readFile = options.readFileSync ?? ((p, enc) => readFileSync(p, enc as BufferEncoding));
 
   for (const candidate of fileSecretsPaths({ stateDir, homeDir, platform })) {
     if (!exists(candidate)) continue;
@@ -88,9 +80,7 @@ export function readMoshiSecretsFromFile(
  * every other platform only the file source is consulted. Returns `null` when
  * no source yields a usable `host-id` + `host-secret` pair.
  */
-export function readMoshiSecrets(
-  options: MoshiSecretsOptions = {},
-): MoshiCredentials | null {
+export function readMoshiSecrets(options: MoshiSecretsOptions = {}): MoshiCredentials | null {
   const platform = options.platform ?? process.platform;
   if (platform === "darwin") {
     const fromKeychain = readMoshiSecretsFromKeychain({

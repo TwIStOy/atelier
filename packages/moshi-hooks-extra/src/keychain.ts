@@ -16,10 +16,7 @@ export const MOSHI_KEYCHAIN_ACCOUNTS = {
 } as const;
 
 /** Read one generic-password value from the macOS Keychain. */
-export type ReadKeychainFn = (
-  service: string,
-  account: string,
-) => string | undefined;
+export type ReadKeychainFn = (service: string, account: string) => string | undefined;
 
 export interface MoshiCredentials {
   hostId: string;
@@ -44,16 +41,12 @@ export interface ReadMoshiSecretsFromKeychainOptions {
  * `undefined`. Only present on darwin; calling this on other platforms will
  * throw and be caught.
  */
-function readKeychainDefault(
-  service: string,
-  account: string,
-): string | undefined {
+function readKeychainDefault(service: string, account: string): string | undefined {
   try {
-    return execFileSync(
-      "security",
-      ["find-generic-password", "-s", service, "-a", account, "-w"],
-      { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
-    );
+    return execFileSync("security", ["find-generic-password", "-s", service, "-a", account, "-w"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
   } catch {
     return undefined;
   }
@@ -74,8 +67,7 @@ export function readMoshiSecretsFromKeychain(
   const hostId = read(service, MOSHI_KEYCHAIN_ACCOUNTS.hostId)?.trim();
   const hostSecret = read(service, MOSHI_KEYCHAIN_ACCOUNTS.hostSecret)?.trim();
   if (!hostId || !hostSecret) return null;
-  const hostName =
-    read(service, MOSHI_KEYCHAIN_ACCOUNTS.hostDisplayName)?.trim() ?? "";
+  const hostName = read(service, MOSHI_KEYCHAIN_ACCOUNTS.hostDisplayName)?.trim() ?? "";
   return {
     hostId,
     hostSecret,

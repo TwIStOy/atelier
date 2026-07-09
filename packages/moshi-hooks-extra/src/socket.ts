@@ -15,13 +15,7 @@ export function resolveSocketPath(options: SocketPathOptions = {}): string {
   if (override && override.length > 0) return override;
   const platform = options.platform ?? process.platform;
   if (platform === "darwin") {
-    return pathJoin(
-      options.homedir ?? homedir(),
-      "Library",
-      "Application Support",
-      "Moshi",
-      "moshi-hook.sock",
-    );
+    return pathJoin(options.homedir ?? homedir(), "Library", "Application Support", "Moshi", "moshi-hook.sock");
   }
   const xdg = env.XDG_RUNTIME_DIR;
   if (xdg && xdg.length > 0) return pathJoin(xdg, "moshi-hook.sock");
@@ -98,10 +92,7 @@ export function sendEnvelopeToSocket(
     const waitTimeoutMs = options.waitTimeoutMs;
 
     const markFailed = (err: unknown) => {
-      const code =
-        err && typeof err === "object"
-          ? (err as { code?: unknown }).code
-          : undefined;
+      const code = err && typeof err === "object" ? (err as { code?: unknown }).code : undefined;
       const msg = err instanceof Error ? err.message : String(err);
       const indicator = typeof code === "string" ? code : msg;
       if (
@@ -120,10 +111,7 @@ export function sendEnvelopeToSocket(
     sock.once("error", markFailed);
 
     if (wait && waitTimeoutMs && waitTimeoutMs > 0) {
-      setTimeoutFn(
-        () => finish({ status: "error", error: "timeout" }),
-        waitTimeoutMs,
-      ).unref?.();
+      setTimeoutFn(() => finish({ status: "error", error: "timeout" }), waitTimeoutMs).unref?.();
     }
 
     sock.once("connect", () => {

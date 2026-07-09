@@ -18,10 +18,8 @@ function makeKeychain(entries: Record<string, string>) {
 describe("readMoshiSecretsFromKeychain", () => {
   const FULL = makeKeychain({
     [`${MOSHI_KEYCHAIN_SERVICE}|${MOSHI_KEYCHAIN_ACCOUNTS.hostId}`]: "host_abc",
-    [`${MOSHI_KEYCHAIN_SERVICE}|${MOSHI_KEYCHAIN_ACCOUNTS.hostSecret}`]:
-      "secret_xyz",
-    [`${MOSHI_KEYCHAIN_SERVICE}|${MOSHI_KEYCHAIN_ACCOUNTS.hostDisplayName}`]:
-      "poi",
+    [`${MOSHI_KEYCHAIN_SERVICE}|${MOSHI_KEYCHAIN_ACCOUNTS.hostSecret}`]: "secret_xyz",
+    [`${MOSHI_KEYCHAIN_SERVICE}|${MOSHI_KEYCHAIN_ACCOUNTS.hostDisplayName}`]: "poi",
   });
 
   test("reads all three entries and trims the trailing newline", () => {
@@ -42,8 +40,7 @@ describe("readMoshiSecretsFromKeychain", () => {
   test("returns null when only host-id is present (no host-secret)", () => {
     const creds = readMoshiSecretsFromKeychain({
       read: makeKeychain({
-        [`${MOSHI_KEYCHAIN_SERVICE}|${MOSHI_KEYCHAIN_ACCOUNTS.hostId}`]:
-          "host_abc",
+        [`${MOSHI_KEYCHAIN_SERVICE}|${MOSHI_KEYCHAIN_ACCOUNTS.hostId}`]: "host_abc",
       }),
     });
     expect(creds).toBeNull();
@@ -52,10 +49,8 @@ describe("readMoshiSecretsFromKeychain", () => {
   test("omits hostName gracefully when host-display-name is absent", () => {
     const creds = readMoshiSecretsFromKeychain({
       read: makeKeychain({
-        [`${MOSHI_KEYCHAIN_SERVICE}|${MOSHI_KEYCHAIN_ACCOUNTS.hostId}`]:
-          "host_abc",
-        [`${MOSHI_KEYCHAIN_SERVICE}|${MOSHI_KEYCHAIN_ACCOUNTS.hostSecret}`]:
-          "secret_xyz",
+        [`${MOSHI_KEYCHAIN_SERVICE}|${MOSHI_KEYCHAIN_ACCOUNTS.hostId}`]: "host_abc",
+        [`${MOSHI_KEYCHAIN_SERVICE}|${MOSHI_KEYCHAIN_ACCOUNTS.hostSecret}`]: "secret_xyz",
       }),
     });
     expect(creds?.hostId).toBe("host_abc");

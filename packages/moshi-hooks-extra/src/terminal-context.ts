@@ -64,17 +64,13 @@ export function parseMoshiContextJson(text: string): MoshiContextJson | null {
   if (!trimmed) return null;
   try {
     const parsed = JSON.parse(trimmed);
-    return parsed && typeof parsed === "object"
-      ? (parsed as MoshiContextJson)
-      : null;
+    return parsed && typeof parsed === "object" ? (parsed as MoshiContextJson) : null;
   } catch {
     return null;
   }
 }
 
-export function contextFromMoshiJson(
-  parsed: MoshiContextJson | null,
-): TerminalContext {
+export function contextFromMoshiJson(parsed: MoshiContextJson | null): TerminalContext {
   if (!parsed) return { ...EMPTY_TERMINAL_CONTEXT };
   const kind = parsed.kind ?? "";
   const herdr = parsed.herdr ?? {};
@@ -97,9 +93,7 @@ export function contextFromMoshiJson(
   };
 }
 
-export function probeTerminalContext(
-  options: ProbeOptions = {},
-): TerminalContext {
+export function probeTerminalContext(options: ProbeOptions = {}): TerminalContext {
   const binary = options.binary ?? "moshi-hook";
   const env = options.env ?? process.env;
   const spawnSyncFn = options.spawnSync ?? spawnSync;
@@ -121,9 +115,7 @@ export function probeTerminalContext(
 
 let cached: TerminalContext | null = null;
 
-export function getCachedTerminalContext(
-  options: ProbeOptions = {},
-): TerminalContext {
+export function getCachedTerminalContext(options: ProbeOptions = {}): TerminalContext {
   if (cached) return cached;
   cached = probeTerminalContext(options);
   return cached;

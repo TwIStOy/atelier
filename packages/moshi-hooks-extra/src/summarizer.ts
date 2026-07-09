@@ -29,15 +29,9 @@ export function loadSummaryConfig(): SummaryConfig {
   return readConfig(CONFIG_NAME, CONFIG_SCHEMA);
 }
 
-export function resolveSummaryModel(
-  registry: ModelRegistry,
-  config: SummaryConfig,
-): AnyModel | undefined {
+export function resolveSummaryModel(registry: ModelRegistry, config: SummaryConfig): AnyModel | undefined {
   if (!config.model) return undefined;
-  return (
-    (resolveModel(registry.getAvailable(), config.model) as AnyModel) ??
-    undefined
-  );
+  return (resolveModel(registry.getAvailable(), config.model) as AnyModel) ?? undefined;
 }
 
 const SUMMARY_SYSTEM_PROMPT =
@@ -47,10 +41,7 @@ const SUMMARY_SYSTEM_PROMPT =
 
 export const SUMMARY_TITLE_FALLBACK = "Task complete";
 
-export function buildSummaryPrompt(
-  userPrompt: string,
-  lastAssistant: AssistantMessage,
-): Message[] {
+export function buildSummaryPrompt(userPrompt: string, lastAssistant: AssistantMessage): Message[] {
   const assistantText = assistantMessageText(lastAssistant).trim();
   const promptParts: string[] = [];
   promptParts.push("User asked the coding agent to do the following:");
@@ -59,9 +50,7 @@ export function buildSummaryPrompt(
   promptParts.push("The agent's final reply was:");
   promptParts.push(assistantText || "(empty reply)");
   promptParts.push("");
-  promptParts.push(
-    "Summarize what the agent accomplished in the format above.",
-  );
+  promptParts.push("Summarize what the agent accomplished in the format above.");
   return [
     {
       role: "user",
@@ -122,15 +111,7 @@ export async function summarizeAgentTurn(opts: {
   fallbackMessage: string;
   signal?: AbortSignal;
 }): Promise<SummaryOutcome> {
-  const {
-    userPrompt,
-    lastAssistant,
-    model,
-    modelRegistry,
-    fallbackTitle,
-    fallbackMessage,
-    signal,
-  } = opts;
+  const { userPrompt, lastAssistant, model, modelRegistry, fallbackTitle, fallbackMessage, signal } = opts;
 
   if (!model) {
     return {
@@ -174,17 +155,11 @@ export async function summarizeAgentTurn(opts: {
   };
 }
 
-export function lastAssistantMessage(
-  messages: unknown[] | undefined,
-): AssistantMessage | undefined {
+export function lastAssistantMessage(messages: unknown[] | undefined): AssistantMessage | undefined {
   if (!Array.isArray(messages)) return undefined;
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i];
-    if (
-      msg &&
-      typeof msg === "object" &&
-      (msg as { role?: unknown }).role === "assistant"
-    ) {
+    if (msg && typeof msg === "object" && (msg as { role?: unknown }).role === "assistant") {
       return msg as AssistantMessage;
     }
   }

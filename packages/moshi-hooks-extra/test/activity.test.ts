@@ -73,11 +73,7 @@ describe("lastAssistantTitleFromMessages", () => {
   });
 
   test("returns empty when no assistant message", () => {
-    expect(
-      lastAssistantTitleFromMessages([
-        { role: "user", content: [{ type: "text", text: "hi" }] },
-      ]),
-    ).toBe("");
+    expect(lastAssistantTitleFromMessages([{ role: "user", content: [{ type: "text", text: "hi" }] }])).toBe("");
   });
 
   test("returns empty for undefined/garbage input", () => {

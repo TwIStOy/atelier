@@ -101,9 +101,7 @@ function finalizeSnapshot(
   credentials: MoshiCredentials,
   now: Date,
 ): MoshiUsageSnapshot {
-  const label = level
-    ? `${ZAI_ACCOUNT_LABEL} (${capitalize(level)})`
-    : ZAI_ACCOUNT_LABEL;
+  const label = level ? `${ZAI_ACCOUNT_LABEL} (${capitalize(level)})` : ZAI_ACCOUNT_LABEL;
 
   return {
     accountId: ZAI_ACCOUNT_ID,

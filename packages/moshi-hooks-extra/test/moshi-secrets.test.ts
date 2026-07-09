@@ -1,8 +1,5 @@
 import { describe, expect, test } from "vitest";
-import {
-  readMoshiSecrets,
-  readMoshiSecretsFromFile,
-} from "../src/moshi-secrets.ts";
+import { readMoshiSecrets, readMoshiSecretsFromFile } from "../src/moshi-secrets.ts";
 
 function makeFs(files: Record<string, string>) {
   return {
@@ -88,10 +85,7 @@ describe("readMoshiSecretsFromFile", () => {
 });
 
 describe("readMoshiSecrets dispatcher", () => {
-  const keychainRead = (
-    service: string,
-    account: string,
-  ): string | undefined => {
+  const keychainRead = (service: string, account: string): string | undefined => {
     if (service !== "app.getmoshi.hook") return undefined;
     const map: Record<string, string> = {
       "host-id": "host_kc",

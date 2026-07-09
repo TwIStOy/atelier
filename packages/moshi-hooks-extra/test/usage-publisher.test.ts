@@ -1,7 +1,4 @@
-import type {
-  CodingPlanRawUsage,
-  CodingPlanUsage,
-} from "@htwang-contrib/common";
+import type { CodingPlanRawUsage, CodingPlanUsage } from "@htwang-contrib/common";
 import { describe, expect, test, vi } from "vitest";
 import type { MoshiCredentials } from "../src/moshi-secrets.ts";
 import {
@@ -67,11 +64,7 @@ describe("buildZaiSnapshot", () => {
   });
 
   test("omits level suffix when level is absent", () => {
-    const snap = buildZaiSnapshot(
-      { limits: [{ window: "weekly", percentage: 1 }] },
-      CREDS,
-      NOW,
-    );
+    const snap = buildZaiSnapshot({ limits: [{ window: "weekly", percentage: 1 }] }, CREDS, NOW);
     expect(snap.accountLabel).toBe("Z.AI Coding Plan");
   });
 });
@@ -108,10 +101,7 @@ describe("buildZaiRawSnapshot", () => {
   });
 
   test("publishes only token windows with kind-aware labels", () => {
-    expect(snapshot.windows.map((w) => w.label)).toEqual([
-      "5h tokens",
-      "weekly tokens",
-    ]);
+    expect(snapshot.windows.map((w) => w.label)).toEqual(["5h tokens", "weekly tokens"]);
   });
 
   test("passes through real resetsAt and clamps percentages", () => {
@@ -124,11 +114,7 @@ describe("buildZaiRawSnapshot", () => {
 
 describe("pushUsageSnapshot", () => {
   test("POSTs snapshot with bearer + UA and reports ok on 200", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue(
-        new Response('{"success":true,"count":1}', { status: 200 }),
-      );
+    const fetchMock = vi.fn().mockResolvedValue(new Response('{"success":true,"count":1}', { status: 200 }));
     const snapshot = buildZaiSnapshot(USAGE, CREDS, NOW);
     const result = await pushUsageSnapshot(snapshot, CREDS, {
       fetch: fetchMock,
@@ -148,9 +134,7 @@ describe("pushUsageSnapshot", () => {
   });
 
   test("reports failure on non-ok response", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue(new Response("nope", { status: 422 }));
+    const fetchMock = vi.fn().mockResolvedValue(new Response("nope", { status: 422 }));
     const snapshot = buildZaiSnapshot(USAGE, CREDS, NOW);
     const result = await pushUsageSnapshot(snapshot, CREDS, {
       fetch: fetchMock,
@@ -171,9 +155,7 @@ describe("pushUsageSnapshot", () => {
   });
 
   test("stays silent when no logger is provided", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue(new Response('"ok"', { status: 200 }));
+    const fetchMock = vi.fn().mockResolvedValue(new Response('"ok"', { status: 200 }));
     const snapshot = buildZaiSnapshot(USAGE, CREDS, NOW);
     await pushUsageSnapshot(snapshot, CREDS, { fetch: fetchMock });
     // No assertion to make beyond "does not throw"; the default path must
@@ -195,11 +177,7 @@ describe("pushUsageSnapshot logging", () => {
   };
 
   test("logs the attempt then the response on success", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue(
-        new Response('{"success":true,"count":1}', { status: 200 }),
-      );
+    const fetchMock = vi.fn().mockResolvedValue(new Response('{"success":true,"count":1}', { status: 200 }));
     const { logger, calls } = makeLogger();
     const snapshot = buildZaiSnapshot(USAGE, CREDS, NOW);
     await pushUsageSnapshot(snapshot, CREDS, { fetch: fetchMock, logger });
@@ -214,11 +192,7 @@ describe("pushUsageSnapshot logging", () => {
   });
 
   test("warns with status + body on a rejected (non-ok) response", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue(
-        new Response('{"error":"bad agent"}', { status: 422 }),
-      );
+    const fetchMock = vi.fn().mockResolvedValue(new Response('{"error":"bad agent"}', { status: 422 }));
     const { logger, calls } = makeLogger();
     const snapshot = buildZaiSnapshot(USAGE, CREDS, NOW);
     await pushUsageSnapshot(snapshot, CREDS, { fetch: fetchMock, logger });

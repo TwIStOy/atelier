@@ -6,20 +6,14 @@ const { executeSideCallMock } = vi.hoisted(() => ({
 }));
 
 vi.mock("@htwang-contrib/common", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("@htwang-contrib/common")>();
+  const actual = await importOriginal<typeof import("@htwang-contrib/common")>();
   return {
     ...actual,
     executeSideCall: executeSideCallMock,
   };
 });
 
-import {
-  buildSummaryPrompt,
-  lastAssistantMessage,
-  parseSummary,
-  summarizeAgentTurn,
-} from "../src/summarizer.ts";
+import { buildSummaryPrompt, lastAssistantMessage, parseSummary, summarizeAgentTurn } from "../src/summarizer.ts";
 
 const fakeRegistry = {
   getApiKeyAndHeaders: vi.fn(),
@@ -42,10 +36,7 @@ function assistantMessage(text: string): AssistantMessage {
 
 describe("buildSummaryPrompt", () => {
   test("includes user prompt and assistant reply", () => {
-    const messages = buildSummaryPrompt(
-      "fix the login bug",
-      assistantMessage("I patched auth.ts."),
-    );
+    const messages = buildSummaryPrompt("fix the login bug", assistantMessage("I patched auth.ts."));
     expect(messages).toHaveLength(1);
     const content = messages[0]!.content as string;
     expect(content).toContain("fix the login bug");
@@ -72,9 +63,7 @@ describe("parseSummary", () => {
   });
 
   test("merges multi-line summary into one message", () => {
-    const parsed = parseSummary(
-      "Refactor\nFirst line. Second line. Third line.",
-    );
+    const parsed = parseSummary("Refactor\nFirst line. Second line. Third line.");
     expect(parsed!.title).toBe("Refactor");
     expect(parsed!.message).toBe("First line. Second line. Third line.");
   });
@@ -115,17 +104,13 @@ describe("lastAssistantMessage", () => {
   });
 
   test("returns undefined when no assistant message", () => {
-    expect(
-      lastAssistantMessage([{ role: "user", content: "hi" }]),
-    ).toBeUndefined();
+    expect(lastAssistantMessage([{ role: "user", content: "hi" }])).toBeUndefined();
   });
 
   test("returns undefined for empty or invalid input", () => {
     expect(lastAssistantMessage(undefined)).toBeUndefined();
     expect(lastAssistantMessage([])).toBeUndefined();
-    expect(
-      lastAssistantMessage("nope" as unknown as unknown[]),
-    ).toBeUndefined();
+    expect(lastAssistantMessage("nope" as unknown as unknown[])).toBeUndefined();
   });
 });
 
