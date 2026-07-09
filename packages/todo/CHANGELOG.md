@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-07-09
+
 ### Breaking Changes
 
 - Split the single `todo` tool into six per-action tools: `todo_create`, `todo_update`, `todo_list`, `todo_get`, `todo_delete`, `todo_clear`. Each tool only exposes the fields its action needs, with required fields enforced at the schema level (`subject` for create, `id` for update/get/delete). The unified `todo` tool and its `action` parameter are removed. The underlying state reducer, transition validation, response envelope, `/todos` command, and overlay widget are unchanged.

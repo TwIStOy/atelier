@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-07-09
+
 ### Fixed
 
 - `moshi-hooks-extra` no longer crashes Pi with an uncaught "stale ctx" exception. The `agent_end` handler forwarded a captured `ctx` to a deferred `sendEnvelope` call that ran after an async summarization gap; if the session was replaced or reloaded in the meantime, Pi invalidates the captured ctx and reading any guarded accessor (`sessionManager`, `cwd`, `model`, ...) throws. `sendEnvelope` now snapshots the guarded ctx fields into a plain object at entry, and `agent_end` snapshots before the async gap, so no guarded getter is ever read after an `await`. A stale ctx degrades the payload's session id/cwd to fallbacks instead of throwing.
