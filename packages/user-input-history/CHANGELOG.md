@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Multi-line prompts are now flattened to a single line when navigating up/down through history, so previously-submitted multi-line entries no longer render as multiple editor lines while browsing ([#51](https://github.com/TwIStOy/pi-extensions/issues/51)).
+
 ## [0.2.4] - 2026-07-09
 
 ## [0.2.3] - 2026-07-09
