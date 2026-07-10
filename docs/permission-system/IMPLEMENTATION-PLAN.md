@@ -147,11 +147,20 @@ infra-read-paths/frontmatter, no JSON-Schema generation script yet.
 > with a mocked resolver + mocked UI; the real-session smoke test is the last
 > acceptance bar before Step 6.
 
-### Step 6 — Post-v1 niceties
+### Step 6 — Session approvals (DONE; audit log + suggestions still todo)
 
-- [ ] Session approvals (remember-a-decision via `bash-arity.prefix`) + test
-- [ ] Decision audit log (`permissionReviewLog`)
-- [ ] Pattern suggestions in the prompt
+- [x] `src/session-approval.ts` — `approvalKeyFromTrigger` (command→prefix, path→display, none→toolName) + `SessionApprovalStore` (has/remember/clear/size). Test: `test/session-approval.test.ts` (8 cases).
+- [x] Pipeline `dispatch` ask branch: 3-way `ui.select` [Allow once / Allow always (session) / Deny]; remembers the key on session choice; a hit skips the dialog. Headless still fails closed.
+- [x] `src/index.ts` — `SessionApprovalStore` lives in per-session state (cleared on every session_start).
+
+> **Verification:** 463 tests pass / 0 skipped (20 files); `npx tsc --build
+> packages/permission-system` clean; `npm run check` clean. Per-session scope
+> only — nothing is persisted to disk.
+
+### Step 7 — Post-v1 niceties (still todo)
+
+- [ ] Decision audit log (`permissionReviewLog`) — append every allow/ask/deny to a log file for post-hoc review.
+- [ ] Pattern suggestions in the prompt (offer to add a matched rule to config).
 
 ---
 
@@ -205,9 +214,11 @@ The biggest remaining chunk. Ports upstream's `path-containment.ts`,
 
 ### Step 6 (post-v1) — Session approvals & niceties
 
-- Remember-a-decision for the rest of the turn (uses `bash-arity.prefix` to scope the remembered pattern). Port `session-approval.test.ts`.
-- Decision audit log (`permissionReviewLog`).
-- Pattern suggestions in the prompt.
+- [x] Remember-a-decision per session (uses `bash-arity.prefix` to scope the
+  remembered pattern; 3-way Allow once / Allow always (session) / Deny select).
+  Test: `test/session-approval.test.ts` + pipeline tests.
+- [ ] Decision audit log (`permissionReviewLog`).
+- [ ] Pattern suggestions in the prompt.
 
 ## Risks & open items
 
