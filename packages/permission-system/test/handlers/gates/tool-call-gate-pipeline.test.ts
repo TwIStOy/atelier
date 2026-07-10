@@ -104,6 +104,56 @@ describe("runGatePipeline", () => {
     });
   });
 
+  // Default-policy denies (no config file): ~/.ssh and *.env are denied by the
+  // baked-in defaults. homedir is mocked to /mock/home at the top of this file,
+  // so both expandHomePath (in the matcher) and AccessPath agree on the home.
+  describe("default-policy deny", () => {
+    it("blocks a write to ~/.ssh/id_rsa (expanded absolute form)", async () => {
+      const tcc = makeTcc({
+        toolName: "write",
+        input: { path: "/mock/home/.ssh/id_rsa", content: "x" },
+        cwd: "/test/project",
+      });
+      const ui = makeUi();
+      const result = await run(tcc, makeDefaultResolver(), ui);
+      expect(result?.block).toBe(true);
+      expect(ui.confirm).not.toHaveBeenCalled();
+    });
+
+    it("blocks a read of .env.local (default *.env.* deny)", async () => {
+      const tcc = makeTcc({
+        toolName: "read",
+        input: { path: "/test/project/.env.local" },
+      });
+      const ui = makeUi();
+      const result = await run(tcc, makeDefaultResolver(), ui);
+      expect(result?.block).toBe(true);
+      expect(ui.confirm).not.toHaveBeenCalled();
+    });
+
+    it("blocks a bash read of ~/.ssh/config via the default path policy", async () => {
+      const tcc = makeTcc({
+        input: { command: "cat ~/.ssh/config" },
+        cwd: "/test/project",
+      });
+      const ui = makeUi();
+      const result = await run(tcc, makeDefaultResolver(), ui);
+      expect(result?.block).toBe(true);
+      expect(ui.confirm).not.toHaveBeenCalled();
+    });
+
+    it("cd-folding: denies rm of .env after cd into a subdir", async () => {
+      const tcc = makeTcc({
+        input: { command: "cd src && rm .env" },
+        cwd: "/test/project",
+      });
+      const ui = makeUi();
+      const result = await run(tcc, makeDefaultResolver(), ui);
+      expect(result?.block).toBe(true);
+      expect(ui.confirm).not.toHaveBeenCalled();
+    });
+  });
+
   describe("ask", () => {
     it("asks via ui.confirm and proceeds when the user accepts", async () => {
       const tcc = makeTcc({ input: { command: "npm test" } });
@@ -132,6 +182,17 @@ describe("runGatePipeline", () => {
       const result = await run(tcc, makeResolverFromConfig({ "*": "allow", bash: { "npm *": "ask" } }), ui, false);
       expect(ui.confirm).not.toHaveBeenCalled();
       expect(result).toEqual({ block: true, reason: expect.any(String) });
+    });
+
+    it("still blocks a deny in headless mode (deny is not downgraded by hasUI)", async () => {
+      const tcc = makeTcc({
+        toolName: "read",
+        input: { path: "/test/project/.env" },
+      });
+      const ui = makeUi();
+      const result = await run(tcc, makeDefaultResolver(), ui, false);
+      expect(ui.confirm).not.toHaveBeenCalled();
+      expect(result?.block).toBe(true);
     });
   });
 
