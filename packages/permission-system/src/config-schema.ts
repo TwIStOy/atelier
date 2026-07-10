@@ -31,10 +31,12 @@ export const permissionMapSchema = z.record(z.string().min(1), patternValueSchem
  */
 export const permissionSchema = z.record(z.string().min(1), z.union([permissionStateSchema, permissionMapSchema]));
 
-/** The on-disk config file. `permission` is the only policy field in v1. */
+/** The on-disk config file. `permission` is the policy; `permissionReviewLog`
+ * toggles the JSONL audit log (default on). */
 export const unifiedConfigSchema = z.strictObject({
   $schema: z.string().optional(),
   permission: permissionSchema.optional(),
+  permissionReviewLog: z.boolean().optional(),
 });
 
 export type PermissionState = z.infer<typeof permissionStateSchema>;

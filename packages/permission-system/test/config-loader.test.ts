@@ -47,6 +47,11 @@ describe("validateUnifiedConfig", () => {
     expect(result.issues).toEqual([]);
   });
 
+  it("accepts the permissionReviewLog toggle", () => {
+    expect(validateUnifiedConfig({ permissionReviewLog: false }).issues).toEqual([]);
+    expect(validateUnifiedConfig({ permissionReviewLog: "yes" }).issues).not.toEqual([]);
+  });
+
   it("rejects an unrecognized top-level key", () => {
     const result = validateUnifiedConfig({ bogus: 1 });
     expect(result.issues.some((i) => i.includes("Unrecognized config key 'bogus'"))).toBe(true);
@@ -93,6 +98,15 @@ describe("mergeUnifiedConfigs", () => {
   it("takes override permission when base has none", () => {
     const merged = mergeUnifiedConfigs({}, { permission: { "*": "ask" } });
     expect(merged.permission?.["*"]).toBe("ask");
+  });
+
+  it("merges permissionReviewLog with override-wins", () => {
+    expect(mergeUnifiedConfigs({}, {}).permissionReviewLog).toBeUndefined();
+    expect(mergeUnifiedConfigs({ permissionReviewLog: false }, {}).permissionReviewLog).toBe(false);
+    expect(mergeUnifiedConfigs({ permissionReviewLog: true }, { permissionReviewLog: false }).permissionReviewLog).toBe(
+      false,
+    );
+    expect(mergeUnifiedConfigs({ permissionReviewLog: false }, {}).permissionReviewLog).toBe(false);
   });
 });
 

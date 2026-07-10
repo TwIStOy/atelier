@@ -111,7 +111,8 @@ export function mergeFlatPermissions(base: FlatPermissionConfig, override: FlatP
   return merged;
 }
 
-/** Merge two unified configs (override wins; permission map deep-merged). */
+/** Merge two unified configs (override wins; permission map deep-merged).
+ * `permissionReviewLog` (if set on either side) follows override-wins. */
 export function mergeUnifiedConfigs(
   base: UnifiedPermissionConfig,
   override: UnifiedPermissionConfig,
@@ -125,6 +126,11 @@ export function mergeUnifiedConfigs(
     merged.permission = overridePerm;
   } else if (basePerm) {
     merged.permission = basePerm;
+  }
+  if (override.permissionReviewLog !== undefined) {
+    merged.permissionReviewLog = override.permissionReviewLog;
+  } else if (base.permissionReviewLog !== undefined) {
+    merged.permissionReviewLog = base.permissionReviewLog;
   }
   return merged;
 }
@@ -185,6 +191,8 @@ export interface MergedConfigResult {
   merged: UnifiedPermissionConfig;
   /** Final permission map with defaults applied. */
   permission: FlatPermissionConfig;
+  /** Whether the JSONL audit log is enabled (default on). */
+  permissionReviewLog: boolean;
   issues: string[];
 }
 
@@ -217,6 +225,7 @@ export function loadAndMergeConfigs(agentDir: string, cwd: string): MergedConfig
     project: projectConfig,
     merged,
     permission: applyDefaults(merged),
+    permissionReviewLog: merged.permissionReviewLog ?? true,
     issues,
   };
 }
