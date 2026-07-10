@@ -4,11 +4,15 @@
 
 ### Fixed
 
+- Confirmation prompts now lead with the **tool name** (e.g. `memory-read`,
+  `bash: rm <path>`) so the user knows what they are approving. A non-path
+  custom tool previously prompted as a vague `read (no specific path or
+  command)`.
 - Pipeline now aggregates all gate results into one most-restrictive decision
   (deny > ask > allow) and prompts **once** per call. Previously a tool call
   matching two `ask` gates (e.g. an external-directory write) prompted twice.
-- Bash command prompts now show the full command (e.g. `execute: rm <path>`)
-  instead of just the subcommand prefix (`execute: rm`).
+- Bash command prompts now show the full command (e.g. `bash: rm <path>`)
+  instead of just the subcommand prefix (`bash: rm`).
 
 ### Added
 
