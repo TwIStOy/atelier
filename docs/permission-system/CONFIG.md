@@ -94,10 +94,29 @@ gates 3–5.
 ## State semantics
 
 - `allow` — proceed (no prompt).
-- `ask` — show a confirmation dialog (`ctx.ui.confirm`). **Headless sessions
-  (print/json mode, `ctx.hasUI === false`) fail closed**: `ask` resolves to
-  `deny`. The command is never silently allowed.
+- `ask` — show a permission dialog with three choices: **Allow once**, **Allow
+  always (session)**, **Deny**. **Headless sessions** (print/json mode,
+  `ctx.hasUI === false`) fail closed: `ask` resolves to `deny`. The command is
+  never silently allowed.
 - `deny` — block the tool call with the rule's reason.
+
+## Session approvals (remember a decision)
+
+When you pick **Allow always (session)** on an `ask` prompt, the decision is
+remembered for the rest of the current pi session: later calls matching the
+same key skip the dialog entirely. This is per-session only — remembered
+approvals are cleared on session start/reload and are never written to disk.
+
+The key a remembered approval matches on is derived from what triggered the
+prompt:
+
+| Trigger | Key | Example |
+| --- | --- | --- |
+| bash command | `command:<prefix>` (bash-arity subcommand) | approving `npm test` later covers `npm test --verbose` |
+| filesystem path | `path:<path>` | the exact path token |
+| whole tool | `tool:<toolName>` | any call of that tool |
+
+**Allow once** does not remember — the next matching call prompts again.
 
 ## Permissive-bash fallback warning
 
