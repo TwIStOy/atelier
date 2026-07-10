@@ -4,6 +4,10 @@
 
 ### Added
 
+- The `ask` prompt now shows a **permanent-allow config snippet** (e.g.
+  `bash: { "npm test *": "allow" }`) so the user knows exactly what to add to
+  stop being asked. The hint reflects the surface that actually fired
+  (`path` vs `external_directory`).
 - Session approvals: an `ask` prompt now offers **Allow once**, **Allow
   always (session)**, and **Deny**. Choosing session scope remembers the
   decision for the rest of the pi session (by bash prefix / path / tool name),
