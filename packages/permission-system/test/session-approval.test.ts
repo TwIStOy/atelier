@@ -5,7 +5,7 @@ import type { GateTrigger } from "../src/types.ts";
 
 function pathTrigger(display: string): GateTrigger {
   const path = AccessPath.forLiteral(display, [display]);
-  return { kind: "path", path, display };
+  return { kind: "path", surface: "path", path, display };
 }
 
 describe("approvalKeyFromTrigger", () => {
