@@ -4,6 +4,11 @@
 
 ### Added
 
+- Decision audit log: every allow/ask/deny decision is appended as JSONL to
+  `~/.pi/agent/extensions/permission-system/logs/review.jsonl`, with a
+  `decision` field distinguishing the path taken (`allow`, `ask-allowed`,
+  `ask-denied`, `ask-headless-denied`, `deny`). Toggle with the new top-level
+  `permissionReviewLog` config key (default on).
 - The `ask` prompt now shows a **permanent-allow config snippet** (e.g.
   `bash: { "npm test *": "allow" }`) so the user knows exactly what to add to
   stop being asked. The hint reflects the surface that actually fired
