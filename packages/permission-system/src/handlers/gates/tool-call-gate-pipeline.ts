@@ -35,11 +35,28 @@ export interface PipelineDeps {
 
 export type PipelineResult = { block: true; reason: string } | undefined;
 
-const CONFIRM_TITLE = "Permission required";
 const ALLOW_ONCE = "Allow once";
 const ALLOW_SESSION = "Allow always (session)";
 const DENY_CHOICE = "Deny";
 const CHOICES = [ALLOW_ONCE, ALLOW_SESSION, DENY_CHOICE];
+
+/** A compact config snippet that would make this call `allow` permanently.
+ * Shown in the prompt so the user knows how to stop being asked. The bash
+ * pattern is `prefix *` so it matches the same family of subcommands the
+ * session approval would (e.g. `npm test *` covers `npm test --verbose`). */
+function configHint(result: GateResult): string {
+  switch (result.trigger.kind) {
+    case "command": {
+      const p = result.trigger.prefix ?? result.trigger.command;
+      const pattern = p === result.trigger.command ? p : `${p} *`;
+      return `bash: { "${pattern}": "allow" }`;
+    }
+    case "path":
+      return `${result.trigger.surface}: { "${result.trigger.display}": "allow" }`;
+    case "none":
+      return `${result.trigger.toolName}: "allow"`;
+  }
+}
 
 const RESTRICTIVENESS: Record<PermissionState, number> = {
   allow: 0,
@@ -159,7 +176,10 @@ async function dispatch(
   const key = approvalKeyFromTrigger(result.trigger);
   if (approvals?.has(key)) return undefined;
 
-  const choice = await ui.select(`${CONFIRM_TITLE}: ${describeForPrompt(result, toolName)}`, CHOICES);
+  const choice = await ui.select(
+    `${describeForPrompt(result, toolName)} — allow? (permanent: ${configHint(result)})`,
+    CHOICES,
+  );
   if (choice === ALLOW_ONCE) return undefined;
   if (choice === ALLOW_SESSION) {
     approvals?.remember(key);

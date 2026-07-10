@@ -287,7 +287,9 @@ describe("runGatePipeline", () => {
       ui.select.mockResolvedValue("Allow once");
       await run(tcc, makeDefaultResolver(), ui);
       const title = ui.select.mock.calls[0]?.[0];
-      expect(title).toBe("Permission required: bash: rm /tmp/pi-test-tmpfile.txt && echo removed");
+      expect(title).toBe(
+        'bash: rm /tmp/pi-test-tmpfile.txt && echo removed — allow? (permanent: bash: { "rm *": "allow" })',
+      );
     });
   });
 
@@ -306,7 +308,34 @@ describe("runGatePipeline", () => {
       const result = await run(tcc, makeDefaultResolver(), ui);
       expect(result).toBeUndefined();
       const title = ui.select.mock.calls[0]?.[0];
-      expect(title).toBe("Permission required: memory-read");
+      expect(title).toBe('memory-read — allow? (permanent: memory-read: "allow")');
+    });
+  });
+
+  // The prompt must include a config snippet showing how to allow the call
+  // permanently, so the user can stop being asked by editing the config.
+  describe("permanent-allow config hint in prompt", () => {
+    it("shows a bash pattern hint for a command trigger", async () => {
+      const tcc = makeTcc({ input: { command: "npm test --verbose" } });
+      const ui = makeUi();
+      ui.select.mockResolvedValue("Allow once");
+      await run(tcc, makeResolverFromConfig({ "*": "allow", bash: { "*": "ask" } }), ui);
+      const title = ui.select.mock.calls[0]?.[0];
+      // prefix is 'npm test' (arity 2); hint offers 'npm test *'.
+      expect(title).toContain('permanent: bash: { "npm test *": "allow" }');
+    });
+
+    it("shows an external_directory hint for an external path trigger", async () => {
+      const tcc = makeTcc({
+        toolName: "write",
+        input: { path: "/tmp/outside.txt" },
+        cwd: "/test/project",
+      });
+      const ui = makeUi();
+      ui.select.mockResolvedValue("Allow once");
+      await run(tcc, makeDefaultResolver(), ui);
+      const title = ui.select.mock.calls[0]?.[0];
+      expect(title).toContain('permanent: external_directory: { "/tmp/outside.txt": "allow" }');
     });
   });
 
