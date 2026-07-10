@@ -17,6 +17,7 @@ import { runGatePipeline } from "../../../src/handlers/gates/tool-call-gate-pipe
 import { PathNormalizer } from "../../../src/path-normalizer.ts";
 import { PermissionResolver } from "../../../src/permission-resolver.ts";
 import { normalizeFlatConfig } from "../../../src/rule.ts";
+import { SessionApprovalStore } from "../../../src/session-approval.ts";
 import type { FlatPermissionConfig, ScopedPermissionResolver, ToolCallContext } from "../../../src/types.ts";
 
 import { makeResolver, makeTcc } from "../../helpers/gate-fixtures.ts";
@@ -38,9 +39,9 @@ function makeDefaultResolver(): ScopedPermissionResolver {
 }
 
 function makeUi() {
-  const confirm = vi.fn<(...args: unknown[]) => Promise<boolean>>();
   const notify = vi.fn<(...args: unknown[]) => void>();
-  return { confirm, notify };
+  const select = vi.fn<(...args: unknown[]) => Promise<string | undefined>>();
+  return { notify, select };
 }
 
 async function run(
@@ -48,12 +49,14 @@ async function run(
   resolver: ScopedPermissionResolver,
   ui: ReturnType<typeof makeUi>,
   hasUI = true,
+  approvals?: SessionApprovalStore,
 ) {
   return runGatePipeline(tcc, {
     resolver,
     normalizer: new PathNormalizer(process.platform, tcc.cwd),
     ui,
     hasUI,
+    approvals,
   });
 }
 
@@ -79,12 +82,12 @@ describe("runGatePipeline", () => {
   });
 
   describe("deny", () => {
-    it("blocks a bash deny rule without calling ui.confirm", async () => {
+    it("blocks a bash deny rule without calling ui.select", async () => {
       const tcc = makeTcc({ input: { command: "rm -rf /" } });
       const ui = makeUi();
       const result = await run(tcc, makeResolverFromConfig({ "*": "allow", bash: { "rm *": "deny" } }), ui);
       expect(result).toEqual({ block: true, reason: expect.stringContaining("rm") });
-      expect(ui.confirm).not.toHaveBeenCalled();
+      expect(ui.select).not.toHaveBeenCalled();
     });
 
     it("blocks a path deny rule (tools) on .env", async () => {
@@ -92,7 +95,7 @@ describe("runGatePipeline", () => {
       const ui = makeUi();
       const result = await run(tcc, makeResolverFromConfig({ "*": "allow", path: { "*.env": "deny" } }), ui);
       expect(result?.block).toBe(true);
-      expect(ui.confirm).not.toHaveBeenCalled();
+      expect(ui.select).not.toHaveBeenCalled();
     });
 
     it("blocks a bash path deny rule on a .env token", async () => {
@@ -100,7 +103,7 @@ describe("runGatePipeline", () => {
       const ui = makeUi();
       const result = await run(tcc, makeResolverFromConfig({ "*": "allow", path: { "*.env": "deny" } }), ui);
       expect(result?.block).toBe(true);
-      expect(ui.confirm).not.toHaveBeenCalled();
+      expect(ui.select).not.toHaveBeenCalled();
     });
   });
 
@@ -117,7 +120,7 @@ describe("runGatePipeline", () => {
       const ui = makeUi();
       const result = await run(tcc, makeDefaultResolver(), ui);
       expect(result?.block).toBe(true);
-      expect(ui.confirm).not.toHaveBeenCalled();
+      expect(ui.select).not.toHaveBeenCalled();
     });
 
     it("blocks a read of .env.local (default *.env.* deny)", async () => {
@@ -128,7 +131,7 @@ describe("runGatePipeline", () => {
       const ui = makeUi();
       const result = await run(tcc, makeDefaultResolver(), ui);
       expect(result?.block).toBe(true);
-      expect(ui.confirm).not.toHaveBeenCalled();
+      expect(ui.select).not.toHaveBeenCalled();
     });
 
     it("blocks a bash read of ~/.ssh/config via the default path policy", async () => {
@@ -139,7 +142,7 @@ describe("runGatePipeline", () => {
       const ui = makeUi();
       const result = await run(tcc, makeDefaultResolver(), ui);
       expect(result?.block).toBe(true);
-      expect(ui.confirm).not.toHaveBeenCalled();
+      expect(ui.select).not.toHaveBeenCalled();
     });
 
     it("cd-folding: denies rm of .env after cd into a subdir", async () => {
@@ -150,27 +153,35 @@ describe("runGatePipeline", () => {
       const ui = makeUi();
       const result = await run(tcc, makeDefaultResolver(), ui);
       expect(result?.block).toBe(true);
-      expect(ui.confirm).not.toHaveBeenCalled();
+      expect(ui.select).not.toHaveBeenCalled();
     });
   });
 
   describe("ask", () => {
-    it("asks via ui.confirm and proceeds when the user accepts", async () => {
+    it("prompts via ui.select and proceeds on 'Allow once'", async () => {
       const tcc = makeTcc({ input: { command: "npm test" } });
       const ui = makeUi();
-      ui.confirm.mockResolvedValue(true);
-      const result = await run(tcc, makeResolverFromConfig({ "*": "allow", bash: { "npm *": "ask" } }), ui);
-      expect(ui.confirm).toHaveBeenCalledTimes(1);
-      expect(ui.confirm.mock.calls[0]?.[0]).toBe("Permission required");
+      ui.select.mockResolvedValue("Allow once");
+      const approvals = new SessionApprovalStore();
+      const result = await run(
+        tcc,
+        makeResolverFromConfig({ "*": "allow", bash: { "npm *": "ask" } }),
+        ui,
+        true,
+        approvals,
+      );
+      expect(ui.select).toHaveBeenCalledTimes(1);
       expect(result).toBeUndefined();
+      // 'Allow once' does not remember the decision.
+      expect(approvals.size).toBe(0);
     });
 
-    it("asks via ui.confirm and blocks when the user rejects", async () => {
+    it("blocks on 'Deny'", async () => {
       const tcc = makeTcc({ input: { command: "npm test" } });
       const ui = makeUi();
-      ui.confirm.mockResolvedValue(false);
+      ui.select.mockResolvedValue("Deny");
       const result = await run(tcc, makeResolverFromConfig({ "*": "allow", bash: { "npm *": "ask" } }), ui);
-      expect(ui.confirm).toHaveBeenCalledTimes(1);
+      expect(ui.select).toHaveBeenCalledTimes(1);
       expect(result).toEqual({ block: true, reason: expect.any(String) });
     });
   });
@@ -180,7 +191,7 @@ describe("runGatePipeline", () => {
       const tcc = makeTcc({ input: { command: "npm test" } });
       const ui = makeUi();
       const result = await run(tcc, makeResolverFromConfig({ "*": "allow", bash: { "npm *": "ask" } }), ui, false);
-      expect(ui.confirm).not.toHaveBeenCalled();
+      expect(ui.select).not.toHaveBeenCalled();
       expect(result).toEqual({ block: true, reason: expect.any(String) });
     });
 
@@ -191,7 +202,7 @@ describe("runGatePipeline", () => {
       });
       const ui = makeUi();
       const result = await run(tcc, makeDefaultResolver(), ui, false);
-      expect(ui.confirm).not.toHaveBeenCalled();
+      expect(ui.select).not.toHaveBeenCalled();
       expect(result?.block).toBe(true);
     });
   });
@@ -206,7 +217,7 @@ describe("runGatePipeline", () => {
         makeResolverFromConfig({ "*": "allow", path: { "*.env": "deny" }, bash: { "*": "ask" } }),
         ui,
       );
-      expect(ui.confirm).not.toHaveBeenCalled();
+      expect(ui.select).not.toHaveBeenCalled();
       expect(result?.block).toBe(true);
     });
   });
@@ -244,10 +255,10 @@ describe("runGatePipeline", () => {
         cwd: "/test/project",
       });
       const ui = makeUi();
-      ui.confirm.mockResolvedValue(true);
+      ui.select.mockResolvedValue("Allow once");
       const result = await run(tcc, makeDefaultResolver(), ui);
       expect(result).toBeUndefined();
-      expect(ui.confirm).toHaveBeenCalledTimes(1);
+      expect(ui.select).toHaveBeenCalledTimes(1);
     });
 
     it("the single prompt carries the path", async () => {
@@ -257,10 +268,10 @@ describe("runGatePipeline", () => {
         cwd: "/test/project",
       });
       const ui = makeUi();
-      ui.confirm.mockResolvedValue(true);
+      ui.select.mockResolvedValue("Allow once");
       await run(tcc, makeDefaultResolver(), ui);
-      const message = ui.confirm.mock.calls[0]?.[1];
-      expect(message).toContain("/tmp/outside.txt");
+      const title = ui.select.mock.calls[0]?.[0];
+      expect(title).toContain("/tmp/outside.txt");
     });
   });
 
@@ -273,10 +284,10 @@ describe("runGatePipeline", () => {
         cwd: "/test/project",
       });
       const ui = makeUi();
-      ui.confirm.mockResolvedValue(true);
+      ui.select.mockResolvedValue("Allow once");
       await run(tcc, makeDefaultResolver(), ui);
-      const message = ui.confirm.mock.calls[0]?.[1];
-      expect(message).toBe("bash: rm /tmp/pi-test-tmpfile.txt && echo removed");
+      const title = ui.select.mock.calls[0]?.[0];
+      expect(title).toBe("Permission required: bash: rm /tmp/pi-test-tmpfile.txt && echo removed");
     });
   });
 
@@ -291,11 +302,66 @@ describe("runGatePipeline", () => {
         cwd: "/test/project",
       });
       const ui = makeUi();
-      ui.confirm.mockResolvedValue(true);
+      ui.select.mockResolvedValue("Allow once");
       const result = await run(tcc, makeDefaultResolver(), ui);
       expect(result).toBeUndefined();
-      const message = ui.confirm.mock.calls[0]?.[1];
-      expect(message).toBe("memory-read");
+      const title = ui.select.mock.calls[0]?.[0];
+      expect(title).toBe("Permission required: memory-read");
+    });
+  });
+
+  // Session approvals: 'Allow always (session)' remembers the decision so the
+  // same pattern does not prompt again; 'Allow once' does not. A remembered
+  // approval skips the dialog entirely.
+  describe("session approvals", () => {
+    it("remembers the decision on 'Allow always (session)'", async () => {
+      const tcc = makeTcc({ input: { command: "npm test" } });
+      const ui = makeUi();
+      ui.select.mockResolvedValue("Allow always (session)");
+      const approvals = new SessionApprovalStore();
+      const result = await run(
+        tcc,
+        makeResolverFromConfig({ "*": "allow", bash: { "npm *": "ask" } }),
+        ui,
+        true,
+        approvals,
+      );
+      expect(result).toBeUndefined();
+      expect(approvals.size).toBe(1);
+    });
+
+    it("does not prompt again after a remembered approval (same prefix)", async () => {
+      const resolver = makeResolverFromConfig({ "*": "allow", bash: { "npm *": "ask" } });
+      const approvals = new SessionApprovalStore();
+      const ui = makeUi();
+
+      // First call: prompt, user picks 'Allow always (session)'.
+      ui.select.mockResolvedValueOnce("Allow always (session)");
+      const tcc1 = makeTcc({ input: { command: "npm test" } });
+      await run(tcc1, resolver, ui, true, approvals);
+      expect(ui.select).toHaveBeenCalledTimes(1);
+
+      // Second call with a different command under the same prefix: no prompt.
+      ui.select.mockClear();
+      const tcc2 = makeTcc({ input: { command: "npm test --verbose" } });
+      const result = await run(tcc2, resolver, ui, true, approvals);
+      expect(ui.select).not.toHaveBeenCalled();
+      expect(result).toBeUndefined();
+    });
+
+    it("does not remember 'Allow once'", async () => {
+      const resolver = makeResolverFromConfig({ "*": "allow", bash: { "npm *": "ask" } });
+      const approvals = new SessionApprovalStore();
+      const ui = makeUi();
+      ui.select.mockResolvedValue("Allow once");
+
+      const tcc1 = makeTcc({ input: { command: "npm test" } });
+      await run(tcc1, resolver, ui, true, approvals);
+      // A second identical call still prompts.
+      ui.select.mockClear();
+      const tcc2 = makeTcc({ input: { command: "npm test" } });
+      await run(tcc2, resolver, ui, true, approvals);
+      expect(ui.select).toHaveBeenCalledTimes(1);
     });
   });
 });

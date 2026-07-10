@@ -1,5 +1,6 @@
 import { BashProgram } from "../../access-intent/bash/program.ts";
 import type { PathNormalizer } from "../../path-normalizer.ts";
+import { approvalKeyFromTrigger, type SessionApprovalStore } from "../../session-approval.ts";
 import type {
   AccessIntent,
   GateResult,
@@ -17,7 +18,7 @@ import { describeToolGate } from "./tool.ts";
 
 /** What the pipeline hands to a caller that can show a UI. */
 export interface PipelineUI {
-  confirm(title: string, message: string): Promise<boolean>;
+  select(title: string, options: string[]): Promise<string | undefined>;
   notify(message: string, type?: "info" | "warning" | "error"): void;
 }
 
@@ -28,11 +29,17 @@ export interface PipelineDeps {
   ui: PipelineUI | null;
   /** Whether dialog-capable UI is available (ctx.hasUI). Default true. */
   hasUI?: boolean;
+  /** Per-session store of approvals the user chose to remember. */
+  approvals?: SessionApprovalStore;
 }
 
 export type PipelineResult = { block: true; reason: string } | undefined;
 
 const CONFIRM_TITLE = "Permission required";
+const ALLOW_ONCE = "Allow once";
+const ALLOW_SESSION = "Allow always (session)";
+const DENY_CHOICE = "Deny";
+const CHOICES = [ALLOW_ONCE, ALLOW_SESSION, DENY_CHOICE];
 
 const RESTRICTIVENESS: Record<PermissionState, number> = {
   allow: 0,
@@ -78,7 +85,7 @@ export async function runGatePipeline(tcc: ToolCallContext, deps: PipelineDeps):
   results.push(describeToolGate(tcc, toolCheck));
 
   const decision = mostRestrictive(results);
-  return dispatch(decision, tcc.toolName, ui, hasUI);
+  return dispatch(decision, tcc.toolName, deps.approvals, ui, hasUI);
 }
 
 function pushNonNull(out: GateResult[], result: GateResult | null): void {
@@ -134,6 +141,7 @@ function toolIntent(tcc: ToolCallContext): AccessIntent {
 async function dispatch(
   result: GateResult,
   toolName: string,
+  approvals: SessionApprovalStore | undefined,
   ui: PipelineUI | null,
   hasUI: boolean,
 ): Promise<PipelineResult> {
@@ -147,9 +155,17 @@ async function dispatch(
   if (!hasUI || !ui) {
     return { block: true, reason: reasonFor(result, toolName, "requires confirmation (headless mode denies)") };
   }
-  const message = describeForPrompt(result, toolName);
-  const accepted = await ui.confirm(CONFIRM_TITLE, message);
-  if (accepted) return undefined;
+  // A remembered approval covers this call without a prompt.
+  const key = approvalKeyFromTrigger(result.trigger);
+  if (approvals?.has(key)) return undefined;
+
+  const choice = await ui.select(`${CONFIRM_TITLE}: ${describeForPrompt(result, toolName)}`, CHOICES);
+  if (choice === ALLOW_ONCE) return undefined;
+  if (choice === ALLOW_SESSION) {
+    approvals?.remember(key);
+    return undefined;
+  }
+  // Deny or dismissed (undefined) — headless select returns undefined too.
   return { block: true, reason: reasonFor(result, toolName, "user declined the permission prompt") };
 }
 

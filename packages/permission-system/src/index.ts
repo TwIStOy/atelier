@@ -6,6 +6,7 @@ import { runGatePipeline } from "./handlers/gates/tool-call-gate-pipeline.ts";
 import { PathNormalizer } from "./path-normalizer.ts";
 import { PermissionResolver } from "./permission-resolver.ts";
 import { normalizeFlatConfig } from "./rule.ts";
+import { SessionApprovalStore } from "./session-approval.ts";
 import type { ScopedPermissionResolver, ToolCallContext } from "./types.ts";
 
 const logger = createLogger("@htwang-contrib/permission-system");
@@ -13,6 +14,7 @@ const logger = createLogger("@htwang-contrib/permission-system");
 interface SessionState {
   resolver: ScopedPermissionResolver;
   normalizer: PathNormalizer;
+  approvals: SessionApprovalStore;
 }
 
 let state: SessionState | null = null;
@@ -27,7 +29,8 @@ export default function permissionSystemExtension(pi: ExtensionAPI): void {
       for (const issue of result.issues) logger.warn(issue);
       const resolver = new PermissionResolver(normalizeFlatConfig(result.permission));
       const normalizer = new PathNormalizer(process.platform, cwd);
-      state = { resolver, normalizer };
+      const approvals = new SessionApprovalStore();
+      state = { resolver, normalizer, approvals };
       logger.info(`session started (cwd=${cwd}, issues=${result.issues.length})`);
     } catch (error) {
       logger.error(`failed to load config: ${String(error)}`);
@@ -47,6 +50,7 @@ export default function permissionSystemExtension(pi: ExtensionAPI): void {
       return await runGatePipeline(tcc, {
         resolver: state.resolver,
         normalizer: state.normalizer,
+        approvals: state.approvals,
         ui: ctx.ui,
         hasUI: ctx.hasUI,
       });
