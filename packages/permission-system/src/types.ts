@@ -71,7 +71,7 @@ export type ToolAction = "read" | "write" | "execute" | "delete";
  *   gated purely by name).
  */
 export type GateTrigger =
-  | { kind: "path"; path: AccessPath; display: string }
+  | { kind: "path"; surface: "path" | "external_directory"; path: AccessPath; display: string }
   | { kind: "command"; command: string; prefix?: string }
   | { kind: "none"; toolName: string };
 
