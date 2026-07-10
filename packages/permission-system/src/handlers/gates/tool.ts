@@ -43,7 +43,7 @@ function deriveToolTrigger(tcc: ToolCallContext, accessPath: AccessPath | undefi
   }
   const path = getNonEmptyString(toRecord(tcc.input).path);
   if (path && accessPath) {
-    return { kind: "path", path: accessPath, display: path };
+    return { kind: "path", surface: "path", path: accessPath, display: path };
   }
   return { kind: "none", toolName: tcc.toolName };
 }

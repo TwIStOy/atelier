@@ -37,7 +37,7 @@ export function describePathGate(
   return {
     state: check.state,
     action: actionFromTool(tcc.toolName),
-    trigger: { kind: "path", path: accessPath, display: filePath },
+    trigger: { kind: "path", surface: "path", path: accessPath, display: filePath },
     reason: check.state === "deny" ? `path rule '${check.matchedPattern}' denies '${filePath}'` : undefined,
   };
 }

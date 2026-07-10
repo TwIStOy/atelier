@@ -39,7 +39,7 @@ export function describeExternalDirectoryGate(
   return {
     state: check.state,
     action: actionFromTool(tcc.toolName),
-    trigger: { kind: "path", path: accessPath, display: externalDirectoryPath },
+    trigger: { kind: "path", surface: "external_directory", path: accessPath, display: externalDirectoryPath },
     reason: check.state === "deny" ? `path '${externalDirectoryPath}' is outside the working directory` : undefined,
   };
 }

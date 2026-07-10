@@ -64,7 +64,7 @@ export function describeBashPathGate(
   return {
     state: worst.state,
     action: "read",
-    trigger: { kind: "path", path: worstEntry.path, display: worstEntry.token },
+    trigger: { kind: "path", surface: "path", path: worstEntry.path, display: worstEntry.token },
     reason: worst.state === "deny" ? `path rule '${worst.matchedPattern}' denies a bash path token` : undefined,
   };
 }
