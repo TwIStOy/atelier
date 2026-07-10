@@ -134,13 +134,18 @@ infra-read-paths/frontmatter, no JSON-Schema generation script yet.
 
 ### Step 5 — Extension wiring
 
-- [ ] `src/handlers/gates/tool-call-gate-pipeline.ts` (moved from Step 3 — ordered gate assembly + single `BashProgram.parse`; composes the 5 gates' `{state,action,trigger,reason?}|null` results: null→skip, deny→block, ask→confirm, else proceed). Uses PermissionResolver from Step 4 + loadAndMergeConfigs(getAgentDir(), cwd).
-- [ ] `src/index.ts` factory: session_start (load config), tool_call (run pipeline, ui.confirm on ask, block on deny), session_shutdown
-- [ ] Headless fail-closed: `ctx.hasUI === false` → ask resolves to deny
-- [ ] Register in root `package.json` `pi.extensions`
-- [ ] Remove `protect-secrets` from `pi.extensions` (RESEARCH.md §10 D4)
-- [ ] README + `docs/permission-system/` config reference
+- [x] `src/handlers/gates/tool-call-gate-pipeline.ts` (ordered gate assembly + single `BashProgram.parse`; composes the 5 gates' `{state,action,trigger,reason?}|null` results: null→skip, deny→block, ask→confirm, else proceed). Uses PermissionResolver from Step 4 + loadAndMergeConfigs(getAgentDir(), cwd). Test: `test/handlers/gates/tool-call-gate-pipeline.test.ts` (12 cases).
+- [x] `src/index.ts` factory: session_start (load config), tool_call (run pipeline, ui.confirm on ask, block on deny)
+- [x] Headless fail-closed: `ctx.hasUI === false` → ask resolves to deny
+- [x] Register in root `package.json` `pi.extensions`
+- [x] Remove `protect-secrets` from `pi.extensions` (RESEARCH.md §10 D4) — user confirmed 2026-07-10
+- [x] README + `docs/permission-system/CONFIG.md` config reference
 - [ ] Manual smoke test in a real pi session (deny/ask/allow)
+
+> **Verification:** 443 tests pass / 0 skipped (19 files); `npx tsc --build
+> packages/permission-system` clean; `npm run check` clean. Pipeline is unit-tested
+> with a mocked resolver + mocked UI; the real-session smoke test is the last
+> acceptance bar before Step 6.
 
 ### Step 6 — Post-v1 niceties
 
