@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Added
+
+- Session approvals: an `ask` prompt now offers **Allow once**, **Allow
+  always (session)**, and **Deny**. Choosing session scope remembers the
+  decision for the rest of the pi session (by bash prefix / path / tool name),
+  so repeated matching calls skip the dialog. Per-session only — nothing is
+  written to disk.
+
 ### Fixed
 
 - Confirmation prompts now lead with the **tool name** (e.g. `memory-read`,

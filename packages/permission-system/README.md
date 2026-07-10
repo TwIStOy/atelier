@@ -42,9 +42,11 @@ across gates 3–5. Each gate returns `allow` / `ask` / `deny` (or `null` if it
 does not apply); `deny` blocks, `ask` prompts, `allow` proceeds.
 
 - `deny` → the tool call is blocked with the rule's reason.
-- `ask` → a confirmation dialog (`ctx.ui.confirm`) is shown. Headless sessions
-  (`ctx.hasUI === false`, e.g. print/json mode) **fail closed**: `ask` resolves
-  to `deny`, never silently allowing.
+- `ask` → a permission dialog offers **Allow once**, **Allow always (session)**,
+  and **Deny**. Session scope remembers the decision for the rest of the pi
+  session (by bash prefix / path / tool). Headless sessions (`ctx.hasUI ===
+  false`, e.g. print/json mode) **fail closed**: `ask` resolves to `deny`, never
+  silently allowing.
 - `allow` → the call proceeds.
 
 ## Configuration
