@@ -157,10 +157,15 @@ infra-read-paths/frontmatter, no JSON-Schema generation script yet.
 > packages/permission-system` clean; `npm run check` clean. Per-session scope
 > only — nothing is persisted to disk.
 
-### Step 7 — Post-v1 niceties (still todo)
+### Step 7 — Decision audit log (DONE; pattern suggestions already covered by Step 6)
 
-- [ ] Decision audit log (`permissionReviewLog`) — append every allow/ask/deny to a log file for post-hoc review.
-- [ ] Pattern suggestions in the prompt (offer to add a matched rule to config).
+- [x] `src/decision-log.ts` — `DecisionLogger` interface + `FileDecisionLogger` (JSONL append, IO errors swallowed, enabled toggle). Test: `test/decision-log.test.ts` (5 cases).
+- [x] `permissionReviewLog` config toggle (schema + loader, default on, override-wins merge). Tests in `test/config-loader.test.ts`.
+- [x] Pipeline `dispatch` records every decision (allow / ask-allowed / ask-denied / ask-headless-denied / deny). `index.ts` wires `FileDecisionLogger` (path under `getGlobalConfigDir()/logs/review.jsonl`). Tests in pipeline test.
+- [x] Pattern suggestions — already delivered by the Step 6 config hint (the `ask` prompt shows the permanent-allow snippet).
+
+> **Verification:** 477 tests pass / 0 skipped (21 files); `npx tsc --build
+> packages/permission-system` clean; `npm run check` clean.
 
 ---
 
@@ -217,8 +222,8 @@ The biggest remaining chunk. Ports upstream's `path-containment.ts`,
 - [x] Remember-a-decision per session (uses `bash-arity.prefix` to scope the
   remembered pattern; 3-way Allow once / Allow always (session) / Deny select).
   Test: `test/session-approval.test.ts` + pipeline tests.
-- [ ] Decision audit log (`permissionReviewLog`).
-- [ ] Pattern suggestions in the prompt.
+- [x] Decision audit log (`permissionReviewLog`, JSONL under the config dir).
+- [x] Pattern suggestions in the prompt (delivered by the Step 6 config hint).
 
 ## Risks & open items
 
