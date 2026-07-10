@@ -45,5 +45,5 @@ function deriveToolTrigger(tcc: ToolCallContext, accessPath: AccessPath | undefi
   if (path && accessPath) {
     return { kind: "path", path: accessPath, display: path };
   }
-  return { kind: "none" };
+  return { kind: "none", toolName: tcc.toolName };
 }

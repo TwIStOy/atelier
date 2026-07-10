@@ -73,7 +73,7 @@ export type ToolAction = "read" | "write" | "execute" | "delete";
 export type GateTrigger =
   | { kind: "path"; path: AccessPath; display: string }
   | { kind: "command"; command: string; prefix?: string }
-  | { kind: "none" };
+  | { kind: "none"; toolName: string };
 
 export interface GateResult {
   state: PermissionState;
