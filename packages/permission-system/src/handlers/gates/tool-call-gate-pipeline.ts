@@ -1,4 +1,5 @@
 import { BashProgram } from "../../access-intent/bash/program.ts";
+import type { DecisionLogger } from "../../decision-log.ts";
 import type { PathNormalizer } from "../../path-normalizer.ts";
 import { approvalKeyFromTrigger, type SessionApprovalStore } from "../../session-approval.ts";
 import type {
@@ -31,6 +32,8 @@ export interface PipelineDeps {
   hasUI?: boolean;
   /** Per-session store of approvals the user chose to remember. */
   approvals?: SessionApprovalStore;
+  /** Optional JSONL audit logger for every decision. */
+  logger?: DecisionLogger;
 }
 
 export type PipelineResult = { block: true; reason: string } | undefined;
@@ -102,7 +105,7 @@ export async function runGatePipeline(tcc: ToolCallContext, deps: PipelineDeps):
   results.push(describeToolGate(tcc, toolCheck));
 
   const decision = mostRestrictive(results);
-  return dispatch(decision, tcc.toolName, deps.approvals, ui, hasUI);
+  return dispatch(decision, tcc.toolName, deps.approvals, deps.logger, ui, hasUI);
 }
 
 function pushNonNull(out: GateResult[], result: GateResult | null): void {
@@ -159,34 +162,53 @@ async function dispatch(
   result: GateResult,
   toolName: string,
   approvals: SessionApprovalStore | undefined,
+  logger: DecisionLogger | undefined,
   ui: PipelineUI | null,
   hasUI: boolean,
 ): Promise<PipelineResult> {
-  if (result.state === "allow") return undefined;
+  const trigger = approvalKeyFromTrigger(result.trigger);
+  const base = { tool: toolName, action: result.action, trigger };
+
+  if (result.state === "allow") {
+    logger?.record({ ...base, decision: "allow" });
+    return undefined;
+  }
   if (result.state === "deny") {
     const reason = result.reason ?? `denied by permission rule`;
+    logger?.record({ ...base, decision: "deny", reason });
     ui?.notify(reason, "warning");
     return { block: true, reason };
   }
   // ask — headless fail closed; never silently allow.
   if (!hasUI || !ui) {
-    return { block: true, reason: reasonFor(result, toolName, "requires confirmation (headless mode denies)") };
+    const reason = reasonFor(result, toolName, "requires confirmation (headless mode denies)");
+    logger?.record({ ...base, decision: "ask-headless-denied", reason });
+    return { block: true, reason };
   }
   // A remembered approval covers this call without a prompt.
   const key = approvalKeyFromTrigger(result.trigger);
-  if (approvals?.has(key)) return undefined;
+  if (approvals?.has(key)) {
+    logger?.record({ ...base, decision: "allow" });
+    return undefined;
+  }
 
   const choice = await ui.select(
     `${describeForPrompt(result, toolName)} — allow? (permanent: ${configHint(result)})`,
     CHOICES,
   );
-  if (choice === ALLOW_ONCE) return undefined;
+  if (choice === ALLOW_ONCE) {
+    logger?.record({ ...base, decision: "ask-allowed" });
+    return undefined;
+  }
   if (choice === ALLOW_SESSION) {
     approvals?.remember(key);
+    logger?.record({ ...base, decision: "ask-allowed" });
     return undefined;
   }
   // Deny or dismissed (undefined) — headless select returns undefined too.
-  return { block: true, reason: reasonFor(result, toolName, "user declined the permission prompt") };
+  const reason = reasonFor(result, toolName, "user declined the permission prompt");
+  logger?.record({ ...base, decision: "ask-denied", reason });
+  return { block: true, reason };
 }
 
 function reasonFor(result: GateResult, toolName: string, fallback: string): string {

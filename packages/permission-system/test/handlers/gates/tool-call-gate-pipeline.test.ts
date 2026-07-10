@@ -44,12 +44,18 @@ function makeUi() {
   return { notify, select };
 }
 
+function makeLogger() {
+  const record = vi.fn<(entry: Record<string, unknown>) => void>();
+  return { record };
+}
+
 async function run(
   tcc: ToolCallContext,
   resolver: ScopedPermissionResolver,
   ui: ReturnType<typeof makeUi>,
   hasUI = true,
   approvals?: SessionApprovalStore,
+  logger?: ReturnType<typeof makeLogger>,
 ) {
   return runGatePipeline(tcc, {
     resolver,
@@ -57,6 +63,7 @@ async function run(
     ui,
     hasUI,
     approvals,
+    logger,
   });
 }
 
@@ -391,6 +398,79 @@ describe("runGatePipeline", () => {
       const tcc2 = makeTcc({ input: { command: "npm test" } });
       await run(tcc2, resolver, ui, true, approvals);
       expect(ui.select).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // Every decision is recorded once to the audit logger with the right outcome.
+  describe("audit logging", () => {
+    it("records 'allow' when a gate allows", async () => {
+      const logger = makeLogger();
+      await run(
+        makeTcc({ input: { command: "echo hi" } }),
+        makeResolverFromConfig(),
+        makeUi(),
+        true,
+        undefined,
+        logger,
+      );
+      expect(logger.record).toHaveBeenCalledTimes(1);
+      expect(logger.record.mock.calls[0]?.[0]).toMatchObject({ decision: "allow", tool: "bash" });
+    });
+
+    it("records 'deny' when a gate denies", async () => {
+      const logger = makeLogger();
+      await run(
+        makeTcc({ input: { command: "rm -rf /" } }),
+        makeResolverFromConfig({ "*": "allow", bash: { "rm *": "deny" } }),
+        makeUi(),
+        true,
+        undefined,
+        logger,
+      );
+      expect(logger.record.mock.calls[0]?.[0]).toMatchObject({ decision: "deny" });
+    });
+
+    it("records 'ask-allowed' when the user allows", async () => {
+      const logger = makeLogger();
+      const ui = makeUi();
+      ui.select.mockResolvedValue("Allow once");
+      await run(
+        makeTcc({ input: { command: "npm test" } }),
+        makeResolverFromConfig({ "*": "allow", bash: { "npm *": "ask" } }),
+        ui,
+        true,
+        undefined,
+        logger,
+      );
+      expect(logger.record.mock.calls[0]?.[0]).toMatchObject({ decision: "ask-allowed" });
+    });
+
+    it("records 'ask-denied' when the user picks Deny", async () => {
+      const logger = makeLogger();
+      const ui = makeUi();
+      ui.select.mockResolvedValue("Deny");
+      await run(
+        makeTcc({ input: { command: "npm test" } }),
+        makeResolverFromConfig({ "*": "allow", bash: { "npm *": "ask" } }),
+        ui,
+        true,
+        undefined,
+        logger,
+      );
+      expect(logger.record.mock.calls[0]?.[0]).toMatchObject({ decision: "ask-denied" });
+    });
+
+    it("records 'ask-headless-denied' in headless mode", async () => {
+      const logger = makeLogger();
+      await run(
+        makeTcc({ input: { command: "npm test" } }),
+        makeResolverFromConfig({ "*": "allow", bash: { "npm *": "ask" } }),
+        makeUi(),
+        false,
+        undefined,
+        logger,
+      );
+      expect(logger.record.mock.calls[0]?.[0]).toMatchObject({ decision: "ask-headless-denied" });
     });
   });
 });

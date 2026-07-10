@@ -1,7 +1,10 @@
+import { join } from "node:path";
 import type { ExtensionAPI, ToolCallEvent } from "@earendil-works/pi-coding-agent";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import { createLogger } from "@htwang-contrib/common";
 import { loadAndMergeConfigs } from "./config-loader.ts";
+import { getGlobalConfigDir } from "./config-paths.ts";
+import { type DecisionLogger, FileDecisionLogger } from "./decision-log.ts";
 import { runGatePipeline } from "./handlers/gates/tool-call-gate-pipeline.ts";
 import { PathNormalizer } from "./path-normalizer.ts";
 import { PermissionResolver } from "./permission-resolver.ts";
@@ -15,6 +18,7 @@ interface SessionState {
   resolver: ScopedPermissionResolver;
   normalizer: PathNormalizer;
   approvals: SessionApprovalStore;
+  decisionLogger: DecisionLogger;
 }
 
 let state: SessionState | null = null;
@@ -30,7 +34,11 @@ export default function permissionSystemExtension(pi: ExtensionAPI): void {
       const resolver = new PermissionResolver(normalizeFlatConfig(result.permission));
       const normalizer = new PathNormalizer(process.platform, cwd);
       const approvals = new SessionApprovalStore();
-      state = { resolver, normalizer, approvals };
+      const decisionLogger = new FileDecisionLogger({
+        path: join(getGlobalConfigDir(getAgentDir()), "logs", "review.jsonl"),
+        enabled: result.permissionReviewLog,
+      });
+      state = { resolver, normalizer, approvals, decisionLogger };
       logger.info(`session started (cwd=${cwd}, issues=${result.issues.length})`);
     } catch (error) {
       logger.error(`failed to load config: ${String(error)}`);
@@ -51,6 +59,7 @@ export default function permissionSystemExtension(pi: ExtensionAPI): void {
         resolver: state.resolver,
         normalizer: state.normalizer,
         approvals: state.approvals,
+        logger: state.decisionLogger,
         ui: ctx.ui,
         hasUI: ctx.hasUI,
       });
