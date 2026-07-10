@@ -57,20 +57,26 @@ function asHistoryEditor(ed: EditorComponent): EditorWithHistory {
   return ed as unknown as EditorWithHistory;
 }
 
+export function flattenToSingleLine(text: string): string {
+  return text.replace(/\s+/g, " ").trim();
+}
+
 function applyDiskHistory(ed: EditorWithHistory): void {
   const diskTexts = loadHistoryTextsNewestFirst();
   if (!Array.isArray(ed.history)) return;
   const seen = new Set<string>();
   const merged: string[] = [];
   for (const row of diskTexts) {
-    if (seen.has(row)) continue;
-    seen.add(row);
-    merged.push(row);
+    const flat = flattenToSingleLine(row);
+    if (!flat || seen.has(flat)) continue;
+    seen.add(flat);
+    merged.push(flat);
   }
   for (const row of ed.history) {
-    if (seen.has(row)) continue;
-    seen.add(row);
-    merged.push(row);
+    const flat = flattenToSingleLine(row);
+    if (!flat || seen.has(flat)) continue;
+    seen.add(flat);
+    merged.push(flat);
     if (merged.length >= MAX_ENTRIES) break;
   }
   ed.history = merged.slice(0, MAX_ENTRIES);
@@ -82,13 +88,14 @@ function patchAddToHistory(ed: EditorWithHistory): void {
     if (!trimmed) return;
     const h = ed.history;
     if (!Array.isArray(h)) return;
-    if (h.length > 0 && h[0] === trimmed) {
-      persistHistoryMergedWithDisk(h);
+    const flat = flattenToSingleLine(trimmed);
+    if (h.length > 0 && h[0] === flat) {
+      persistHistoryMergedWithDisk([trimmed]);
       return;
     }
-    h.unshift(trimmed);
+    h.unshift(flat);
     while (h.length > MAX_ENTRIES) h.pop();
-    persistHistoryMergedWithDisk(h);
+    persistHistoryMergedWithDisk([trimmed]);
   };
 }
 
