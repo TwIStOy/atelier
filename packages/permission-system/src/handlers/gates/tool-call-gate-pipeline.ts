@@ -78,7 +78,7 @@ export async function runGatePipeline(tcc: ToolCallContext, deps: PipelineDeps):
   results.push(describeToolGate(tcc, toolCheck));
 
   const decision = mostRestrictive(results);
-  return dispatch(decision, ui, hasUI);
+  return dispatch(decision, tcc.toolName, ui, hasUI);
 }
 
 function pushNonNull(out: GateResult[], result: GateResult | null): void {
@@ -131,7 +131,12 @@ function toolIntent(tcc: ToolCallContext): AccessIntent {
 }
 
 /** Translate the aggregated gate decision into a pipeline return value. */
-async function dispatch(result: GateResult, ui: PipelineUI | null, hasUI: boolean): Promise<PipelineResult> {
+async function dispatch(
+  result: GateResult,
+  toolName: string,
+  ui: PipelineUI | null,
+  hasUI: boolean,
+): Promise<PipelineResult> {
   if (result.state === "allow") return undefined;
   if (result.state === "deny") {
     const reason = result.reason ?? `denied by permission rule`;
@@ -140,25 +145,28 @@ async function dispatch(result: GateResult, ui: PipelineUI | null, hasUI: boolea
   }
   // ask — headless fail closed; never silently allow.
   if (!hasUI || !ui) {
-    return { block: true, reason: reasonFor(result, "requires confirmation (headless mode denies)") };
+    return { block: true, reason: reasonFor(result, toolName, "requires confirmation (headless mode denies)") };
   }
-  const message = describeForPrompt(result);
+  const message = describeForPrompt(result, toolName);
   const accepted = await ui.confirm(CONFIRM_TITLE, message);
   if (accepted) return undefined;
-  return { block: true, reason: reasonFor(result, "user declined the permission prompt") };
+  return { block: true, reason: reasonFor(result, toolName, "user declined the permission prompt") };
 }
 
-function reasonFor(result: GateResult, fallback: string): string {
-  return result.reason ?? describeForPrompt(result) ?? fallback;
+function reasonFor(result: GateResult, toolName: string, fallback: string): string {
+  return result.reason ?? describeForPrompt(result, toolName) ?? fallback;
 }
 
-function describeForPrompt(result: GateResult): string {
+/** Build the one-line confirmation message. Always leads with the tool name,
+ * the clearest signal of what the user is approving (a `memory-read` is not
+ * the same as a built-in `read`). */
+function describeForPrompt(result: GateResult, toolName: string): string {
   switch (result.trigger.kind) {
     case "path":
-      return `${result.action} on ${result.trigger.display}`;
+      return `${toolName}: ${result.trigger.display}`;
     case "command":
-      return `${result.action}: ${result.trigger.command}`;
+      return `${toolName}: ${result.trigger.command}`;
     case "none":
-      return `${result.action} (no specific path or command)`;
+      return toolName;
   }
 }

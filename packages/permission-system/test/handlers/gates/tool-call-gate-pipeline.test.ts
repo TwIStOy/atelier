@@ -204,7 +204,7 @@ describe("runGatePipeline", () => {
   });
 
   // Regression: a bash `rm` prompt used to show only the subcommand prefix
-  // ("execute: rm") with no target. The prompt must show the full command.
+  // ("execute: rm") with no target. The prompt must show the tool + full command.
   describe("bash command prompt shows the full command", () => {
     it("includes the full rm command, not just the prefix", async () => {
       const tcc = makeTcc({
@@ -215,7 +215,26 @@ describe("runGatePipeline", () => {
       ui.confirm.mockResolvedValue(true);
       await run(tcc, makeDefaultResolver(), ui);
       const message = ui.confirm.mock.calls[0]?.[1];
-      expect(message).toBe("execute: rm /tmp/pi-test-tmpfile.txt && echo removed");
+      expect(message).toBe("bash: rm /tmp/pi-test-tmpfile.txt && echo removed");
+    });
+  });
+
+  // Regression: a non-path custom tool (e.g. memory-read) used to prompt as a
+  // vague "read (no specific path or command)". The prompt must name the tool
+  // so the user knows what they are approving.
+  describe("prompt names the tool", () => {
+    it("shows the tool name for a non-path custom tool", async () => {
+      const tcc = makeTcc({
+        toolName: "memory-read",
+        input: { uri: "system://boot" },
+        cwd: "/test/project",
+      });
+      const ui = makeUi();
+      ui.confirm.mockResolvedValue(true);
+      const result = await run(tcc, makeDefaultResolver(), ui);
+      expect(result).toBeUndefined();
+      const message = ui.confirm.mock.calls[0]?.[1];
+      expect(message).toBe("memory-read");
     });
   });
 });
