@@ -34,8 +34,7 @@
       "packages/moshi-hooks-extra",
       "packages/herdr",
       "packages/truncate-outputs",
-      "packages/experience",
-      "packages/permission-system"
+      "packages/experience"
     ],
     "skills": [
       "skills/code-philosophy",
