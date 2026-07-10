@@ -21,7 +21,8 @@ Project overrides global. If neither file exists, the
   "permission": {
     "<surface>": "<state>" | { "<pattern>": "<state>", ... },
     ...
-  }
+  },
+  "permissionReviewLog": true   // optional, default true
 }
 ```
 
@@ -30,6 +31,9 @@ Project overrides global. If neither file exists, the
 - **`<state>`** — `"allow"`, `"ask"`, or `"deny"`.
 - A surface may be a bare string (applies to every call on that surface) or a
   pattern map (last-match-wins).
+- **`permissionReviewLog`** — top-level boolean (default `true`); when on,
+  every decision is appended to a JSONL audit log (see
+  [Decision audit log](#decision-audit-log)).
 
 ## Surfaces
 
@@ -117,6 +121,31 @@ prompt:
 | whole tool | `tool:<toolName>` | any call of that tool |
 
 **Allow once** does not remember — the next matching call prompts again.
+
+## Decision audit log
+
+Every permission decision is appended as one JSONL line to
+`~/.pi/agent/extensions/permission-system/logs/review.jsonl` (under the
+global config dir; honors `PI_CODING_AGENT_DIR`). Each record:
+
+```jsonc
+{ "timestamp": "2026-07-10T00:00:00.000Z", "tool": "bash",
+  "action": "execute", "decision": "ask-allowed",
+  "trigger": "command:npm test" }
+```
+
+The `decision` field records the disposition:
+
+| decision | meaning |
+| --- | --- |
+| `allow` | a gate allowed it (no prompt) |
+| `ask-allowed` | the user picked Allow once / Allow always (session) |
+| `ask-denied` | the user picked Deny |
+| `ask-headless-denied` | ask in headless mode → fail-closed deny |
+| `deny` | a gate denied it (rule-based block) |
+
+Set `"permissionReviewLog": false` in the config to disable it. Write errors
+are swallowed — logging never breaks an agent turn.
 
 ## Permissive-bash fallback warning
 
