@@ -14,7 +14,7 @@ The default stance is pragmatic:
 - Do not add helpers, abstractions, or compatibility branches without a concrete need.
 - Comments are a last resort. Fix the shape or the names first.
 
-## The 5 Laws
+## The 6 Laws
 
 ### 1. The Law of the Early Exit (Guard Clauses)
 - Keep the happy path flat.
@@ -42,6 +42,12 @@ The default stance is pragmatic:
 - Prefer verbs for functions and concrete nouns for data.
 - If a comment is explaining obvious mechanics, improve the names instead.
 
+### 6. The Law of the Single Source of Truth
+- One fact lives in one place. If two stores both claim to be authoritative for the same fact, they will desync, and the divergence is where bugs hide.
+- A client mirror of server state is fine **as long as the server is the only writer of record** and the client only reads back from it. The client must never independently decide the fact and then ignore the server.
+- Classic SPA auth trap: a persisted client flag ("is authed" in `sessionStorage`) coexisting with a full-page `window.location` redirect on 401. The reload drops in-memory state but the persisted flag survives → `login → page → 401 → reload login → flag says authed → back to page → 401 → ⟲`. Fix: the server session is the single authority; the client probes it on mount and reacts to 401 via a state handler, never via a full-page navigation.
+- Smell to grep for: any auth/identity decision based on `sessionStorage`/`localStorage`/a cookie the client also sets, alongside a hard redirect on a 4xx response.
+
 ## Review Questions
 
 Before finishing, check:
@@ -60,3 +66,4 @@ Before finishing, check:
 - Keeping defensive fallback branches for states that should be impossible.
 - Adding backward-compatibility code without an active caller, persisted data, or explicit requirement.
 - Writing comments that explain obvious mechanics instead of intent.
+- Keeping two stores that both claim to own the same fact (e.g. a client flag and a server session) — the desync is the bug.
