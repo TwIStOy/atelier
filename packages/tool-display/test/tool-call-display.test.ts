@@ -247,3 +247,84 @@ describe("bash adapter command display width", () => {
     }
   });
 });
+
+describe("tool call timer", () => {
+  it("renders the elapsed-time label between the status icon and tool name", () => {
+    const lines = renderToolCall(
+      {
+        toolName: "read",
+        args: { path: "foo.txt" },
+        output: "",
+        expanded: false,
+        isPartial: true,
+        isError: false,
+        registry: globalToolDisplayRegistry,
+        startedAtMs: 1000,
+        endedAtMs: 1500,
+      },
+      PLAIN_THEME,
+    ).render(80);
+    const first = lines[0] ?? "";
+    expect(first).toContain("500 ms");
+    expect(first.indexOf("500 ms")).toBeLessThan(first.indexOf("Read"));
+  });
+
+  it("keeps the timer on the first line and never overflows narrow terminals", () => {
+    globalToolDisplayRegistry.register("bash", bashAdapter);
+    const lines = renderToolCall(
+      {
+        toolName: "bash",
+        args: { command: "echo hello world this is a long enough command to wrap" },
+        output: "",
+        expanded: false,
+        isPartial: true,
+        isError: false,
+        registry: globalToolDisplayRegistry,
+        startedAtMs: 0,
+        endedAtMs: 2500,
+      },
+      PLAIN_THEME,
+    ).render(40);
+    const joined = lines.join("\n");
+    expect(lines[0]).toContain("2500 ms");
+    for (const line of lines) {
+      expect(visibleWidth(line)).toBeLessThanOrEqual(40);
+    }
+    expect(joined).toContain("Bash");
+  });
+
+  it("freezes the timer at the final elapsed time once the tool completes", () => {
+    const lines = renderToolCall(
+      {
+        toolName: "read",
+        args: { path: "foo.txt" },
+        output: "done",
+        expanded: false,
+        isPartial: false,
+        isError: false,
+        registry: globalToolDisplayRegistry,
+        startedAtMs: 1000,
+        endedAtMs: 5200,
+      },
+      PLAIN_THEME,
+    ).render(80);
+    expect(lines[0]).toContain("4.20s");
+  });
+
+  it("omits the timer when no timing is provided", () => {
+    const lines = renderToolCall(
+      {
+        toolName: "read",
+        args: { path: "foo.txt" },
+        output: "",
+        expanded: false,
+        isPartial: true,
+        isError: false,
+        registry: globalToolDisplayRegistry,
+      },
+      PLAIN_THEME,
+    ).render(80);
+    expect(lines[0]).not.toContain(" ms");
+    expect(lines[0]).not.toMatch(/\d+s\b/);
+  });
+});

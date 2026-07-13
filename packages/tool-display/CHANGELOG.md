@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Tool calls now show an elapsed-time label between the status icon and the tool name. Durations under 3s render as milliseconds (e.g. `123 ms`), 3s-90s as seconds with two decimals (e.g. `4.20s`), and 90s+ as `m:ss` (e.g. `1:30`). The timer ticks live while running and freezes at the final duration once the call completes.
+
 ## [0.2.4] - 2026-07-09
 
 ## [0.2.3] - 2026-07-09

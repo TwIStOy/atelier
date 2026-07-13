@@ -3,7 +3,7 @@ import { Container, truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@ear
 import { trimTrailingEmpty, truncateDisplay } from "@htwang-contrib/common";
 import { formatExpandedToolOutputLines } from "./adapters/shared.ts";
 import { loadConfig } from "./config.ts";
-import { spinnerGlyph } from "./format.ts";
+import { formatDuration, spinnerGlyph } from "./format.ts";
 import type { ContentRenderer, ToolDisplayAdapter } from "./types.ts";
 
 export type { ContentRenderer, ToolDisplayAdapter };
@@ -108,6 +108,7 @@ function makeHeader(
   spinAt: number,
   expanded: boolean,
   details?: unknown,
+  elapsedMs?: number,
 ): string[] {
   let statusIcon: string;
   if (toolName === "subagent") {
@@ -134,13 +135,18 @@ function makeHeader(
     statusIcon = isPartial ? spinnerGlyph(theme, spinAt) : isError ? theme.fg("error", "◆") : theme.fg("success", "◆");
   }
 
+  const timerLabel = elapsedMs !== undefined ? formatDuration(elapsedMs) : undefined;
+  const timerPart = timerLabel ? `${theme.fg("dim", timerLabel)} ` : "";
+  const timerWidth = timerLabel ? visibleWidth(timerLabel) + 1 : 0;
+  const innerWidth = Math.max(1, width - timerWidth);
+
   const headerText = adapter
-    ? adapter.formatCallHeader(args, theme, details, isPartial, expanded, width)
-    : formatGenericToolHeader(toolName, args, theme, width);
+    ? adapter.formatCallHeader(args, theme, details, isPartial, expanded, innerWidth)
+    : formatGenericToolHeader(toolName, args, theme, innerWidth);
 
   const headerLines = headerText.split("\n");
   return headerLines.map((line, i) => {
-    const prefix = i === 0 ? `${statusIcon} ` : INDENT;
+    const prefix = i === 0 ? `${statusIcon} ${timerPart}` : INDENT;
     return truncateToWidth(prefix + line, width, "…");
   });
 }
@@ -191,6 +197,8 @@ export interface ToolCallDisplayOpts {
   registry?: ToolDisplayRegistry;
   renderCollapsed?: ContentRenderer;
   renderExpanded?: ContentRenderer;
+  startedAtMs?: number;
+  endedAtMs?: number;
 }
 
 export function renderToolCall(
@@ -202,6 +210,7 @@ export function renderToolCall(
   return {
     render(width: number): string[] {
       const spinAt = Date.now();
+      const elapsedMs = opts.startedAtMs !== undefined ? (opts.endedAtMs ?? spinAt) - opts.startedAtMs : undefined;
       const header = makeHeader(
         opts.toolName,
         opts.args,
@@ -213,6 +222,7 @@ export function renderToolCall(
         spinAt,
         opts.expanded,
         opts.details,
+        elapsedMs,
       );
       const lines = [...header];
 
@@ -288,7 +298,7 @@ export class ToolCallDisplayComponent extends Container {
 
   constructor(opts: ToolCallDisplayOpts, theme: Theme) {
     super();
-    this.opts = opts;
+    this.opts = { startedAtMs: Date.now(), ...opts };
     this.theme = theme;
     this.rebuild();
   }

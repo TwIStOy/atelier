@@ -30,6 +30,7 @@ export { readAdapter } from "./adapters/read.ts";
 export { todoAdapter } from "./adapters/todo.ts";
 export { writeAdapter } from "./adapters/write.ts";
 export {
+  formatDuration,
   prefixLine,
   SpinnerTimer,
   spinnerGlyph,
@@ -95,6 +96,8 @@ function patchToolExecutionRender(getTheme: () => Theme, registry: typeof global
 
   if (proto.__tdPatched) return;
 
+  const timings = new WeakMap<object, { startedAtMs?: number; endedAtMs?: number }>();
+
   const originalSetExpanded = proto.setExpanded as (this: ToolExecutionPatchThis, expanded: boolean) => void;
   proto.setExpanded = function (this: ToolExecutionPatchThis, expanded: boolean) {
     originalSetExpanded.call(this, expanded);
@@ -116,6 +119,13 @@ function patchToolExecutionRender(getTheme: () => Theme, registry: typeof global
     const getTextOutput = this.getTextOutput?.bind(this);
     const output = this.result ? getTextOutput?.() : undefined;
 
+    const timing = timings.get(this) ?? {};
+    if (timing.startedAtMs === undefined) timing.startedAtMs = Date.now();
+    if (!this.isPartial && this.result && timing.endedAtMs === undefined) {
+      timing.endedAtMs = Date.now();
+    }
+    timings.set(this, timing);
+
     const opts = {
       toolName: this.toolName,
       args: this.args,
@@ -125,6 +135,8 @@ function patchToolExecutionRender(getTheme: () => Theme, registry: typeof global
       isPartial: this.isPartial,
       isError: this.result?.isError ?? false,
       registry: reg,
+      startedAtMs: timing.startedAtMs,
+      endedAtMs: timing.endedAtMs,
     };
 
     const theme = proto.__tdGetTheme?.() ?? FALLBACK_THEME;

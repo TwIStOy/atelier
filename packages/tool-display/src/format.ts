@@ -10,6 +10,19 @@ export function spinnerGlyph(theme: Theme, nowMs = Date.now()): string {
   return theme.fg("accent", SPINNER_FRAMES[i] ?? "");
 }
 
+const MS_THRESHOLD = 3000;
+const SECONDS_THRESHOLD = 90;
+
+export function formatDuration(elapsedMs: number): string {
+  if (elapsedMs < MS_THRESHOLD) return `${Math.max(0, Math.round(elapsedMs))} ms`;
+  const totalSeconds = elapsedMs / 1000;
+  if (totalSeconds < SECONDS_THRESHOLD) return `${totalSeconds.toFixed(2)}s`;
+  const totalSec = Math.round(totalSeconds);
+  const minutes = Math.floor(totalSec / 60);
+  const seconds = totalSec % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
 export function prefixLine(line: string, prefix: string, width: number): string {
   const prefixWidth = visibleWidth(prefix);
   const innerWidth = Math.max(1, width - prefixWidth);
