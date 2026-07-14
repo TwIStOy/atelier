@@ -36,6 +36,33 @@ export default function (pi: ExtensionAPI) {
     authHeader: true,
     models: [
       {
+        id: "gpt-5.6-sol",
+        name: "GPT-5.6 Sol",
+        reasoning: true,
+        input: ["text", "image"],
+        cost: { input: 5, output: 30, cacheRead: 0.5, cacheWrite: 6.25 },
+        contextWindow: 1050000,
+        maxTokens: 128000,
+      },
+      {
+        id: "gpt-5.6-terra",
+        name: "GPT-5.6 Terra",
+        reasoning: true,
+        input: ["text", "image"],
+        cost: { input: 2.5, output: 15, cacheRead: 0.25, cacheWrite: 3.125 },
+        contextWindow: 1050000,
+        maxTokens: 128000,
+      },
+      {
+        id: "gpt-5.6-luna",
+        name: "GPT-5.6 Luna",
+        reasoning: true,
+        input: ["text", "image"],
+        cost: { input: 1, output: 6, cacheRead: 0.1, cacheWrite: 1.25 },
+        contextWindow: 1050000,
+        maxTokens: 128000,
+      },
+      {
         id: "gpt-5.5",
         name: "GPT-5.5",
         reasoning: true,

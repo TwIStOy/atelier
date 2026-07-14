@@ -125,6 +125,21 @@ const MODEL_SOURCES: Record<string, ModelSource> = {
       { provider: "github-copilot", modelId: "gpt-5.5" },
     ],
   },
+  "gpt-5.6-sol": {
+    provider: "openai",
+    modelId: "gpt-5.6-sol",
+    fallbacks: [{ provider: "github-copilot", modelId: "gpt-5.6-sol" }],
+  },
+  "gpt-5.6-terra": {
+    provider: "openai",
+    modelId: "gpt-5.6-terra",
+    fallbacks: [{ provider: "github-copilot", modelId: "gpt-5.6-terra" }],
+  },
+  "gpt-5.6-luna": {
+    provider: "openai",
+    modelId: "gpt-5.6-luna",
+    fallbacks: [{ provider: "github-copilot", modelId: "gpt-5.6-luna" }],
+  },
   "gpt-image-2": {
     provider: "openai",
     modelId: "gpt-image-2",
