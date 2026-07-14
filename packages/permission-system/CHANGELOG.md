@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-07-14
+
 ### Added
 
 - Decision audit log: every allow/ask/deny decision is appended as JSONL to

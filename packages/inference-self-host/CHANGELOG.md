@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-07-14
+
 ### Added
 
 - GPT-5.6 family models: `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna` (prices synced from models.dev).
