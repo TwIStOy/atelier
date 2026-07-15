@@ -1,5 +1,6 @@
 import type { ProviderMeta } from "./types.ts";
 
+export { AnySearchProvider } from "./anysearch.ts";
 export { BraveProvider } from "./brave.ts";
 export { ProviderError, throwIfApiError } from "./errors.ts";
 export { ExaProvider } from "./exa.ts";
@@ -94,6 +95,14 @@ export const ZAI_PROVIDER_META: ProviderMeta = {
   roles: ["search", "fetch"] as const,
 };
 
+export const ANYSEARCH_API_KEY_ENV_VAR = "ANYSEARCH_API_KEY";
+export const ANYSEARCH_PROVIDER_META: ProviderMeta = {
+  name: "anysearch",
+  label: "AnySearch",
+  envVar: ANYSEARCH_API_KEY_ENV_VAR,
+  roles: ["search", "fetch"] as const,
+};
+
 export const PROVIDERS: readonly ProviderMeta[] = [
   BRAVE_PROVIDER_META,
   TAVILY_PROVIDER_META,
@@ -104,4 +113,5 @@ export const PROVIDERS: readonly ProviderMeta[] = [
   FIRECRAWL_PROVIDER_META,
   PERPLEXITY_PROVIDER_META,
   ZAI_PROVIDER_META,
+  ANYSEARCH_PROVIDER_META,
 ];

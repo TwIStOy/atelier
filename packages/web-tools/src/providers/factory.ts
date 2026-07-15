@@ -1,3 +1,4 @@
+import { AnySearchProvider } from "./anysearch.ts";
 import { BraveProvider } from "./brave.ts";
 import { ExaProvider } from "./exa.ts";
 import { FirecrawlProvider } from "./firecrawl.ts";
@@ -34,6 +35,8 @@ export function createSearchProvider(name: string, creds: ProviderCredentials): 
       return new FirecrawlProvider(apiKey);
     case "zai":
       return new ZaiProvider(apiKey);
+    case "anysearch":
+      return new AnySearchProvider(apiKey);
     default:
       throw new Error(`Unknown search provider: "${name}"`);
   }

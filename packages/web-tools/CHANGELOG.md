@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- AnySearch provider (`search` + `fetch`). Connects to the AnySearch MCP API at `https://api.anysearch.com/mcp`; API key is optional (anonymous access allowed, lower rate limits). Configure via env var `ANYSEARCH_API_KEY` or the `/config` UI.
+
 ## [0.2.4] - 2026-07-09
 
 ## [0.2.3] - 2026-07-09

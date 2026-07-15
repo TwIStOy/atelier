@@ -7,6 +7,7 @@ export {
   resolveApiKey,
   type WebToolsConfig,
 } from "./config.ts";
+export { AnySearchProvider } from "./providers/anysearch.ts";
 export { BraveProvider } from "./providers/brave.ts";
 export { ExaProvider } from "./providers/exa.ts";
 export {
@@ -25,6 +26,7 @@ export {
 } from "./providers/fetch-helpers.ts";
 export { FirecrawlProvider } from "./providers/firecrawl.ts";
 export {
+  ANYSEARCH_PROVIDER_META,
   BRAVE_PROVIDER_META,
   EXA_PROVIDER_META,
   FIRECRAWL_PROVIDER_META,
