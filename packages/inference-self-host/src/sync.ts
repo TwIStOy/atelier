@@ -184,6 +184,11 @@ const MODEL_SOURCES: Record<string, ModelSource> = {
     modelId: "claude-opus-4-8",
     compatFamily: "anthropic",
   },
+  "grok-4.5": {
+    provider: "xai",
+    modelId: "grok-4.5",
+    fallbacks: [{ provider: "openrouter", modelId: "x-ai/grok-4.5" }],
+  },
 };
 
 type ProviderModelConfig = {

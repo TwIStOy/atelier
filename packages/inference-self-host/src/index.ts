@@ -367,6 +367,15 @@ export default function (pi: ExtensionAPI) {
         maxTokens: 131072,
         compat: zaiCompat,
       },
+      {
+        id: "grok-4.5",
+        name: "Grok 4.5",
+        reasoning: true,
+        input: ["text", "image"],
+        cost: { input: 2, output: 6, cacheRead: 0.5, cacheWrite: 0 },
+        contextWindow: 500000,
+        maxTokens: 500000,
+      },
     ],
   });
 }
