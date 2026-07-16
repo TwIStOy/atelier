@@ -1,4 +1,16 @@
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdir,
+  mkdirSync,
+  readFileSync,
+  realpath,
+  renameSync,
+  rmdir,
+  rmdirSync,
+  stat,
+  utimes,
+  writeFileSync,
+} from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { createLogger } from "@htwang-contrib/common";
@@ -13,9 +25,19 @@ export type HistoryEntry = {
   at: number;
 };
 
+const plainLockFs = {
+  mkdir,
+  rmdir,
+  rmdirSync,
+  stat,
+  utimes,
+  realpath,
+};
+
 const HISTORY_LOCK_OPTIONS = {
   stale: 60_000,
   realpath: false,
+  fs: plainLockFs,
   retries: {
     forever: true,
     minTimeout: 15,

@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- History file locking now passes a plain `fs` object to `proper-lockfile`, avoiding a Proxy invariant crash when the runtime wraps Node's `fs` module (`mtime-precision` cache Symbol).
+
 ## [0.2.5] - 2026-07-14
 
 ### Fixed
