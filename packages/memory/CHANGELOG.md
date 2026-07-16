@@ -2,9 +2,13 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Disabled proactive auto-recall system-prompt injection. Matching/`recall-index` helpers remain in source but no longer run on `before_agent_start`; memory tools still rely on explicit `memory-search` / `memory-read`.
+
 ### Added
 
-- Proactive auto-recall: on each turn the extension fetches a flat recall index (`hat memory recall-index`, single bulk query against the denormalized `search_cache`) and injects memories whose disclosure matches the current project (cwd) or prompt topic. Project match uses single-token overlap; topic match requires 2+ token overlap to stay precise. Results are deduped, sorted by priority, capped at 8, and injected as a `<recalled_memory>` block. Best-effort and non-blocking; silently no-ops when `hat` lacks the `recall-index` subcommand.
+- Proactive auto-recall helpers (`recall.ts`: disclosure match against cwd/prompt, capped `<recalled_memory>` block). Currently disabled at the extension entrypoint — not injected into the system prompt.
 - Rewrote the memory prompt's recall section ("Recall BEFORE You Answer"): forceful, observable triggers (on the request, not guesses about memory), multi-search guidance for multi-part questions, and a proactive nudge in the `memory-search` tool description.
 
 ## [0.2.4] - 2026-07-09

@@ -5,11 +5,8 @@ import { buildMemoryStatusReport } from "./memory-status.js";
 import { getNamespace, isDisabledByEnv, isMemoryEnabled, setSessionNamespace } from "./settings.js";
 import { generateSystemPrompt } from "./system-prompt.js";
 import { registerJournalTools, registerMemoryTools } from "./tools/index.js";
-import { buildRecallBlock, fetchRecallIndex, matchRecall, type RecallEntry } from "./recall.js";
 
 const INSTALL_GUARD = Symbol.for("pi.memory.installed");
-
-let recallCache: { ns: string; entries: RecallEntry[] } | null = null;
 
 export default function initMemory(pi: ExtensionAPI): void {
   const guard = pi as unknown as Record<symbol, boolean>;
@@ -96,24 +93,9 @@ export default function initMemory(pi: ExtensionAPI): void {
   pi.on("before_agent_start", async (event, ctx) => {
     if (!isMemoryEnabled(ctx)) return;
     sessionCwd = ctx.cwd;
-    const ns = getNamespace(ctx);
-    setSessionNamespace(ns);
+    setSessionNamespace(getNamespace(ctx));
 
     const appendix = await generateSystemPrompt();
-
-    let recallBlock = "";
-    try {
-      if (!recallCache || recallCache.ns !== ns) {
-        recallCache = { ns, entries: await fetchRecallIndex() };
-      }
-      const matches = matchRecall(recallCache.entries, ctx.cwd, event.prompt ?? "");
-      recallBlock = buildRecallBlock(matches);
-    } catch (e) {
-      console.error("[memory] auto-recall failed:", e);
-    }
-
-    const parts = [event.systemPrompt, appendix];
-    if (recallBlock) parts.push(recallBlock);
-    return { systemPrompt: parts.join("\n\n") };
+    return { systemPrompt: [event.systemPrompt, appendix].join("\n\n") };
   });
 }

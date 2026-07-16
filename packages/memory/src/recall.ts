@@ -13,14 +13,83 @@ const SNIPPET_CHARS = 700;
 const MAX_INJECT = 8;
 
 const STOPWORDS = new Set([
-  "the", "a", "an", "when", "working", "work", "works", "worktree", "worker",
-  "in", "on", "at", "with", "for", "of", "to", "and", "or", "from", "into", "via",
-  "repo", "repository", "project", "projects", "package", "packages",
-  "user", "users", "home", "code", "src", "file", "files", "dir", "docs", "doc",
-  "that", "this", "is", "are", "was", "be", "been", "has", "have", "had", "it", "its",
-  "how", "do", "we", "handle", "use", "using", "used", "set", "get", "new", "make",
-  "add", "run", "build", "test", "debug", "fix", "state", "config",
-  "dev", "local", "var", "etc", "opt", "tmp", "documents", "github", "workspace",
+  "the",
+  "a",
+  "an",
+  "when",
+  "working",
+  "work",
+  "works",
+  "worktree",
+  "worker",
+  "in",
+  "on",
+  "at",
+  "with",
+  "for",
+  "of",
+  "to",
+  "and",
+  "or",
+  "from",
+  "into",
+  "via",
+  "repo",
+  "repository",
+  "project",
+  "projects",
+  "package",
+  "packages",
+  "user",
+  "users",
+  "home",
+  "code",
+  "src",
+  "file",
+  "files",
+  "dir",
+  "docs",
+  "doc",
+  "that",
+  "this",
+  "is",
+  "are",
+  "was",
+  "be",
+  "been",
+  "has",
+  "have",
+  "had",
+  "it",
+  "its",
+  "how",
+  "do",
+  "we",
+  "handle",
+  "use",
+  "using",
+  "used",
+  "set",
+  "get",
+  "new",
+  "make",
+  "add",
+  "run",
+  "build",
+  "test",
+  "debug",
+  "fix",
+  "state",
+  "config",
+  "dev",
+  "local",
+  "var",
+  "etc",
+  "opt",
+  "tmp",
+  "documents",
+  "github",
+  "workspace",
 ]);
 
 const TOKEN_RE = /[a-z0-9][a-z0-9_-]{2,}/g;
@@ -36,9 +105,7 @@ function homeBasename(): string {
 export function tokenize(s: string): string[] {
   const home = homeBasename();
   const matches = s.toLowerCase().match(TOKEN_RE) ?? [];
-  return matches.filter(
-    (t) => t.length >= 3 && !STOPWORDS.has(t) && !/^\d+$/.test(t) && t !== home,
-  );
+  return matches.filter((t) => t.length >= 3 && !STOPWORDS.has(t) && !/^\d+$/.test(t) && t !== home);
 }
 
 function disclosureWords(d: string): Set<string> {
@@ -62,11 +129,7 @@ export interface MatchedRecall {
  * - topic (prompt): require 2+ token overlap. Prompts are natural language and
  *   noisy, so a single common word must not trigger injection.
  */
-export function matchRecall(
-  entries: RecallEntry[],
-  cwd: string,
-  prompt: string,
-): MatchedRecall[] {
+export function matchRecall(entries: RecallEntry[], cwd: string, prompt: string): MatchedRecall[] {
   const cwdTokens = new Set(tokenize(cwd));
   const promptTokens = new Set(tokenize(prompt));
   const seen = new Set<string>();
