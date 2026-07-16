@@ -15,7 +15,7 @@ export const memorySearch = {
   name: "memory-search",
   label: "Memory search",
   description:
-    "Ranked search across all memory nodes. Tokenizes query, scores matches across URI, content, tags, and disclosure fields, returns results sorted by relevance with snippets.",
+    "Ranked search across all memory nodes — use PROACTIVELY before answering anything that may depend on past context (past work, preferences, decisions, project conventions). Tokenizes query, scores matches across URI, content, tags, and disclosure fields, returns results sorted by relevance with snippets. For multi-part or comparative questions, run several searches with different phrasings and combine the results — one search is rarely enough.",
   parameters: Type.Object({
     query: Type.String({
       description: "Search keywords (tokenized, multi-term supported).",

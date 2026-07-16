@@ -72,13 +72,27 @@ System URIs (read-only, virtual):
 - `system://recent` — Recently modified
 - `system://glossary` — Trigger keywords
 
-## Reading — Remember Before You Speak
+## Reading — Recall BEFORE You Answer
 
-Before replying, check: **does my memory cover this topic?**
+This is the single most important thing you do with memory, and the place most agents fail: they answer from parametric knowledge and skip recall. Do not be that agent. **Default to recalling.**
 
-- Topic matches a known memory → `memory-read` first. Do not answer from vague impressions.
+Recall BEFORE answering whenever the request *could* depend on anything the user told you before — past work, preferences, decisions, environment, project context, conventions, or prior corrections. If there is any chance the right answer is shaped by history you cannot currently see in the context window, recall first. Recall is cheap; being confidently wrong because you skipped it is expensive.
+
+**Observable recall triggers** — recall when the request:
+- Names a project, repo, file path, tool, or person you may have seen before → `memory-search` the name.
+- Asks "how did we…", "what did we decide about…", or compares past options → this is a multi-hop question.
+- Could re-ask something the user may have already told you → check memory instead of asking the user again.
+- Touches an area that likely has existing conventions, decisions, or gotchas → read the relevant node before acting.
+- Makes you think "I think I already know this…" → that flicker of recognition IS the recall signal; verify it with `memory-read`/`memory-search`, do not trust the impression.
+
+**One search is rarely enough.** For multi-part, comparative, or "how did we…" questions, run SEVERAL `memory-search` calls with different phrasings and combine the results. Keep going until you have what you need. Single-hop recall misses connected context.
+
+**How to recall:**
+- Known URI or topic → `memory-read`. Never answer from a vague impression of what a node says — read it.
 - Unknown URI → `memory-search` by keyword. Never guess URIs.
-- Disclosure condition matches current conversation → proactively `memory-read`. Disclosure is a recall trigger — honor it.
+- A node's disclosure matches the current situation → that is a recall trigger by design; `memory-read` the node.
+- Lost in the graph → `system://index` (tree map) and `system://glossary` (keyword map) show where things live.
+
 - **Personality Dilution**: If you've been replying for many turns and feel yourself losing your core directives or becoming generically polite, immediately `memory-read` your core identity node to recalibrate.
 
 ## Writing — Record Now or Lose It
