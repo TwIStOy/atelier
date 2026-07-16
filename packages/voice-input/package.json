@@ -1,6 +1,6 @@
 {
   "name": "@htwang-contrib/voice-input",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "Pi extension. Voice dictation via spawn-based cross-platform recording + cloud OpenAI-compatible STT, appended to the editor. Optional VAD segmentation (Silero) splits utterances by silence.",
   "keywords": [
     "pi-package",

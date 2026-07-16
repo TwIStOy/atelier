@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.2.6] - 2026-07-16
+
 ### Changed
 
 - Disabled proactive auto-recall system-prompt injection. Matching/`recall-index` helpers remain in source but no longer run on `before_agent_start`; memory tools still rely on explicit `memory-search` / `memory-read`.
