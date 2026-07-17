@@ -95,7 +95,7 @@ describe("transcribeWithMimoChat — success", () => {
     const content = (body.messages as Array<{ content: Array<Record<string, unknown>> }>)[0].content;
     const audioBlock = content.find((b) => b.type === "input_audio");
     expect(audioBlock?.input_audio).toMatchObject({ format: "wav" });
-    const data = (audioBlock?.input_audio as { data: string }).data;
+    const data = (audioBlock!.input_audio as { data: string }).data;
     expect(data).not.toMatch(/^data:/);
     expect(data).not.toContain(",");
     expect(Buffer.from(data, "base64")).toEqual(Buffer.from([0x52, 0x49, 0x46, 0x46]));
