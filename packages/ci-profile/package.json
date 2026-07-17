@@ -1,0 +1,16 @@
+{
+  "name": "@htwang-contrib/ci-profile",
+  "version": "0.2.6",
+  "private": true,
+  "type": "module",
+  "pi": {
+    "extensions": [
+      "../inference-self-host",
+      "../extra-tools",
+      "../auto-compact",
+      "../tool-call-fixer",
+      "../truncate-outputs",
+      "../subagents"
+    ]
+  }
+}
