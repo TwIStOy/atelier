@@ -249,6 +249,16 @@ export default function (pi: ExtensionAPI) {
         maxTokens: 131072,
       },
       {
+        id: "kimi-k3",
+        name: "Kimi-K3",
+        reasoning: true,
+        input: ["text", "image"],
+        cost: { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 0 },
+        contextWindow: 1048576,
+        maxTokens: 131072,
+        compat: moonshotCompat,
+      },
+      {
         id: "kimi-k2.6",
         name: "Kimi-K2.6",
         reasoning: true,

@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- `kimi-k3` (prices synced from models.dev, Moonshot family).
+
 ## [0.2.5] - 2026-07-14
 
 ### Added

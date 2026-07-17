@@ -80,6 +80,11 @@ const MODEL_SOURCES: Record<string, ModelSource> = {
     compatFamily: "zai",
   },
   "mimo-v2-omni": { provider: "opencode-go", modelId: "mimo-v2-omni" },
+  "kimi-k3": {
+    provider: "opencode-go",
+    modelId: "kimi-k3",
+    compatFamily: "moonshot",
+  },
   "kimi-k2.6": {
     provider: "opencode-go",
     modelId: "kimi-k2.6",
