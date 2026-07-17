@@ -10,9 +10,9 @@
   },
   "devDependencies": {
     "@types/proper-lockfile": "4.1.4",
-    "@earendil-works/pi-ai": "^0.80.3",
+    "@earendil-works/pi-ai": "^0.80.10",
     "@earendil-works/pi-coding-agent": "latest",
-    "@earendil-works/pi-tui": "^0.80.3",
+    "@earendil-works/pi-tui": "^0.80.10",
     "@types/node": "^26.1.1",
     "typescript": "^6.0.0"
   }
