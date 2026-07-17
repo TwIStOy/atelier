@@ -6,7 +6,7 @@
   "types": "src/index.ts",
   "dependencies": {},
   "devDependencies": {
-    "@earendil-works/pi-ai": "^0.80.3",
+    "@earendil-works/pi-ai": "^0.80.10",
     "@earendil-works/pi-coding-agent": "latest",
     "@earendil-works/pi-tui": "latest",
     "@types/node": "^26.1.1",
