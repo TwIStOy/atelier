@@ -6,7 +6,7 @@
   "types": "src/index.ts",
   "dependencies": {
     "@htwang-contrib/common": "*",
-    "@sinclair/typebox": "^0.34.0"
+    "@sinclair/typebox": "^0.34.52"
   },
   "devDependencies": {
     "@earendil-works/pi-agent-core": "^0.80.10",
