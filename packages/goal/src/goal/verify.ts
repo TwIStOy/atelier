@@ -12,6 +12,7 @@ import {
   DEFAULT_MAX_LINES,
   DefaultResourceLoader,
   getAgentDir,
+  ModelRuntime,
   SessionManager,
   SettingsManager,
   truncateHead,
@@ -155,10 +156,11 @@ export async function verifyGoalCompletion(
 
   let session: AgentSession;
   try {
+    const modelRuntime = await ModelRuntime.create();
     const { session: created } = await createAgentSession({
       cwd,
       agentDir,
-      modelRegistry: ctx.modelRegistry,
+      modelRuntime,
       model: verifierModel,
       tools: VERIFIER_TOOLS,
       resourceLoader: loader,
