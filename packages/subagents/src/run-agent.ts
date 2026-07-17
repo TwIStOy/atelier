@@ -12,6 +12,7 @@ import {
   DefaultResourceLoader,
   formatSize,
   getAgentDir,
+  ModelRuntime,
   SessionManager,
   SettingsManager,
   truncateHead,
@@ -261,10 +262,11 @@ export async function runSubAgent(
     });
     await loader.reload();
 
+    const modelRuntime = await ModelRuntime.create();
     const { session: created } = await createAgentSession({
       cwd,
       agentDir,
-      modelRegistry: ctx.modelRegistry,
+      modelRuntime,
       model,
       thinkingLevel,
       tools: toolList,
