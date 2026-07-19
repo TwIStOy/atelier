@@ -32,6 +32,7 @@
       "packages/working-indicator",
       "packages/todo",
       "packages/moshi-hooks-extra",
+      "packages/fish-env-sync",
       "packages/herdr",
       "packages/truncate-outputs",
       "packages/experience"
