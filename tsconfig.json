@@ -26,6 +26,6 @@
     { "path": "packages/read-tracker" },
     { "path": "packages/working-indicator" },
     { "path": "packages/moshi-hooks-extra" },
-    { "path": "packages/fish-env-sync" }
+    { "path": "packages/unset-ssh-auth-sock" }
   ]
 }

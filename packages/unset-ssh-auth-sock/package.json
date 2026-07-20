@@ -1,5 +1,5 @@
 {
-  "name": "@htwang-contrib/fish-env-sync",
+  "name": "@htwang-contrib/unset-ssh-auth-sock",
   "version": "0.2.6",
   "type": "module",
   "main": "src/index.ts",

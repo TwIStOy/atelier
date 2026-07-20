@@ -33,10 +33,10 @@
       "packages/working-indicator",
       "packages/todo",
       "packages/moshi-hooks-extra",
-      "packages/fish-env-sync",
       "packages/herdr",
       "packages/truncate-outputs",
-      "packages/experience"
+      "packages/experience",
+      "packages/unset-ssh-auth-sock"
     ],
     "skills": [
       "skills/code-philosophy",
