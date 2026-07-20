@@ -35,8 +35,7 @@
       "packages/moshi-hooks-extra",
       "packages/herdr",
       "packages/truncate-outputs",
-      "packages/experience",
-      "packages/unset-ssh-auth-sock"
+      "packages/experience"
     ],
     "skills": [
       "skills/code-philosophy",

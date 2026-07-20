@@ -25,7 +25,6 @@
     { "path": "packages/voice-input" },
     { "path": "packages/read-tracker" },
     { "path": "packages/working-indicator" },
-    { "path": "packages/moshi-hooks-extra" },
-    { "path": "packages/unset-ssh-auth-sock" }
+    { "path": "packages/moshi-hooks-extra" }
   ]
 }
