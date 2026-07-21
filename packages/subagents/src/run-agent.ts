@@ -19,6 +19,8 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { resolveModel } from "@htwang-contrib/common";
 import extraTools from "@htwang-contrib/extra-tools";
+import inferenceSelfHost from "@htwang-contrib/inference-self-host";
+import inferenceV2SelfHost from "@htwang-contrib/inference-v2-self-host";
 import protectSecrets from "@htwang-contrib/protect-secrets";
 import webTools from "@htwang-contrib/web-tools";
 import {
@@ -35,7 +37,14 @@ const gitCloneExtension = (pi: ExtensionAPI) => {
   registerGitCloneTool(pi);
 };
 
-const CHILD_SESSION_EXTENSION_FACTORIES: ExtensionFactory[] = [protectSecrets, extraTools, webTools, gitCloneExtension];
+const CHILD_SESSION_EXTENSION_FACTORIES: ExtensionFactory[] = [
+  protectSecrets,
+  extraTools,
+  webTools,
+  inferenceSelfHost,
+  inferenceV2SelfHost,
+  gitCloneExtension,
+];
 
 const THINKING_LEVELS = new Set<string>(["off", "minimal", "low", "medium", "high", "xhigh"]);
 
