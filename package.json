@@ -10,7 +10,6 @@
     "extensions": [
       "packages/tool-call-fixer",
       "packages/zai-coding-plan",
-      "packages/inference-self-host",
       "packages/inference-v2-self-host",
       "packages/statusline",
       "packages/user-input-history",
