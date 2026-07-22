@@ -67,7 +67,7 @@
     "@earendil-works/pi-coding-agent": "latest",
     "@earendil-works/pi-tui": "^0.80.10",
     "@types/node": "^26.1.1",
-    "fallow": "^3.6.0",
+    "fallow": "^3.7.1",
     "prettier": "^3.9.5",
     "typescript": "^7.0.2",
     "vitest": "^4.1.10"
