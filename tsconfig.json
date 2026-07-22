@@ -4,6 +4,7 @@
     { "path": "packages/common" },
     { "path": "packages/zai-coding-plan" },
     { "path": "packages/inference-self-host" },
+    { "path": "packages/inference-v2-self-host" },
     { "path": "packages/protect-secrets" },
     { "path": "packages/statusline" },
     { "path": "packages/user-input-history" },
