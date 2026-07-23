@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-23
+
 ### Fixed
 
 - Register the `inference-self-host` and `inference-v2-self-host` providers inside child (subagent) sessions. Child sessions build a fresh `ModelRuntime` with `noExtensions: true` and only a fixed set of extension factories, so providers registered in the parent were never available to subagents, and personas hardcoding `inference-self-host/deepseek-v4-flash` failed with `No API key found for inference-self-host`.

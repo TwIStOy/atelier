@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-23
+
 ### Changed
 
 - `catalog.ts` now applies per-family `compat` overrides based on model id (mirroring `inference-self-host`), instead of only special-casing `glm-5.2`. Covers GLM (base / standard / `glm-5.2`), DeepSeek, Moonshot/Kimi (incl. Kimi-K3), Qwen, MiMo, Hunyuan (`hy3`), and `grok-4.5` (responses API compat when the gateway advertises `openai-responses`).
