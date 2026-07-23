@@ -34,7 +34,8 @@
       "packages/moshi-hooks-extra",
       "packages/herdr",
       "packages/truncate-outputs",
-      "packages/experience"
+      "packages/experience",
+      "packages/htw-producer"
     ],
     "skills": [
       "skills/code-philosophy",
