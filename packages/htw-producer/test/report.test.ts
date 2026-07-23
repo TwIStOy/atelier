@@ -31,6 +31,7 @@ interface CtxOpts {
   percent?: number | null;
   model?: unknown;
   branch?: unknown[];
+  sessionName?: string;
 }
 
 function mockCtx(opts: CtxOpts = {}): ExtensionContext {
@@ -47,6 +48,7 @@ function mockCtx(opts: CtxOpts = {}): ExtensionContext {
     },
     sessionManager: {
       getSessionId: () => "abc123",
+      getSessionName: () => opts.sessionName,
       getBranch: () => opts.branch ?? [],
     },
   } as unknown as ExtensionContext;
@@ -151,7 +153,7 @@ describe("buildReport", () => {
     expect(report.tool).toEqual({ name: "edit", args: { file: "a.ts" } });
   });
 
-  test("omits optional fields when absent", () => {
+  test("omits optional fields when absent (agent is always sent)", () => {
     const report = buildReport({
       ctx: mockCtx(),
       sessionId: "x",
@@ -161,11 +163,70 @@ describe("buildReport", () => {
       gitCache: createGitContextCache(NO_GIT_RUNNER),
       env: {},
     });
+    expect(report.agent).toBe("pi");
+    expect(report.title).toBeUndefined();
     expect(report.tool).toBeUndefined();
     expect(report.worktree).toBeUndefined();
     expect(report.cost).toBeUndefined();
     expect(report.tmux_pane).toBeUndefined();
     expect(report.pid).toBeUndefined();
+  });
+
+  test("title comes from the session name when set", () => {
+    const report = buildReport({
+      ctx: mockCtx({ sessionName: "Refactor auth" }),
+      sessionId: "x",
+      startedAt: 1,
+      status: "idle",
+      diff: diff.snapshot(),
+      gitCache: createGitContextCache(NO_GIT_RUNNER),
+      env: {},
+    });
+    expect(report.title).toBe("Refactor auth");
+  });
+
+  test("title falls back to the first user prompt when no session name", () => {
+    const branch = [{ type: "message", message: { role: "user", content: "fix the login bug\non line 42" } }];
+    const report = buildReport({
+      ctx: mockCtx({ branch }),
+      sessionId: "x",
+      startedAt: 1,
+      status: "working",
+      diff: diff.snapshot(),
+      gitCache: createGitContextCache(NO_GIT_RUNNER),
+      env: {},
+    });
+    expect(report.title).toBe("fix the login bug on line 42");
+  });
+
+  test("title truncates long prompts to a single line", () => {
+    const long = `Implement ${"a".repeat(200)}`;
+    const report = buildReport({
+      ctx: mockCtx({ branch: [{ type: "message", message: { role: "user", content: long } }] }),
+      sessionId: "x",
+      startedAt: 1,
+      status: "idle",
+      diff: diff.snapshot(),
+      gitCache: createGitContextCache(NO_GIT_RUNNER),
+      env: {},
+    });
+    const title = report.title ?? "";
+    expect(title.length).toBeLessThanOrEqual(80);
+    expect(title.endsWith("…")).toBe(true);
+  });
+
+  test("session name takes priority over the first user prompt", () => {
+    const branch = [{ type: "message", message: { role: "user", content: "hello" } }];
+    const report = buildReport({
+      ctx: mockCtx({ sessionName: "Named", branch }),
+      sessionId: "x",
+      startedAt: 1,
+      status: "idle",
+      diff: diff.snapshot(),
+      gitCache: createGitContextCache(NO_GIT_RUNNER),
+      env: {},
+    });
+    expect(report.title).toBe("Named");
   });
 
   test("includes tmux_pane and pid when available", () => {

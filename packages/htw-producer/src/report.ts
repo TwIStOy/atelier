@@ -1,5 +1,6 @@
-import type { AssistantMessage } from "@earendil-works/pi-ai";
+import type { AssistantMessage, UserMessage } from "@earendil-works/pi-ai";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { userMessageText } from "@htwang-contrib/common";
 import type { DiffCounts } from "./diff-tracker.ts";
 import type { GitContextCache } from "./git-context.ts";
 
@@ -41,7 +42,12 @@ export interface Report {
   tmux_pane?: string;
   pid?: number;
   started_at?: number;
+  agent?: string;
+  title?: string;
 }
+
+export const AGENT_HARNESS = "pi";
+const TITLE_MAX_LEN = 80;
 
 const SUMMARY_FIELDS = ["file", "path", "command", "pattern", "url", "query"] as const;
 const MAX_VALUE_LEN = 200;
@@ -71,6 +77,34 @@ function modelName(ctx: ExtensionContext): string {
   const model = ctx.model as { name?: string; id?: string } | undefined;
   if (!model) return "unknown";
   return model.name || model.id || "unknown";
+}
+
+function firstUserPrompt(ctx: ExtensionContext): string | undefined {
+  for (const entry of ctx.sessionManager.getBranch()) {
+    if (entry.type !== "message") continue;
+    const message = (entry as { message: { role?: string } }).message;
+    if (message?.role !== "user") continue;
+    const text = userMessageText(entry.message as UserMessage);
+    return text || undefined;
+  }
+  return undefined;
+}
+
+function toSingleLine(text: string, maxLen: number): string {
+  const line = text
+    .replace(/[\r\n\t]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (line.length <= maxLen) return line;
+  return `${line.slice(0, maxLen - 1)}…`;
+}
+
+export function deriveTitle(ctx: ExtensionContext): string | undefined {
+  const name = ctx.sessionManager.getSessionName();
+  if (name && name.trim().length > 0) return name.trim();
+  const prompt = firstUserPrompt(ctx);
+  if (!prompt) return undefined;
+  return toSingleLine(prompt, TITLE_MAX_LEN) || undefined;
 }
 
 export function computeSessionCost(ctx: ExtensionContext): number {
@@ -158,6 +192,11 @@ export function buildReport(input: BuildReportInput): Report {
   if (typeof pid === "number" && pid > 0) {
     report.pid = pid;
   }
+
+  report.agent = AGENT_HARNESS;
+
+  const title = deriveTitle(ctx);
+  if (title) report.title = title;
 
   return report;
 }

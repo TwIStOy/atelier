@@ -26,6 +26,8 @@ the agent's main flow.
 | `pid` | `process.pid` (lets the daemon reap the session if pi dies) |
 | `tmux_pane` | `$TMUX_PANE` when present |
 | `started_at` | first `session_start` for this session id (Unix epoch seconds) |
+| `agent` | always `"pi"` (the harness label) |
+| `title` | `getSessionName()` if set, else the first user prompt (single-lined, ≤80 chars); omitted when neither is available |
 
 ### Status derivation
 
