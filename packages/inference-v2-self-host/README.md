@@ -14,6 +14,12 @@ Set this environment variable:
 - `authHeader: true` sends `Authorization: Bearer <key>`.
 - Anthropic models get a model-level `baseUrl` of `https://inference-v2.twistoy.cn/api`; the Anthropic SDK appends `/v1/messages`, producing `/api/v1/messages`.
 
+## Session affinity (lite-gateway)
+
+Every request to this provider carries an `x-lite-session-id` header whose value is the current pi session id (`ctx.sessionManager.getSessionId()`). The lite-gateway uses this to pin requests from one pi session to the same upstream replica, maximizing prompt-cache locality (see lite-gateway issue [#24](https://github.com/TwIStOy/lite-gateway/issues/24)).
+
+The header is injected via pi's `before_provider_headers` hook and scoped to `ctx.model.provider === "inference-v2-self-host"`, so it is never sent to other providers. It applies to both `openai-completions` and `anthropic-messages` models served by the gateway.
+
 ## Model Catalog (dynamic)
 
 Starts with an empty `models: []` baseline and is populated by the new `refreshModels` provider API:
