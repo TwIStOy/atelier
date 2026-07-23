@@ -1,0 +1,11 @@
+# Changelog
+
+## [Unreleased]
+
+## [0.1.0] - 2026-07-22
+
+### Added
+
+- Initial release. Pushes full-state session Reports to the `htw daemon`
+  producer HTTP API (`POST /v1/reports`) so live pi sessions show up in the
+  `htw agents` dashboard.
