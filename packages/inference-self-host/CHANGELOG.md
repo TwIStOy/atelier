@@ -6,6 +6,18 @@
 
 - `kimi-k3` (prices synced from models.dev, Moonshot family).
 
+### Changed
+
+- Aligned every per-family `compat` override with pi's official model definitions (`@earendil-works/pi-ai` `models.generated`):
+  - **GLM (ZAI)** split into base (`glm-4.5-air`, no `zaiToolStream`), standard (`zaiToolStream: true`), and `glm-5.2` (`supportsReasoningEffort: true`) variants; `glm-5.2` thinkingLevelMap is `{ minimal: null, low/medium/high: "high", max: "max" }`.
+  - **DeepSeek** gained `supportsStore: false` and thinkingLevelMap `{ minimal/low/medium: null, high: "high", max: "max" }`.
+  - **Moonshot (Kimi)** gained `supportsStore: false`, `supportsStrictMode: false`, `thinkingFormat: "deepseek"`.
+  - **Qwen** gained `supportsStore: false`.
+  - All families now set `supportsStore: false` / `supportsDeveloperRole: false` explicitly instead of relying on URL auto-detection.
+- Added compat overrides that were previously missing: **MiMo (Xiaomi)** family now uses `thinkingFormat: "deepseek"` + `requiresReasoningContentOnAssistantMessages: true`; `hy3-preview` uses `{ supportsStore: false, supportsDeveloperRole: false }`; `glm-4.5` and the MiMo models that had no override now carry their family compat.
+- `kimi-k3` uses the Kimi-K3-specific compat (`requiresReasoningContentOnAssistantMessages` + `thinkingFormat: "deepseek"` + `maxTokensField`/`supportsStrictMode`) and thinkingLevelMap where only `max` enables thinking. `deferredToolsMode: "kimi"` is intentionally omitted (gateway tool loading is static).
+- `grok-4.5` switched to the `openai-responses` API with `supportsLongCacheRetention: false` and thinkingLevelMap `{ off: null, minimal: null }`, matching pi's xai definition.
+
 ## [0.2.5] - 2026-07-14
 
 ### Added

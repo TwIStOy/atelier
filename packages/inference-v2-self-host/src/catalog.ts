@@ -46,17 +46,82 @@ const API_PREFERENCE: readonly Api[] = ["openai-responses", "openai-completions"
 const ZAI_COMPAT: NonNullable<ProviderModelConfig["compat"]> = {
   supportsStore: false,
   supportsDeveloperRole: false,
-  supportsReasoningEffort: true,
+  supportsReasoningEffort: false,
   thinkingFormat: "zai",
   zaiToolStream: true,
 };
 
-const GLM_5_2_THINKING_LEVEL_MAP: NonNullable<ProviderModelConfig["thinkingLevelMap"]> = {
+const ZAI_COMPAT_52: NonNullable<ProviderModelConfig["compat"]> = {
+  ...ZAI_COMPAT,
+  supportsReasoningEffort: true,
+};
+
+const GLM_52_THINKING_LEVEL_MAP: NonNullable<ProviderModelConfig["thinkingLevelMap"]> = {
   minimal: null,
   low: "high",
   medium: "high",
   high: "high",
-  xhigh: "max",
+  max: "max",
+};
+
+const DEEPSEEK_COMPAT: NonNullable<ProviderModelConfig["compat"]> = {
+  supportsStore: false,
+  supportsDeveloperRole: false,
+  requiresReasoningContentOnAssistantMessages: true,
+  thinkingFormat: "deepseek",
+};
+
+const DEEPSEEK_THINKING_LEVEL_MAP: NonNullable<ProviderModelConfig["thinkingLevelMap"]> = {
+  minimal: null,
+  low: null,
+  medium: null,
+  high: "high",
+  max: "max",
+};
+
+const MOONSHOT_COMPAT: NonNullable<ProviderModelConfig["compat"]> = {
+  supportsStore: false,
+  supportsDeveloperRole: false,
+  supportsReasoningEffort: false,
+  maxTokensField: "max_tokens",
+  supportsStrictMode: false,
+  thinkingFormat: "deepseek",
+};
+
+const KIMI_K3_COMPAT: NonNullable<ProviderModelConfig["compat"]> = {
+  ...MOONSHOT_COMPAT,
+  requiresReasoningContentOnAssistantMessages: true,
+};
+
+const KIMI_K3_THINKING_LEVEL_MAP: NonNullable<ProviderModelConfig["thinkingLevelMap"]> = {
+  off: null,
+  minimal: null,
+  low: null,
+  medium: null,
+  high: null,
+  xhigh: null,
+  max: "max",
+};
+
+const QWEN_COMPAT: NonNullable<ProviderModelConfig["compat"]> = {
+  supportsStore: false,
+  supportsDeveloperRole: false,
+  thinkingFormat: "qwen",
+};
+
+const MIMO_COMPAT: NonNullable<ProviderModelConfig["compat"]> = {
+  requiresReasoningContentOnAssistantMessages: true,
+  thinkingFormat: "deepseek",
+};
+
+const HY3_COMPAT: NonNullable<ProviderModelConfig["compat"]> = {
+  supportsStore: false,
+  supportsDeveloperRole: false,
+};
+
+const GROK_45_THINKING_LEVEL_MAP: NonNullable<ProviderModelConfig["thinkingLevelMap"]> = {
+  off: null,
+  minimal: null,
 };
 
 function resolveApiKey(context: RefreshModelsContext): string | undefined {
@@ -71,6 +136,52 @@ function pickApi(entry: GatewayModelObject): Api {
     if (formats.has(api)) return api;
   }
   return "openai-completions";
+}
+
+function applyFamilyOverrides(config: ProviderModelConfig, api: Api): void {
+  const id = config.id;
+  if (id === "glm-5.2") {
+    config.compat = ZAI_COMPAT_52;
+    config.thinkingLevelMap = GLM_52_THINKING_LEVEL_MAP;
+    return;
+  }
+  if (id.startsWith("glm-")) {
+    config.compat = ZAI_COMPAT;
+    return;
+  }
+  if (id.startsWith("deepseek-")) {
+    config.compat = DEEPSEEK_COMPAT;
+    config.thinkingLevelMap = DEEPSEEK_THINKING_LEVEL_MAP;
+    return;
+  }
+  if (id === "kimi-k3") {
+    config.compat = KIMI_K3_COMPAT;
+    config.thinkingLevelMap = KIMI_K3_THINKING_LEVEL_MAP;
+    return;
+  }
+  if (id.startsWith("kimi-")) {
+    config.compat = MOONSHOT_COMPAT;
+    return;
+  }
+  if (id.startsWith("qwen")) {
+    config.compat = QWEN_COMPAT;
+    return;
+  }
+  if (id.startsWith("mimo-")) {
+    config.compat = MIMO_COMPAT;
+    return;
+  }
+  if (id.startsWith("hy3")) {
+    config.compat = HY3_COMPAT;
+    return;
+  }
+  if (id === "grok-4.5") {
+    if (api === "openai-responses") {
+      config.compat = { supportsLongCacheRetention: false };
+      config.thinkingLevelMap = GROK_45_THINKING_LEVEL_MAP;
+    }
+    return;
+  }
 }
 
 function toModelConfig(entry: GatewayModelObject): ProviderModelConfig {
@@ -102,10 +213,7 @@ function toModelConfig(entry: GatewayModelObject): ProviderModelConfig {
     config.baseUrl = GATEWAY_ROOT_BASE_URL;
   }
 
-  if (entry.id === "glm-5.2") {
-    config.compat = ZAI_COMPAT;
-    config.thinkingLevelMap = GLM_5_2_THINKING_LEVEL_MAP;
-  }
+  applyFamilyOverrides(config, api);
 
   return config;
 }

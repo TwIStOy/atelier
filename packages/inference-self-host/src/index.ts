@@ -3,27 +3,83 @@ import { createLogger } from "@htwang-contrib/common";
 
 const logger = createLogger("inference-self-host");
 
-const zaiCompat = {
+const zaiCompatBase = {
+  supportsStore: false,
   supportsDeveloperRole: false,
+  supportsReasoningEffort: false,
   thinkingFormat: "zai" as const,
-  zaiToolStream: true,
+};
+
+const zaiCompat = { ...zaiCompatBase, zaiToolStream: true };
+
+const zaiCompat52 = { ...zaiCompat, supportsReasoningEffort: true };
+
+const glm52ThinkingLevelMap = {
+  minimal: null,
+  low: "high",
+  medium: "high",
+  high: "high",
+  max: "max",
 };
 
 const deepseekCompat = {
+  supportsStore: false,
   supportsDeveloperRole: false,
-  thinkingFormat: "deepseek" as const,
   requiresReasoningContentOnAssistantMessages: true,
+  thinkingFormat: "deepseek" as const,
+};
+
+const deepseekThinkingLevelMap = {
+  minimal: null,
+  low: null,
+  medium: null,
+  high: "high",
+  max: "max",
 };
 
 const moonshotCompat = {
+  supportsStore: false,
   supportsDeveloperRole: false,
   supportsReasoningEffort: false,
   maxTokensField: "max_tokens" as const,
+  supportsStrictMode: false,
+  thinkingFormat: "deepseek" as const,
+};
+
+const kimiK3Compat = {
+  ...moonshotCompat,
+  requiresReasoningContentOnAssistantMessages: true,
+};
+
+const kimiK3ThinkingLevelMap = {
+  off: null,
+  minimal: null,
+  low: null,
+  medium: null,
+  high: null,
+  xhigh: null,
+  max: "max",
 };
 
 const qwenCompat = {
+  supportsStore: false,
   supportsDeveloperRole: false,
   thinkingFormat: "qwen" as const,
+};
+
+const mimoCompat = {
+  requiresReasoningContentOnAssistantMessages: true,
+  thinkingFormat: "deepseek" as const,
+};
+
+const hy3Compat = {
+  supportsStore: false,
+  supportsDeveloperRole: false,
+};
+
+const grok45ThinkingLevelMap = {
+  off: null,
+  minimal: null,
 };
 
 export default function (pi: ExtensionAPI) {
@@ -152,24 +208,18 @@ export default function (pi: ExtensionAPI) {
         cost: { input: 1, output: 3, cacheRead: 0.2, cacheWrite: 0 },
         contextWindow: 1048576,
         maxTokens: 131072,
+        compat: mimoCompat,
       },
       {
         id: "glm-5.2",
         name: "GLM-5.2",
         reasoning: true,
-        thinkingLevelMap: {
-          off: "high",
-          minimal: "high",
-          low: "high",
-          medium: "high",
-          high: "high",
-          xhigh: "max",
-        },
+        thinkingLevelMap: glm52ThinkingLevelMap,
         input: ["text"],
         cost: { input: 1.4, output: 4.4, cacheRead: 0.26, cacheWrite: 0 },
         contextWindow: 1000000,
         maxTokens: 131072,
-        compat: zaiCompat,
+        compat: zaiCompat52,
       },
       {
         id: "glm-5",
@@ -189,6 +239,7 @@ export default function (pi: ExtensionAPI) {
         cost: { input: 0.2, output: 1.1, cacheRead: 0.03, cacheWrite: 0 },
         contextWindow: 128000,
         maxTokens: 16384,
+        compat: zaiCompatBase,
       },
       {
         id: "glm-4.5",
@@ -198,6 +249,7 @@ export default function (pi: ExtensionAPI) {
         cost: { input: 0.6, output: 2.2, cacheRead: 0.11, cacheWrite: 0 },
         contextWindow: 128000,
         maxTokens: 16384,
+        compat: zaiCompat,
       },
       {
         id: "qwen3.5-plus",
@@ -247,16 +299,18 @@ export default function (pi: ExtensionAPI) {
         cost: { input: 0.4, output: 2, cacheRead: 0.08, cacheWrite: 0 },
         contextWindow: 262144,
         maxTokens: 131072,
+        compat: mimoCompat,
       },
       {
         id: "kimi-k3",
         name: "Kimi-K3",
         reasoning: true,
+        thinkingLevelMap: kimiK3ThinkingLevelMap,
         input: ["text", "image"],
         cost: { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 0 },
         contextWindow: 1048576,
         maxTokens: 131072,
-        compat: moonshotCompat,
+        compat: kimiK3Compat,
       },
       {
         id: "kimi-k2.6",
@@ -272,6 +326,7 @@ export default function (pi: ExtensionAPI) {
         id: "deepseek-v4-pro",
         name: "DeepSeek V4 Pro",
         reasoning: true,
+        thinkingLevelMap: deepseekThinkingLevelMap,
         input: ["text"],
         cost: {
           input: 0.435,
@@ -309,6 +364,7 @@ export default function (pi: ExtensionAPI) {
         cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
         contextWindow: 256000,
         maxTokens: 64000,
+        compat: hy3Compat,
       },
       {
         id: "kimi-k2.5",
@@ -328,6 +384,7 @@ export default function (pi: ExtensionAPI) {
         cost: { input: 0.4, output: 2, cacheRead: 0.08, cacheWrite: 0 },
         contextWindow: 1048576,
         maxTokens: 131072,
+        compat: mimoCompat,
       },
       {
         id: "qwen3.6-plus",
@@ -347,11 +404,13 @@ export default function (pi: ExtensionAPI) {
         cost: { input: 1, output: 3, cacheRead: 0.2, cacheWrite: 0 },
         contextWindow: 1048576,
         maxTokens: 131072,
+        compat: mimoCompat,
       },
       {
         id: "deepseek-v4-flash",
         name: "DeepSeek V4 Flash",
         reasoning: true,
+        thinkingLevelMap: deepseekThinkingLevelMap,
         input: ["text"],
         cost: { input: 0.14, output: 0.28, cacheRead: 0.0028, cacheWrite: 0 },
         contextWindow: 1000000,
@@ -366,6 +425,7 @@ export default function (pi: ExtensionAPI) {
         cost: { input: 0.6, output: 2.2, cacheRead: 0.11, cacheWrite: 0 },
         contextWindow: 128000,
         maxTokens: 16384,
+        compat: zaiCompat,
       },
       {
         id: "glm-4.6",
@@ -380,11 +440,14 @@ export default function (pi: ExtensionAPI) {
       {
         id: "grok-4.5",
         name: "Grok 4.5",
+        api: "openai-responses",
         reasoning: true,
+        thinkingLevelMap: grok45ThinkingLevelMap,
         input: ["text", "image"],
         cost: { input: 2, output: 6, cacheRead: 0.5, cacheWrite: 0 },
         contextWindow: 500000,
         maxTokens: 500000,
+        compat: { supportsLongCacheRetention: false },
       },
     ],
   });
