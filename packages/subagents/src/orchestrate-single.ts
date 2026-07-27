@@ -119,11 +119,13 @@ export async function runSingleSubagent(
     ui.stopAndFlush();
   }
   if (result.isError) {
+    const failureText = result.errorMessage ?? "subagent failed";
+    const partial = result.text.trim();
     return {
       content: [
         {
           type: "text",
-          text: result.errorMessage ?? "subagent failed",
+          text: partial ? `${failureText}\n\nPartial output before the failure:\n\n${partial}` : failureText,
         },
       ],
       details: subagentDetails({

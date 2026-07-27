@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import * as fs from "node:fs";
 import type { AgentMessage, ThinkingLevel } from "@earendil-works/pi-agent-core";
-import type { TextContent } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionContext, ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import {
   type AgentSession,
@@ -46,7 +45,7 @@ const CHILD_SESSION_EXTENSION_FACTORIES: ExtensionFactory[] = [
   gitCloneExtension,
 ];
 
-const THINKING_LEVELS = new Set<string>(["off", "minimal", "low", "medium", "high", "xhigh"]);
+const THINKING_LEVELS = new Set<string>(["off", "minimal", "low", "medium", "high", "xhigh", "max"]);
 
 export type SubagentUsageSnapshot = {
   usage_input: number;
@@ -119,29 +118,45 @@ export type SubagentChildProgress = {
   task_total?: number;
 } & SubagentUsageSnapshot;
 
-function parseThinking(raw: string | undefined): ThinkingLevel | undefined {
+export function parseThinking(raw: string | undefined): ThinkingLevel | undefined {
   if (raw === undefined || raw === "") return undefined;
   const t = raw.trim().toLowerCase();
   if (!THINKING_LEVELS.has(t)) return undefined;
   return t as ThinkingLevel;
 }
 
-function extractAssistantText(messages: AgentMessage[]): string {
+export function assistantMessageText(msg: AgentMessage): string {
+  if (msg.role !== "assistant") return "";
+  const chunks: string[] = [];
+  for (const part of msg.content) {
+    if (part.type === "text" && typeof part.text === "string") chunks.push(part.text);
+  }
+  return chunks.join("").trim();
+}
+
+export function extractAssistantText(messages: AgentMessage[]): string {
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i];
     if (msg.role !== "assistant") continue;
-    const parts = msg.content;
-    if (!Array.isArray(parts)) continue;
-    const chunks: string[] = [];
-    for (const part of parts as TextContent[]) {
-      if (part.type === "text" && typeof part.text === "string") {
-        chunks.push(part.text);
-      }
-    }
-    const joined = chunks.join("").trim();
-    if (joined) return joined;
+    const text = assistantMessageText(msg);
+    if (text) return text;
   }
   return "";
+}
+
+export function finalTurnError(messages: AgentMessage[]): string | undefined {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i];
+    if (msg.role !== "assistant") continue;
+    if (msg.stopReason === "error") {
+      return msg.errorMessage?.trim() || "provider error with no output";
+    }
+    if (msg.stopReason === "length" && assistantMessageText(msg) === "") {
+      return "hit output token limit without producing any text";
+    }
+    return undefined;
+  }
+  return undefined;
 }
 
 function resolveModelForSubagent(raw: string | undefined, ctx: ExtensionContext) {
@@ -353,7 +368,13 @@ export async function runSubAgent(
       text += `\n\n[Output truncated: ${trunc.outputLines} of ${trunc.totalLines} lines (${formatSize(trunc.outputBytes)} of ${formatSize(trunc.totalBytes)}).]`;
     }
 
-    return finish({ text, isError: false, tool_calls: toolCallCount });
+    const failure = finalTurnError(created.messages);
+    return finish({
+      text,
+      isError: Boolean(failure),
+      errorMessage: failure,
+      tool_calls: toolCallCount,
+    });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return finish({

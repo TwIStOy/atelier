@@ -12,6 +12,12 @@ export function formatBatchToolText(items: SubagentBatchItemDetail[]): string {
       out.push(t.length > 12_000 ? `${t.slice(0, 12_000)}\n…` : t);
     } else {
       out.push(it.error ?? "unknown error");
+      const partial = (it.text ?? "").trim();
+      if (partial) {
+        out.push("");
+        out.push("Partial output before the failure:");
+        out.push(partial.length > 12_000 ? `${partial.slice(0, 12_000)}\n…` : partial);
+      }
     }
     if (
       (typeof it.usage_input === "number" && it.usage_input > 0) ||

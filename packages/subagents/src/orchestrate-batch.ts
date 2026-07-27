@@ -161,6 +161,7 @@ export async function runParallelBatchSubagent(
           index: i,
           ok: false,
           error: r.errorMessage ?? "subagent failed",
+          text: r.text.trim() || undefined,
           tool_calls: r.tool_calls,
           sub_session_file: r.sub_session_file,
           agent_type: at,

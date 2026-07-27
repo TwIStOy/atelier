@@ -23,7 +23,7 @@ const taskItem = Type.Object({
   ),
   thinking: Type.Optional(
     Type.String({
-      description: "Thinking level for this task.",
+      description: "Thinking level for this task: off, minimal, low, medium, high, xhigh, or max.",
     }),
   ),
   inherit_context: Type.Optional(
@@ -85,7 +85,7 @@ export const subagentParams = Type.Object({
   ),
   thinking: Type.Optional(
     Type.String({
-      description: "Thinking level.",
+      description: "Thinking level: off, minimal, low, medium, high, xhigh, or max.",
     }),
   ),
   inherit_context: Type.Optional(
