@@ -46,8 +46,9 @@ export {
   MODAL_ACTIVE_EVENT,
   ZAI_CODING_PLAN_EVENTS,
 } from "./events.ts";
-export type { UsageStressLevel } from "./format.ts";
+export type { PrioritizedSegment, SegmentFitOptions, UsageStressLevel } from "./format.ts";
 export {
+  fitSegmentsByPriority,
   formatCwd,
   formatElapsedSeconds,
   formatNumber,
@@ -82,11 +83,23 @@ export {
   createSessionCache,
   isStaleCtxError,
 } from "./session-cache.ts";
+export { SessionLifecycle } from "./session-lifecycle.ts";
 export type { SideCallResult } from "./side-call.ts";
 export { executeSideCall } from "./side-call.ts";
 export { getAvailableSkillNames } from "./skills.ts";
 export type { SpinnerStyle } from "./spinner.ts";
 export { DEFAULT_SPINNER, resolveSpinner, SPINNER_STYLES } from "./spinner.ts";
+export type {
+  TelemetryDeltaType,
+  TelemetryFormatOptions,
+  TelemetryModelRef,
+  TelemetryUsage,
+  TurnTelemetry,
+} from "./telemetry.ts";
+export {
+  formatTurnTelemetry,
+  TurnTelemetryTracker,
+} from "./telemetry.ts";
 export {
   extractAnsiRgb,
   fitColWidths,

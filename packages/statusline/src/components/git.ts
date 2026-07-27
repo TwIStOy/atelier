@@ -1,11 +1,94 @@
-import { exec } from "node:child_process";
+import { execFile } from "node:child_process";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import type { StatusLineComponent } from "./base.ts";
 
+export interface GitStatus {
+  branch: string | null;
+  detached: boolean;
+  shortHash: string | null;
+  ahead: number;
+  behind: number;
+  stashed: number;
+  staged: number;
+  modified: number;
+  untracked: number;
+  conflicted: number;
+}
+
+function emptyStatus(): GitStatus {
+  return {
+    branch: null,
+    detached: false,
+    shortHash: null,
+    ahead: 0,
+    behind: 0,
+    stashed: 0,
+    staged: 0,
+    modified: 0,
+    untracked: 0,
+    conflicted: 0,
+  };
+}
+
+function isDirty(s: GitStatus): boolean {
+  return s.staged + s.modified + s.untracked + s.conflicted > 0;
+}
+
+/**
+ * Parse `git status --porcelain=v1 --branch --show-stash` output into a
+ * structured status. Branch header forms handled:
+ *   `## main` · `## main...origin/main` · `## main...origin/main [ahead 2]`
+ *   `## main [ahead 2, behind 1]` · `## HEAD (no branch)` (detached)
+ */
+export function parseGitPorcelain(stdout: string): GitStatus {
+  const status = emptyStatus();
+  const lines = stdout.split("\n");
+
+  for (const line of lines) {
+    if (line === "") continue;
+
+    if (line.startsWith("## ")) {
+      const header = line.slice(3);
+      if (header.startsWith("HEAD (no branch)")) {
+        status.detached = true;
+        continue;
+      }
+      const branchMatch = header.match(/^(\S+?)(?:\.\.\.\S+)?(?:\s+\[([^\]]+)\])?$/);
+      if (branchMatch) status.branch = branchMatch[1];
+      if (branchMatch?.[2]) {
+        for (const part of branchMatch[2].split(", ")) {
+          const ahead = part.match(/^ahead (\d+)$/);
+          if (ahead) status.ahead = parseInt(ahead[1], 10);
+          const behind = part.match(/^behind (\d+)$/);
+          if (behind) status.behind = parseInt(behind[1], 10);
+        }
+      }
+      continue;
+    }
+
+    if (line.startsWith("# stash ")) {
+      status.stashed = parseInt(line.slice(8).trim(), 10) || 0;
+      continue;
+    }
+
+    const x = line[0];
+    const y = line[1];
+    if (x === "U" || y === "U" || (x === "C" && y === "C")) {
+      status.conflicted++;
+    } else if (x === "?" && y === "?") {
+      status.untracked++;
+    } else {
+      if (x !== " " && x !== "?") status.staged++;
+      if (y === "M" || y === "D") status.modified++;
+    }
+  }
+
+  return status;
+}
+
 export class GitComponent implements StatusLineComponent {
-  private branch: string | null = null;
-  private dirty = false;
+  private status: GitStatus | null = null;
   private refreshing = false;
   private requestRender: (() => void) | null = null;
   private refreshTimer: ReturnType<typeof setTimeout> | null = null;
@@ -37,17 +120,11 @@ export class GitComponent implements StatusLineComponent {
     if (this.refreshing) return;
     this.refreshing = true;
 
-    const cwd = this.cwd;
     try {
-      const [branchOut, statusOut] = await Promise.all([
-        this.exec("git rev-parse --abbrev-ref HEAD", cwd),
-        this.exec("git status --porcelain", cwd),
-      ]);
-      this.branch = branchOut?.trim() || null;
-      this.dirty = (statusOut?.trim().length ?? 0) > 0;
+      const status = await this.readStatus(this.cwd);
+      this.status = status;
     } catch {
-      this.branch = null;
-      this.dirty = false;
+      this.status = null;
     }
 
     this.refreshing = false;
@@ -56,20 +133,38 @@ export class GitComponent implements StatusLineComponent {
     this.scheduleRefresh(5000);
   }
 
-  private exec(cmd: string, cwd: string): Promise<string | null> {
+  private async readStatus(cwd: string): Promise<GitStatus | null> {
+    const stdout = await this.git(["status", "--porcelain=v1", "--branch", "--show-stash"], cwd);
+    if (stdout === null) return null;
+    const status = parseGitPorcelain(stdout);
+    if (status.detached) {
+      const hash = await this.git(["rev-parse", "--short", "HEAD"], cwd);
+      status.shortHash = hash?.trim() || null;
+    }
+    return status;
+  }
+
+  private git(args: string[], cwd: string): Promise<string | null> {
     return new Promise((resolve) => {
-      exec(cmd, { cwd, encoding: "utf-8" }, (_err, stdout) => {
-        resolve(_err ? null : stdout);
+      execFile("git", args, { cwd, encoding: "utf-8" }, (err, stdout) => {
+        resolve(err ? null : stdout);
       });
     });
   }
 
   render(width: number, theme: Theme): string[] {
-    if (!this.branch) return [];
+    const status = this.status;
+    if (!status || (!status.branch && !status.detached)) return [];
 
-    const marker = this.dirty ? theme.fg("error", "✗") : theme.fg("success", "✓");
-    const branchBudget = Math.max(0, width - visibleWidth(marker) - 1);
-    const branch = truncateToWidth(this.branch, branchBudget, "…");
-    return [truncateToWidth(`${theme.fg("muted", branch)} ${marker}`, width, "")];
+    const label = status.detached ? (status.shortHash ?? "detached") : status.branch;
+
+    const ahead = status.ahead > 0 ? ` ↑${status.ahead}` : "";
+    const behind = status.behind > 0 ? ` ↓${status.behind}` : "";
+    const dirty = isDirty(status);
+    const marker = dirty ? theme.fg("error", "✗") : theme.fg("success", "✓");
+
+    const budget = Math.max(0, width - visibleWidth(marker) - 1);
+    const head = truncateToWidth(`${label}${ahead}${behind}`, budget, "…");
+    return [truncateToWidth(`${theme.fg("muted", head)} ${marker}`, width, "")];
   }
 }

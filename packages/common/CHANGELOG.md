@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Added
+
+- Turn telemetry tracker: `TurnTelemetryTracker` measures TPS, TTFT, and streaming stalls across an agent run by feeding in lifecycle observations (turn/message deltas, tool execution). Only turns with measurable streaming contribute to the aggregated TPS; tool-call turns are clamped to the model's best observed speed. `formatTurnTelemetry` renders a one-line summary with individually gated segments. Injectable `now` for deterministic tests.
+- `SessionLifecycle` generation counter that fences stale async callbacks out of the current session — capture a generation before an `await`, re-check it after.
+- `fitSegmentsByPriority` joins prioritized segments into a width-bounded line, dropping the lowest-priority segments first and truncating the highest-priority survivor only as a last resort. `measure`/`truncate` are injectable for ANSI-colored or wide (CJK) segments.
+
 ## [0.2.4] - 2026-07-09
 
 ## [0.2.3] - 2026-07-09

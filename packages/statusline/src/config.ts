@@ -3,6 +3,9 @@ import { readConfig, registerConfigItems } from "@htwang-contrib/common";
 
 export interface StatuslineConfig {
   showGitBranch: boolean;
+  showRuntime: boolean;
+  /** Master switch for the post-run telemetry notification (TPS/TTFT/stalls). */
+  telemetry: boolean;
 }
 
 const CONFIG_NAME = "statusline";
@@ -10,6 +13,8 @@ const CONFIG_NAME = "statusline";
 const CONFIG_SCHEMA: ExtensionConfigSchema<StatuslineConfig> = {
   defaults: {
     showGitBranch: true,
+    showRuntime: true,
+    telemetry: true,
   },
 };
 
@@ -28,6 +33,25 @@ export function registerStatuslineConfigItems(): void {
         "Show the git branch and dirty marker in the footer. Turn off in large repos where git status is slow.",
       extensionLabel: "Statusline",
       order: 0,
+    },
+    {
+      key: "showRuntime",
+      type: "boolean",
+      label: "Show Runtime",
+      value: () => loadConfig().showRuntime,
+      description:
+        "Detect the project's runtime (node/rust/go/python/...) from manifest files and show its version in the footer.",
+      extensionLabel: "Statusline",
+      order: 1,
+    },
+    {
+      key: "telemetry",
+      type: "boolean",
+      label: "Turn Telemetry",
+      value: () => loadConfig().telemetry,
+      description: "Show a one-line notification (TPS, TTFT, stalls, tokens, cost) after each agent run settles.",
+      extensionLabel: "Statusline",
+      order: 2,
     },
   ]);
 }

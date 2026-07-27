@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Added
+
+- Turn telemetry notification: after each agent run settles, the statusline shows a one-line summary (TPS, TTFT, duration, tokens, stalls, cost-per-million) via `ctx.ui.notify`. Toggle in `/config` -> Statusline -> "Turn Telemetry" (default on). Powered by `TurnTelemetryTracker` from `@htwang-contrib/common`.
+- Runtime detection segment in the footer: detects the project runtime (node, python, rust, go, ruby, deno, bun, php, swift, kotlin, java, c/cpp, dotnet, elixir, haskell, dart, zig, julia, nix, terraform, and more) from manifest files and shows its version. Version is fetched once per runtime with a 2.5s timeout and cached. Toggle in `/config` -> Statusline -> "Show Runtime" (default on).
+
+### Changed
+
+- Footer now lays out segments by priority via `fitSegmentsByPriority` (`@htwang-contrib/common`): when the terminal is narrow, the lowest-priority segments (runtime, git) drop first instead of the whole line being hard-truncated. Segment priorities: tokens > coding-plan usage > git/runtime.
+- Git footer status now uses a single `git status --porcelain=v1 --branch --show-stash` call and parses ahead/behind, detached HEAD, and stash/working-tree state. Display now shows ahead (`↑N`) / behind (`↓N`) next to the branch; the `✓`/`✗` clean/dirty marker is unchanged.
+
 ## [0.2.4] - 2026-07-09
 
 ### Added
