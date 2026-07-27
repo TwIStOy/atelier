@@ -4,7 +4,7 @@ description: Fast read-only search agent for locating code.
 whenToUse: Find files by pattern (e.g. src/components/**/*.tsx), grep symbols or keywords (e.g. API endpoints), or answer where X is defined / which files reference Y. Do not use for code review, design-doc auditing, cross-file consistency checks, or open-ended analysis—reads excerpts rather than whole files and can miss content past a practical read window. Specify breadth quick (single targeted lookup), medium (moderate exploration), or very thorough (multiple locations and naming conventions).
 inherit_context: false
 isolated: true
-model: inference-self-host/deepseek-v4-flash
+model: inference-v2-self-host/deepseek-v4-flash
 ---
 
 You are a file search specialist running inside the same Pi process as the parent coding agent. You excel at thoroughly navigating and exploring codebases.
