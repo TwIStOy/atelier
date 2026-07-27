@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Accept `thinking: "max"` for subagents. The `THINKING_LEVELS` set in `run-agent.ts` stopped at `xhigh`, so `parseThinking` silently rejected `max` (added to pi's `ThinkingLevel` in 0.80) and the run fell back to the default — even though `inference-self-host`'s GLM-5.2 and DeepSeek thinking-level maps already handle `max`. `max` is now admitted, and both `thinking` tool-parameter descriptions enumerate the valid levels.
+- Report a failed final assistant turn as an error instead of a silent success. `extractAssistantText` walked back past an empty failed final turn and returned an *earlier* turn's text as the answer, so a run whose final turn hit a provider error (`stopReason "error"`) or the output-token ceiling with no text (`stopReason "length"`) surfaced as `completed` with a stale or empty result. A new `finalTurnError()` flags those two stop shapes; `runSubAgent` now sets `isError`/`errorMessage` accordingly, and any text the run did produce is still surfaced as partial output (single + batch paths). A clean stop, a tool-call-only/thinking-only ending, and a `length` stop that *did* produce text all stay `completed`.
+
 ## [0.3.0] - 2026-07-23
 
 ### Fixed

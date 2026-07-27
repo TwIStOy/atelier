@@ -11,20 +11,23 @@ diffing from a known point each session instead of re-auditing from scratch.
 > **Decision (2026-07-05): the maintainer reviewed the full diff and declined
 > every borrowable item.** See
 > [§ Not borrowing — user-declined](#not-borrowing--user-declined-2026-07-05).
-> Future audits: update the commit pointers and change log only. **Do not
-> re-propose declined items** unless the maintainer explicitly reopens one.
+> **Update (2026-07-27): the maintainer reopened the audit; two robustness fixes
+> were borrowed (`#147` max thinking level, `#144` failed-final-turn detection)
+> and the rest were either verified not-applicable to our architecture or
+> re-confirmed declined.** See
+> [§ Borrowed / not-applicable — 2026-07-27](#borrowed--not-applicable--2026-07-27).
 
 ## Commit pointers
 
 | Role | SHA | Date (UTC+2) | Subject |
 | ---- | --- | ---- | ------- |
 | **Our baseline** (last audited) | `4b8f45a909492d82239553c63e8cdebcfbdf8ac9` | 2026-06-01 | `e2e tests` (parent of the first substantive June commit `e55d391`) |
-| **Upstream HEAD (this audit)** | `8405e556acc8ab2c0fcfa02021f871365695f776` | 2026-06-30 | `v0.13.0` (version bump; last real change `c32beeb` inline steer composer, also 2026-06-30) |
+| **Upstream HEAD (this audit)** | `3ed8632ee25f0160276dc95b9c9cf2a8d8f7df6b` | 2026-07-26 | `fix(#174): foreground results state output completeness, not partiality` (v0.14.3) |
 
-> Next session: `git -C <cache> fetch && git log 8405e55..origin/main` to see only
+> Next session: `git -C <cache> fetch && git log 3ed8632..origin/main` to see only
 > what landed since this audit. Update the HEAD row above when you re-audit.
 
-## What changed upstream (2026-06-01 → HEAD)
+## What changed upstream (2026-06-01 → 2026-06-30, v0.13.0 audit)
 
 Only substantive commits are listed (version bumps, README-only, and pure test
 scaffolding are omitted). Grouped by theme. This section is **reference
@@ -82,6 +85,42 @@ material**, not a to-do list.
 - `SettingsAppliers` interface gained 4 hooks (`setDisableDefaultAgents`, `setToolDescriptionMode`, `setFleetView`, `setWidgetMode`).
 - `AgentRecord`: `worktree.baseSha`, `worktree.workPath`, `isBackground?` (spawn now writes it).
 - No `@earendil-works/pi-coding-agent` peer-dep bump (still `>=0.74.0`).
+
+## What changed upstream — 2026-06-30 → 2026-07-26 (v0.14.0 → v0.14.3 audit)
+
+36 commits. Most extend the already-declined directions (FleetView polish, steer
+composer, worktree). The items below are the ones evaluated for borrowing in the
+2026-07-27 audit.
+
+### Borrowed / not-applicable — 2026-07-27
+
+#### Borrowed
+
+| Commit | Change | Outcome |
+| --- | --- | --- |
+| `2d0eb9b` (#147) | Advertise pi 0.80's `max` `ThinkingLevel` across the tool/wizard surfaces. | **BORROWED.** Our `THINKING_LEVELS` set in `run-agent.ts` omitted `max`, so `thinking: "max"` was silently rejected by `parseThinking` and fell back to the default — even though `inference-self-host`'s GLM-5.2 / DeepSeek maps already handle `max`. Added `max` to the set and enriched both `thinking` tool-param descriptions to enumerate the levels. |
+| `441dd4c` + `f8116ee` (#144) | Report a failed final assistant turn (`stopReason "error"`, or `"length"` with no text) as `error`, not `completed` with an empty or stale result. | **BORROWED.** `extractAssistantText` walked back past an empty failed final turn and returned an *earlier* turn's text as the answer. Added `finalTurnError()`; wired into `runSubAgent` (`isError`/`errorMessage`); partial text is surfaced in `orchestrate-single`, `orchestrate-batch`, and `batch-text`. |
+
+#### Verified not applicable — do not re-investigate
+
+| Commit | Why it does not bite us |
+| --- | --- |
+| `4cc76c0` (#152) isolated custom providers lost on Pi 0.80.8+ | We pass the correct `modelRuntime` option (not the deprecated `modelRegistry`), and the child session loads our provider extensions (`inferenceSelfHost` / `inferenceV2SelfHost`) via `CHILD_SESSION_EXTENSION_FACTORIES`; `pi.registerProvider` writes into that same runtime. Upstream was bitten because their isolated mode disabled extension loading. |
+| `9afc801` (#128) `Symbol.for("pi-subagents:manager")` clobber by child activations | We keep no `Symbol.for` registry. |
+| `409da8a` (#145) `.output` stream freeze after session compaction | We do not stream to a separate `.output` file; the viewer tails the session JSONL via `buildSessionContext`, which already resolves compaction. |
+| `878ce00` (#127) / `4738533` (#159) `get_subagent_result(wait:true)` queue + abort | Our `subagent_status` is read-only with no wait path. |
+| `92dcc52` (#157) async-registered extension tools (MCP) in subagents | Fixed `CHILD_SESSION_EXTENSION_FACTORIES`, no MCP; the static `tools:` allowlist cannot drop a late-registered tool. |
+| `226f03b` (#142) RPC registration gated on `session_start` | No cross-extension RPC surface. |
+| `a47595a` (#166) user-memory `PI_CODING_AGENT_DIR` | Our memory model differs; no `memory: user` agent pinning that hardcodes `~/.pi`. |
+| `7275213` (#143) extension match by package short name | We have no `exclude_extensions`; child extension scoping is a fixed factory list. |
+| `3ed8632` (#174) foreground result "output may be partial" wording | Our foreground tool result already composes its own outcome note; not a behavior fix. |
+
+#### Still declined (unchanged from 2026-07-05)
+
+FleetView polish (`4bbab47` markers, `55e0885` key-focus, `d54dba2` row width,
+`044824b` nested ANSI), `output_transcript` / `outputTranscript` opt-out
+(`8c89823` — we always persist the session by design), and every item in the
+original [§ Not borrowing — user-declined](#not-borrowing--user-declined-2026-07-05).
 
 ## Comparison with our port
 
@@ -166,3 +205,4 @@ The decision section above is **not** a re-evaluation queue.
 | Date | Note |
 | --- | --- |
 | 2026-07-05 | First upstream-tracking audit. Baseline `4b8f45a` → HEAD `8405e55` (v0.13.0). Change log recorded. Maintainer reviewed the full diff and **declined every borrowable item**; future audits advance pointers + change log only unless an item is explicitly reopened. |
+| 2026-07-27 | Second audit (reopened). HEAD advanced `8405e55` → `3ed8632` (v0.14.3). Of 36 new commits, **two borrowed**: `2d0eb9b` (#147 `max` thinking level) and `441dd4c`+`f8116ee` (#144 failed-final-turn → error). Nine verified **not-applicable** to our architecture (#152, #128, #145, #127, #159, #157, #142, #166, #143, #174). Remainder re-confirmed declined. |
