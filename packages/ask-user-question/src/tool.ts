@@ -53,6 +53,7 @@ export function registerAskUserQuestionTool(pi: ExtensionAPI): void {
     promptSnippet: DEFAULT_PROMPT_SNIPPET,
     promptGuidelines: DEFAULT_PROMPT_GUIDELINES,
     parameters: QuestionParamsSchema,
+    constrainedSampling: { type: "json_schema", strict: "prefer" },
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       const typed = params as QuestionParams;
       if (!ctx.hasUI) {
