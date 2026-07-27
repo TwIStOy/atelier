@@ -184,6 +184,46 @@ function applyFamilyOverrides(config: ProviderModelConfig, api: Api): void {
   }
 }
 
+const BRAND_DISPLAY_NAMES: Record<string, string> = {
+  glm: "GLM",
+  gpt: "GPT",
+  claude: "Claude",
+  deepseek: "DeepSeek",
+  kimi: "Kimi",
+  qwen: "Qwen",
+  mimo: "MIMO",
+  hy3: "HY3",
+  grok: "Grok",
+};
+
+function formatNameSegment(segment: string): string {
+  const brand = BRAND_DISPLAY_NAMES[segment.toLowerCase()];
+  if (brand) return brand;
+  if (/^[\d.]+$/.test(segment)) return segment;
+  return segment.charAt(0).toUpperCase() + segment.slice(1);
+}
+
+export function guessDisplayName(id: string): string {
+  const segments = id.split("-").filter((s) => s.length > 0);
+  if (segments.length === 0) return id;
+
+  let versionStart = segments.length;
+  while (versionStart > 0 && /^\d+$/.test(segments[versionStart - 1])) {
+    versionStart--;
+  }
+
+  const tokens: string[] = [];
+  for (let i = 0; i < versionStart; i++) tokens.push(formatNameSegment(segments[i]));
+
+  if (segments.length - versionStart >= 2) {
+    tokens.push(segments.slice(versionStart).join("."));
+  } else {
+    for (let i = versionStart; i < segments.length; i++) tokens.push(formatNameSegment(segments[i]));
+  }
+
+  return tokens.join(" ");
+}
+
 function toModelConfig(entry: GatewayModelObject): ProviderModelConfig {
   const api = pickApi(entry);
   const capabilities = entry.capabilities;
@@ -200,7 +240,7 @@ function toModelConfig(entry: GatewayModelObject): ProviderModelConfig {
 
   const config: ProviderModelConfig = {
     id: entry.id,
-    name: entry.id,
+    name: guessDisplayName(entry.id),
     api,
     reasoning: capabilities?.supports_reasoning ?? true,
     input,
