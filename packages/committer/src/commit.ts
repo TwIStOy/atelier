@@ -36,7 +36,7 @@ export async function handleCommit(args: string, ctx: ExtensionCommandContext): 
     progress.statusMessage = "Checking repository...";
     ctrl.invalidate();
 
-    const isRepo = await isGitRepo(ctx.cwd);
+    const isRepo = await isGitRepo(ctx.cwd, controller.signal);
     if (!isRepo) {
       progress.phase = "error";
       progress.errorMessage = "Not a git repository.";
@@ -61,7 +61,7 @@ export async function handleCommit(args: string, ctx: ExtensionCommandContext): 
     progress.statusMessage = "Checking changes...";
     ctrl.invalidate();
 
-    const changeCount = await countChanges(ctx.cwd);
+    const changeCount = await countChanges(ctx.cwd, controller.signal);
     if (changeCount === 0) {
       progress.phase = "error";
       progress.errorMessage = "No changes to commit.";
@@ -73,9 +73,9 @@ export async function handleCommit(args: string, ctx: ExtensionCommandContext): 
     progress.statusMessage = "Staging changes...";
     ctrl.invalidate();
 
-    await stageAll(ctx.cwd);
+    await stageAll(ctx.cwd, controller.signal);
 
-    const diff = await getDiff(ctx.cwd);
+    const diff = await getDiff(ctx.cwd, 1_000_000, controller.signal);
     progress.filesTotal = diff.files.length;
     progress.diffStat = diff.stat;
     ctrl.invalidate();
@@ -153,10 +153,15 @@ async function commitSingle(
   }
 
   try {
-    const hash = await commit(cwd, message);
+    const hash = await commit(cwd, message, signal);
     progress.commitLog.push({ hash, message, success: true });
     progress.commitsCompleted = 1;
   } catch (err) {
+    if (signal.aborted) {
+      progress.phase = "cancelled";
+      ctrl.invalidate();
+      return;
+    }
     const errMsg = err instanceof Error ? err.message : String(err);
     progress.commitLog.push({ hash: "", message, success: false });
     progress.phase = "error";
@@ -182,7 +187,7 @@ async function commitGrouped(
   progress.statusMessage = "Grouping changes into logical commits...";
   ctrl.invalidate();
 
-  const { files: allFiles } = await getDiff(cwd);
+  const { files: allFiles } = await getDiff(cwd, 1_000_000, signal);
   const truncatedDiff = diffText.slice(0, loadConfig().maxDiffLength);
 
   const groups = await groupingWithRetry(truncatedDiff, allFiles, model, ctx, progress, ctrl, signal);
@@ -217,17 +222,22 @@ async function commitGrouped(
     }
 
     const group = groups[i];
-    await unstageAll(cwd);
-    await stageFiles(cwd, group.files);
+    await unstageAll(cwd, signal);
+    await stageFiles(cwd, group.files, signal);
 
     try {
-      const hash = await commit(cwd, group.message);
+      const hash = await commit(cwd, group.message, signal);
       progress.commitLog.push({
         hash,
         message: group.message,
         success: true,
       });
     } catch (err) {
+      if (signal.aborted) {
+        progress.phase = "cancelled";
+        ctrl.invalidate();
+        return;
+      }
       const errMsg = err instanceof Error ? err.message : String(err);
       progress.commitLog.push({
         hash: "",
