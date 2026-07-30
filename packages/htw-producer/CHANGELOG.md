@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-07-30
+
 ### Added
 - Populate the new `agent` and `title` Report fields. `agent` is always `"pi"`;
   `title` is the session name (else the first user prompt), omitted when unknown.

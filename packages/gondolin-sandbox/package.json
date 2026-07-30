@@ -1,6 +1,6 @@
 {
   "name": "@htwang-contrib/gondolin-sandbox",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Run pi's read/write/edit/bash tools inside a Gondolin local micro-VM.",
   "type": "module",
   "main": "src/index.ts",
