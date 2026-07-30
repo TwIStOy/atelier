@@ -6,12 +6,11 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import type { Component, TUI } from "@earendil-works/pi-tui";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
-import { fitSegmentsByPriority, type PrioritizedSegment, SessionLifecycle } from "@htwang-contrib/common";
+import { fitSegmentsByPriority, type PrioritizedSegment } from "@htwang-contrib/common";
 import type { StatusLineComponent } from "./components/base.ts";
 import { CodingPlanUsageComponent } from "./components/coding-plan-usage.ts";
 import { ExtensionStatusComponent } from "./components/extension-status.ts";
 import { GitComponent } from "./components/git.ts";
-import { RuntimeComponent } from "./components/runtime.ts";
 import { TokensComponent } from "./components/tokens.ts";
 import { loadConfig } from "./config.ts";
 
@@ -20,23 +19,18 @@ export function makeFooter(
   pi: ExtensionAPI,
 ): (tui: TUI, theme: Theme, footerData: ReadonlyFooterDataProvider) => Component & { dispose?(): void } {
   const config = loadConfig();
-  const lifecycle = new SessionLifecycle();
-  lifecycle.start();
 
   const git = config.showGitBranch ? new GitComponent(ctx.cwd) : null;
-  const runtime = config.showRuntime ? new RuntimeComponent(ctx.cwd, lifecycle) : null;
   const codingPlan = new CodingPlanUsageComponent(ctx, pi);
   const tokens = new TokensComponent(ctx);
 
   const segments: { component: StatusLineComponent; priority: number }[] = [];
   if (git) segments.push({ component: git, priority: 1 });
-  if (runtime) segments.push({ component: runtime, priority: 1 });
   segments.push({ component: codingPlan, priority: 2 });
   segments.push({ component: tokens, priority: 3 });
 
   return (tui, theme, footerData) => {
     git?.bindRender(() => tui.requestRender());
-    runtime?.bindRender(() => tui.requestRender());
     codingPlan.bindRender(() => tui.requestRender());
 
     const extensionStatus = config.showExtensionStatus ? new ExtensionStatusComponent(footerData) : null;
@@ -44,9 +38,7 @@ export function makeFooter(
     return {
       dispose() {
         git?.dispose();
-        runtime?.dispose();
         codingPlan.dispose();
-        lifecycle.shutdown();
       },
       render(width: number): string[] {
         const fitted: PrioritizedSegment[] = [];

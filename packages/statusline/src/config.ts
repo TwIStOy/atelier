@@ -3,7 +3,6 @@ import { readConfig, registerConfigItems } from "@htwang-contrib/common";
 
 export interface StatuslineConfig {
   showGitBranch: boolean;
-  showRuntime: boolean;
   /** Master switch for the post-run telemetry notification (TPS/TTFT/stalls). */
   telemetry: boolean;
   /** Render extension statuses set via ctx.ui.setStatus() in the footer. */
@@ -15,7 +14,6 @@ const CONFIG_NAME = "statusline";
 const CONFIG_SCHEMA: ExtensionConfigSchema<StatuslineConfig> = {
   defaults: {
     showGitBranch: true,
-    showRuntime: true,
     telemetry: true,
     showExtensionStatus: true,
   },
@@ -38,23 +36,13 @@ export function registerStatuslineConfigItems(): void {
       order: 0,
     },
     {
-      key: "showRuntime",
-      type: "boolean",
-      label: "Show Runtime",
-      value: () => loadConfig().showRuntime,
-      description:
-        "Detect the project's runtime (node/rust/go/python/...) from manifest files and show its version in the footer.",
-      extensionLabel: "Statusline",
-      order: 1,
-    },
-    {
       key: "telemetry",
       type: "boolean",
       label: "Turn Telemetry",
       value: () => loadConfig().telemetry,
       description: "Show a one-line notification (TPS, TTFT, stalls, tokens, cost) after each agent run settles.",
       extensionLabel: "Statusline",
-      order: 2,
+      order: 1,
     },
     {
       key: "showExtensionStatus",
@@ -64,7 +52,7 @@ export function registerStatuslineConfigItems(): void {
       description:
         "Render values set by extensions via ctx.ui.setStatus() (e.g. agents-mirror injection count) in the footer.",
       extensionLabel: "Statusline",
-      order: 3,
+      order: 2,
     },
   ]);
 }

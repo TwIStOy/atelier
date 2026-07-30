@@ -4,7 +4,11 @@
 
 ### Added
 
-- Extension status segment in the footer: renders values set by any extension via `ctx.ui.setStatus()` (e.g. `agents-mirror`'s injection count) from `footerData.ln()`. Toggle in `/config` -> Statusline -> "Show Extension Statuses" (default on). Lowest-priority segment, dropped first when the terminal is narrow.
+- Extension status segment in the footer: renders values set by any extension via `ctx.ui.setStatus()` (e.g. `agents-mirror`'s injection count) from `footerData.getExtensionStatuses()`. Toggle in `/config` -> Statusline -> "Show Extension Statuses" (default on). Lowest-priority segment, dropped first when the terminal is narrow.
+
+### Removed
+
+- Runtime detection segment (node/python/rust/... version in the footer), its `showRuntime` config item, `RuntimeComponent`, and tests. Footer no longer spawns version probes.
 
 ## [0.3.1] - 2026-07-30
 
