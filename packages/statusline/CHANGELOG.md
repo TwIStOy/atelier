@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.2.7] - 2026-07-30
+
 ### Added
 
 - Turn telemetry notification: after each agent run settles, the statusline shows a one-line summary (TPS, TTFT, duration, tokens, stalls, cost-per-million) via `ctx.ui.notify`. Toggle in `/config` -> Statusline -> "Turn Telemetry" (default on). Powered by `TurnTelemetryTracker` from `@htwang-contrib/common`.

@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.2.7] - 2026-07-30
+
 ### Fixed
 
 - Killing in-flight git commands when the `/commit` overlay is dismissed (Esc) — previously only the LLM side-call honored the abort signal, so staging/diff/commit subprocesses kept running after dismiss.

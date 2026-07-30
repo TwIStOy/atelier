@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.2.7] - 2026-07-30
+
 ### Added
 
 - Catalog models now derive a human-readable display `name` from their id instead of echoing the raw id (e.g. `glm-5.2` -> `GLM 5.2`, `claude-sonnet-4-6` -> `Claude Sonnet 4.6`, `gpt-5.6-sol` -> `GPT 5.6 Sol`). Brand tokens (GLM, GPT, Claude, DeepSeek, Kimi, Qwen, MIMO, HY3, Grok) are mapped to their canonical casing, trailing numeric segments are merged into a dotted version (`4-6` -> `4.6`), and other segments are title-cased.

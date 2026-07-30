@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.2.7] - 2026-07-30
+
 ### Fixed
 
 - Accept `thinking: "max"` for subagents. The `THINKING_LEVELS` set in `run-agent.ts` stopped at `xhigh`, so `parseThinking` silently rejected `max` (added to pi's `ThinkingLevel` in 0.80) and the run fell back to the default — even though `inference-self-host`'s GLM-5.2 and DeepSeek thinking-level maps already handle `max`. `max` is now admitted, and both `thinking` tool-parameter descriptions enumerate the valid levels.

@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.2.7] - 2026-07-30
+
 ### Added
 
 - Turn telemetry tracker: `TurnTelemetryTracker` measures TPS, TTFT, and streaming stalls across an agent run by feeding in lifecycle observations (turn/message deltas, tool execution). Only turns with measurable streaming contribute to the aggregated TPS; tool-call turns are clamped to the model's best observed speed. `formatTurnTelemetry` renders a one-line summary with individually gated segments. Injectable `now` for deterministic tests.
