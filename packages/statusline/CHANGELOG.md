@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Extension status segment in the footer: renders values set by any extension via `ctx.ui.setStatus()` (e.g. `agents-mirror`'s injection count) from `footerData.ln()`. Toggle in `/config` -> Statusline -> "Show Extension Statuses" (default on). Lowest-priority segment, dropped first when the terminal is narrow.
+
 ## [0.3.1] - 2026-07-30
 
 ### Added

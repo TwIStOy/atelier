@@ -9,10 +9,11 @@ import { visibleWidth } from "@earendil-works/pi-tui";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 let showGitBranch = true;
+let showExtensionStatus = true;
 let gitInstances = 0;
 
 vi.mock("../src/config.ts", () => ({
-  loadConfig: () => ({ showGitBranch }),
+  loadConfig: () => ({ showGitBranch, showExtensionStatus }),
 }));
 
 vi.mock("../src/components/git.ts", () => {
@@ -56,10 +57,10 @@ function fakePi(): ExtensionAPI {
   } as unknown as ExtensionAPI;
 }
 
-function fakeFooterData(): ReadonlyFooterDataProvider {
+function fakeFooterData(statuses: Map<string, string> = new Map()): ReadonlyFooterDataProvider {
   return {
     getGitBranch: () => null,
-    getExtensionStatuses: () => new Map(),
+    getExtensionStatuses: () => statuses,
     getAvailableProviderCount: () => 0,
     onBranchChange: () => () => {},
   } as unknown as ReadonlyFooterDataProvider;
@@ -71,6 +72,7 @@ function fakeTui(): TUI {
 
 afterEach(() => {
   showGitBranch = true;
+  showExtensionStatus = true;
   gitInstances = 0;
 });
 
@@ -95,6 +97,38 @@ describe("makeFooter git branch toggle", () => {
       expect(visibleWidth(line)).toBeLessThanOrEqual(80);
       expect(stripAnsi(line)).not.toMatch(/[\u2713\u2717]/);
     }
+    comp.dispose?.();
+  });
+});
+
+describe("makeFooter extension status", () => {
+  test("renders ctx.ui.setStatus values from footerData.ln()", () => {
+    showGitBranch = false;
+    const factory = makeFooter(fakeCtx(), fakePi());
+    const statuses = new Map([["ext:agents-mirror:status", "\u25C6 2"]]);
+    const comp = factory(fakeTui(), fakeTheme(), fakeFooterData(statuses));
+    const lines = comp.render(80);
+    expect(stripAnsi(lines.join(" "))).toContain("\u25C6 2");
+    comp.dispose?.();
+  });
+
+  test("renders nothing extra when no extension has set a status", () => {
+    showGitBranch = true;
+    const factory = makeFooter(fakeCtx(), fakePi());
+    const comp = factory(fakeTui(), fakeTheme(), fakeFooterData(new Map()));
+    const lines = comp.render(80);
+    expect(stripAnsi(lines.join(" "))).toContain("\u2713");
+    comp.dispose?.();
+  });
+
+  test("can be disabled via config", () => {
+    showGitBranch = false;
+    showExtensionStatus = false;
+    const factory = makeFooter(fakeCtx(), fakePi());
+    const statuses = new Map([["ext:agents-mirror:status", "\u25C6 2"]]);
+    const comp = factory(fakeTui(), fakeTheme(), fakeFooterData(statuses));
+    const lines = comp.render(80);
+    expect(stripAnsi(lines.join(" "))).not.toContain("\u25C6");
     comp.dispose?.();
   });
 });

@@ -57,7 +57,7 @@ The mapping file itself is a plain JSON object of `{ "absoluteProjectRoot": "abs
 ## TUI
 
 - **Inline chat entry** (`agents-mirror:injected`): on each successful injection, a compact dim row renders in the chat body right after the `read` result, e.g. `↳ agents-mirror · injected 2 (1 project, 1 mirror)`. Expand it to see the per-file paths (`[mirror]` tag for mirror-sourced, `(truncated)` when the byte cap was hit). This entry is **not** sent to the LLM — the injected text already reaches the model via the `read` result, so there is no token duplication. Toggle via the **Inline Chat Entry** setting.
-- **Status line** (`ext:agents-mirror:status`): shows the running count of injected directories this session; a trailing warning glyph appears if any `AGENTS.md` failed to read.
+- **Status line** (`ext:agents-mirror:status`): shows the running count of injected directories this session; a trailing warning glyph appears if any `AGENTS.md` failed to read. Rendered by whatever owns the footer — in this repo, enable statusline's **Show Extension Statuses** setting (default on) so it surfaces `ctx.ui.setStatus` values.
 - **Widget** (`ext:agents-mirror:widget`): hidden by default; `/agents-mirror` toggles it. Lists injected files with a `[mirror]` tag for mirror-sourced entries and a `(truncated)` marker when the byte cap was hit.
 
 In headless / RPC / print mode (`ctx.hasUI === false`) all UI calls are skipped; injection still occurs.

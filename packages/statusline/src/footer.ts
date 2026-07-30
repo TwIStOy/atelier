@@ -9,6 +9,7 @@ import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { fitSegmentsByPriority, type PrioritizedSegment, SessionLifecycle } from "@htwang-contrib/common";
 import type { StatusLineComponent } from "./components/base.ts";
 import { CodingPlanUsageComponent } from "./components/coding-plan-usage.ts";
+import { ExtensionStatusComponent } from "./components/extension-status.ts";
 import { GitComponent } from "./components/git.ts";
 import { RuntimeComponent } from "./components/runtime.ts";
 import { TokensComponent } from "./components/tokens.ts";
@@ -17,7 +18,7 @@ import { loadConfig } from "./config.ts";
 export function makeFooter(
   ctx: ExtensionContext,
   pi: ExtensionAPI,
-): (tui: TUI, theme: Theme, _footerData: ReadonlyFooterDataProvider) => Component & { dispose?(): void } {
+): (tui: TUI, theme: Theme, footerData: ReadonlyFooterDataProvider) => Component & { dispose?(): void } {
   const config = loadConfig();
   const lifecycle = new SessionLifecycle();
   lifecycle.start();
@@ -33,10 +34,12 @@ export function makeFooter(
   segments.push({ component: codingPlan, priority: 2 });
   segments.push({ component: tokens, priority: 3 });
 
-  return (tui, theme) => {
+  return (tui, theme, footerData) => {
     git?.bindRender(() => tui.requestRender());
     runtime?.bindRender(() => tui.requestRender());
     codingPlan.bindRender(() => tui.requestRender());
+
+    const extensionStatus = config.showExtensionStatus ? new ExtensionStatusComponent(footerData) : null;
 
     return {
       dispose() {
@@ -47,6 +50,10 @@ export function makeFooter(
       },
       render(width: number): string[] {
         const fitted: PrioritizedSegment[] = [];
+        if (extensionStatus) {
+          const text = extensionStatus.render(width, theme)[0];
+          if (text) fitted.push({ text, priority: 0 });
+        }
         for (const { component, priority } of segments) {
           const lines = component.render(width, theme);
           const text = lines[0];

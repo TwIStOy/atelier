@@ -6,6 +6,8 @@ export interface StatuslineConfig {
   showRuntime: boolean;
   /** Master switch for the post-run telemetry notification (TPS/TTFT/stalls). */
   telemetry: boolean;
+  /** Render extension statuses set via ctx.ui.setStatus() in the footer. */
+  showExtensionStatus: boolean;
 }
 
 const CONFIG_NAME = "statusline";
@@ -15,6 +17,7 @@ const CONFIG_SCHEMA: ExtensionConfigSchema<StatuslineConfig> = {
     showGitBranch: true,
     showRuntime: true,
     telemetry: true,
+    showExtensionStatus: true,
   },
 };
 
@@ -52,6 +55,16 @@ export function registerStatuslineConfigItems(): void {
       description: "Show a one-line notification (TPS, TTFT, stalls, tokens, cost) after each agent run settles.",
       extensionLabel: "Statusline",
       order: 2,
+    },
+    {
+      key: "showExtensionStatus",
+      type: "boolean",
+      label: "Show Extension Statuses",
+      value: () => loadConfig().showExtensionStatus,
+      description:
+        "Render values set by extensions via ctx.ui.setStatus() (e.g. agents-mirror injection count) in the footer.",
+      extensionLabel: "Statusline",
+      order: 3,
     },
   ]);
 }
