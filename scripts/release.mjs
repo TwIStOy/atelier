@@ -20,12 +20,22 @@
 //   git push origin v<version>
 //
 // Usage:
-//   node scripts/release.mjs <version>            # cut the release
-//   node scripts/release.mjs <version> --dry-run  # preview without writing
-//   node scripts/release.mjs <version> --force    # skip the clean-tree check
-//   node scripts/release.mjs <version> --no-sign  # do not GPG/SSH sign
+//   node scripts/release.mjs --major               # 1.2.3 -> 2.0.0
+//   node scripts/release.mjs --minor               # 1.2.3 -> 1.3.0
+//   node scripts/release.mjs --patch               # 1.2.3 -> 1.2.4
+//   node scripts/release.mjs <version>             # cut an explicit version
+//   node scripts/release.mjs <version> --dry-run   # preview without writing
+//   node scripts/release.mjs <version> --force     # skip the clean-tree check
+//   node scripts/release.mjs <version> --no-sign   # do not GPG/SSH sign
+//
+// The target version must be greater than the current one in package.json.
 //
 // Flags:
+//   --major     Bump the major component of the current version (+1, reset the
+//               rest to zero).
+//   --minor     Bump the minor component of the current version (+1, reset
+//               patch to zero).
+//   --patch     Bump the patch component of the current version (+1).
 //   --dry-run   Print every planned action without modifying files, committing,
 //               or tagging.
 //   --force     Run even when the working tree is dirty. By default the script
@@ -35,8 +45,14 @@
 //               release commit and tag are created unsigned. Use on a machine
 //               whose signing key or agent is unavailable.
 //
-// Versioning model: unified. Every package shares one version and ships
-// together under a single v<version> tag.
+// The bump flags are mutually exclusive with each other and with an explicit
+// <version>.
+//
+// Versioning model: single global release version per cut. Only packages that
+// changed since the previous release tag (git diff under packages/<name>/) OR
+// that have a non-empty "## [Unreleased]" changelog section adopt the new
+// version; unchanged packages keep their current version. The root package.json
+// and the single v<version> tag always advance to the new version.
 
 import { execFileSync } from "node:child_process";
 import { readdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
@@ -44,26 +60,90 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const SEMVER = /^\d+\.\d+\.\d+$/;
+const SEMVER = /^(\d+)\.(\d+)\.(\d+)$/;
+
+function parseSemver(v) {
+  const m = SEMVER.exec(v);
+  return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null;
+}
+
+function formatSemver([maj, min, pat]) {
+  return `${maj}.${min}.${pat}`;
+}
+
+function compareSemver(a, b) {
+  for (let i = 0; i < 3; i++) {
+    if (a[i] !== b[i]) return a[i] < b[i] ? -1 : 1;
+  }
+  return 0;
+}
 
 const args = process.argv.slice(2);
 let dryRun = false;
 let force = false;
 let noSign = false;
+let bumpMajor = false;
+let bumpMinor = false;
+let bumpPatch = false;
 const positional = [];
 for (const a of args) {
   if (a === "--dry-run") dryRun = true;
   else if (a === "--force") force = true;
   else if (a === "--no-sign") noSign = true;
+  else if (a === "--major") bumpMajor = true;
+  else if (a === "--minor") bumpMinor = true;
+  else if (a === "--patch") bumpPatch = true;
   else positional.push(a);
 }
 
-const version = positional[0];
-if (!version || !SEMVER.test(version)) {
+const bumps = [
+  ["--major", bumpMajor],
+  ["--minor", bumpMinor],
+  ["--patch", bumpPatch],
+];
+const activeBumps = bumps.filter(([, b]) => b);
+const explicit = positional[0];
+
+if (activeBumps.length > 1) {
+  fail(
+    `${activeBumps.map((f) => f[0]).join(", ")} are mutually exclusive; pick one.`,
+  );
+}
+if (activeBumps.length === 1 && explicit !== undefined) {
+  fail(`cannot combine ${activeBumps[0][0]} with an explicit version.`);
+}
+if (activeBumps.length === 0 && explicit === undefined) {
   console.error(
-    "Usage: node scripts/release.mjs <X.Y.Z> [--dry-run] [--force] [--no-sign]",
+    "Usage: node scripts/release.mjs (--major|--minor|--patch|<X.Y.Z>) [--dry-run] [--force] [--no-sign]",
   );
   process.exit(2);
+}
+
+const currentVersion = JSON.parse(
+  readFileSync(join(ROOT, "package.json"), "utf8"),
+).version;
+const currentParts = parseSemver(currentVersion);
+if (!currentParts) {
+  fail(`current version ${currentVersion} in package.json is not X.Y.Z.`);
+}
+
+let version;
+if (activeBumps.length === 1) {
+  const [maj, min, pat] = currentParts;
+  if (bumpMajor) version = formatSemver([maj + 1, 0, 0]);
+  else if (bumpMinor) version = formatSemver([maj, min + 1, 0]);
+  else version = formatSemver([maj, min, pat + 1]);
+} else {
+  const parts = parseSemver(explicit);
+  if (!parts) {
+    fail(`version "${explicit}" is not X.Y.Z.`);
+  }
+  if (compareSemver(parts, currentParts) <= 0) {
+    fail(
+      `version ${explicit} must be greater than the current version ${currentVersion}.`,
+    );
+  }
+  version = explicit;
 }
 
 const gitConfig = noSign
@@ -97,6 +177,24 @@ if (status !== "" && !force) {
   );
 }
 
+let prevTag = null;
+try {
+  prevTag = git("describe", "--tags", "--abbrev=0", "--match", "v[0-9]*");
+} catch {
+  prevTag = null;
+}
+let changedFiles = null;
+if (prevTag !== null) {
+  const out = git("diff", "--name-only", prevTag, "--", "packages/");
+  changedFiles = out === "" ? [] : out.split("\n");
+}
+
+function pkgChangedByGit(name) {
+  if (changedFiles === null) return true;
+  const prefix = `packages/${name}/`;
+  return changedFiles.some((f) => f.startsWith(prefix));
+}
+
 const pkgNames = readdirSync(join(ROOT, "packages"), { withFileTypes: true })
   .filter((e) => e.isDirectory())
   .map((e) => e.name)
@@ -111,22 +209,33 @@ const toBump = [{ dir: ROOT, name: rootPkg.name, prev: rootPkg.version }];
 const changelogModified = [];
 const changelogCreated = [];
 const changelogSkipped = [];
+const notBumped = [];
 
 for (const name of pkgNames) {
   const dir = join(ROOT, "packages", name);
   const pkg = readPkg(dir);
-  toBump.push({ dir, name: pkg.name, prev: pkg.version });
-
   const cl = join(dir, "CHANGELOG.md");
-  if (!existsSync(cl)) {
-    changelogCreated.push(cl);
+
+  const gitChanged = pkgChangedByGit(name);
+  let changelogChanged = false;
+  const hasChangelog = existsSync(cl);
+  if (hasChangelog) {
+    const content = readFileSync(cl, "utf8");
+    if (content.includes(`## [${version}]`)) {
+      fail(`${rel(cl)} already contains a [${version}] section.`);
+    }
+    changelogChanged = unreleasedHasContent(content);
+  }
+
+  if (!gitChanged && !changelogChanged) {
+    notBumped.push({ name: pkg.name, prev: pkg.version });
     continue;
   }
-  const content = readFileSync(cl, "utf8");
-  if (content.includes(`## [${version}]`)) {
-    fail(`${rel(cl)} already contains a [${version}] section.`);
-  }
-  if (unreleasedHasContent(content)) {
+
+  toBump.push({ dir, name: pkg.name, prev: pkg.version });
+  if (!hasChangelog) {
+    changelogCreated.push(cl);
+  } else if (changelogChanged) {
     changelogModified.push(cl);
   } else {
     changelogSkipped.push(cl);
@@ -143,6 +252,12 @@ if (existsSync(rootCl)) {
   } else {
     changelogSkipped.push(rootCl);
   }
+}
+
+const anyChangelogWork =
+  changelogModified.length > 0 || changelogCreated.length > 0;
+if (toBump.length === 1 && !anyChangelogWork) {
+  fail(`no packages changed since ${prevTag ?? "the start"}; nothing to release.`);
 }
 
 function rel(abs) {
@@ -205,12 +320,15 @@ const flags = [
 ].filter(Boolean);
 const tagSuffix = flags.length ? ` (${flags.join(", ")})` : "";
 console.log(
-  `Releasing ${toBump.length - 1} packages${tagSuffix}: ${version} (${today})`,
+  `Releasing ${toBump.length - 1} of ${pkgNames.length} packages${tagSuffix}: ${version} (${today})`,
 );
 
 for (const { dir, name, prev } of toBump) {
   const label = dir === ROOT ? "(root)" : name;
   console.log(`  bump  ${label}  ${prev} -> ${version}`);
+}
+for (const { name, prev } of notBumped) {
+  console.log(`  skip  ${name}  ${prev}`);
 }
 
 for (const cl of changelogModified) {
