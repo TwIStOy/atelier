@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-31
+
 ### Added
 
 - Initial `agents-mirror` extension: injects nested `AGENTS.md` from an external mirror directory (same structure as the project, agents.md only) plus the project's own nested `AGENTS.md` into `read` tool results.

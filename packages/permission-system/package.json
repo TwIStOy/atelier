@@ -1,6 +1,6 @@
 {
   "name": "@htwang-contrib/permission-system",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Permission enforcement extension for the Pi coding agent (bash + path + tool gates, tree-sitter-bash analysis).",
   "type": "module",
   "main": "src/index.ts",

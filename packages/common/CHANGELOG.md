@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-31
+
 ### Added
 
 - File-based extension disable flag: `isExtensionDisabled(id)` reports whether an extension is disabled, resolved from two JSON maps — global `~/.pi/agent/extensions-disabled.json` and project `<cwd>/.pi/extensions-disabled.json`, each `{ "<extensionId>": true }`. Disabled when `true` in either file (union precedence); missing/malformed files and non-`true` values are ignored. Also exports `defaultDisablePaths()` and `resolveDisabledExtensions(paths)`.
