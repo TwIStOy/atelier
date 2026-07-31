@@ -4,10 +4,29 @@
   "type": "module",
   "main": "src/index.ts",
   "types": "src/index.ts",
+  "description": "Pi extension. Karpathy-style LLM Wiki: capture raw sources into immutable Source Packets and maintain a cited, interlinked markdown wiki.",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "llm-wiki",
+    "knowledge-base",
+    "wiki",
+    "agent"
+  ],
+  "dependencies": {
+    "@htwang-contrib/common": "*",
+    "@htwang-contrib/web-tools": "*",
+    "typebox": "1.3.6"
+  },
   "devDependencies": {
     "@earendil-works/pi-coding-agent": "*",
     "@types/node": "^26.1.1",
     "typescript": "^7.0.2",
     "vitest": "^4.1.10"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
   }
 }
