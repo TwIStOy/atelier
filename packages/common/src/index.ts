@@ -46,6 +46,12 @@ export {
   MODAL_ACTIVE_EVENT,
   ZAI_CODING_PLAN_EVENTS,
 } from "./events.ts";
+export type { DisableConfigPaths } from "./extension-disable.ts";
+export {
+  defaultDisablePaths,
+  isExtensionDisabled,
+  resolveDisabledExtensions,
+} from "./extension-disable.ts";
 export type { PrioritizedSegment, SegmentFitOptions, UsageStressLevel } from "./format.ts";
 export {
   fitSegmentsByPriority,
@@ -61,7 +67,10 @@ export {
   truncateDisplay,
   usagePercentStressLevel,
 } from "./format.ts";
-export { clearGlobalState, getGlobalState } from "./global-state.ts";
+export {
+  clearGlobalState,
+  getGlobalState,
+} from "./global-state.ts";
 export type { CreateLoggerOptions, Logger, LogLevel } from "./log.ts";
 export {
   createLogger,
