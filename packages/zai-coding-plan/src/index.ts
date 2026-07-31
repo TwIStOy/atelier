@@ -1,5 +1,5 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { resetForegroundBeforeText, ZAI_CODING_PLAN_EVENTS } from "@htwang-contrib/common";
+import { isExtensionDisabled, resetForegroundBeforeText, ZAI_CODING_PLAN_EVENTS } from "@htwang-contrib/common";
 import { queryUsage } from "./quota.ts";
 
 const PROVIDER_ID = "zai-coding-plan";
@@ -11,6 +11,7 @@ function maybeRefreshUsage(pi: ExtensionAPI, ctx: ExtensionContext) {
 }
 
 export default function (pi: ExtensionAPI) {
+  if (isExtensionDisabled("zai-coding-plan")) return;
   pi.registerProvider(PROVIDER_ID, {
     name: "Z.AI Coding Plan",
     baseUrl: "https://api.z.ai/api/coding/paas/v4",

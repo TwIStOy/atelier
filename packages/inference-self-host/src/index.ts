@@ -1,5 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { createLogger } from "@htwang-contrib/common";
+import { createLogger, isExtensionDisabled } from "@htwang-contrib/common";
 
 const logger = createLogger("inference-self-host");
 
@@ -83,6 +83,7 @@ const grok45ThinkingLevelMap = {
 };
 
 export default function (pi: ExtensionAPI) {
+  if (isExtensionDisabled("inference-self-host")) return;
   logger.info("extension loaded");
   pi.registerProvider("inference-self-host", {
     name: "Inference(Self Host)",

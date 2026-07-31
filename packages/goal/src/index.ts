@@ -1,7 +1,7 @@
 import { fileURLToPath } from "node:url";
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { isStaleCtxError } from "@htwang-contrib/common";
+import { isExtensionDisabled, isStaleCtxError } from "@htwang-contrib/common";
 import { Type } from "@sinclair/typebox";
 import { parseGoalCommand } from "./goal/command.ts";
 import { loadGoalConfig, registerGoalConfigItems, setCachedModelOptions } from "./goal/config.ts";
@@ -73,6 +73,7 @@ function lastAssistantStopReason(messages: unknown[]): { stopReason: string; err
 }
 
 export default function initGoal(pi: ExtensionAPI): void {
+  if (isExtensionDisabled("goal")) return;
   let currentGoalForWidget: Goal | null = null;
   let widgetCtx: ExtensionContext | null = null;
   const recoveryState: RecoveryState = createRecoveryState();

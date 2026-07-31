@@ -1,6 +1,7 @@
 import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import type { TUI } from "@earendil-works/pi-tui";
 import { Key, matchesKey } from "@earendil-works/pi-tui";
+import { isExtensionDisabled } from "@htwang-contrib/common";
 import { buildContextUsageDetails, renderContextUsageMessage } from "./context-usage.ts";
 
 const CONTEXT_USAGE_WIDGET_KEY = "pi-extensions.context-usage";
@@ -35,6 +36,7 @@ function ensureBelowState(ctx: ExtensionContext): BelowState | undefined {
 }
 
 export default function initContextUsage(pi: ExtensionAPI): void {
+  if (isExtensionDisabled("context-usage")) return;
   const guard = pi as unknown as Record<symbol, boolean>;
   if (guard[INSTALL_GUARD]) return;
   guard[INSTALL_GUARD] = true;

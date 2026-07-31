@@ -1,7 +1,13 @@
 import type { VM } from "@earendil-works/gondolin";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { createBashTool, createEditTool, createReadTool, createWriteTool } from "@earendil-works/pi-coding-agent";
-import { type ExtensionConfigSchema, isStaleCtxError, readConfig, registerConfigItems } from "@htwang-contrib/common";
+import {
+  type ExtensionConfigSchema,
+  isExtensionDisabled,
+  isStaleCtxError,
+  readConfig,
+  registerConfigItems,
+} from "@htwang-contrib/common";
 
 import {
   createGondolinBashOps,
@@ -118,6 +124,7 @@ function notify(ctx: ExtensionContext | undefined, message: string, type: "info"
 }
 
 export default function (pi: ExtensionAPI) {
+  if (isExtensionDisabled("gondolin-sandbox")) return;
   registerConfig();
 
   const localCwd = process.cwd();

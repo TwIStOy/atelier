@@ -3,6 +3,7 @@ import {
   EDITOR_HINT_EVENT,
   type EditorHintPayload,
   formatTurnTelemetry,
+  isExtensionDisabled,
   type TelemetryModelRef,
   type TelemetryUsage,
   TurnTelemetryTracker,
@@ -39,6 +40,7 @@ function usageOf(message: {
 }
 
 export default function (pi: ExtensionAPI) {
+  if (isExtensionDisabled("statusline")) return;
   let activeCtx: ExtensionContext | undefined;
   let activeEditor: MyEditor | undefined;
   let unsubscribeHint: (() => void) | undefined;

@@ -1,4 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { isExtensionDisabled } from "@htwang-contrib/common";
 import { checkBashCommand } from "./bash-check.ts";
 
 const PROTECTED_PREFIX = "/run/agenix";
@@ -21,6 +22,7 @@ function checkPath(input: Record<string, unknown>): string | null {
 }
 
 export default function (pi: ExtensionAPI) {
+  if (isExtensionDisabled("protect-secrets")) return;
   pi.on("tool_call", async (event, ctx) => {
     if (READ_LIKE_TOOLS.has(event.toolName)) {
       const matched = checkPath(event.input as Record<string, unknown>);

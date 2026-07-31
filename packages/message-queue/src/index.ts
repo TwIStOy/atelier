@@ -2,7 +2,7 @@ import type { ImageContent, TextContent } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import type { TUI } from "@earendil-works/pi-tui";
 import { getKeybindings, Key, matchesKey } from "@earendil-works/pi-tui";
-import { MODAL_ACTIVE_EVENT } from "@htwang-contrib/common";
+import { isExtensionDisabled, MODAL_ACTIVE_EVENT } from "@htwang-contrib/common";
 import type { QueuedMessage } from "./queue.ts";
 import { MessageQueue } from "./queue.ts";
 import { createQueuePanel, type QueueAction } from "./queue-panel.ts";
@@ -11,6 +11,7 @@ import { renderQueueWidget, WIDGET_KEY, WIDGET_OPTIONS } from "./queue-widget.ts
 const USER_MSG_QUEUE = { deliverAs: "followUp" as const };
 
 export default function messageQueueExtension(pi: ExtensionAPI): void {
+  if (isExtensionDisabled("message-queue")) return;
   const queue = new MessageQueue();
   let widgetCtx: ExtensionContext | null = null;
   let unsubTerminal: (() => void) | null = null;

@@ -1,5 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { createLogger } from "@htwang-contrib/common";
+import { createLogger, isExtensionDisabled } from "@htwang-contrib/common";
 import { refreshCatalog } from "./catalog.ts";
 
 const logger = createLogger("inference-v2-self-host");
@@ -8,6 +8,7 @@ const PROVIDER_ID = "inference-v2-self-host";
 const SESSION_AFFINITY_HEADER = "x-lite-session-id";
 
 export default async function (pi: ExtensionAPI) {
+  if (isExtensionDisabled("inference-v2-self-host")) return;
   logger.info("extension loaded");
   pi.registerProvider(PROVIDER_ID, {
     name: "Inference V2 (Self Host)",

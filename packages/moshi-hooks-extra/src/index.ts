@@ -5,6 +5,7 @@ import {
   type CodingPlanRawUsage,
   type CodingPlanUsage,
   createLogger,
+  isExtensionDisabled,
   MODAL_ACTIVE_EVENT,
   registerConfigItems,
   ZAI_CODING_PLAN_EVENTS,
@@ -40,6 +41,7 @@ export function setCachedModels(models: Array<{ label: string; value: string }>)
 }
 
 export default function moshiHooksExtra(pi: ExtensionAPI): void {
+  if (isExtensionDisabled("moshi-hooks-extra")) return;
   logger.info("extension loaded");
   if (!isMoshiHookAvailable()) {
     return;

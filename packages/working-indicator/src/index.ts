@@ -1,5 +1,5 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { SPINNER_STYLES } from "@htwang-contrib/common";
+import { isExtensionDisabled, SPINNER_STYLES } from "@htwang-contrib/common";
 import { loadConfig, registerWorkingIndicatorConfigItems } from "./config.ts";
 import { type NarrowWidthOptions, resolveEffectiveSpinnerKey } from "./narrow-screen.ts";
 import { pickPhrase } from "./phrase.ts";
@@ -26,6 +26,7 @@ const TICK_MS = 250;
 const TOKS_LABEL = "tok/s";
 
 export default function (pi: ExtensionAPI) {
+  if (isExtensionDisabled("working-indicator")) return;
   let thinking = false;
   let thinkingStartMs = 0;
   let tickTimer: ReturnType<typeof setInterval> | undefined;

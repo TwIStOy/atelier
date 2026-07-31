@@ -1,5 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { registerConfigItems } from "@htwang-contrib/common";
+import { isExtensionDisabled, registerConfigItems } from "@htwang-contrib/common";
 import { handleCommit } from "./commit.ts";
 import { loadConfig, selectModel } from "./model-select.ts";
 import { MAX_DIFF_LENGTH, MAX_DIFF_LENGTH_SINGLE, MAX_GROUPING_RETRIES } from "./prompt.ts";
@@ -11,6 +11,7 @@ export function setCachedModels(models: Array<{ label: string; value: string }>)
 }
 
 export default function (pi: ExtensionAPI): void {
+  if (isExtensionDisabled("committer")) return;
   registerConfigItems("committer", [
     {
       key: "model",

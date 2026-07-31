@@ -53,6 +53,7 @@ export type { ContentRenderer, ToolDisplayAdapter } from "./types.ts";
 
 import type { ExtensionAPI, Theme } from "@earendil-works/pi-coding-agent";
 import { ToolExecutionComponent } from "@earendil-works/pi-coding-agent";
+import { isExtensionDisabled } from "@htwang-contrib/common";
 import { registerToolDisplayConfigItems } from "./config.ts";
 import { globalToolDisplayRegistry } from "./registry.ts";
 import { renderToolCall } from "./tool-call-display.ts";
@@ -147,6 +148,7 @@ function patchToolExecutionRender(getTheme: () => Theme, registry: typeof global
 }
 
 export default function (pi: ExtensionAPI) {
+  if (isExtensionDisabled("tool-display")) return;
   let activeTheme: Theme = FALLBACK_THEME;
 
   registerToolDisplayConfigItems();

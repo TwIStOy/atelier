@@ -1,7 +1,7 @@
 import { CustomEditor, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { EditorComponent, KeybindingsConfig, KeyId } from "@earendil-works/pi-tui";
 import { getKeybindings, Key } from "@earendil-works/pi-tui";
-import { chainEditorFactory, createLogger } from "@htwang-contrib/common";
+import { chainEditorFactory, createLogger, isExtensionDisabled } from "@htwang-contrib/common";
 import { loadHistoryTextsNewestFirst, MAX_ENTRIES, persistHistoryMergedWithDisk } from "./history-store.ts";
 import { InteractiveHistorySearch } from "./interactive-search.ts";
 
@@ -122,6 +122,7 @@ async function openReverseSearch(ctx: ExtensionContext): Promise<void> {
 }
 
 export default function userInputHistoryExtension(pi: ExtensionAPI): void {
+  if (isExtensionDisabled("user-input-history")) return;
   logger.info("extension loaded");
   // Every user text that enters `session.prompt()` (after slash-command precheck),
   // including CLI `-m` / `initialMessage` which never touch the editor `addToHistory`.

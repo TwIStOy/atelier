@@ -1,4 +1,5 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { isExtensionDisabled } from "@htwang-contrib/common";
 import { buildSubagentAgentCatalog, subagentsPersonasSystemPromptXml } from "./agent-catalog.ts";
 import { runSubagentsAgentsCommand } from "./agents-inspect.ts";
 import { shouldInjectSubagentsParentSystemPrompt, subagentsFeatureSystemPrompt } from "./feature-system-prompt.ts";
@@ -7,6 +8,7 @@ import { registerSubagentStatusTool, registerSubagentTool } from "./tool.ts";
 import { runSubagentViewerCommand } from "./viewer/command.ts";
 
 export default function (pi: ExtensionAPI) {
+  if (isExtensionDisabled("subagents")) return;
   registerSubagentTool(pi);
   registerSubagentStatusTool(pi);
 

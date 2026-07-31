@@ -1,6 +1,7 @@
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { isExtensionDisabled } from "@htwang-contrib/common";
 import { LocalAudioCapture } from "./audio/capture.ts";
 import { selectRecorder, selectStreamRecorder } from "./audio/recorder.ts";
 import { StreamCapture } from "./audio/stream-capture.ts";
@@ -133,6 +134,7 @@ async function tryCreateVadPipeline(
 }
 
 export default function (pi: ExtensionAPI): void {
+  if (isExtensionDisabled("voice-input")) return;
   const controller = new VoiceInputController(createFlow);
 
   pi.on("session_start", () => {

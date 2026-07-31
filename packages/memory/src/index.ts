@@ -1,4 +1,5 @@
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
+import { isExtensionDisabled } from "@htwang-contrib/common";
 import { buildReorganizeMemoryPrompt } from "./commands/reorganize-memory-template.js";
 import { buildSelfImprovePrompt } from "./commands/self-improve-template.js";
 import { buildMemoryStatusReport } from "./memory-status.js";
@@ -9,6 +10,7 @@ import { registerJournalTools, registerMemoryTools } from "./tools/index.js";
 const INSTALL_GUARD = Symbol.for("pi.memory.installed");
 
 export default function initMemory(pi: ExtensionAPI): void {
+  if (isExtensionDisabled("memory")) return;
   const guard = pi as unknown as Record<symbol, boolean>;
   if (guard[INSTALL_GUARD]) return;
   guard[INSTALL_GUARD] = true;

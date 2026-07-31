@@ -1,5 +1,5 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { createLogger, MODAL_ACTIVE_EVENT } from "@htwang-contrib/common";
+import { createLogger, isExtensionDisabled, MODAL_ACTIVE_EVENT } from "@htwang-contrib/common";
 import { postReport } from "./client.ts";
 import { loadConfig, registerHtwProducerConfigItems } from "./config.ts";
 import { DiffTracker } from "./diff-tracker.ts";
@@ -93,6 +93,7 @@ function stopHeartbeat(): void {
 }
 
 export default function htwProducer(pi: ExtensionAPI): void {
+  if (isExtensionDisabled("htw-producer")) return;
   logger.info("extension loaded");
   registerHtwProducerConfigItems();
 

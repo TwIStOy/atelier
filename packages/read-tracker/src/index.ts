@@ -1,5 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { isToolCallEventType } from "@earendil-works/pi-coding-agent";
+import { isExtensionDisabled } from "@htwang-contrib/common";
 import { buildReadRows, renderReadTrackerTable, summarizeRows } from "./display.ts";
 import { ReadTracker } from "./read-tracker.ts";
 
@@ -11,6 +12,7 @@ function extractPath(input: Record<string, unknown>): string | null {
 }
 
 export default function (pi: ExtensionAPI) {
+  if (isExtensionDisabled("read-tracker")) return;
   const tracker = new ReadTracker();
 
   pi.on("tool_call", async (event) => {

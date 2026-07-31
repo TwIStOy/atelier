@@ -6,6 +6,7 @@ import {
   UserMessageComponent,
 } from "@earendil-works/pi-coding-agent";
 import { Markdown, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import { isExtensionDisabled } from "@htwang-contrib/common";
 
 const PREFIX_MARKER = "▌ ";
 
@@ -86,6 +87,7 @@ function patchUserMessageRender(getTheme: () => Theme | undefined, getThinkingLe
 }
 
 export default function (pi: ExtensionAPI) {
+  if (isExtensionDisabled("user-message")) return;
   let activeTheme: Theme | undefined;
   let activeThinkingLevel = "off";
 

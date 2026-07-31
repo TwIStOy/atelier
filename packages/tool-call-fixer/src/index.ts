@@ -1,5 +1,11 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { type ExtensionConfigSchema, isStaleCtxError, readConfig, registerConfigItems } from "@htwang-contrib/common";
+import {
+  type ExtensionConfigSchema,
+  isExtensionDisabled,
+  isStaleCtxError,
+  readConfig,
+  registerConfigItems,
+} from "@htwang-contrib/common";
 import { repairAssistantMessageGrammarLeaks } from "./grammar-repair/index.ts";
 import { normalizePhantomToolUse } from "./phantom-tool-use.ts";
 import { STRATEGIES } from "./strategies/index.ts";
@@ -71,6 +77,7 @@ function registerConfig(): void {
 }
 
 export default function (pi: ExtensionAPI) {
+  if (isExtensionDisabled("tool-call-fixer")) return;
   registerConfig();
 
   pi.on("tool_call", async (event, ctx) => {

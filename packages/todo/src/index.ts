@@ -1,5 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { isStaleCtxError } from "@htwang-contrib/common";
+import { isExtensionDisabled, isStaleCtxError } from "@htwang-contrib/common";
 import { replayFromBranch } from "./state/replay.ts";
 import { replaceState } from "./state/store.ts";
 import { registerTodosCommand, registerTodoTools } from "./todo.ts";
@@ -7,6 +7,7 @@ import { TodoOverlay } from "./todo-overlay.ts";
 import { isTodoToolName } from "./tool/types.ts";
 
 export default function (pi: ExtensionAPI) {
+  if (isExtensionDisabled("todo")) return;
   let todoOverlay: TodoOverlay | undefined;
 
   registerTodoTools(pi);

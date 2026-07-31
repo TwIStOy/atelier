@@ -4,6 +4,7 @@ import {
   ASK_USER_PROMPT_EVENT,
   type AskUserPromptPayload,
   createLogger,
+  isExtensionDisabled,
   MODAL_ACTIVE_EVENT,
   registerConfigItems,
 } from "@htwang-contrib/common";
@@ -32,6 +33,7 @@ export function setCachedModels(models: Array<{ label: string; value: string }>)
 const DEFAULT_TITLE = "Pi";
 
 export default function herdrExtension(pi: ExtensionAPI): void {
+  if (isExtensionDisabled("herdr")) return;
   logger.info("extension loaded");
   // Config items are registered unconditionally so users can pre-set the
   // summary model from /config even when pi is not running inside herdr.

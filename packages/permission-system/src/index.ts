@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import type { ExtensionAPI, ToolCallEvent } from "@earendil-works/pi-coding-agent";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
-import { createLogger } from "@htwang-contrib/common";
+import { createLogger, isExtensionDisabled } from "@htwang-contrib/common";
 import { loadAndMergeConfigs } from "./config-loader.ts";
 import { getGlobalConfigDir } from "./config-paths.ts";
 import { type DecisionLogger, FileDecisionLogger } from "./decision-log.ts";
@@ -24,6 +24,7 @@ interface SessionState {
 let state: SessionState | null = null;
 
 export default function permissionSystemExtension(pi: ExtensionAPI): void {
+  if (isExtensionDisabled("permission-system")) return;
   logger.info("extension loaded");
 
   pi.on("session_start", (_event, ctx) => {

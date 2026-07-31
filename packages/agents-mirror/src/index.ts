@@ -2,6 +2,7 @@ import type { TextContent } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { isReadToolResult } from "@earendil-works/pi-coding-agent";
 import { Box, Text } from "@earendil-works/pi-tui";
+import { isExtensionDisabled } from "@htwang-contrib/common";
 import { InjectionCache } from "./cache.ts";
 import { clearMappingsCache, loadConfigPath, loadInlineEntry, loadMappings, registerConfig } from "./config.ts";
 import { injectDirectoryContext } from "./injection.ts";
@@ -25,6 +26,7 @@ const ENTRY_TYPE_DEBUG = "agents-mirror:debug";
 const ENTRY_TYPE_INJECTED = "agents-mirror:injected";
 
 export default function agentsMirror(pi: ExtensionAPI): void {
+  if (isExtensionDisabled("agents-mirror")) return;
   registerConfig();
 
   pi.registerEntryRenderer<InjectedEntryData>(ENTRY_TYPE_INJECTED, (entry, { expanded }, theme) => {

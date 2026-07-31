@@ -2,7 +2,13 @@ import * as nodeFs from "node:fs";
 import * as nodePath from "node:path";
 import type { TextContent } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { type ExtensionConfigSchema, isStaleCtxError, readConfig, registerConfigItems } from "@htwang-contrib/common";
+import {
+  type ExtensionConfigSchema,
+  isExtensionDisabled,
+  isStaleCtxError,
+  readConfig,
+  registerConfigItems,
+} from "@htwang-contrib/common";
 import {
   buildReplacementMessage,
   buildTempFilePath,
@@ -83,6 +89,7 @@ function writeOutputFile(targetPath: string, text: string): void {
 }
 
 export default function (pi: ExtensionAPI) {
+  if (isExtensionDisabled("truncate-outputs")) return;
   registerConfig();
 
   pi.on("tool_result", async (event, ctx) => {

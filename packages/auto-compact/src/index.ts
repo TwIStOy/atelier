@@ -1,7 +1,12 @@
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { estimateTokens } from "@earendil-works/pi-coding-agent";
-import { type ExtensionConfigSchema, readConfig, registerConfigItems } from "@htwang-contrib/common";
+import {
+  type ExtensionConfigSchema,
+  isExtensionDisabled,
+  readConfig,
+  registerConfigItems,
+} from "@htwang-contrib/common";
 
 type CompactionStrategy = "keep-recent" | "keep-bookends" | "summarize-all";
 
@@ -202,6 +207,7 @@ function registerAutoCompactConfigItems(): void {
 }
 
 export default function autoCompact(pi: ExtensionAPI): void {
+  if (isExtensionDisabled("auto-compact")) return;
   const guard = pi as unknown as Record<symbol, boolean>;
   const INSTALL_GUARD = Symbol.for("pi-extensions.auto-compact.installed");
   if (guard[INSTALL_GUARD]) return;
