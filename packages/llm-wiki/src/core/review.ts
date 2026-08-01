@@ -1,8 +1,8 @@
 import { randomBytes } from "node:crypto";
 import * as fs from "node:fs";
+import { resolveNow } from "@htwang-contrib/common/time";
 import { appendJsonl } from "./atomic.ts";
 import { vaultLayout } from "./paths.ts";
-import { resolveNow } from "./time.ts";
 
 export const REVIEW_SCHEMA_VERSION = 1;
 

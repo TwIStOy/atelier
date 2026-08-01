@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- `resolveNow(now?)` injectable-clock helper (`src/time.ts`): normalizes a `Date`, a `() => Date` thunk, or undefined→current time into a concrete `Date`. Exported from the main entry and also from a new pi-free sub-entry `@htwang-contrib/common/time` — the sub-entry loads only `time.ts` and does not pull in the pi-bound modules (e.g. `executeSideCall`) that the main entry re-exports, so pi-free cores (like llm-wiki's `src/core/*`) can use it without breaking their invariant. `package.json` gained an `exports` map (`"."` → existing entry, `"./time"` → `./src/time.ts`); no existing deep-import consumers are affected.
+
 ## [0.4.0] - 2026-07-31
 
 ### Added
