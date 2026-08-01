@@ -6,12 +6,14 @@ import { bootstrapVault } from "../src/core/bootstrap.ts";
 import { appendReviewItem, listReviewItems } from "../src/core/review.ts";
 import initLlmWiki from "../src/index.ts";
 
+const mockConfig = vi.hoisted(() => ({ current: { ingestModel: "", sessionStartNotice: true } }));
+
 vi.mock("@htwang-contrib/common", () => ({
   isExtensionDisabled: () => false,
   createLogger: () => ({ debug() {}, info() {}, warn() {}, error() {} }),
   executeSideCall: vi.fn(),
   registerConfigItems: () => {},
-  readConfig: () => ({ ingestModel: "" }),
+  readConfig: () => mockConfig.current,
   resolveModel: () => undefined,
 }));
 
@@ -477,5 +479,136 @@ describe("llm-wiki wiring — wiki_review tool + /wiki-review command", () => {
     expect(select).toHaveBeenCalledTimes(1);
     expect(notify.mock.calls.some((c) => /item\(s\) still open/.test(c[0]))).toBe(true);
     expect(listReviewItems(vaultRoot, { status: "open" }).map((e) => e.title)).toEqual(["first", "second"]);
+  });
+});
+
+describe("llm-wiki wiring — wiki_lint tool", () => {
+  function lintTool(mock: MockPi): {
+    execute: (id: string, params: unknown, signal: unknown, onUpdate: unknown, ctx: unknown) => Promise<unknown>;
+  } {
+    return mock.tools.get("wiki_lint") as {
+      execute: (id: string, params: unknown, signal: unknown, onUpdate: unknown, ctx: unknown) => Promise<unknown>;
+    };
+  }
+
+  it("registers the wiki_lint tool", () => {
+    const mock = setup();
+    expect(mock.tools.has("wiki_lint")).toBe(true);
+  });
+
+  it("writes meta/lint-report.md and reports findings", async () => {
+    const mock = setup();
+    fs.writeFileSync(
+      path.join(vaultRoot, "wiki", "concepts", "foo.md"),
+      "---\ntitle: Foo\ntype: concept\n---\n[[ghost]]\n",
+      "utf8",
+    );
+
+    const result = (await lintTool(mock).execute("t1", {}, undefined, undefined, { cwd: projectDir })) as {
+      content: { text: string }[];
+      details: { summary: { total: number; warnings: number }; reportPath: string };
+    };
+
+    expect(result.details.summary.total).toBe(1);
+    expect(result.details.summary.warnings).toBe(1);
+    expect(fs.existsSync(result.details.reportPath)).toBe(true);
+    expect(result.content[0].text).toContain("1 issues");
+  });
+
+  it("auto-captures uncaptured inbox files when fix=true", async () => {
+    const mock = setup();
+    fs.mkdirSync(path.join(vaultRoot, "inbox"), { recursive: true });
+    fs.writeFileSync(path.join(vaultRoot, "inbox", "new.md"), "# New\n", "utf8");
+
+    const result = (await lintTool(mock).execute("t1", { fix: true }, undefined, undefined, { cwd: projectDir })) as {
+      details: { fixResult: { captured: { relPath: string; packetId: string }[]; remaining: number } | null };
+    };
+
+    expect(result.details.fixResult?.captured).toHaveLength(1);
+    expect(result.details.fixResult?.captured[0]?.packetId).toMatch(/^SRC-\d{4}-\d{2}-\d{2}-001$/);
+    expect(result.details.fixResult?.captured[0]?.relPath).toBe("inbox/new.md");
+    expect(result.details.fixResult?.remaining).toBe(0);
+  });
+});
+
+describe("llm-wiki wiring — wiki_status tool", () => {
+  it("registers the wiki_status tool and returns a summary", async () => {
+    const mock = setup();
+    expect(mock.tools.has("wiki_status")).toBe(true);
+
+    fs.writeFileSync(
+      path.join(vaultRoot, "wiki", "concepts", "foo.md"),
+      "---\ntitle: Foo\ntype: concept\n---\n# Foo\n",
+      "utf8",
+    );
+    const tool = mock.tools.get("wiki_status") as {
+      execute: (id: string, params: unknown, signal: unknown, onUpdate: unknown, ctx: unknown) => Promise<unknown>;
+    };
+    const result = (await tool.execute("t1", {}, undefined, undefined, { cwd: projectDir })) as {
+      content: { text: string }[];
+      details: { pages: number };
+    };
+    expect(result.details.pages).toBe(1);
+    expect(result.content[0].text).toContain("pages: 1");
+  });
+});
+
+describe("llm-wiki wiring — lint/status slash commands", () => {
+  it("registers /wiki-lint and /wiki-status", () => {
+    const mock = setup();
+    expect(mock.commands.has("wiki-lint")).toBe(true);
+    expect(mock.commands.has("wiki-status")).toBe(true);
+  });
+});
+
+describe("llm-wiki wiring — session-start notice", () => {
+  beforeEach(() => {
+    mockConfig.current = { ingestModel: "", sessionStartNotice: true };
+  });
+
+  function callSessionStart(mock: MockPi, cwd: string): { notify: ReturnType<typeof vi.fn> } {
+    const notify = vi.fn();
+    mock.handlers.get("session_start")!(
+      { type: "session_start", reason: "startup" },
+      {
+        cwd,
+        modelRegistry: { getAvailable: () => [] },
+        ui: { notify },
+      },
+    );
+    return { notify };
+  }
+
+  it("notifies with a one-line wiki status hint when a vault exists on disk", () => {
+    const mock = setup();
+    fs.writeFileSync(
+      path.join(vaultRoot, "wiki", "concepts", "foo.md"),
+      "---\ntitle: Foo\ntype: concept\n---\n# Foo\n",
+      "utf8",
+    );
+    fs.mkdirSync(path.join(vaultRoot, "inbox"), { recursive: true });
+    fs.writeFileSync(path.join(vaultRoot, "inbox", "new.md"), "x", "utf8");
+
+    const { notify } = callSessionStart(mock, projectDir);
+
+    expect(notify).toHaveBeenCalledTimes(1);
+    const msg = notify.mock.calls[0]![0] as string;
+    expect(msg).toContain("wiki: 1 pages");
+    expect(msg).toContain("1 new source");
+  });
+
+  it("is silent when sessionStartNotice is disabled", () => {
+    mockConfig.current = { ingestModel: "", sessionStartNotice: false };
+    const mock = setup();
+    const { notify } = callSessionStart(mock, projectDir);
+    expect(notify).not.toHaveBeenCalled();
+  });
+
+  it("is silent when no vault exists on disk", () => {
+    const mock = setup();
+    const cwdWithoutVault = path.join(tmpRoot, "elsewhere");
+    fs.mkdirSync(cwdWithoutVault, { recursive: true });
+    const { notify } = callSessionStart(mock, cwdWithoutVault);
+    expect(notify).not.toHaveBeenCalled();
   });
 });

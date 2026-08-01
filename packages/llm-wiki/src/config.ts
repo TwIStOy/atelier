@@ -6,12 +6,13 @@ import { DEFAULT_INGEST_MAX_ATTEMPTS } from "./core/ingest.ts";
 export interface LlmWikiConfig {
   ingestModel: string;
   ingestMaxAttempts: number;
+  sessionStartNotice: boolean;
 }
 
 const CONFIG_ID = "llm-wiki";
 
 const CONFIG_SCHEMA: ExtensionConfigSchema<LlmWikiConfig> = {
-  defaults: { ingestModel: "", ingestMaxAttempts: DEFAULT_INGEST_MAX_ATTEMPTS },
+  defaults: { ingestModel: "", ingestMaxAttempts: DEFAULT_INGEST_MAX_ATTEMPTS, sessionStartNotice: true },
 };
 
 export function loadLlmWikiConfig(): LlmWikiConfig {
@@ -23,6 +24,7 @@ export function loadLlmWikiConfig(): LlmWikiConfig {
       Number.isFinite(ingestMaxAttempts) && ingestMaxAttempts >= 1
         ? Math.floor(ingestMaxAttempts)
         : DEFAULT_INGEST_MAX_ATTEMPTS,
+    sessionStartNotice: typeof raw.sessionStartNotice === "boolean" ? raw.sessionStartNotice : true,
   };
 }
 
@@ -54,6 +56,15 @@ export function registerLlmWikiConfigItems(): void {
       extensionLabel: "LLM Wiki",
       min: 1,
       max: 10,
+    },
+    {
+      key: "sessionStartNotice",
+      type: "boolean",
+      label: "Session-Start Notice",
+      value: () => loadLlmWikiConfig().sessionStartNotice,
+      description: "Show a one-line wiki status hint (inbox drift, pending ingest, pending review) at session start.",
+      extensionLabel: "LLM Wiki",
+      order: 20,
     },
   ]);
 }

@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { atomicWriteFile } from "./atomic.ts";
+import { atomicWriteFile, readJsonl } from "./atomic.ts";
 import { parseFrontmatter } from "./frontmatter.ts";
 import { MANIFEST_FILENAME, type SourcePacketManifest, type SourceType } from "./manifest.ts";
 import { extractWikilinkTargets } from "./wikilinks.ts";
@@ -440,17 +440,8 @@ function getOrInitRecord(record: Record<string, string[]>, key: string): string[
   return created;
 }
 
-function readEvents(eventsPath: string): unknown[] {
-  if (!fs.existsSync(eventsPath)) return [];
-  const out: unknown[] = [];
-  for (const line of fs.readFileSync(eventsPath, "utf8").split("\n")) {
-    const trimmed = line.trim();
-    if (trimmed.length === 0) continue;
-    try {
-      out.push(JSON.parse(trimmed));
-    } catch {}
-  }
-  return out;
+export function readEvents(eventsPath: string): unknown[] {
+  return readJsonl(eventsPath);
 }
 
 interface RenderedEvent {

@@ -1,3 +1,4 @@
+import * as fs from "node:fs";
 import type { Message, UserMessage } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { createLogger, executeSideCall, isExtensionDisabled } from "@htwang-contrib/common";
@@ -13,6 +14,7 @@ import { Type } from "typebox";
 import { loadLlmWikiConfig, registerLlmWikiConfigItems, resolveIngestModel, setCachedModelOptions } from "./config.ts";
 import { classifyPathOperation } from "./core/guardrail.ts";
 import { type IngestBatchResult, ingestBatch, type SideCaller } from "./core/ingest.ts";
+import { applyLintFixes, type LintFixResult, type LintReport, lintVault, writeLintReport } from "./core/lint.ts";
 import { rebuildMeta } from "./core/meta.ts";
 import { type CaptureInput, type CaptureResult, captureSource, type UrlFetcher } from "./core/packet.ts";
 import { type EnsurePageResult, ensurePage } from "./core/page.ts";
@@ -26,6 +28,7 @@ import {
   type ReviewItem,
   resolveReviewItem,
 } from "./core/review.ts";
+import { renderSessionStartNotice, renderStatusSummary, type WikiStatus, wikiStatus } from "./core/status.ts";
 import { resolveVaults } from "./core/vault.ts";
 
 const logger = createLogger("llm-wiki");
@@ -106,6 +109,13 @@ function targetVaultRoot(cwd: string): string {
 function activeVaultRoots(cwd: string): string[] {
   const { projectVault, personalVault } = resolveVaults({ cwd });
   return [projectVault, personalVault].filter((v): v is string => v !== null);
+}
+
+function activeVaultOnDisk(cwd: string): string | null {
+  const { projectVault, personalVault } = resolveVaults({ cwd });
+  if (projectVault && fs.existsSync(projectVault)) return projectVault;
+  if (personalVault && fs.existsSync(personalVault)) return personalVault;
+  return null;
 }
 
 const touchedVaults = new Set<string>();
@@ -725,6 +735,113 @@ function formatReviewItemPrompt(scope: string, entry: ReviewItem, position: numb
   return lines.join("\n");
 }
 
+function emitSessionStartNotice(ctx: ExtensionContext): void {
+  if (!loadLlmWikiConfig().sessionStartNotice) return;
+  const vault = activeVaultOnDisk(ctx.cwd);
+  if (!vault) return;
+  const status = wikiStatus(vault);
+  ctx.ui.notify(renderSessionStartNotice(status), "info");
+}
+
+interface LintRun {
+  report: LintReport;
+  reportPath: string;
+  fixResult: LintFixResult | null;
+  summary: string;
+}
+
+async function runLint(vaultRoot: string, fix: boolean): Promise<LintRun> {
+  const initial = lintVault(vaultRoot);
+  let fixResult: LintFixResult | null = null;
+  if (fix) fixResult = await applyLintFixes(vaultRoot, initial);
+  const report = fixResult?.report ?? initial;
+  const reportPath = writeLintReport(vaultRoot, report);
+  return { report, reportPath, fixResult, summary: formatLintSummary(report, reportPath, fixResult) };
+}
+
+function formatLintSummary(report: LintReport, reportPath: string, fixResult: LintFixResult | null): string {
+  const lines = [
+    `Linted ${report.vault}: ${report.summary.total} issues (${report.summary.errors} errors, ${report.summary.warnings} warnings)`,
+    `report: ${reportPath}`,
+  ];
+  for (const [kind, count] of Object.entries(report.summary.byKind)) {
+    if (count > 0) lines.push(`- ${kind}: ${count}`);
+  }
+  if (fixResult) {
+    const captured = fixResult.captured.map((c) => c.relPath).join(", ");
+    lines.push(
+      `fix: captured ${fixResult.captured.length} inbox file(s)${captured ? ` (${captured})` : ""}, ${fixResult.remaining} issue(s) remaining`,
+    );
+  }
+  return lines.join("\n");
+}
+
+function registerWikiLintTool(pi: ExtensionAPI): void {
+  pi.registerTool({
+    name: "wiki_lint",
+    label: "Wiki Lint",
+    description:
+      "Run mechanical health checks on the active LLM Wiki vault (project if present, otherwise the personal vault) and write `meta/lint-report.md`. " +
+      "Checks: orphan pages (no incoming wikilinks), broken wikilinks, duplicate aliases across pages, coverage gaps (pages citing unknown Source Packets + ingested packets cited by no page), and Inbox drift (uncaptured files + modified originals). " +
+      "Pass `fix: true` to auto-capture uncaptured Inbox files (the only safe, deterministic repair); structural findings are report-only and need human judgment.",
+    promptSnippet:
+      "Health-check the wiki and write meta/lint-report.md (orphans, broken links, dup aliases, coverage gaps, inbox drift)",
+    parameters: Type.Object({
+      fix: Type.Optional(
+        Type.Boolean({
+          description: "If true, apply safe fixes — capture uncaptured Inbox files into Source Packets. Default false.",
+        }),
+      ),
+    }),
+
+    async execute(_toolCallId, params, _signal, onUpdate, ctx) {
+      const vaultRoot = targetVaultRoot(ctx.cwd);
+      const run = await runLint(vaultRoot, params.fix === true);
+      const details = { summary: run.report.summary, reportPath: run.reportPath, fixResult: run.fixResult };
+      onUpdate?.({ content: [{ type: "text", text: run.summary }], details });
+      return { content: [{ type: "text", text: run.summary }], details };
+    },
+  });
+}
+
+function registerWikiStatusTool(pi: ExtensionAPI): void {
+  pi.registerTool({
+    name: "wiki_status",
+    label: "Wiki Status",
+    description:
+      "Report the state of the active LLM Wiki vault (project if present, otherwise the personal vault): page/source counts, pages by Page Type, pending ingests, unresolved review-queue items, Inbox drift counts, and recent events from `meta/events.jsonl`.",
+    promptSnippet: "Report wiki status (counts, pending ingest/review, inbox drift, recent events)",
+    parameters: Type.Object({}),
+
+    async execute(_toolCallId, _params, _signal, onUpdate, ctx) {
+      const vaultRoot = targetVaultRoot(ctx.cwd);
+      const status: WikiStatus = wikiStatus(vaultRoot);
+      const summary = renderStatusSummary(status);
+      onUpdate?.({ content: [{ type: "text", text: summary }], details: status });
+      return { content: [{ type: "text", text: summary }], details: status };
+    },
+  });
+}
+
+function registerWikiSlashCommands(pi: ExtensionAPI): void {
+  pi.registerCommand("wiki-lint", {
+    description: "Run wiki lint and write meta/lint-report.md. Append --fix to auto-capture uncaptured inbox files.",
+    async handler(args, ctx) {
+      const vaultRoot = targetVaultRoot(ctx.cwd);
+      const run = await runLint(vaultRoot, /\b--fix\b/.test(args));
+      ctx.ui.notify(run.summary, run.report.summary.errors > 0 ? "warning" : "info");
+    },
+  });
+
+  pi.registerCommand("wiki-status", {
+    description: "Print the active vault's wiki status (counts, pending ingest/review, inbox drift, recent events).",
+    async handler(_args, ctx) {
+      const vaultRoot = targetVaultRoot(ctx.cwd);
+      ctx.ui.notify(renderStatusSummary(wikiStatus(vaultRoot)), "info");
+    },
+  });
+}
+
 export default function initLlmWiki(pi: ExtensionAPI): void {
   if (isExtensionDisabled("llm-wiki")) return;
   logger.info("extension loaded");
@@ -739,6 +856,11 @@ export default function initLlmWiki(pi: ExtensionAPI): void {
         value: `${m.provider}/${m.id}`,
       })),
     );
+    try {
+      emitSessionStartNotice(ctx);
+    } catch (err) {
+      logger.debug(`session-start notice failed: ${String(err)}`);
+    }
   });
 
   pi.on("tool_call", (event, ctx) => {
@@ -770,4 +892,7 @@ export default function initLlmWiki(pi: ExtensionAPI): void {
   registerWikiIngestCommand(pi);
   registerWikiReviewTool(pi);
   registerWikiReviewCommand(pi);
+  registerWikiLintTool(pi);
+  registerWikiStatusTool(pi);
+  registerWikiSlashCommands(pi);
 }
