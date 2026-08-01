@@ -248,11 +248,14 @@ export interface IngestBatchResult {
   outcomes: PacketIngestOutcome[];
 }
 
+export const DEFAULT_INGEST_MAX_ATTEMPTS = 3;
+
 export interface IngestBatchOptions {
   caller: SideCaller;
   signal?: AbortSignal;
   now?: Date | (() => Date);
   packetId?: string;
+  maxAttempts?: number;
 }
 
 export function listPendingPackets(vaultRoot: string): SourcePacketManifest[] {
@@ -513,10 +516,56 @@ function truncateOverviewSummary(summary: string): string {
   return collapsed.length <= 120 ? collapsed : `${collapsed.slice(0, 117)}...`;
 }
 
+type StepOutcome<T> = { ok: true; value: T } | { ok: false; reason: string };
+type StepValidator<T> = (text: string) => StepOutcome<T>;
+
+async function attemptStepWithRetry<T>(
+  caller: SideCaller,
+  build: () => SideCallInput,
+  validate: StepValidator<T>,
+  label: string,
+  maxAttempts: number,
+  signal: AbortSignal,
+): Promise<StepOutcome<T>> {
+  let lastReason = `${label} was not attempted`;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    if (signal.aborted) return { ok: false, reason: `${label} aborted` };
+    const res = await caller.call(build(), signal);
+    if (!res.ok) {
+      lastReason = `${label} side-call failed: ${res.error}`;
+      continue;
+    }
+    const validated = validate(res.text);
+    if (!validated.ok) {
+      lastReason = validated.reason;
+      continue;
+    }
+    return { ok: true, value: validated.value };
+  }
+  return { ok: false, reason: `${lastReason} (after ${maxAttempts} attempt${maxAttempts === 1 ? "" : "s"})` };
+}
+
+function validateAnalysis(text: string): StepOutcome<AnalysisResult> {
+  const analysis = parseAnalysis(text);
+  return analysis
+    ? { ok: true, value: analysis }
+    : { ok: false, reason: "analysis produced no usable wiki-analysis block" };
+}
+
+function validateGeneration(text: string): StepOutcome<GenerationResult> {
+  const generation = parseGeneration(text);
+  if (!generation) return { ok: false, reason: "generation produced no source page" };
+  if (!generation.pages.some((p) => p.type === "source")) {
+    return { ok: false, reason: "generation produced no source page" };
+  }
+  return { ok: true, value: generation };
+}
+
 async function ingestOnePacket(
   vaultRoot: string,
   manifest: SourcePacketManifest,
   opts: IngestBatchOptions,
+  maxAttempts: number,
   now: Date,
   signal: AbortSignal,
 ): Promise<PacketIngestOutcome> {
@@ -525,35 +574,39 @@ async function ingestOnePacket(
   const digest = buildExistingDigest(vaultRoot);
   const extracted = readExtractedText(manifest.packetDir);
 
-  const analysisRes = await opts.caller.call(
-    {
-      systemPrompt: ANALYSIS_SYSTEM_PROMPT,
-      userText: buildAnalysisUser({ purpose, digest, packetId, extracted }),
-    },
+  const analysisInput = (): SideCallInput => ({
+    systemPrompt: ANALYSIS_SYSTEM_PROMPT,
+    userText: buildAnalysisUser({ purpose, digest, packetId, extracted }),
+  });
+  const analysisStep = await attemptStepWithRetry(
+    opts.caller,
+    analysisInput,
+    validateAnalysis,
+    "analysis",
+    maxAttempts,
     signal,
   );
-  if (!analysisRes.ok) {
-    return outcomeFailed(packetId, `analysis side-call failed: ${analysisRes.error}`);
+  if (!analysisStep.ok) {
+    return outcomeFailed(packetId, analysisStep.reason);
   }
-  const analysis = parseAnalysis(analysisRes.text);
-  if (!analysis) {
-    return outcomeFailed(packetId, "analysis produced no usable wiki-analysis block");
-  }
+  const analysis = analysisStep.value;
 
-  const generationRes = await opts.caller.call(
-    {
-      systemPrompt: GENERATION_SYSTEM_PROMPT,
-      userText: buildGenerationUser({ purpose, packetId, extracted, analysis }),
-    },
+  const generationInput = (): SideCallInput => ({
+    systemPrompt: GENERATION_SYSTEM_PROMPT,
+    userText: buildGenerationUser({ purpose, packetId, extracted, analysis }),
+  });
+  const generationStep = await attemptStepWithRetry(
+    opts.caller,
+    generationInput,
+    validateGeneration,
+    "generation",
+    maxAttempts,
     signal,
   );
-  if (!generationRes.ok) {
-    return outcomeFailed(packetId, `generation side-call failed: ${generationRes.error}`);
+  if (!generationStep.ok) {
+    return outcomeFailed(packetId, generationStep.reason);
   }
-  const generation = parseGeneration(generationRes.text);
-  if (!generation?.pages.some((p) => p.type === "source")) {
-    return outcomeFailed(packetId, "generation produced no source page");
-  }
+  const generation = generationStep.value;
 
   let pagesCreated = 0;
   let pagesExisted = 0;
@@ -581,6 +634,7 @@ function outcomeFailed(packetId: string, reason: string): PacketIngestOutcome {
 export async function ingestBatch(vaultRoot: string, opts: IngestBatchOptions): Promise<IngestBatchResult> {
   const now = resolveNow(opts.now);
   const signal = opts.signal ?? new AbortController().signal;
+  const maxAttempts = Math.max(1, Math.floor(opts.maxAttempts ?? DEFAULT_INGEST_MAX_ATTEMPTS));
 
   let pending = listPendingPackets(vaultRoot);
   if (opts.packetId !== undefined) {
@@ -589,7 +643,7 @@ export async function ingestBatch(vaultRoot: string, opts: IngestBatchOptions): 
 
   const outcomes: PacketIngestOutcome[] = [];
   for (const manifest of pending) {
-    const outcome = await ingestOnePacket(vaultRoot, manifest, opts, now, signal);
+    const outcome = await ingestOnePacket(vaultRoot, manifest, opts, maxAttempts, now, signal);
     outcomes.push(outcome);
   }
 
