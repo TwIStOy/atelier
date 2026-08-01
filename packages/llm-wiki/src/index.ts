@@ -14,6 +14,7 @@ import { rebuildMeta } from "./core/meta.ts";
 import { type CaptureInput, type CaptureResult, captureSource, type UrlFetcher } from "./core/packet.ts";
 import { type EnsurePageResult, ensurePage } from "./core/page.ts";
 import { vaultLayout } from "./core/paths.ts";
+import { type RecallHit, type RecallResult, recallAcross, recallVault } from "./core/recall.ts";
 import { resolveVaults } from "./core/vault.ts";
 
 const logger = createLogger("llm-wiki");
@@ -232,6 +233,119 @@ function registerWikiEnsurePageTool(pi: ExtensionAPI): void {
   });
 }
 
+function registerWikiSearchTool(pi: ExtensionAPI): void {
+  pi.registerTool({
+    name: "wiki_search",
+    label: "Wiki Search",
+    description:
+      "Keyword-search the registry of ONE LLM Wiki vault (the active vault: project vault if present, otherwise the personal vault). " +
+      "Matches page title, aliases, headings, id, and excerpt; ranks by field-weighted score. " +
+      "Does NOT do graph expansion or cross-vault merge — use `wiki_recall` for that. " +
+      "Returns ranked hits with score and matched fields.",
+    promptSnippet: "Keyword-search pages in the active LLM Wiki vault",
+    parameters: Type.Object({
+      query: Type.String({ description: "Search query (tokenized on whitespace/punctuation)." }),
+      limit: Type.Optional(
+        Type.Integer({
+          description: "Max hits to return (default 20).",
+          minimum: 1,
+        }),
+      ),
+    }),
+
+    async execute(_toolCallId, params, _signal, onUpdate, ctx) {
+      const vaultRoot = targetVaultRoot(ctx.cwd);
+      const query = typeof params.query === "string" ? params.query : "";
+      const limit = typeof params.limit === "number" && params.limit > 0 ? params.limit : undefined;
+      const result = recallVault(vaultRoot, query, { ...(limit ? { limit } : {}) });
+      const keywordHits: RecallResult = {
+        query: result.query,
+        vaults: result.vaults,
+        hits: result.hits
+          .filter((h) => h.matchedBy.includes("keyword"))
+          .map((h) => ({ ...h, matchedBy: ["keyword"], signals: undefined, viaSeeds: undefined })),
+      };
+      const summary = formatSearchSummary(keywordHits, vaultRoot);
+      onUpdate?.({ content: [{ type: "text", text: summary }], details: keywordHits });
+      return { content: [{ type: "text", text: summary }], details: keywordHits };
+    },
+  });
+}
+
+function registerWikiRecallTool(pi: ExtensionAPI): void {
+  pi.registerTool({
+    name: "wiki_recall",
+    label: "Wiki Recall",
+    description:
+      "Layered Recall over the LLM Wiki: keyword search + four-signal Graph Relevance expansion (direct link x3, source overlap x4, Adamic-Adar x1.5, type affinity x1), " +
+      "merged across BOTH the project vault (if present) and the personal vault. " +
+      "Graph expansion surfaces pages the keyword search missed but that are related via wikilinks, shared sources, common neighbours, or page type. " +
+      "Cross-vault duplicates (same page id) are collapsed into one entry listing every vault they were found in (primary = highest score). " +
+      "Each hit is annotated with which vault(s) it came from and why it matched (keyword | graph).",
+    promptSnippet: "Recall relevant pages across both LLM Wiki vaults with graph expansion",
+    parameters: Type.Object({
+      query: Type.String({ description: "Recall query (tokenized on whitespace/punctuation)." }),
+      limit: Type.Optional(
+        Type.Integer({
+          description: "Max hits to return across the merged set (default 20).",
+          minimum: 1,
+        }),
+      ),
+    }),
+
+    async execute(_toolCallId, params, _signal, onUpdate, ctx) {
+      const roots = activeVaultRoots(ctx.cwd);
+      const query = typeof params.query === "string" ? params.query : "";
+      const limit = typeof params.limit === "number" && params.limit > 0 ? params.limit : undefined;
+      const result = await recallAcross(roots, query, { ...(limit ? { limit } : {}) });
+      const summary = formatRecallSummary(result);
+      onUpdate?.({ content: [{ type: "text", text: summary }], details: result });
+      return { content: [{ type: "text", text: summary }], details: result };
+    },
+  });
+}
+
+function formatSearchSummary(result: RecallResult, vaultRoot: string): string {
+  const header = `Searched "${result.query}" in ${vaultRoot} — ${result.hits.length} hit(s)`;
+  if (result.hits.length === 0) return header;
+  const lines = [header];
+  for (const hit of result.hits) lines.push(formatHitLine(hit));
+  return lines.join("\n");
+}
+
+function formatRecallSummary(result: RecallResult): string {
+  const header = `Recalled "${result.query}" across ${result.vaults.length} vault(s): ${result.vaults.join(", ")} — ${result.hits.length} hit(s)`;
+  if (result.hits.length === 0) return header;
+  const lines = [header];
+  for (const hit of result.hits) lines.push(formatHitLine(hit));
+  return lines.join("\n");
+}
+
+function formatHitLine(hit: RecallHit): string {
+  const title = hit.title ?? hit.id;
+  const type = hit.type ?? "untyped";
+  const matched = hit.matchedBy.join("+");
+  const vault = hit.vaults && hit.vaults.length > 1 ? `vaults: ${hit.vaults.join(", ")}` : `vault: ${hit.vault}`;
+  const line = `- [[${hit.id}]] — ${title} (${type}) [score ${hit.score}, ${matched}] (${vault})`;
+  const extras: string[] = [];
+  if (hit.signals) {
+    const parts = Object.entries(hit.signals)
+      .filter(([, v]) => (v ?? 0) > 0)
+      .map(([k, v]) => `${k}=${Number.isInteger(v) ? String(v) : v.toFixed(2)}`);
+    if (parts.length > 0) extras.push(`signals: ${parts.join(", ")}`);
+  }
+  if (hit.matchedFields && hit.matchedFields.length > 0) {
+    extras.push(`fields: ${hit.matchedFields.join(", ")}`);
+  }
+  if (hit.viaSeeds && hit.viaSeeds.length > 0) {
+    extras.push(`via: ${hit.viaSeeds.join(", ")}`);
+  }
+  const out = [line];
+  if (extras.length > 0) out.push(`  ${extras.join("; ")}`);
+  if (hit.excerpt.length > 0) out.push(`  > ${hit.excerpt}`);
+  return out.join("\n");
+}
+
 function formatRebuildSummary(result: ReturnType<typeof rebuildMeta>): string {
   return [
     `Rebuilt metadata for ${result.vault}`,
@@ -314,4 +428,6 @@ export default function initLlmWiki(pi: ExtensionAPI): void {
   registerWikiCaptureTool(pi);
   registerWikiRebuildMetaTool(pi);
   registerWikiEnsurePageTool(pi);
+  registerWikiSearchTool(pi);
+  registerWikiRecallTool(pi);
 }
