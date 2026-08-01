@@ -2,6 +2,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { bootstrapVault } from "../src/core/bootstrap.ts";
 import initLlmWiki from "../src/index.ts";
 
 vi.mock("@htwang-contrib/common", () => ({
@@ -154,5 +155,71 @@ describe("llm-wiki wiring — wiki_rebuild_meta tool", () => {
     expect(result.details.pages).toBe(1);
     expect(result.content[0].text).toContain("Rebuilt metadata");
     expect(fs.existsSync(path.join(vaultRoot, "meta", "registry.json"))).toBe(true);
+  });
+});
+
+describe("llm-wiki wiring — wiki_ensure_page tool", () => {
+  beforeEach(() => {
+    bootstrapVault(vaultRoot, { now: () => new Date(Date.UTC(2024, 0, 5, 9, 0, 0)) });
+  });
+
+  function ensureTool(mock: MockPi): {
+    execute: (id: string, params: unknown, signal: unknown, onUpdate: unknown, ctx: unknown) => Promise<unknown>;
+  } {
+    return mock.tools.get("wiki_ensure_page") as {
+      execute: (id: string, params: unknown, signal: unknown, onUpdate: unknown, ctx: unknown) => Promise<unknown>;
+    };
+  }
+
+  function ensure(mock: MockPi, params: Record<string, unknown>): Promise<unknown> {
+    return ensureTool(mock).execute("t1", params, undefined, undefined, { cwd: projectDir });
+  }
+
+  it("registers the wiki_ensure_page tool", () => {
+    const mock = setup();
+    expect(mock.tools.has("wiki_ensure_page")).toBe(true);
+  });
+
+  it("creates a concept page from the template when none exists", async () => {
+    const mock = setup();
+    const result = (await ensure(mock, { type: "concept", title: "React Hooks" })) as {
+      content: { text: string }[];
+      details: { created: boolean; id: string; relPath: string; type: string };
+    };
+
+    expect(result.details.created).toBe(true);
+    expect(result.details.type).toBe("concept");
+    expect(result.details.id).toBe("concepts/react-hooks");
+    expect(result.details.relPath).toBe("wiki/concepts/react-hooks.md");
+    expect(fs.existsSync(path.join(vaultRoot, "wiki", "concepts", "react-hooks.md"))).toBe(true);
+    expect(result.content[0].text).toContain("Created concept page");
+  });
+
+  it("resolves to the existing page on a second call with the same title (created=false)", async () => {
+    const mock = setup();
+    await ensure(mock, { type: "concept", title: "React" });
+    const result = (await ensure(mock, { type: "concept", title: "React" })) as {
+      details: { created: boolean; matchedOn: string; id: string };
+    };
+
+    expect(result.details.created).toBe(false);
+    expect(result.details.matchedOn).toBe("title");
+    expect(fs.readdirSync(path.join(vaultRoot, "wiki", "concepts"))).toHaveLength(1);
+  });
+
+  it("marks the vault for a turn-end meta rebuild when it creates a page", async () => {
+    const mock = setup();
+    const registryPath = path.join(vaultRoot, "meta", "registry.json");
+
+    await ensure(mock, { type: "entity", title: "OpenAI" });
+
+    const stale = JSON.parse(fs.readFileSync(registryPath, "utf8")) as { pages: unknown[] };
+    expect(stale.pages).toHaveLength(0);
+
+    callTurnEnd(mock);
+
+    const fresh = JSON.parse(fs.readFileSync(registryPath, "utf8")) as { pages: { id: string }[] };
+    expect(fresh.pages).toHaveLength(1);
+    expect(fresh.pages[0].id).toBe("entities/openai");
   });
 });

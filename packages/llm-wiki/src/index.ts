@@ -12,6 +12,7 @@ import { Type } from "typebox";
 import { classifyPathOperation } from "./core/guardrail.ts";
 import { rebuildMeta } from "./core/meta.ts";
 import { type CaptureInput, type CaptureResult, captureSource, type UrlFetcher } from "./core/packet.ts";
+import { type EnsurePageResult, ensurePage } from "./core/page.ts";
 import { vaultLayout } from "./core/paths.ts";
 import { resolveVaults } from "./core/vault.ts";
 
@@ -176,6 +177,61 @@ function registerWikiRebuildMetaTool(pi: ExtensionAPI): void {
   });
 }
 
+function registerWikiEnsurePageTool(pi: ExtensionAPI): void {
+  pi.registerTool({
+    name: "wiki_ensure_page",
+    label: "Wiki Ensure Page",
+    description:
+      "Resolve-or-create a typed Wiki Page in the active LLM Wiki vault (project vault if present, otherwise the personal vault). " +
+      "Resolves first: if a page of the SAME type already claims the title or an alias (case-insensitive), returns that existing page without creating a duplicate. " +
+      "Otherwise instantiates the template for the given Page Type (templates/<type>.md), filling type/title/aliases/sources into the frontmatter, and writes it under wiki/<type>s/<slug>.md. " +
+      "Page Types: source | concept | entity | synthesis | analysis. " +
+      "`sources` are Source Packet ids (SRC-YYYY-MM-DD-NNN). `slug` optionally overrides the filename (defaults to a kebab slug derived from title).",
+    promptSnippet: "Get-or-create a typed Wiki Page, deduping by title/alias within the type",
+    parameters: Type.Object({
+      type: Type.Union(
+        [
+          Type.Literal("source"),
+          Type.Literal("concept"),
+          Type.Literal("entity"),
+          Type.Literal("synthesis"),
+          Type.Literal("analysis"),
+        ],
+        { description: "Page Type: source | concept | entity | synthesis | analysis." },
+      ),
+      title: Type.String({ description: "Human-readable page title (required)." }),
+      aliases: Type.Optional(
+        Type.Array(Type.String(), { description: "Alternative names; resolved for dedup within the same type." }),
+      ),
+      sources: Type.Optional(
+        Type.Array(Type.String(), {
+          description: "Source Packet ids (SRC-YYYY-MM-DD-NNN) the page draws on.",
+        }),
+      ),
+      slug: Type.Optional(
+        Type.String({
+          description: "Optional filename slug override (kebab-case). Defaults to a slug derived from title.",
+        }),
+      ),
+    }),
+
+    async execute(_toolCallId, params, _signal, onUpdate, ctx) {
+      const vaultRoot = targetVaultRoot(ctx.cwd);
+      const result: EnsurePageResult = ensurePage(vaultRoot, params);
+
+      if (result.created) touchedVaults.add(vaultRoot);
+
+      const summary = formatEnsureSummary(result, vaultRoot);
+      onUpdate?.({ content: [{ type: "text", text: summary }], details: { ...result, vaultRoot } });
+
+      return {
+        content: [{ type: "text", text: summary }],
+        details: { ...result, vaultRoot },
+      };
+    },
+  });
+}
+
 function formatRebuildSummary(result: ReturnType<typeof rebuildMeta>): string {
   return [
     `Rebuilt metadata for ${result.vault}`,
@@ -199,6 +255,14 @@ function rebuildTouchedVaults(): void {
       logger.warn(`auto-rebuild of ${vault} failed: ${String(err)}`);
     }
   }
+}
+
+function formatEnsureSummary(result: EnsurePageResult, vaultRoot: string): string {
+  const verb = result.created ? `Created ${result.type} page` : `Already exists (resolved by ${result.matchedOn})`;
+  const lines = [`${verb}: ${result.id}`, `vault: ${vaultRoot}`, `path: ${result.relPath}`, `title: ${result.title}`];
+  if (result.aliases.length > 0) lines.push(`aliases: ${result.aliases.join(", ")}`);
+  if (result.sources.length > 0) lines.push(`sources: ${result.sources.join(", ")}`);
+  return lines.join("\n");
 }
 
 function formatSummary(result: CaptureResult, vaultRoot: string): string {
@@ -249,4 +313,5 @@ export default function initLlmWiki(pi: ExtensionAPI): void {
 
   registerWikiCaptureTool(pi);
   registerWikiRebuildMetaTool(pi);
+  registerWikiEnsurePageTool(pi);
 }
