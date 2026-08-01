@@ -223,3 +223,117 @@ describe("llm-wiki wiring — wiki_ensure_page tool", () => {
     expect(fresh.pages[0].id).toBe("entities/openai");
   });
 });
+
+describe("llm-wiki wiring — wiki_search tool", () => {
+  function writePage(rel: string, content: string): void {
+    const abs = path.join(vaultRoot, "wiki", rel);
+    fs.mkdirSync(path.dirname(abs), { recursive: true });
+    fs.writeFileSync(abs, content, "utf8");
+  }
+
+  function searchTool(mock: MockPi): {
+    execute: (id: string, params: unknown, signal: unknown, onUpdate: unknown, ctx: unknown) => Promise<unknown>;
+  } {
+    return mock.tools.get("wiki_search") as {
+      execute: (id: string, params: unknown, signal: unknown, onUpdate: unknown, ctx: unknown) => Promise<unknown>;
+    };
+  }
+
+  it("registers the wiki_search tool", () => {
+    const mock = setup();
+    expect(mock.tools.has("wiki_search")).toBe(true);
+  });
+
+  it("returns keyword-ranked hits from the active vault only", async () => {
+    const mock = setup();
+    writePage("concepts/react.md", "---\ntitle: React\ntype: concept\n---\n# React\nA UI library.\n");
+    writePage("entities/unrelated.md", "---\ntitle: Boring\ntype: entity\n---\n# Boring\n");
+
+    const result = (await searchTool(mock).execute("t1", { query: "react" }, undefined, undefined, {
+      cwd: projectDir,
+    })) as {
+      content: { text: string }[];
+      details: { hits: { id: string; matchedBy: string[] }[] };
+    };
+
+    const ids = result.details.hits.map((h) => h.id);
+    expect(ids).toContain("concepts/react");
+    expect(ids).not.toContain("entities/unrelated");
+    expect(result.details.hits[0]!.matchedBy).toEqual(["keyword"]);
+    expect(result.content[0].text).toContain("concepts/react");
+    expect(result.content[0].text).toContain(vaultRoot);
+  });
+
+  it("reports zero hits for a query that matches nothing", async () => {
+    const mock = setup();
+    writePage("concepts/react.md", "---\ntitle: React\n---\n# React\n");
+    const result = (await searchTool(mock).execute("t1", { query: "zzzz" }, undefined, undefined, {
+      cwd: projectDir,
+    })) as { details: { hits: unknown[] } };
+    expect(result.details.hits).toEqual([]);
+  });
+});
+
+describe("llm-wiki wiring — wiki_recall tool", () => {
+  const originalHome = process.env.HOME;
+
+  beforeEach(() => {
+    process.env.HOME = tmpRoot;
+  });
+  afterEach(() => {
+    process.env.HOME = originalHome;
+  });
+
+  function writePage(rel: string, content: string): void {
+    const abs = path.join(vaultRoot, "wiki", rel);
+    fs.mkdirSync(path.dirname(abs), { recursive: true });
+    fs.writeFileSync(abs, content, "utf8");
+  }
+
+  function recallTool(mock: MockPi): {
+    execute: (id: string, params: unknown, signal: unknown, onUpdate: unknown, ctx: unknown) => Promise<unknown>;
+  } {
+    return mock.tools.get("wiki_recall") as {
+      execute: (id: string, params: unknown, signal: unknown, onUpdate: unknown, ctx: unknown) => Promise<unknown>;
+    };
+  }
+
+  it("registers the wiki_recall tool", () => {
+    const mock = setup();
+    expect(mock.tools.has("wiki_recall")).toBe(true);
+  });
+
+  it("returns merged keyword + graph hits and annotates the vault(s)", async () => {
+    const mock = setup();
+    writePage(
+      "concepts/react.md",
+      "---\ntitle: React\ntype: concept\nsources: [SRC-1]\n---\n# React\n\nSee [[concepts/hooks]].\n",
+    );
+    writePage("concepts/hooks.md", "---\ntitle: Hooks\ntype: concept\nsources: [SRC-1]\n---\n# Hooks\n");
+    writePage("entities/other.md", "---\ntitle: Other\ntype: entity\n---\n# Other\n");
+
+    const result = (await recallTool(mock).execute("t1", { query: "react" }, undefined, undefined, {
+      cwd: projectDir,
+    })) as {
+      content: { text: string }[];
+      details: {
+        vaults: string[];
+        hits: { id: string; matchedBy: string[]; vault: string }[];
+      };
+    };
+
+    const ids = result.details.hits.map((h) => h.id);
+    expect(ids).toContain("concepts/react");
+    expect(ids).toContain("concepts/hooks");
+    expect(ids).not.toContain("entities/other");
+
+    const react = result.details.hits.find((h) => h.id === "concepts/react")!;
+    expect(react.matchedBy).toContain("keyword");
+    const hooks = result.details.hits.find((h) => h.id === "concepts/hooks")!;
+    expect(hooks.matchedBy).toContain("graph");
+
+    expect(result.details.vaults).toContain(vaultRoot);
+    expect(result.content[0].text).toContain("Recalled");
+    expect(result.content[0].text).toContain(vaultRoot);
+  });
+});
