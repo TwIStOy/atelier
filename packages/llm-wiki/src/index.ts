@@ -1,4 +1,5 @@
 import * as fs from "node:fs";
+import { fileURLToPath } from "node:url";
 import type { Message, UserMessage } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { createLogger, executeSideCall, isExtensionDisabled } from "@htwang-contrib/common";
@@ -32,6 +33,9 @@ import { renderSessionStartNotice, renderStatusSummary, type WikiStatus, wikiSta
 import { resolveVaults } from "./core/vault.ts";
 
 const logger = createLogger("llm-wiki");
+
+const SKILLS_DIR = fileURLToPath(new URL("../skills", import.meta.url));
+const PROMPTS_DIR = fileURLToPath(new URL("../prompts", import.meta.url));
 
 function fetchCapableProviderNames(): string[] {
   return PROVIDERS.filter((p) => p.roles.includes("fetch"))
@@ -848,6 +852,7 @@ export default function initLlmWiki(pi: ExtensionAPI): void {
 
   registerLlmWikiConfigItems();
 
+  pi.on("resources_discover", () => ({ skillPaths: [SKILLS_DIR], promptPaths: [PROMPTS_DIR] }));
   pi.on("session_start", (_event, ctx) => {
     touchedVaults.clear();
     setCachedModelOptions(

@@ -561,6 +561,30 @@ describe("llm-wiki wiring — lint/status slash commands", () => {
   });
 });
 
+describe("llm-wiki wiring — resources_discover (bundled skill + /wiki-query prompt)", () => {
+  it("registers a resources_discover handler", () => {
+    const mock = setup();
+    expect(mock.handlers.has("resources_discover")).toBe(true);
+  });
+
+  it("advertises the bundled skill dir and the /wiki-query prompt dir as resolvable paths", () => {
+    const mock = setup();
+    const handler = mock.handlers.get("resources_discover")!;
+    const result = handler({ type: "resources_discover", cwd: projectDir, reason: "startup" }, { cwd: projectDir }) as {
+      skillPaths?: string[];
+      promptPaths?: string[];
+    };
+
+    expect(result.skillPaths).toHaveLength(1);
+    expect(result.promptPaths).toHaveLength(1);
+
+    const skillDir = result.skillPaths![0]!;
+    const promptDir = result.promptPaths![0]!;
+    expect(fs.existsSync(path.join(skillDir, "llm-wiki", "SKILL.md"))).toBe(true);
+    expect(fs.existsSync(path.join(promptDir, "wiki-query.md"))).toBe(true);
+  });
+});
+
 describe("llm-wiki wiring — session-start notice", () => {
   beforeEach(() => {
     mockConfig.current = { ingestModel: "", sessionStartNotice: true };
