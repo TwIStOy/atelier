@@ -117,6 +117,7 @@ export {
   resetForegroundBeforeText,
   terminalWidth,
 } from "./terminal.ts";
+export { resolveNow } from "./time.ts";
 export type {
   CodingPlanLimitKind,
   CodingPlanLimitPeriod,

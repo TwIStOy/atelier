@@ -1,5 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { resolveNow } from "@htwang-contrib/common/time";
 import { atomicWriteFile } from "./atomic.ts";
 import { rebuildMeta } from "./meta.ts";
 import { vaultLayout } from "./paths.ts";
@@ -23,11 +24,6 @@ const CONFIG_SCHEMA_VERSION = 1;
 const TOPIC_MARKER_OPEN = "<!-- llm-wiki:topic -->";
 const TOPIC_MARKER_CLOSE = "<!-- /llm-wiki:topic -->";
 const TOPIC_PLACEHOLDER = "(unset — run the bootstrap script with --topic)";
-
-function resolveNow(now: Date | (() => Date) | undefined): Date {
-  if (now instanceof Date) return now;
-  return typeof now === "function" ? now() : new Date();
-}
 
 function writeFileIfAbsent(root: string, absPath: string, content: string, created: string[]): void {
   if (fs.existsSync(absPath)) return;

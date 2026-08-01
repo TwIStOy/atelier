@@ -1,5 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { resolveNow } from "@htwang-contrib/common/time";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import { appendJsonl, atomicWriteFile } from "./atomic.ts";
 import { PAGE_TYPES, type PageType } from "./bootstrap.ts";
@@ -9,7 +10,6 @@ import { buildRegistry, type RegistryDoc, rebuildMeta } from "./meta.ts";
 import { ensurePage } from "./page.ts";
 import { vaultLayout } from "./paths.ts";
 import { appendReviewItem, listReviewItems, REVIEW_ACTIONS, type ReviewAction } from "./review.ts";
-import { resolveNow } from "./time.ts";
 
 const ANALYSIS_FENCE = /```wiki-analysis[^\n]*\n([\s\S]*?)\n```/;
 const PAGE_FENCE = /```wiki-page:([a-zA-Z]+)[^\n]*\n([\s\S]*?)\n```/g;
