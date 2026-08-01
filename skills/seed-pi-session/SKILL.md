@@ -60,7 +60,7 @@ Expect the template's body (e.g. `/implement`'s "…Commit … Stage only the fi
 
 This user's templates are supplied globally by the installed package `~/pi-extensions`
 (`settings.json` → `packages`), under `~/pi-extensions/prompts/*.md`: `/implement`, `/triage`,
-`/to-tickets`, `/grill-with-docs`, `/teach`, `/worktree-feature`, … `~/.pi/agent/prompts/` does not
+`/to-tickets`, `/grill-with-docs`, `/teach`, `/implement-many`, … `~/.pi/agent/prompts/` does not
 exist; don't look there. Load extras ad hoc with `--prompt-template <path>`.
 
 ## Related

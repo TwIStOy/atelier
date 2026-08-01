@@ -1,4 +1,5 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
+import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { formatTokenUsageArrows, truncateDisplay, usagePercentStressLevel } from "@htwang-contrib/common";
 import { spinnerGlyph } from "../format.ts";
 import type { ToolDisplayAdapter } from "../types.ts";
@@ -107,6 +108,12 @@ function formatUsageSuffix(theme: Theme, inp?: number, out?: number, pct?: numbe
   return theme.fg("muted", " · ") + parts.join(theme.fg("muted", " · "));
 }
 
+const SUBAGENT_DESC_MAX = 56;
+
+function fitRowWidth(line: string, width: number): string {
+  return visibleWidth(line) <= width ? line : truncateToWidth(line, width, "…");
+}
+
 function callsLineStyled(
   theme: Theme,
   rawType: string | undefined,
@@ -117,26 +124,37 @@ function callsLineStyled(
   waiting: boolean,
   spinning: boolean,
   spinAt: number | undefined,
-  usageExtra?: string,
+  usageExtra: string | undefined,
+  maxWidth: number,
 ): string {
   const ct = capitalizeType(normalizeAgentType(rawType));
-  const w = count === 1 ? "tool" : "tools";
-  const desc = lineDescription.trim();
-  const betweenTypeAndCalls =
-    desc === "" ? " " : ` ${theme.fg("muted", truncateDisplay(desc, 56))} ${theme.fg("muted", "·")} `;
-  let line =
-    statusGlyph(theme, ok, waiting, spinning, spinAt) +
-    " " +
-    theme.fg("syntaxType", ct) +
-    betweenTypeAndCalls +
-    theme.fg("muted", "calls ") +
-    theme.fg("toolOutput", String(count)) +
-    theme.fg("muted", ` ${w}`);
-  if (usageExtra) line += usageExtra;
-  if (ok === false && error && error.trim()) {
-    line += theme.fg("error", ` — ${truncateDisplay(error.trim(), 200)}`);
-  }
-  return line;
+  const unit = count === 1 ? "tool" : "tools";
+  const rawDesc = lineDescription.trim();
+  const errorPart =
+    ok === false && error && error.trim() ? theme.fg("error", ` — ${truncateDisplay(error.trim(), 200)}`) : "";
+
+  const compose = (descStyled: string): string => {
+    const between = descStyled === "" ? " " : ` ${descStyled} ${theme.fg("muted", "·")} `;
+    return (
+      statusGlyph(theme, ok, waiting, spinning, spinAt) +
+      " " +
+      theme.fg("syntaxType", ct) +
+      between +
+      theme.fg("muted", "calls ") +
+      theme.fg("toolOutput", String(count)) +
+      theme.fg("muted", ` ${unit}`) +
+      (usageExtra ?? "") +
+      errorPart
+    );
+  };
+
+  if (rawDesc === "") return compose("");
+
+  const wrapperOverhead = visibleWidth(compose(theme.fg("muted", "x"))) - 1;
+  const descBudget = maxWidth - wrapperOverhead;
+  if (descBudget <= 0) return compose("");
+  const cap = Math.min(SUBAGENT_DESC_MAX, descBudget);
+  return compose(theme.fg("muted", truncateToWidth(rawDesc, cap, "…")));
 }
 
 function formatCallSubtitle(args: SubagentArgs, theme: Theme): string {
@@ -249,6 +267,7 @@ function formatCollapsedSubagentSummary(
   theme: Theme,
   isPartial: boolean,
   spinAt: number,
+  width: number,
 ): string[] | null {
   const d = details && typeof details === "object" ? (details as SubagentDetails) : undefined;
 
@@ -267,10 +286,21 @@ function formatCollapsedSubagentSummary(
       const waiting = false;
       const spinning = isPartial && item.ok === undefined;
       const uExtra = formatUsageSuffix(theme, item.usage_input, item.usage_output, item.context_percent);
-      lines.push(
-        theme.fg("muted", `${branch} `) +
-          callsLineStyled(theme, typ, rowDesc, tc, item.ok, item.error, waiting, spinning, spinAt, uExtra),
+      const branchPrefix = theme.fg("muted", `${branch} `);
+      const row = callsLineStyled(
+        theme,
+        typ,
+        rowDesc,
+        tc,
+        item.ok,
+        item.error,
+        waiting,
+        spinning,
+        spinAt,
+        uExtra,
+        Math.max(1, width - visibleWidth(branchPrefix)),
       );
+      lines.push(fitRowWidth(branchPrefix + row, width));
     }
     return lines;
   }
@@ -315,10 +345,21 @@ function formatCollapsedSubagentSummary(
         Array.isArray(pout) ? pout[i] : undefined,
         Array.isArray(ppct) ? ppct[i] : undefined,
       );
-      lines.push(
-        theme.fg("muted", `${branch} `) +
-          callsLineStyled(theme, typ, rowDesc, tc, rowOk, undefined, waiting, spinning, spinAt, uExtra),
+      const branchPrefix = theme.fg("muted", `${branch} `);
+      const row = callsLineStyled(
+        theme,
+        typ,
+        rowDesc,
+        tc,
+        rowOk,
+        undefined,
+        waiting,
+        spinning,
+        spinAt,
+        uExtra,
+        Math.max(1, width - visibleWidth(branchPrefix)),
       );
+      lines.push(fitRowWidth(branchPrefix + row, width));
     }
     return lines;
   }
@@ -338,8 +379,8 @@ export const subagentAdapter: ToolDisplayAdapter<SubagentArgs> = {
     return base + formatCallSubtitle(args, theme) + formatSingleSubagentInlineStats(args, d, theme);
   },
 
-  formatCollapsedContent(args, output, theme, _width, details, isPartial, spinAt = Date.now()) {
-    const fromDetails = formatCollapsedSubagentSummary(args, details, theme, isPartial === true, spinAt);
+  formatCollapsedContent(args, output, theme, width, details, isPartial, spinAt = Date.now()) {
+    const fromDetails = formatCollapsedSubagentSummary(args, details, theme, isPartial === true, spinAt, width);
     if (fromDetails !== null) return fromDetails;
     if (singleSubagentArgs(args)) return [];
     if (isPartial) return [];

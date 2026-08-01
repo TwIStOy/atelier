@@ -3,6 +3,7 @@ import { visibleWidth } from "@earendil-works/pi-tui";
 import { describe, expect, it } from "vitest";
 import { bashAdapter } from "../src/adapters/bash.ts";
 import { editAdapter } from "../src/adapters/edit.ts";
+import { subagentAdapter } from "../src/adapters/subagent.ts";
 import { todoAdapter } from "../src/adapters/todo.ts";
 import { writeAdapter } from "../src/adapters/write.ts";
 import { globalToolDisplayRegistry } from "../src/registry.ts";
@@ -326,5 +327,132 @@ describe("tool call timer", () => {
     ).render(80);
     expect(lines[0]).not.toContain(" ms");
     expect(lines[0]).not.toMatch(/\d+s\b/);
+  });
+});
+
+describe("subagent adapter respects terminal width", () => {
+  it("truncates per-task rows so no line exceeds a narrow terminal width", () => {
+    globalToolDisplayRegistry.register("subagent", subagentAdapter);
+    const lines = renderToolCall(
+      {
+        toolName: "subagent",
+        args: {
+          tasks: [
+            { agent_type: "general-purpose", description: "Standards review of #79 diff" },
+            { agent_type: "general-purpose", description: "Spec review of #79 diff" },
+          ],
+        },
+        output: "",
+        expanded: false,
+        isPartial: true,
+        isError: false,
+        details: {
+          per_task_started: [false, false],
+          per_task_done: [false, false],
+          per_task_tool_calls: [0, 0],
+        },
+        registry: globalToolDisplayRegistry,
+      },
+      PLAIN_THEME,
+    ).render(50);
+
+    for (const line of lines) {
+      expect(visibleWidth(line)).toBeLessThanOrEqual(50);
+    }
+    const joined = lines.join("\n");
+    expect(joined).toContain("calls");
+    expect(joined).toContain("tools");
+  });
+
+  it("truncates batch rows so no line exceeds a narrow terminal width", () => {
+    globalToolDisplayRegistry.register("subagent", subagentAdapter);
+    const lines = renderToolCall(
+      {
+        toolName: "subagent",
+        args: {
+          tasks: [
+            { agent_type: "general-purpose", description: "Standards review of #79 diff" },
+            { agent_type: "general-purpose", description: "Spec review of #79 diff" },
+          ],
+        },
+        output: "",
+        expanded: false,
+        isPartial: true,
+        isError: false,
+        details: {
+          mode: "batch",
+          batch: [
+            { index: 0, tool_calls: 0, agent_type: "general-purpose", description: "Standards review of #79 diff" },
+            { index: 1, tool_calls: 0, agent_type: "general-purpose", description: "Spec review of #79 diff" },
+          ],
+        },
+        registry: globalToolDisplayRegistry,
+      },
+      PLAIN_THEME,
+    ).render(40);
+
+    for (const line of lines) {
+      expect(visibleWidth(line)).toBeLessThanOrEqual(40);
+    }
+  });
+
+  it("never overflows even on a very narrow terminal", () => {
+    globalToolDisplayRegistry.register("subagent", subagentAdapter);
+    const lines = renderToolCall(
+      {
+        toolName: "subagent",
+        args: {
+          tasks: [
+            { agent_type: "general-purpose", description: "Standards review of #79 diff" },
+            { agent_type: "general-purpose", description: "Spec review of #79 diff" },
+          ],
+        },
+        output: "",
+        expanded: false,
+        isPartial: true,
+        isError: false,
+        details: {
+          per_task_started: [false, false],
+          per_task_done: [false, false],
+          per_task_tool_calls: [0, 0],
+        },
+        registry: globalToolDisplayRegistry,
+      },
+      PLAIN_THEME,
+    ).render(20);
+
+    for (const line of lines) {
+      expect(visibleWidth(line)).toBeLessThanOrEqual(20);
+    }
+  });
+
+  it("keeps full descriptions when the terminal is wide enough", () => {
+    globalToolDisplayRegistry.register("subagent", subagentAdapter);
+    const lines = renderToolCall(
+      {
+        toolName: "subagent",
+        args: {
+          tasks: [
+            { agent_type: "general-purpose", description: "Short desc one" },
+            { agent_type: "general-purpose", description: "Short desc two" },
+          ],
+        },
+        output: "",
+        expanded: false,
+        isPartial: true,
+        isError: false,
+        details: {
+          per_task_started: [false, false],
+          per_task_done: [false, false],
+          per_task_tool_calls: [0, 0],
+        },
+        registry: globalToolDisplayRegistry,
+      },
+      PLAIN_THEME,
+    ).render(120);
+
+    const joined = lines.join("\n");
+    expect(joined).toContain("Short desc one");
+    expect(joined).toContain("Short desc two");
   });
 });

@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Multi-task `Subagent` tool calls no longer crash pi on narrow terminals. The per-task and batch summary rows in the collapsed tool display now truncate the task description against the terminal width (width- and ANSI-aware via `truncateToWidth`/`visibleWidth`) and apply a safety-net truncation so no rendered row can exceed the terminal width. Previously the description was capped at a fixed 56 characters and the composed row was never bounded, producing lines wider than the terminal and triggering `Rendered line exceeds terminal width`.
+
 ## [0.4.0] - 2026-07-31
 
 ### Changed
