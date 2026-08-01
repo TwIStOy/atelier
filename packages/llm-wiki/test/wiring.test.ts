@@ -8,6 +8,10 @@ import initLlmWiki from "../src/index.ts";
 vi.mock("@htwang-contrib/common", () => ({
   isExtensionDisabled: () => false,
   createLogger: () => ({ debug() {}, info() {}, warn() {}, error() {} }),
+  executeSideCall: vi.fn(),
+  registerConfigItems: () => {},
+  readConfig: () => ({ ingestModel: "" }),
+  resolveModel: () => undefined,
 }));
 
 type Handler = (...args: unknown[]) => unknown;
@@ -15,12 +19,14 @@ type Handler = (...args: unknown[]) => unknown;
 interface MockPi {
   tools: Map<string, Record<string, unknown>>;
   handlers: Map<string, Handler>;
+  commands: Map<string, Record<string, unknown>>;
   pi: unknown;
 }
 
 function createMockPi(): MockPi {
   const tools = new Map<string, Record<string, unknown>>();
   const handlers = new Map<string, Handler>();
+  const commands = new Map<string, Record<string, unknown>>();
   const pi = {
     on(event: string, handler: Handler) {
       handlers.set(event, handler);
@@ -28,8 +34,11 @@ function createMockPi(): MockPi {
     registerTool(tool: Record<string, unknown>) {
       tools.set(tool.name as string, tool);
     },
+    registerCommand(name: string, _options: Record<string, unknown>) {
+      commands.set(name, _options);
+    },
   };
-  return { tools, handlers, pi };
+  return { tools, handlers, commands, pi };
 }
 
 let tmpRoot: string;
@@ -129,7 +138,12 @@ describe("llm-wiki wiring — turn-end auto-rebuild", () => {
   it("clears the touched set on session_start so a stale flag never rebuilds", () => {
     const mock = setup();
     callToolCall(mock, "write", { path: path.join(vaultRoot, "wiki", "concepts", "foo.md"), content: "# Foo" });
-    mock.handlers.get("session_start")!({ type: "session_start", reason: "reload" });
+    mock.handlers.get("session_start")!(
+      { type: "session_start", reason: "reload" },
+      {
+        modelRegistry: { getAvailable: () => [] },
+      },
+    );
     callTurnEnd(mock);
     expect(fs.existsSync(path.join(vaultRoot, "meta", "registry.json"))).toBe(false);
   });
