@@ -3,6 +3,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { bootstrapVault } from "../src/core/bootstrap.ts";
+import { appendReviewItem, listReviewItems } from "../src/core/review.ts";
 import initLlmWiki from "../src/index.ts";
 
 vi.mock("@htwang-contrib/common", () => ({
@@ -349,5 +350,132 @@ describe("llm-wiki wiring — wiki_recall tool", () => {
     expect(result.details.vaults).toContain(vaultRoot);
     expect(result.content[0].text).toContain("Recalled");
     expect(result.content[0].text).toContain(vaultRoot);
+  });
+});
+
+describe("llm-wiki wiring — wiki_review tool + /wiki-review command", () => {
+  const FIXED_NOW = () => new Date(Date.UTC(2024, 0, 5, 9, 30, 0));
+
+  it("registers the wiki_review tool and the /wiki-review command", () => {
+    const mock = setup();
+    expect(mock.tools.has("wiki_review")).toBe(true);
+    expect(mock.commands.has("wiki-review")).toBe(true);
+  });
+
+  it("lists open items and resolves one through the registered tool", async () => {
+    const mock = setup();
+    appendReviewItem(
+      vaultRoot,
+      { packetId: "SRC-2024-01-05-001", kind: "contradiction", title: "RSC vs client", action: "create_page" },
+      { now: FIXED_NOW() },
+    );
+
+    const tool = mock.tools.get("wiki_review") as {
+      execute: (id: string, params: unknown, signal: unknown, onUpdate: unknown, ctx: unknown) => Promise<unknown>;
+    };
+
+    const listed = (await tool.execute("t1", { action: "list" }, undefined, undefined, { cwd: projectDir })) as {
+      content: { text: string }[];
+      details: { count: number; items: { id: string; title: string }[] };
+    };
+    expect(listed.details.count).toBe(1);
+    expect(listed.details.items[0].title).toBe("RSC vs client");
+    expect(listed.content[0].text).toContain("RSC vs client");
+    const itemId = listed.details.items[0].id;
+
+    const resolved = (await tool.execute("t2", { action: "resolve", itemId, decision: "skip" }, undefined, undefined, {
+      cwd: projectDir,
+    })) as { details: { remainingOpen: number } };
+    expect(resolved.details.remainingOpen).toBe(0);
+
+    const after = (await tool.execute("t1", { action: "list" }, undefined, undefined, { cwd: projectDir })) as {
+      details: { count: number };
+    };
+    expect(after.details.count).toBe(0);
+  });
+
+  it("/wiki-review notifies 'no open items' when the queue is empty", async () => {
+    const mock = setup();
+    const cmd = mock.commands.get("wiki-review") as { handler: (args: string, ctx: unknown) => Promise<void> };
+    const notify = vi.fn();
+    await cmd.handler("", { cwd: projectDir, hasUI: true, ui: { notify } });
+    expect(notify).toHaveBeenCalledTimes(1);
+    expect(notify.mock.calls[0][0]).toMatch(/no open review items/i);
+  });
+
+  it("/wiki-review falls back to a summary when there is no interactive UI", async () => {
+    const mock = setup();
+    appendReviewItem(
+      vaultRoot,
+      { packetId: "SRC-2024-01-05-001", kind: "gap", title: "needs a page", action: "create_page" },
+      { now: FIXED_NOW() },
+    );
+    const cmd = mock.commands.get("wiki-review") as { handler: (args: string, ctx: unknown) => Promise<void> };
+    const notify = vi.fn();
+    await cmd.handler("", { cwd: projectDir, hasUI: false, ui: { notify } });
+    expect(notify).toHaveBeenCalledTimes(2);
+    expect(notify.mock.calls[0][0]).toContain("needs a page");
+    expect(notify.mock.calls[1][0]).toMatch(/interactive terminal/i);
+  });
+
+  it("/wiki-review resolves items via the interactive select loop and records notes", async () => {
+    const mock = setup();
+    appendReviewItem(
+      vaultRoot,
+      { packetId: "SRC-1", kind: "gap", title: "first", action: "create_page" },
+      { now: FIXED_NOW() },
+    );
+    appendReviewItem(
+      vaultRoot,
+      { packetId: "SRC-1", kind: "gap", title: "second", action: "deep_research" },
+      { now: FIXED_NOW() },
+    );
+
+    const selectCalls: string[] = [];
+    const selectQueue = ["Create page", "Skip"];
+    const select = vi.fn((_title: string, _options: string[]) => {
+      selectCalls.push(_title);
+      return Promise.resolve(selectQueue.shift());
+    });
+    const input = vi.fn(() => Promise.resolve("created concepts/x.md"));
+    const notify = vi.fn();
+    const cmd = mock.commands.get("wiki-review") as { handler: (args: string, ctx: unknown) => Promise<void> };
+
+    await cmd.handler("", { cwd: projectDir, hasUI: true, ui: { select, input, notify } });
+
+    expect(select).toHaveBeenCalledTimes(2);
+    expect(input).toHaveBeenCalledTimes(1);
+    expect(notify.mock.calls.some((c) => /All open review items resolved/.test(c[0]))).toBe(true);
+
+    expect(listReviewItems(vaultRoot, { status: "open" })).toEqual([]);
+    const resolved = listReviewItems(vaultRoot, { status: "resolved" });
+    expect(resolved.map((e) => ({ title: e.title, action: e.resolvedAction, note: e.resolutionNote }))).toEqual([
+      { title: "first", action: "create_page", note: "created concepts/x.md" },
+      { title: "second", action: "skip", note: undefined },
+    ]);
+  });
+
+  it("/wiki-review stops early when the user picks Stop", async () => {
+    const mock = setup();
+    appendReviewItem(
+      vaultRoot,
+      { packetId: "SRC-1", kind: "gap", title: "first", action: "skip" },
+      { now: FIXED_NOW() },
+    );
+    appendReviewItem(
+      vaultRoot,
+      { packetId: "SRC-1", kind: "gap", title: "second", action: "skip" },
+      { now: FIXED_NOW() },
+    );
+
+    const select = vi.fn(() => Promise.resolve("Stop"));
+    const notify = vi.fn();
+    const cmd = mock.commands.get("wiki-review") as { handler: (args: string, ctx: unknown) => Promise<void> };
+
+    await cmd.handler("", { cwd: projectDir, hasUI: true, ui: { select, input: vi.fn(), notify } });
+
+    expect(select).toHaveBeenCalledTimes(1);
+    expect(notify.mock.calls.some((c) => /item\(s\) still open/.test(c[0]))).toBe(true);
+    expect(listReviewItems(vaultRoot, { status: "open" }).map((e) => e.title)).toEqual(["first", "second"]);
   });
 });

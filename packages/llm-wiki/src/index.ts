@@ -18,6 +18,14 @@ import { type CaptureInput, type CaptureResult, captureSource, type UrlFetcher }
 import { type EnsurePageResult, ensurePage } from "./core/page.ts";
 import { vaultLayout } from "./core/paths.ts";
 import { type RecallHit, type RecallResult, recallAcross, recallVault } from "./core/recall.ts";
+import {
+  listReviewItems,
+  REVIEW_ACTIONS,
+  type ReviewAction,
+  type ReviewFilterStatus,
+  type ReviewItem,
+  resolveReviewItem,
+} from "./core/review.ts";
 import { resolveVaults } from "./core/vault.ts";
 
 const logger = createLogger("llm-wiki");
@@ -521,6 +529,202 @@ function formatSummary(result: CaptureResult, vaultRoot: string): string {
   return lines.join("\n");
 }
 
+interface ReviewToolParams {
+  action: "list" | "resolve";
+  status?: ReviewFilterStatus;
+  itemId?: string;
+  decision?: ReviewAction;
+  note?: string;
+}
+
+function resolveActiveVault(cwd: string): { vaultRoot: string; scope: string } {
+  const { projectVault, personalVault } = resolveVaults({ cwd });
+  if (projectVault) return { vaultRoot: projectVault, scope: "project vault" };
+  return { vaultRoot: personalVault, scope: "personal vault" };
+}
+
+function registerWikiReviewTool(pi: ExtensionAPI): void {
+  pi.registerTool({
+    name: "wiki_review",
+    label: "Wiki Review",
+    description:
+      "List and resolve items in the LLM Wiki Review Queue (meta/review.jsonl) for the active vault " +
+      "(project vault if present, otherwise the personal vault). During ingest the agent files items needing human judgment " +
+      "(one per claim/gap, with a suggested action); this tool reads them back and records a decision.\n" +
+      "- action=list: returns open items by default. Pass status=all to include resolved entries, or status=resolved for only resolved.\n" +
+      "- action=resolve: marks one item resolved with one of three constrained decisions: `create_page` | `deep_research` | `skip`. " +
+      "Recording a decision only updates the queue; the actual page creation / web research is performed in-session by the agent " +
+      "(guided by the bundled skill). Resolved items no longer appear in the default open list.",
+    promptSnippet: "List or resolve the LLM Wiki Review Queue (actions: create_page/deep_research/skip)",
+    parameters: Type.Object({
+      action: Type.Union([Type.Literal("list"), Type.Literal("resolve")], {
+        description: "Operation: list (read items) | resolve (record a decision on one item).",
+      }),
+      status: Type.Optional(
+        Type.Union([Type.Literal("open"), Type.Literal("resolved"), Type.Literal("all")], {
+          description: "list only. Status filter. Defaults to open.",
+        }),
+      ),
+      itemId: Type.Optional(Type.String({ description: "resolve only. The review item id (REV-...) to resolve." })),
+      decision: Type.Optional(
+        Type.Union([Type.Literal("create_page"), Type.Literal("deep_research"), Type.Literal("skip")], {
+          description: "resolve only. The decision to record. One of create_page | deep_research | skip.",
+        }),
+      ),
+      note: Type.Optional(
+        Type.String({
+          description: "resolve only. Optional free-text note recording what was done (e.g. created page path).",
+        }),
+      ),
+    }),
+
+    async execute(_toolCallId, params, _signal, onUpdate, ctx) {
+      const { vaultRoot, scope } = resolveActiveVault(ctx.cwd);
+      const p = params as ReviewToolParams;
+
+      if (p.action === "list") {
+        const status: ReviewFilterStatus = p.status ?? "open";
+        const items = listReviewItems(vaultRoot, { status });
+        const summary = formatReviewListSummary(scope, items, status);
+        const details = { vaultRoot, scope, status, count: items.length, items };
+        onUpdate?.({ content: [{ type: "text", text: summary }], details });
+        return { content: [{ type: "text", text: summary }], details };
+      }
+
+      const itemId = requireReviewString(p.itemId, "itemId");
+      if (p.decision === undefined) {
+        throw new Error(
+          `wiki_review: \`decision\` is required when action=resolve (one of ${REVIEW_ACTIONS.join(", ")})`,
+        );
+      }
+      const resolved = resolveReviewItem(vaultRoot, itemId, p.decision, {
+        ...(p.note !== undefined && p.note.length > 0 ? { note: p.note } : {}),
+      });
+      const remaining = listReviewItems(vaultRoot, { status: "open" }).length;
+      const summary = formatReviewResolveSummary(scope, vaultRoot, resolved, remaining);
+      const details = { vaultRoot, scope, resolved, remainingOpen: remaining };
+      onUpdate?.({ content: [{ type: "text", text: summary }], details });
+      return { content: [{ type: "text", text: summary }], details };
+    },
+  });
+}
+
+function requireReviewString(value: string | undefined, field: string): string {
+  if (value === undefined || value.trim().length === 0) {
+    throw new Error(`wiki_review: \`${field}\` is required when action=resolve`);
+  }
+  return value.trim();
+}
+
+function formatReviewListSummary(scope: string, items: ReviewItem[], status: ReviewFilterStatus): string {
+  const label = status === "all" ? "all" : status;
+  if (items.length === 0) {
+    return `Review queue (${scope}): no ${label} items.`;
+  }
+  const lines = [`Review queue (${scope}): ${items.length} ${label} item${items.length === 1 ? "" : "s"}`];
+  for (const item of items) {
+    const flag = item.status === "resolved" ? `[resolved=${item.resolvedAction ?? "?"}]` : `[${item.action}]`;
+    lines.push(`- ${item.id} ${flag} ${item.title} (${item.kind})`);
+    lines.push(`  packet: ${item.packetId}`);
+    if (item.query) lines.push(`  search: ${item.query}`);
+    if (item.note) lines.push(`  note: ${item.note}`);
+  }
+  return lines.join("\n");
+}
+
+function formatReviewResolveSummary(scope: string, vaultRoot: string, resolved: ReviewItem, remaining: number): string {
+  const lines = [
+    `Resolved ${resolved.id} as ${resolved.resolvedAction} (${scope})`,
+    `vault: ${vaultRoot}`,
+    `remaining open: ${remaining}`,
+  ];
+  if (resolved.resolutionNote) lines.push(`note: ${resolved.resolutionNote}`);
+  return lines.join("\n");
+}
+
+const REVIEW_CHOICE_STOP = "Stop";
+const REVIEW_CHOICES: ReadonlyArray<readonly [string, ReviewAction]> = [
+  ["Create page", "create_page"],
+  ["Deep research", "deep_research"],
+  ["Skip", "skip"],
+];
+
+function registerWikiReviewCommand(pi: ExtensionAPI): void {
+  pi.registerCommand("wiki-review", {
+    description:
+      "Walk pending LLM Wiki Review Queue items one by one and record a decision " +
+      "(create_page / deep_research / skip) for the active vault.",
+    async handler(_args, ctx) {
+      const { vaultRoot, scope } = resolveActiveVault(ctx.cwd);
+      const open = listReviewItems(vaultRoot, { status: "open" });
+
+      if (open.length === 0) {
+        ctx.ui.notify(`No open review items (${scope}).`, "info");
+        return;
+      }
+
+      if (!ctx.hasUI) {
+        ctx.ui.notify(formatReviewListSummary(scope, open, "open"), "info");
+        ctx.ui.notify("Run /wiki-review in an interactive terminal to resolve items.", "info");
+        return;
+      }
+
+      const optionLabels = [...REVIEW_CHOICES.map(([label]) => label), REVIEW_CHOICE_STOP];
+      let resolvedCount = 0;
+
+      for (let i = 0; i < open.length; i++) {
+        const entry = open[i]!;
+        const choice = await ctx.ui.select(formatReviewItemPrompt(scope, entry, i + 1, open.length), [...optionLabels]);
+        if (choice === undefined || choice === REVIEW_CHOICE_STOP) {
+          ctx.ui.notify(`Stopped. ${open.length - i} item(s) still open (${resolvedCount} resolved).`, "info");
+          return;
+        }
+        const action = REVIEW_CHOICES.find(([label]) => label === choice)?.[1];
+        if (!action) {
+          ctx.ui.notify("Unrecognized choice; stopping.", "warning");
+          return;
+        }
+
+        const note = await promptReviewNote(ctx, entry.id, action);
+        resolveReviewItem(vaultRoot, entry.id, action, note !== undefined ? { note } : {});
+        resolvedCount += 1;
+        ctx.ui.notify(`Resolved ${entry.id} as ${action} (${resolvedCount}/${open.length}).`, "info");
+      }
+
+      ctx.ui.notify(`All open review items resolved (${resolvedCount}).`, "info");
+    },
+  });
+}
+
+async function promptReviewNote(
+  ctx: ExtensionContext,
+  itemId: string,
+  action: ReviewAction,
+): Promise<string | undefined> {
+  if (action === "skip") return undefined;
+  const entered = await ctx.ui.input(
+    `Optional note for ${itemId} (${action}) — e.g. created page path or research plan:`,
+    "",
+  );
+  const trimmed = entered?.trim();
+  return trimmed && trimmed.length > 0 ? trimmed : undefined;
+}
+
+function formatReviewItemPrompt(scope: string, entry: ReviewItem, position: number, total: number): string {
+  const lines = [
+    `Review queue (${scope}) — item ${position}/${total}`,
+    entry.id,
+    `Title: ${entry.title}`,
+    `Kind: ${entry.kind}`,
+    `Suggested action: ${entry.action}`,
+    `Packet: ${entry.packetId}`,
+  ];
+  if (entry.query) lines.push(`Search: ${entry.query}`);
+  if (entry.note) lines.push(`Note: ${entry.note}`);
+  lines.push("Choose an action:");
+  return lines.join("\n");
+}
+
 export default function initLlmWiki(pi: ExtensionAPI): void {
   if (isExtensionDisabled("llm-wiki")) return;
   logger.info("extension loaded");
@@ -564,4 +768,6 @@ export default function initLlmWiki(pi: ExtensionAPI): void {
   registerWikiRecallTool(pi);
   registerWikiIngestTool(pi);
   registerWikiIngestCommand(pi);
+  registerWikiReviewTool(pi);
+  registerWikiReviewCommand(pi);
 }
