@@ -1,6 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { atomicWriteFile } from "./atomic.ts";
+import { rebuildMeta } from "./meta.ts";
 import { vaultLayout } from "./paths.ts";
 
 export const PAGE_TYPES = ["source", "concept", "entity", "synthesis", "analysis"] as const;
@@ -105,14 +106,6 @@ wiki_lint  ->  health checks (orphans, broken links, coverage gaps, inbox drift)
 Raw Sources are immutable. Generated metadata under \`meta/\` is derived data,
 rebuildable from \`raw/**\` and \`wiki/**\` at any time. Never edit \`raw/**\` or
 \`meta/**\` directly — the tools own those paths.
-`;
-}
-
-function buildOverview(): string {
-  return `# Overview
-
-The LLM-maintained global summary of this wiki. Rewrite this page as the wiki
-grows: the major themes, the open questions, and how the pages connect.
 `;
 }
 
@@ -267,21 +260,6 @@ const TEMPLATES: ReadonlyArray<readonly [PageType, string]> = [
   ["analysis", TEMPLATE_ANALYSIS],
 ];
 
-function buildMetaIndex(): string {
-  return `# Index
-
-Generated index of Wiki Pages. Rebuilt by the metadata engine; do not edit by hand.
-`;
-}
-
-function buildLog(): string {
-  return `# Log
-
-Append-only human-readable event log (mirrors \`events.jsonl\`). Rebuilt by the
-metadata engine.
-`;
-}
-
 export function bootstrapVault(root: string, opts: BootstrapOptions = {}): BootstrapResult {
   const layout = vaultLayout(root);
   const now = resolveNow(opts.now);
@@ -306,20 +284,17 @@ export function bootstrapVault(root: string, opts: BootstrapOptions = {}): Boots
   writeFileIfAbsent(root, layout.config, buildConfigJson(now.toISOString()), createdFiles);
   writeFileIfAbsent(root, layout.schema, buildSchema(), createdFiles);
   writeFileIfAbsent(root, layout.purpose, buildPurpose(topic ?? TOPIC_PLACEHOLDER), createdFiles);
-  writeFileIfAbsent(root, layout.wikiOverview, buildOverview(), createdFiles);
   for (const [type, body] of TEMPLATES) {
     writeFileIfAbsent(root, path.join(layout.templates, `${type}.md`), body, createdFiles);
   }
 
-  writeFileIfAbsent(root, layout.registry, "[]\n", createdFiles);
-  writeFileIfAbsent(root, layout.backlinks, "{}\n", createdFiles);
-  writeFileIfAbsent(root, layout.metaIndex, buildMetaIndex(), createdFiles);
   writeFileIfAbsent(root, layout.events, "", createdFiles);
-  writeFileIfAbsent(root, layout.log, buildLog(), createdFiles);
-  writeFileIfAbsent(root, layout.lintReport, "", createdFiles);
   writeFileIfAbsent(root, layout.review, "", createdFiles);
+  writeFileIfAbsent(root, layout.lintReport, "", createdFiles);
 
   if (topic) applyTopic(layout.purpose, topic);
+
+  if (createdFiles.length > 0) rebuildMeta(root);
 
   return {
     root,

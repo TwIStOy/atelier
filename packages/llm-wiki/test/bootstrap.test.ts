@@ -81,12 +81,15 @@ describe("bootstrapVault — fresh vault", () => {
     }
   });
 
-  it("creates wiki/overview.md and the meta seed files", () => {
+  it("creates the derived meta artifacts and append-only seeds", () => {
     bootstrapVault(vaultRoot, { now: fixedNow });
 
-    expect(exists("wiki/overview.md")).toBe(true);
-    expect(JSON.parse(readFile("meta/registry.json"))).toEqual([]);
-    expect(JSON.parse(readFile("meta/backlinks.json"))).toEqual({});
+    expect(JSON.parse(readFile("meta/registry.json"))).toEqual(
+      expect.objectContaining({ schemaVersion: 1, pages: [], sources: [] }),
+    );
+    expect(JSON.parse(readFile("meta/backlinks.json"))).toEqual(
+      expect.objectContaining({ schemaVersion: 1, backlinks: {} }),
+    );
     expect(exists("meta/index.md")).toBe(true);
     expect(exists("meta/events.jsonl")).toBe(true);
     expect(exists("meta/log.md")).toBe(true);

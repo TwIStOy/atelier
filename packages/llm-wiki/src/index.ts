@@ -11,6 +11,8 @@ import {
 } from "@htwang-contrib/web-tools";
 import { Type } from "typebox";
 import { type BootstrapResult, bootstrapVault } from "./core/bootstrap.ts";
+import { classifyPathOperation } from "./core/guardrail.ts";
+import { rebuildMeta } from "./core/meta.ts";
 import { type CaptureInput, type CaptureResult, captureSource, type UrlFetcher } from "./core/packet.ts";
 import { VAULT_DIR_NAME, vaultLayout } from "./core/paths.ts";
 import { resolveVaults } from "./core/vault.ts";
@@ -90,6 +92,13 @@ function targetVaultRoot(cwd: string): string {
   return projectVault ?? personalVault;
 }
 
+function activeVaultRoots(cwd: string): string[] {
+  const { projectVault, personalVault } = resolveVaults({ cwd });
+  return [projectVault, personalVault].filter((v): v is string => v !== null);
+}
+
+const touchedVaults = new Set<string>();
+
 function registerWikiCaptureTool(pi: ExtensionAPI): void {
   pi.registerTool({
     name: "wiki_capture",
@@ -146,6 +155,52 @@ function registerWikiCaptureTool(pi: ExtensionAPI): void {
       };
     },
   });
+}
+
+function registerWikiRebuildMetaTool(pi: ExtensionAPI): void {
+  pi.registerTool({
+    name: "wiki_rebuild_meta",
+    label: "Wiki Rebuild Meta",
+    description:
+      "Rebuild all derived LLM Wiki metadata for the active vault (project vault if present, otherwise the personal vault). " +
+      "Regenerates meta/registry.json, meta/backlinks.json, meta/index.md, and meta/log.md (from events.jsonl) from raw/** + wiki/**. " +
+      "Derived metadata is also rebuilt automatically at the end of any turn that directly edits wiki/**.",
+    promptSnippet: "Rebuild derived LLM Wiki metadata (registry, backlinks, index, log) for the active vault",
+    parameters: Type.Object({}),
+
+    async execute(_toolCallId, _params, _signal, onUpdate, ctx) {
+      const vaultRoot = targetVaultRoot(ctx.cwd);
+      const result = rebuildMeta(vaultRoot);
+      const summary = formatRebuildSummary(result);
+      onUpdate?.({ content: [{ type: "text", text: summary }], details: result });
+      return { content: [{ type: "text", text: summary }], details: result };
+    },
+  });
+}
+
+function formatRebuildSummary(result: ReturnType<typeof rebuildMeta>): string {
+  return [
+    `Rebuilt metadata for ${result.vault}`,
+    `- pages: ${result.pages}`,
+    `- sources: ${result.sources}`,
+    `- backlinked pages: ${result.backlinks}`,
+    `- events rendered to log: ${result.events}`,
+    `- written: ${result.written.join(", ")}`,
+  ].join("\n");
+}
+
+function rebuildTouchedVaults(): void {
+  if (touchedVaults.size === 0) return;
+  const vaults = [...touchedVaults];
+  touchedVaults.clear();
+  for (const vault of vaults) {
+    try {
+      const result = rebuildMeta(vault);
+      logger.debug(`auto-rebuilt meta for ${vault}: ${result.pages} pages, ${result.sources} sources`);
+    } catch (err) {
+      logger.warn(`auto-rebuild of ${vault} failed: ${String(err)}`);
+    }
+  }
 }
 
 function formatSummary(result: CaptureResult, vaultRoot: string): string {
@@ -247,7 +302,33 @@ function registerWikiInitCommand(pi: ExtensionAPI): void {
 export default function initLlmWiki(pi: ExtensionAPI): void {
   if (isExtensionDisabled("llm-wiki")) return;
   logger.info("extension loaded");
+
+  pi.on("session_start", () => {
+    touchedVaults.clear();
+  });
+
+  pi.on("tool_call", (event, ctx) => {
+    const decision = classifyPathOperation(event.toolName, event.input, {
+      cwd: ctx.cwd,
+      vaultRoots: activeVaultRoots(ctx.cwd),
+    });
+    if (decision.block) {
+      const reason = decision.reason ?? "wiki guardrail blocked this operation";
+      ctx.ui.notify(reason, "warning");
+      return { block: true, reason };
+    }
+    if (decision.wikiTouched && decision.touchedVault) {
+      touchedVaults.add(decision.touchedVault);
+    }
+    return undefined;
+  });
+
+  pi.on("turn_end", () => {
+    rebuildTouchedVaults();
+  });
+
   registerWikiCaptureTool(pi);
   registerWikiBootstrapTool(pi);
+  registerWikiRebuildMetaTool(pi);
   registerWikiInitCommand(pi);
 }
