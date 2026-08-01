@@ -58,3 +58,13 @@ export function writeManifest(packetDir: string, manifest: SourcePacketManifest)
 export function readManifest(packetDir: string): SourcePacketManifest {
   return JSON.parse(fs.readFileSync(manifestPath(packetDir), "utf8")) as SourcePacketManifest;
 }
+
+export function readManifestSafe(packetDir: string): SourcePacketManifest | null {
+  const file = manifestPath(packetDir);
+  if (!fs.existsSync(file)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(file, "utf8")) as SourcePacketManifest;
+  } catch {
+    return null;
+  }
+}

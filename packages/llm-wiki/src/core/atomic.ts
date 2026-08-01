@@ -20,6 +20,19 @@ export function appendJsonl(filePath: string, record: unknown): void {
   fs.appendFileSync(filePath, `${line}\n`, "utf8");
 }
 
+export function readJsonl(filePath: string): unknown[] {
+  if (!fs.existsSync(filePath)) return [];
+  const out: unknown[] = [];
+  for (const line of fs.readFileSync(filePath, "utf8").split("\n")) {
+    const trimmed = line.trim();
+    if (trimmed.length === 0) continue;
+    try {
+      out.push(JSON.parse(trimmed));
+    } catch {}
+  }
+  return out;
+}
+
 function ensureParentDir(filePath: string): void {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
 }
