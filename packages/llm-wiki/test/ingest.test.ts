@@ -3,7 +3,12 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { bootstrapVault } from "../src/core/bootstrap.ts";
-import { type IngestBatchResult, ingestBatch, type SideCaller } from "../src/core/ingest.ts";
+import {
+  DEFAULT_INGEST_MAX_ATTEMPTS,
+  type IngestBatchResult,
+  ingestBatch,
+  type SideCaller,
+} from "../src/core/ingest.ts";
 import { readManifest } from "../src/core/manifest.ts";
 import { captureSource } from "../src/core/packet.ts";
 import { vaultLayout } from "../src/core/paths.ts";
@@ -148,14 +153,12 @@ describe("ingestBatch — re-entrancy", () => {
 
   it("does not duplicate pages when a packet is re-ingested after a failure", async () => {
     const packetId = await captureTextSource("# Foo");
-    let calls = 0;
+    let generationShouldFail = true;
     const caller: SideCaller = {
       async call(input) {
-        calls += 1;
         if (input.systemPrompt.includes("STEP: analysis")) return { ok: true, text: ANALYSIS_TEXT };
         if (input.systemPrompt.includes("STEP: generation")) {
-          if (calls < 3) return { ok: false, error: "transient" };
-          return { ok: true, text: GENERATION_TEXT };
+          return generationShouldFail ? { ok: false, error: "transient" } : { ok: true, text: GENERATION_TEXT };
         }
         return { ok: false, error: "unknown" };
       },
@@ -166,6 +169,7 @@ describe("ingestBatch — re-entrancy", () => {
     expect(readManifest(path.join(vaultLayout(vaultRoot).sourcesRoot, packetId)).ingest.status).toBe("pending");
     expect(fs.existsSync(path.join(vaultRoot, "wiki", "sources", "the-foo-paper.md"))).toBe(false);
 
+    generationShouldFail = false;
     const second = await ingestBatch(vaultRoot, { caller, now: FIXED_DATE });
     expect(second.ingested).toBe(1);
 
@@ -207,18 +211,16 @@ describe("ingestBatch — failure handling", () => {
   });
 
   it("continues to the next packet after a failure", async () => {
-    await captureTextSource("# First");
+    const first = await captureTextSource("# First");
     await captureSource(
       { sourceType: "text", text: "# Second", title: "Second" },
       { sourcesDir: vaultLayout(vaultRoot).sourcesRoot, now: () => new Date(Date.UTC(2024, 0, 6, 9, 0, 0)) },
     );
 
-    let analysisCalls = 0;
     const caller: SideCaller = {
       async call(input) {
         if (input.systemPrompt.includes("STEP: analysis")) {
-          analysisCalls += 1;
-          if (analysisCalls === 1) return { ok: false, error: "boom" };
+          if (input.userText.includes(first)) return { ok: false, error: "permanent boom" };
           return { ok: true, text: ANALYSIS_TEXT };
         }
         return { ok: true, text: GENERATION_TEXT };
@@ -311,5 +313,111 @@ describe("ingestBatch — review queue re-entrancy", () => {
 
     const forPacket = listReviewItems(vaultRoot).filter((r) => r.packetId === packetId);
     expect(forPacket).toHaveLength(1);
+  });
+});
+
+const CONCEPT_ONLY_GENERATION = [
+  "```wiki-page:concept",
+  "---",
+  "type: concept",
+  "title: Foo",
+  "---",
+  "# Foo",
+  "```",
+].join("\n");
+
+describe("ingestBatch — retry on bad output", () => {
+  it("retries the analysis step when the format is wrong, then succeeds within maxAttempts", async () => {
+    const packetId = await captureTextSource("# Foo");
+    let analysisCalls = 0;
+    const caller: SideCaller = {
+      async call(input) {
+        if (input.systemPrompt.includes("STEP: analysis")) {
+          analysisCalls += 1;
+          if (analysisCalls < 3) return { ok: true, text: "no fence here" };
+          return { ok: true, text: ANALYSIS_TEXT };
+        }
+        return { ok: true, text: GENERATION_TEXT };
+      },
+    };
+
+    const result = await ingestBatch(vaultRoot, { caller, now: FIXED_DATE, maxAttempts: 3 });
+    expect(result.ingested).toBe(1);
+    expect(analysisCalls).toBe(3);
+    expect(readManifest(path.join(vaultLayout(vaultRoot).sourcesRoot, packetId)).ingest.status).toBe("ingested");
+  });
+
+  it("marks the packet failed when analysis never yields a usable block within maxAttempts", async () => {
+    const packetId = await captureTextSource("# Foo");
+    let analysisCalls = 0;
+    const caller: SideCaller = {
+      async call(input) {
+        if (input.systemPrompt.includes("STEP: analysis")) {
+          analysisCalls += 1;
+          return { ok: true, text: "no fence here" };
+        }
+        return { ok: true, text: GENERATION_TEXT };
+      },
+    };
+
+    const result = await ingestBatch(vaultRoot, { caller, now: FIXED_DATE, maxAttempts: 3 });
+    expect(result.failed).toBe(1);
+    expect(analysisCalls).toBe(3);
+    expect(result.outcomes[0].reason).toMatch(/after 3 attempt/i);
+    expect(readManifest(path.join(vaultLayout(vaultRoot).sourcesRoot, packetId)).ingest.status).toBe("pending");
+  });
+
+  it("retries the generation step when it omits the source page", async () => {
+    await captureTextSource("# Foo");
+    let genCalls = 0;
+    const caller: SideCaller = {
+      async call(input) {
+        if (input.systemPrompt.includes("STEP: analysis")) return { ok: true, text: ANALYSIS_TEXT };
+        genCalls += 1;
+        if (genCalls < 2) return { ok: true, text: CONCEPT_ONLY_GENERATION };
+        return { ok: true, text: GENERATION_TEXT };
+      },
+    };
+
+    const result = await ingestBatch(vaultRoot, { caller, now: FIXED_DATE, maxAttempts: 3 });
+    expect(result.ingested).toBe(1);
+    expect(genCalls).toBe(2);
+  });
+
+  it("retries on a transient provider error and succeeds on a later attempt", async () => {
+    await captureTextSource("# Foo");
+    let analysisCalls = 0;
+    const caller: SideCaller = {
+      async call(input) {
+        if (input.systemPrompt.includes("STEP: analysis")) {
+          analysisCalls += 1;
+          if (analysisCalls === 1) return { ok: false, error: "rate limited" };
+          return { ok: true, text: ANALYSIS_TEXT };
+        }
+        return { ok: true, text: GENERATION_TEXT };
+      },
+    };
+
+    const result = await ingestBatch(vaultRoot, { caller, now: FIXED_DATE, maxAttempts: 3 });
+    expect(result.ingested).toBe(1);
+    expect(analysisCalls).toBe(2);
+  });
+
+  it("uses the default maxAttempts when none is given", async () => {
+    await captureTextSource("# Foo");
+    let analysisCalls = 0;
+    const caller: SideCaller = {
+      async call(input) {
+        if (input.systemPrompt.includes("STEP: analysis")) {
+          analysisCalls += 1;
+          return { ok: true, text: "no fence here" };
+        }
+        return { ok: true, text: GENERATION_TEXT };
+      },
+    };
+
+    const result = await ingestBatch(vaultRoot, { caller, now: FIXED_DATE });
+    expect(result.failed).toBe(1);
+    expect(analysisCalls).toBe(DEFAULT_INGEST_MAX_ATTEMPTS);
   });
 });

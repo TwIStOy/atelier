@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const { executeSideCallMock, registerConfigItemsMock, readConfigMock, resolveModelMock } = vi.hoisted(() => ({
   executeSideCallMock: vi.fn(),
   registerConfigItemsMock: vi.fn(),
-  readConfigMock: vi.fn(() => ({ ingestModel: "" })),
+  readConfigMock: vi.fn(() => ({ ingestModel: "", ingestMaxAttempts: 3 })),
   resolveModelMock: vi.fn(() => undefined),
 }));
 
@@ -99,7 +99,7 @@ let vaultRoot: string;
 
 beforeEach(() => {
   vi.clearAllMocks();
-  readConfigMock.mockReturnValue({ ingestModel: "" });
+  readConfigMock.mockReturnValue({ ingestModel: "", ingestMaxAttempts: 3 });
   resolveModelMock.mockReturnValue(undefined);
 
   tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "llm-wiki-ingest-wire-"));
@@ -147,13 +147,16 @@ describe("llm-wiki wiring — registrations", () => {
     expect(mock.commands.has("wiki-ingest")).toBe(true);
   });
 
-  it("registers an ingestModel config item under llm-wiki", () => {
+  it("registers ingestModel and ingestMaxAttempts config items under llm-wiki", () => {
     const mock = createMockPi();
     initLlmWiki(mock.pi as never);
 
     expect(registerConfigItemsMock).toHaveBeenCalledWith(
       "llm-wiki",
-      expect.arrayContaining([expect.objectContaining({ key: "ingestModel", type: "select" })]),
+      expect.arrayContaining([
+        expect.objectContaining({ key: "ingestModel", type: "select" }),
+        expect.objectContaining({ key: "ingestMaxAttempts", type: "number" }),
+      ]),
     );
   });
 });

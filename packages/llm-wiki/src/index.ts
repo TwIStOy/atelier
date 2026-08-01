@@ -10,7 +10,7 @@ import {
   resolveApiKey,
 } from "@htwang-contrib/web-tools";
 import { Type } from "typebox";
-import { registerLlmWikiConfigItems, resolveIngestModel, setCachedModelOptions } from "./config.ts";
+import { loadLlmWikiConfig, registerLlmWikiConfigItems, resolveIngestModel, setCachedModelOptions } from "./config.ts";
 import { classifyPathOperation } from "./core/guardrail.ts";
 import { type IngestBatchResult, ingestBatch, type SideCaller } from "./core/ingest.ts";
 import { rebuildMeta } from "./core/meta.ts";
@@ -420,7 +420,13 @@ async function runIngest(args: {
   }
   const caller = createSideCaller(model, args.ctx.modelRegistry);
   const signal = args.signal ?? new AbortController().signal;
-  return ingestBatch(vaultRoot, { caller, signal, ...(args.packetId ? { packetId: args.packetId } : {}) });
+  const { ingestMaxAttempts } = loadLlmWikiConfig();
+  return ingestBatch(vaultRoot, {
+    caller,
+    signal,
+    maxAttempts: ingestMaxAttempts,
+    ...(args.packetId ? { packetId: args.packetId } : {}),
+  });
 }
 
 function formatIngestSummary(result: IngestBatchResult, vaultRoot: string): string {
