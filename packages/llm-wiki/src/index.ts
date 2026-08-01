@@ -1,5 +1,6 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { createLogger, isExtensionDisabled } from "@htwang-contrib/common";
+import type { Message, UserMessage } from "@earendil-works/pi-ai";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { createLogger, executeSideCall, isExtensionDisabled } from "@htwang-contrib/common";
 import {
   type FetchResponse,
   type FullProvider,
@@ -9,7 +10,9 @@ import {
   resolveApiKey,
 } from "@htwang-contrib/web-tools";
 import { Type } from "typebox";
+import { registerLlmWikiConfigItems, resolveIngestModel, setCachedModelOptions } from "./config.ts";
 import { classifyPathOperation } from "./core/guardrail.ts";
+import { type IngestBatchResult, ingestBatch, type SideCaller } from "./core/ingest.ts";
 import { rebuildMeta } from "./core/meta.ts";
 import { type CaptureInput, type CaptureResult, captureSource, type UrlFetcher } from "./core/packet.ts";
 import { type EnsurePageResult, ensurePage } from "./core/page.ts";
@@ -379,6 +382,121 @@ function formatEnsureSummary(result: EnsurePageResult, vaultRoot: string): strin
   return lines.join("\n");
 }
 
+function createSideCaller(
+  model: NonNullable<ExtensionContext["model"]>,
+  modelRegistry: ExtensionContext["modelRegistry"],
+): SideCaller {
+  return {
+    async call({ systemPrompt, userText }, signal) {
+      const messages: Message[] = [{ role: "user", content: userText, timestamp: Date.now() } as UserMessage];
+      const result = await executeSideCall({
+        model,
+        modelRegistry,
+        systemPrompt,
+        messages,
+        signal,
+        commandName: "wiki_ingest",
+      });
+      if (result.ok) return { ok: true, text: result.answer };
+      if ("aborted" in result) return { ok: false, error: "aborted" };
+      return { ok: false, error: result.error };
+    },
+  };
+}
+
+type RunIngestOutcome = IngestBatchResult | { error: string };
+
+async function runIngest(args: {
+  ctx: ExtensionContext;
+  signal?: AbortSignal;
+  packetId?: string;
+}): Promise<RunIngestOutcome> {
+  const vaultRoot = targetVaultRoot(args.ctx.cwd);
+  const model = resolveIngestModel(args.ctx);
+  if (!model) {
+    return {
+      error: "wiki_ingest: no model available — set a session model, or configure the Wiki Ingest Model in /config.",
+    };
+  }
+  const caller = createSideCaller(model, args.ctx.modelRegistry);
+  const signal = args.signal ?? new AbortController().signal;
+  return ingestBatch(vaultRoot, { caller, signal, ...(args.packetId ? { packetId: args.packetId } : {}) });
+}
+
+function formatIngestSummary(result: IngestBatchResult, vaultRoot: string): string {
+  const lines = [
+    `Ingest batch: ${result.ingested} ingested, ${result.failed} failed, ${result.skipped} skipped (${result.processed} processed)`,
+    `vault: ${vaultRoot}`,
+  ];
+  for (const outcome of result.outcomes) {
+    const details: string[] = [];
+    if (outcome.pagesCreated > 0) details.push(`${outcome.pagesCreated} page(s) created`);
+    if (outcome.pagesExisted > 0) details.push(`${outcome.pagesExisted} existed`);
+    if (outcome.reviewFiled > 0) details.push(`${outcome.reviewFiled} review item(s)`);
+    const extra = details.length > 0 ? ` — ${details.join(", ")}` : "";
+    const reason = outcome.reason ? ` — ${outcome.reason}` : "";
+    lines.push(`- ${outcome.packetId}: ${outcome.status}${reason}${extra}`);
+  }
+  return lines.join("\n");
+}
+
+function registerWikiIngestTool(pi: ExtensionAPI): void {
+  pi.registerTool({
+    name: "wiki_ingest",
+    label: "Wiki Ingest",
+    description:
+      "Batch-ingest pending Source Packets in the active LLM Wiki vault into typed, cited Wiki Pages. " +
+      "For each pending packet, runs two side-calls (analysis, then generation) and writes the Source page plus any related concept/entity/synthesis pages, files review items, updates the manifest ingest state, and rebuilds metadata. " +
+      "Idempotent and re-entrant: already-ingested packets are skipped; a packet that fails stays pending and is retried on the next call. " +
+      "Optional `packetId` (SRC-YYYY-MM-DD-NNN) restricts the run to one packet. Interactive ingest is skill-guided (call wiki_capture / wiki_ensure_page directly).",
+    promptSnippet: "Analyze pending Source Packets and generate cited Wiki Pages (batch, side-calls)",
+    parameters: Type.Object({
+      packetId: Type.Optional(
+        Type.String({
+          description: "Optional Source Packet id (SRC-YYYY-MM-DD-NNN) to ingest. Omit to ingest every pending packet.",
+        }),
+      ),
+    }),
+
+    async execute(_toolCallId, params, signal, onUpdate, ctx) {
+      const result = await runIngest({ ctx, signal, ...(params.packetId ? { packetId: params.packetId } : {}) });
+      if ("error" in result) {
+        return { content: [{ type: "text", text: result.error }], details: { error: result.error } };
+      }
+      const vaultRoot = targetVaultRoot(ctx.cwd);
+      const summary = formatIngestSummary(result, vaultRoot);
+      onUpdate?.({ content: [{ type: "text", text: summary }], details: result });
+      return { content: [{ type: "text", text: summary }], details: { ...result, vaultRoot } };
+    },
+  });
+}
+
+function registerWikiIngestCommand(pi: ExtensionAPI): void {
+  pi.registerCommand("wiki-ingest", {
+    description:
+      "Run batch wiki ingest: analyze + generate Wiki Pages for every pending Source Packet via side-calls (off-conversation). Optional arg: a specific packet id. Interactive ingest is skill-guided.",
+    async handler(args, ctx) {
+      const packetId = args.trim() || undefined;
+      ctx.ui.setWorkingMessage(packetId ? `ingesting ${packetId}\u2026` : "ingesting pending sources\u2026");
+      try {
+        const result = await runIngest({ ctx, ...(packetId ? { packetId } : {}) });
+        if ("error" in result) {
+          ctx.ui.notify(result.error, "error");
+          return;
+        }
+        const vaultRoot = targetVaultRoot(ctx.cwd);
+        ctx.ui.notify(
+          `wiki ingest: ${result.ingested} ingested, ${result.failed} failed, ${result.skipped} skipped`,
+          result.failed > 0 ? "warning" : "info",
+        );
+        logger.info(`wiki ingest batch on ${vaultRoot}:\n${formatIngestSummary(result, vaultRoot)}`);
+      } finally {
+        ctx.ui.setWorkingMessage(undefined);
+      }
+    },
+  });
+}
+
 function formatSummary(result: CaptureResult, vaultRoot: string): string {
   const { manifest, created } = result;
   const verb = created ? "Captured" : "Already captured (deduped, no new packet)";
@@ -401,8 +519,16 @@ export default function initLlmWiki(pi: ExtensionAPI): void {
   if (isExtensionDisabled("llm-wiki")) return;
   logger.info("extension loaded");
 
-  pi.on("session_start", () => {
+  registerLlmWikiConfigItems();
+
+  pi.on("session_start", (_event, ctx) => {
     touchedVaults.clear();
+    setCachedModelOptions(
+      ctx.modelRegistry.getAvailable().map((m) => ({
+        label: `${m.provider}/${m.id}`,
+        value: `${m.provider}/${m.id}`,
+      })),
+    );
   });
 
   pi.on("tool_call", (event, ctx) => {
@@ -430,4 +556,6 @@ export default function initLlmWiki(pi: ExtensionAPI): void {
   registerWikiEnsurePageTool(pi);
   registerWikiSearchTool(pi);
   registerWikiRecallTool(pi);
+  registerWikiIngestTool(pi);
+  registerWikiIngestCommand(pi);
 }
