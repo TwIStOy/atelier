@@ -13,14 +13,12 @@ type Handler = (...args: unknown[]) => unknown;
 
 interface MockPi {
   tools: Map<string, Record<string, unknown>>;
-  commands: Map<string, Record<string, unknown>>;
   handlers: Map<string, Handler>;
   pi: unknown;
 }
 
 function createMockPi(): MockPi {
   const tools = new Map<string, Record<string, unknown>>();
-  const commands = new Map<string, Record<string, unknown>>();
   const handlers = new Map<string, Handler>();
   const pi = {
     on(event: string, handler: Handler) {
@@ -29,11 +27,8 @@ function createMockPi(): MockPi {
     registerTool(tool: Record<string, unknown>) {
       tools.set(tool.name as string, tool);
     },
-    registerCommand(command: Record<string, unknown>) {
-      commands.set(command.name as string, command);
-    },
   };
-  return { tools, commands, handlers, pi };
+  return { tools, handlers, pi };
 }
 
 let tmpRoot: string;

@@ -1,4 +1,3 @@
-import * as path from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { createLogger, isExtensionDisabled } from "@htwang-contrib/common";
 import {
@@ -10,11 +9,10 @@ import {
   resolveApiKey,
 } from "@htwang-contrib/web-tools";
 import { Type } from "typebox";
-import { type BootstrapResult, bootstrapVault } from "./core/bootstrap.ts";
 import { classifyPathOperation } from "./core/guardrail.ts";
 import { rebuildMeta } from "./core/meta.ts";
 import { type CaptureInput, type CaptureResult, captureSource, type UrlFetcher } from "./core/packet.ts";
-import { VAULT_DIR_NAME, vaultLayout } from "./core/paths.ts";
+import { vaultLayout } from "./core/paths.ts";
 import { resolveVaults } from "./core/vault.ts";
 
 const logger = createLogger("llm-wiki");
@@ -221,84 +219,6 @@ function formatSummary(result: CaptureResult, vaultRoot: string): string {
   return lines.join("\n");
 }
 
-type BootstrapScope = "project" | "personal";
-
-function bootstrapRoot(cwd: string, scope: BootstrapScope): string {
-  if (scope === "personal") return resolveVaults({ cwd }).personalVault;
-  return path.join(cwd, VAULT_DIR_NAME);
-}
-
-function formatBootstrapSummary(result: BootstrapResult, scope: BootstrapScope): string {
-  const verb = result.created ? "Initialized vault" : "Vault already initialized";
-  const lines = [`${verb}: ${result.root} [scope: ${scope}]`];
-  if (result.created) lines.push(`created: ${result.createdFiles.length} files`);
-  if (result.topic) lines.push(`topic: ${result.topic}`);
-  return lines.join("\n");
-}
-
-function registerWikiBootstrapTool(pi: ExtensionAPI): void {
-  pi.registerTool({
-    name: "wiki_bootstrap",
-    label: "Wiki Bootstrap",
-    description:
-      "Initialize an LLM Wiki vault: creates config.json, WIKI_SCHEMA.md (Schema), purpose.md (Purpose), " +
-      "the five Page Type templates (source/concept/entity/synthesis/analysis), inbox/, the wiki/ page-type " +
-      "directories, raw/sources/, and meta/. Idempotent — re-running creates only what is missing and never " +
-      "overwrites existing files. An optional `topic` is backfilled into purpose.md. Use scope=project (default) " +
-      "for <cwd>/.llm-wiki or scope=personal for the personal vault.",
-    promptSnippet: "Create the vault skeleton (Schema, Purpose, templates, directories) for an LLM Wiki",
-    parameters: Type.Object({
-      topic: Type.Optional(
-        Type.String({ description: "Optional directional topic, written into purpose.md's Topic section." }),
-      ),
-      scope: Type.Optional(
-        Type.Union([Type.Literal("project"), Type.Literal("personal")], {
-          description: "Which vault to bootstrap: project (<cwd>/.llm-wiki, default) or personal (~/.llm-wiki).",
-        }),
-      ),
-    }),
-    async execute(_toolCallId, params, _signal, onUpdate, ctx) {
-      const scope: BootstrapScope = params.scope === "personal" ? "personal" : "project";
-      const topic = typeof params.topic === "string" ? params.topic.trim() : undefined;
-      const root = bootstrapRoot(ctx.cwd, scope);
-      const result = bootstrapVault(root, { ...(topic ? { topic } : {}) });
-      const summary = formatBootstrapSummary(result, scope);
-      onUpdate?.({
-        content: [{ type: "text", text: summary }],
-        details: { vaultRoot: root, scope, created: result.created, topic: result.topic },
-      });
-      return {
-        content: [{ type: "text", text: summary }],
-        details: {
-          vaultRoot: root,
-          scope,
-          created: result.created,
-          createdFiles: result.createdFiles,
-          ...(result.topic ? { topic: result.topic } : {}),
-        },
-      };
-    },
-  });
-}
-
-function registerWikiInitCommand(pi: ExtensionAPI): void {
-  pi.registerCommand("wiki-init", {
-    description:
-      "Bootstrap the project LLM Wiki vault at <cwd>/.llm-wiki (config, Schema, Purpose, templates, dirs). " +
-      "Optional <topic> is backfilled into purpose.md. Idempotent — safe to re-run.",
-    async handler(args, ctx) {
-      const topic = (args ?? "").trim();
-      const root = path.join(ctx.cwd, VAULT_DIR_NAME);
-      const result = bootstrapVault(root, { ...(topic ? { topic } : {}) });
-      const head = result.created
-        ? `Initialized project wiki at ${root} (${result.createdFiles.length} files created)`
-        : `Project wiki already initialized at ${root}`;
-      const tail = topic ? `; topic set to "${topic}"` : "";
-      ctx.ui.notify(`${head}${tail}`, "info");
-    },
-  });
-}
-
 export default function initLlmWiki(pi: ExtensionAPI): void {
   if (isExtensionDisabled("llm-wiki")) return;
   logger.info("extension loaded");
@@ -328,7 +248,5 @@ export default function initLlmWiki(pi: ExtensionAPI): void {
   });
 
   registerWikiCaptureTool(pi);
-  registerWikiBootstrapTool(pi);
   registerWikiRebuildMetaTool(pi);
-  registerWikiInitCommand(pi);
 }

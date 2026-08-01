@@ -22,7 +22,7 @@ export interface BootstrapResult {
 const CONFIG_SCHEMA_VERSION = 1;
 const TOPIC_MARKER_OPEN = "<!-- llm-wiki:topic -->";
 const TOPIC_MARKER_CLOSE = "<!-- /llm-wiki:topic -->";
-const TOPIC_PLACEHOLDER = "(unset — pass a topic to wiki_bootstrap or /wiki-init)";
+const TOPIC_PLACEHOLDER = "(unset — run the bootstrap script with --topic)";
 
 function resolveNow(now: Date | (() => Date) | undefined): Date {
   if (now instanceof Date) return now;

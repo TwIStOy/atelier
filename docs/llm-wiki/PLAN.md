@@ -32,7 +32,6 @@ v1 scope and task breakdown. Glossary: [CONTEXT.md](./CONTEXT.md). Decisions: [a
 
 | Tool | Purpose |
 | --- | --- |
-| `wiki_bootstrap` | Initialize a vault (config, Schema, Purpose, templates, meta) |
 | `wiki_capture` | URL (web-tools Jina/Firecrawl provider) / pasted text / local md/txt → Source Packet. Copy + originPath/originHash registration; drains Inbox files |
 | `wiki_ingest` | Batch mode: two-step (analysis → generation) via `executeSideCall`, serial, updates manifests + review queue. No-arg interactive mode is skill-guided in-conversation |
 | `wiki_ensure_page` | Resolve-or-create a typed Wiki Page from template (alias dedup via registry) |
@@ -44,7 +43,9 @@ v1 scope and task breakdown. Glossary: [CONTEXT.md](./CONTEXT.md). Decisions: [a
 | `wiki_rebuild_meta` | Full metadata rebuild from `raw/**` + `wiki/**` |
 | `wiki_log_event` | Append a structured event (used by tools internally; exposed for Interactive Ingest bookkeeping) |
 
-Slash commands: `/wiki-init`, `/wiki-ingest`, `/wiki-query`, `/wiki-review`, `/wiki-lint`, `/wiki-status`.
+Slash commands: `/wiki-ingest`, `/wiki-query`, `/wiki-review`, `/wiki-lint`, `/wiki-status`.
+
+Vault bootstrap is a one-time setup, so it is a standalone script (`packages/llm-wiki/scripts/bootstrap.ts`), not a pi tool or slash command: `node packages/llm-wiki/scripts/bootstrap.ts [parent-dir] [--topic "<text>"]` creates the vault at `<parent-dir>/.llm-wiki` (defaults to `<cwd>`).
 
 Config items (`registerConfigItems`, surfaced via `/config`): personal vault path override, Inbox path, ingest side-call model, session-start notice on/off.
 
@@ -64,7 +65,7 @@ Config items (`registerConfigItems`, surfaced via `/config`): personal vault pat
 4. Core: Source Packet store + manifest schema + `wiki_capture` (URL via web-tools provider — export what's needed from `web-tools`, else thin `r.jina.ai` wrapper; text/file)
 5. Core: metadata engine (registry, backlinks, index, events→log, rebuild)
 6. Guardrails interceptor + end-of-turn auto-rebuild
-7. `wiki_bootstrap` + templates + `/wiki-init`
+7. `wiki_bootstrap` core + templates + standalone bootstrap script (revised: not a tool/command)
 8. `wiki_ensure_page` + five Page Types + frontmatter conventions
 9. Recall: registry search + Graph Relevance (`wiki_recall`, `wiki_search`)
 10. `wiki_ingest` batch pipeline (side-call two-step, serial, ingest-model config) + `/wiki-ingest`
