@@ -7,7 +7,9 @@ import {
   appendReviewItem,
   listReviewItems,
   REVIEW_SCHEMA_VERSION,
+  type ReviewAction,
   type ReviewItem,
+  resolveReviewItem,
 } from "../src/core/review.ts";
 
 let tmpRoot: string;
@@ -102,5 +104,74 @@ describe("listReviewItems", () => {
     const items = listReviewItems(tmpRoot);
     expect(items).toHaveLength(1);
     expect(items[0].title).toBe("valid");
+  });
+
+  it("filters by status when a filter is given (default returns all)", () => {
+    const a = appendReviewItem(tmpRoot, baseInput({ title: "a" }), { now: FIXED_NOW });
+    const b = appendReviewItem(tmpRoot, baseInput({ title: "b" }), { now: FIXED_NOW });
+    resolveReviewItem(tmpRoot, a.id, "skip", { now: FIXED_NOW });
+
+    expect(listReviewItems(tmpRoot).map((i) => i.id)).toEqual([a.id, b.id]);
+    expect(listReviewItems(tmpRoot, { status: "all" }).map((i) => i.id)).toEqual([a.id, b.id]);
+    expect(listReviewItems(tmpRoot, { status: "open" }).map((i) => i.id)).toEqual([b.id]);
+    expect(listReviewItems(tmpRoot, { status: "resolved" }).map((i) => i.id)).toEqual([a.id]);
+  });
+});
+
+describe("resolveReviewItem", () => {
+  it("marks the item resolved with the chosen action, timestamp, and resolutionNote", () => {
+    const filed = appendReviewItem(tmpRoot, baseInput(), { now: FIXED_NOW });
+    const resolved = resolveReviewItem(tmpRoot, filed.id, "create_page", {
+      now: () => new Date(Date.UTC(2024, 0, 7, 12, 0, 0)),
+      note: "created concepts/x.md",
+    });
+
+    expect(resolved.status).toBe("resolved");
+    expect(resolved.resolvedAction).toBe("create_page");
+    expect(resolved.resolvedAt).toBe("2024-01-07T12:00:00.000Z");
+    expect(resolved.resolutionNote).toBe("created concepts/x.md");
+    expect(resolved.action).toBe("create_page");
+
+    expect(listReviewItems(tmpRoot, { status: "open" })).toEqual([]);
+  });
+
+  it("accepts all three constrained actions", () => {
+    const a = appendReviewItem(tmpRoot, baseInput({ title: "a" }), { now: FIXED_NOW });
+    const b = appendReviewItem(tmpRoot, baseInput({ title: "b" }), { now: FIXED_NOW });
+    const c = appendReviewItem(tmpRoot, baseInput({ title: "c" }), { now: FIXED_NOW });
+
+    resolveReviewItem(tmpRoot, a.id, "create_page", { now: FIXED_NOW });
+    resolveReviewItem(tmpRoot, b.id, "deep_research", { now: FIXED_NOW });
+    resolveReviewItem(tmpRoot, c.id, "skip", { now: FIXED_NOW });
+
+    const actions = listReviewItems(tmpRoot, { status: "resolved" }).map((i) => i.resolvedAction);
+    expect(actions).toEqual(["create_page", "deep_research", "skip"]);
+  });
+
+  it("rewrites atomically (no .tmp leftovers) and preserves the other entries", () => {
+    const a = appendReviewItem(tmpRoot, baseInput({ title: "a" }), { now: FIXED_NOW });
+    appendReviewItem(tmpRoot, baseInput({ title: "b" }), { now: FIXED_NOW });
+    resolveReviewItem(tmpRoot, a.id, "skip", { now: FIXED_NOW });
+
+    const metaDir = path.join(tmpRoot, "meta");
+    expect(fs.readdirSync(metaDir).filter((f) => f.endsWith(".tmp"))).toEqual([]);
+    expect(listReviewItems(tmpRoot, { status: "all" })).toHaveLength(2);
+  });
+
+  it("throws when the item id does not exist", () => {
+    expect(() => resolveReviewItem(tmpRoot, "REV-does-not-exist", "skip", { now: FIXED_NOW })).toThrow(/not found/i);
+  });
+
+  it("throws when the item is already resolved", () => {
+    const filed = appendReviewItem(tmpRoot, baseInput(), { now: FIXED_NOW });
+    resolveReviewItem(tmpRoot, filed.id, "skip", { now: FIXED_NOW });
+    expect(() => resolveReviewItem(tmpRoot, filed.id, "skip", { now: FIXED_NOW })).toThrow(/already resolved/i);
+  });
+
+  it("throws on an invalid action (prevents hallucinated actions)", () => {
+    const filed = appendReviewItem(tmpRoot, baseInput(), { now: FIXED_NOW });
+    expect(() => resolveReviewItem(tmpRoot, filed.id, "delete_everything" as ReviewAction, { now: FIXED_NOW })).toThrow(
+      /action/i,
+    );
   });
 });

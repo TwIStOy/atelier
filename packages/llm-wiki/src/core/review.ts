@@ -1,13 +1,14 @@
 import { randomBytes } from "node:crypto";
 import * as fs from "node:fs";
 import { resolveNow } from "@htwang-contrib/common/time";
-import { appendJsonl } from "./atomic.ts";
+import { appendJsonl, atomicWriteFile } from "./atomic.ts";
 import { vaultLayout } from "./paths.ts";
 
 export const REVIEW_SCHEMA_VERSION = 1;
 
 export type ReviewAction = "create_page" | "deep_research" | "skip";
 export type ReviewStatus = "open" | "resolved";
+export type ReviewFilterStatus = ReviewStatus | "all";
 export const REVIEW_ACTIONS: readonly ReviewAction[] = ["create_page", "deep_research", "skip"];
 
 export interface ReviewItem {
@@ -21,6 +22,9 @@ export interface ReviewItem {
   status: ReviewStatus;
   note?: string;
   query?: string;
+  resolvedAt?: string;
+  resolvedAction?: ReviewAction;
+  resolutionNote?: string;
 }
 
 export interface AppendReviewInput {
@@ -35,6 +39,15 @@ export interface AppendReviewInput {
 export interface AppendReviewOptions {
   now?: Date | (() => Date);
   randomSuffix?: () => string;
+}
+
+export interface ListReviewFilter {
+  status?: ReviewFilterStatus;
+}
+
+export interface ResolveReviewOptions {
+  now?: Date | (() => Date);
+  note?: string;
 }
 
 function defaultRandomSuffix(): string {
@@ -56,10 +69,12 @@ function allocateReviewId(date: Date, suffix: string): string {
 }
 
 function normalizeAction(action: unknown): ReviewAction {
-  if (typeof action === "string" && (REVIEW_ACTIONS as readonly string[]).includes(action)) {
-    return action as ReviewAction;
-  }
+  if (isReviewAction(action)) return action;
   throw new Error(`review: action must be one of ${REVIEW_ACTIONS.join(", ")} (got ${String(action)})`);
+}
+
+function isReviewAction(value: unknown): value is ReviewAction {
+  return typeof value === "string" && (REVIEW_ACTIONS as readonly string[]).includes(value);
 }
 
 export function appendReviewItem(
@@ -88,36 +103,76 @@ export function appendReviewItem(
   return item;
 }
 
-export function listReviewItems(vaultRoot: string): ReviewItem[] {
+export function listReviewItems(vaultRoot: string, filter: ListReviewFilter = {}): ReviewItem[] {
   const file = vaultLayout(vaultRoot).review;
-  if (!fs.existsSync(file)) return [];
   const out: ReviewItem[] = [];
-  for (const line of fs.readFileSync(file, "utf8").split("\n")) {
-    const trimmed = line.trim();
-    if (trimmed.length === 0) continue;
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(trimmed);
-    } catch {
-      continue;
+  if (fs.existsSync(file)) {
+    for (const line of fs.readFileSync(file, "utf8").split("\n")) {
+      const trimmed = line.trim();
+      if (trimmed.length === 0) continue;
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(trimmed);
+      } catch {
+        continue;
+      }
+      const item = coerceReviewItem(parsed);
+      if (item) out.push(item);
     }
-    const item = coerceReviewItem(parsed);
-    if (item) out.push(item);
   }
-  return out;
+  const status = filter.status;
+  if (status === undefined || status === "all") return out;
+  return out.filter((item) => item.status === status);
+}
+
+export function resolveReviewItem(
+  vaultRoot: string,
+  id: string,
+  decision: ReviewAction,
+  opts: ResolveReviewOptions = {},
+): ReviewItem {
+  const resolvedAction = normalizeAction(decision);
+  const file = vaultLayout(vaultRoot).review;
+  const items = listReviewItems(vaultRoot);
+
+  const index = items.findIndex((item) => item.id === id);
+  if (index === -1) {
+    throw new Error(`wiki_review: item "${id}" not found`);
+  }
+  const target = items[index]!;
+  if (target.status === "resolved") {
+    throw new Error(`wiki_review: item "${id}" is already resolved`);
+  }
+
+  const now = resolveNow(opts.now);
+  const resolved: ReviewItem = {
+    ...target,
+    status: "resolved",
+    resolvedAction,
+    resolvedAt: now.toISOString(),
+    ...(opts.note !== undefined && opts.note.length > 0 ? { resolutionNote: opts.note } : {}),
+  };
+  items[index] = resolved;
+  rewriteReviewFile(file, items);
+  return resolved;
+}
+
+function rewriteReviewFile(file: string, items: ReviewItem[]): void {
+  const body = items.map((item) => JSON.stringify(item)).join("\n");
+  atomicWriteFile(file, items.length > 0 ? `${body}\n` : "");
 }
 
 function coerceReviewItem(raw: unknown): ReviewItem | null {
   if (raw === null || typeof raw !== "object") return null;
   const record = raw as Record<string, unknown>;
-  const action = normalizeAction(record.action);
   if (
     typeof record.id !== "string" ||
     typeof record.filedAt !== "string" ||
     typeof record.packetId !== "string" ||
     typeof record.kind !== "string" ||
     typeof record.title !== "string" ||
-    typeof record.status !== "string"
+    typeof record.status !== "string" ||
+    !isReviewAction(record.action)
   ) {
     return null;
   }
@@ -128,10 +183,15 @@ function coerceReviewItem(raw: unknown): ReviewItem | null {
     packetId: record.packetId,
     kind: record.kind,
     title: record.title,
-    action,
+    action: record.action,
     status: record.status as ReviewStatus,
     ...(typeof record.note === "string" ? { note: record.note } : {}),
     ...(typeof record.query === "string" ? { query: record.query } : {}),
+    ...(typeof record.resolvedAt === "string" ? { resolvedAt: record.resolvedAt } : {}),
+    ...(isReviewAction(record.resolvedAction) ? { resolvedAction: record.resolvedAction } : {}),
+    ...(typeof record.resolutionNote === "string" && record.resolutionNote.length > 0
+      ? { resolutionNote: record.resolutionNote }
+      : {}),
   };
   return item;
 }
