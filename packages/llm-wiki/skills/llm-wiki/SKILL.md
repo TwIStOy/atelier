@@ -71,7 +71,11 @@ During Ingest the agent files items needing human judgment into the **Review Que
 - `wiki_review` (`action=list` to read, `action=resolve` to record a decision + optional note), or
 - `/wiki-review` to walk open items one by one interactively.
 
-**Resolving only records the decision** — the queue is a ledger, not an executor. `create_page` and `deep_research` are then performed in-session by the agent: create the page with `wiki_ensure_page`, or run a gap-driven multi-query web search (`wiki_capture` each result, then ingest). `skip` closes the item with no action.
+**Resolving only records the decision** — the queue is a ledger, not an executor. `/wiki-review` (and `wiki_review` resolve) deliberately stay decision-only, keeping the ledger separate from execution. The actions are then carried out separately:
+
+- **`deep_research`** — automated end-to-end by `/wiki-research` (or the `wiki_deep_research` tool): for each open `deep_research` item it runs the item's pre-built query through the configured web-search provider chain, captures each result URL into a Source Packet (idempotent by URL), batch-ingests them, and **resolves the item once at least one packet ingests**. Re-entrant: re-running skips already-captured URLs and already-ingested packets; an item where every packet fails stays open, and items with no query are skipped (recorded, never blocking). Override the top-N per run via the `deepResearchMaxResults` config item or a per-call `maxResults`.
+- **`create_page`** — performed in-session by the agent: create the page with `wiki_ensure_page`.
+- **`skip`** — closes the item with no action.
 
 ## Citation discipline
 

@@ -11,6 +11,7 @@ The agent captures a source into an immutable **Source Packet**, ingests it into
 - **Two-step ingest** — analysis, then generation; runs unattended as side-calls (batch) or interactively in conversation, with retry on bad LLM output
 - **Layered Recall** — keyword search plus a four-signal **Graph Relevance** model (direct link, source overlap, Adamic-Adar, type affinity) over the wikilink graph, merged across both vaults
 - **Review Queue** — async human-in-the-loop; ingest files items needing judgment with a constrained action (`create_page` / `deep_research` / `skip`) and a pre-built query
+- **Deep Research automation** — `/wiki-research` (or `wiki_deep_research`) auto-closes open `deep_research` items end-to-end: web search → capture → ingest → resolve
 - **Lint + guardrails** — mechanical health checks (`meta/lint-report.md`); direct `write`/`edit` into `raw/**` and `meta/**` is blocked, and metadata rebuilds itself at end of turn whenever `wiki/**` changes
 - **Bundled skill + prompt** — ships `skills/llm-wiki/SKILL.md` and the `/wiki-query` prompt template via the extension's `resources_discover` hook
 
@@ -40,7 +41,7 @@ Then in a pi session:
 2. Ingest the backlog → `/wiki-ingest` (batch side-calls) or interactively per the bundled skill.
 3. Ask against the wiki → `/wiki-query <question>` (read-only; cites Source Packets).
 4. Health-check → `/wiki-lint` (append `--fix` to auto-capture uncaptured Inbox files).
-5. Resolve deferred items → `/wiki-review`.
+5. Resolve deferred items → `/wiki-review`, or auto-run `deep_research` items → `/wiki-research`.
 
 ## Tools
 
@@ -52,6 +53,7 @@ Then in a pi session:
 | `wiki_recall` | Layered Recall — keyword + Graph Relevance across **both** vaults, merged and deduped by page id. |
 | `wiki_search` | Keyword search over **one** vault (the active vault); no graph expansion. |
 | `wiki_review` | List / resolve Review Queue items (`action: list \| resolve`). |
+| `wiki_deep_research` | Auto-close open `deep_research` items: web search → capture → ingest → resolve. Optional `reviewItemId` / `maxResults`. |
 | `wiki_lint` | Mechanical checks → `meta/lint-report.md`; `fix: true` auto-captures uncaptured Inbox files. |
 | `wiki_status` | Counts, pending ingests/reviews, Inbox drift, recent events for the active vault. |
 | `wiki_rebuild_meta` | Rebuild all derived `meta/` artifacts for the active vault. |
@@ -63,6 +65,7 @@ Then in a pi session:
 | `/wiki-ingest [packetId]` | Run the batch ingest pipeline directly via side-calls. |
 | `/wiki-query <question>` | Read-only Query workflow; files the answer as an Analysis page only when explicitly asked. |
 | `/wiki-review` | Walk open Review Queue items one by one interactively. |
+| `/wiki-research [reviewItemId]` | Run the Deep Research pipeline for every open `deep_research` item (search → capture → ingest → resolve). |
 | `/wiki-lint [--fix]` | Run the Lint engine; `--fix` applies the single safe auto-repair. |
 | `/wiki-status` | Print the active vault's status summary. |
 
@@ -74,6 +77,7 @@ Surfaced through `/config` → **LLM Wiki**:
 | --- | --- | --- | --- |
 | `ingestModel` | select | `(use session model)` | Model for batch `wiki_ingest` side-calls; empty follows the session model. |
 | `ingestMaxAttempts` | number | `3` | Max attempts per side-call on unparseable output or provider error (`1` = no retry). |
+| `deepResearchMaxResults` | number | `5` | Top-N web results captured per `deep_research` item by `wiki_deep_research` / `/wiki-research` (per-call can override). |
 | `sessionStartNotice` | boolean | `true` | One-line status hint at session start (Inbox drift / pending ingest / pending review). |
 
 ## Vault layout

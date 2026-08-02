@@ -2,28 +2,40 @@ import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { type ExtensionConfigSchema, readConfig, registerConfigItems, resolveModel } from "@htwang-contrib/common";
 
 import { DEFAULT_INGEST_MAX_ATTEMPTS } from "./core/ingest.ts";
+import { DEFAULT_DEEP_RESEARCH_MAX_RESULTS } from "./core/research.ts";
 
 export interface LlmWikiConfig {
   ingestModel: string;
   ingestMaxAttempts: number;
+  deepResearchMaxResults: number;
   sessionStartNotice: boolean;
 }
 
 const CONFIG_ID = "llm-wiki";
 
 const CONFIG_SCHEMA: ExtensionConfigSchema<LlmWikiConfig> = {
-  defaults: { ingestModel: "", ingestMaxAttempts: DEFAULT_INGEST_MAX_ATTEMPTS, sessionStartNotice: true },
+  defaults: {
+    ingestModel: "",
+    ingestMaxAttempts: DEFAULT_INGEST_MAX_ATTEMPTS,
+    deepResearchMaxResults: DEFAULT_DEEP_RESEARCH_MAX_RESULTS,
+    sessionStartNotice: true,
+  },
 };
 
 export function loadLlmWikiConfig(): LlmWikiConfig {
   const raw = readConfig(CONFIG_ID, CONFIG_SCHEMA);
   const ingestMaxAttempts = Number(raw.ingestMaxAttempts);
+  const deepResearchMaxResults = Number(raw.deepResearchMaxResults);
   return {
     ingestModel: typeof raw.ingestModel === "string" ? raw.ingestModel : "",
     ingestMaxAttempts:
       Number.isFinite(ingestMaxAttempts) && ingestMaxAttempts >= 1
         ? Math.floor(ingestMaxAttempts)
         : DEFAULT_INGEST_MAX_ATTEMPTS,
+    deepResearchMaxResults:
+      Number.isFinite(deepResearchMaxResults) && deepResearchMaxResults >= 1
+        ? Math.floor(deepResearchMaxResults)
+        : DEFAULT_DEEP_RESEARCH_MAX_RESULTS,
     sessionStartNotice: typeof raw.sessionStartNotice === "boolean" ? raw.sessionStartNotice : true,
   };
 }
@@ -53,6 +65,17 @@ export function registerLlmWikiConfigItems(): void {
       value: () => loadLlmWikiConfig().ingestMaxAttempts,
       description:
         "Max attempts for each ingest side-call (analysis and generation) when the output is unparseable or the provider errors. 1 = no retry.",
+      extensionLabel: "LLM Wiki",
+      min: 1,
+      max: 10,
+    },
+    {
+      key: "deepResearchMaxResults",
+      type: "number",
+      label: "Wiki Deep Research Max Results",
+      value: () => loadLlmWikiConfig().deepResearchMaxResults,
+      description:
+        "Top-N web results captured per deep_research review item by wiki_deep_research / /wiki-research (per-call can override). Default 5.",
       extensionLabel: "LLM Wiki",
       min: 1,
       max: 10,

@@ -10,6 +10,7 @@ import {
   isRateLimitError,
   PROVIDERS,
   resolveApiKey,
+  type SearchProvider,
 } from "@htwang-contrib/web-tools";
 import { Type } from "typebox";
 import { loadLlmWikiConfig, registerLlmWikiConfigItems, resolveIngestModel, setCachedModelOptions } from "./config.ts";
@@ -21,6 +22,12 @@ import { type CaptureInput, type CaptureResult, captureSource, type UrlFetcher }
 import { type EnsurePageResult, ensurePage } from "./core/page.ts";
 import { vaultLayout } from "./core/paths.ts";
 import { type RecallHit, type RecallResult, recallAcross, recallVault } from "./core/recall.ts";
+import {
+  type DeepResearchBatchResult,
+  type DeepResearchSearcher,
+  deepResearchBatch,
+  type ItemResearchOutcome,
+} from "./core/research.ts";
 import {
   listReviewItems,
   REVIEW_ACTIONS,
@@ -71,6 +78,48 @@ function createWebToolsUrlFetcher(): UrlFetcher {
         }
       }
       throw new Error(`wiki_capture: every configured fetch provider was rate-limited for ${url}`);
+    },
+  };
+}
+
+function searchCapableProviderNames(): string[] {
+  return PROVIDERS.filter((p) => p.roles.includes("search"))
+    .map((p) => p.envVar)
+    .filter((v): v is string => Boolean(v));
+}
+
+function usableSearchProviders(): Array<{ name: string; provider: SearchProvider | FullProvider }> {
+  const { providers } = instantiateProviders();
+  return providers.filter(({ name }) => Boolean(resolveApiKey(name)));
+}
+
+function noSearchProviderMessage(): string {
+  return `wiki_deep_research: no search provider is configured. Set one of: ${searchCapableProviderNames().join(
+    ", ",
+  )} (via /config or the matching env var).`;
+}
+
+function hasUsableSearchProvider(): boolean {
+  return usableSearchProviders().length > 0;
+}
+
+function createWebToolsSearcher(): DeepResearchSearcher {
+  return {
+    async search(query, maxResults, signal) {
+      const usable = usableSearchProviders();
+      if (usable.length === 0) throw new Error(noSearchProviderMessage());
+      let lastError: Error | undefined;
+      for (const { name, provider } of usable) {
+        try {
+          const response = await provider.search(query, maxResults, signal);
+          logger.debug(`searched "${query}" via ${name}`);
+          return response.results;
+        } catch (err) {
+          lastError = err instanceof Error ? err : new Error(String(err));
+          if (!isRateLimitError(err)) break;
+        }
+      }
+      throw lastError ?? new Error(`wiki_deep_research: search failed for "${query}"`);
     },
   };
 }
@@ -739,6 +788,162 @@ function formatReviewItemPrompt(scope: string, entry: ReviewItem, position: numb
   return lines.join("\n");
 }
 
+type RunDeepResearchOutcome = DeepResearchBatchResult | { error: string };
+
+async function runDeepResearch(args: {
+  ctx: ExtensionContext;
+  signal?: AbortSignal;
+  reviewItemId?: string;
+  maxResults?: number;
+}): Promise<RunDeepResearchOutcome> {
+  const model = resolveIngestModel(args.ctx);
+  if (!model) {
+    return {
+      error:
+        "wiki_deep_research: no model available — set a session model, or configure the Wiki Ingest Model in /config.",
+    };
+  }
+  if (!hasUsableSearchProvider()) {
+    return { error: noSearchProviderMessage() };
+  }
+
+  const vaultRoot = targetVaultRoot(args.ctx.cwd);
+  const config = loadLlmWikiConfig();
+  const perCall = typeof args.maxResults === "number" && args.maxResults > 0 ? Math.floor(args.maxResults) : undefined;
+  const maxResults = perCall ?? config.deepResearchMaxResults;
+  const sourcesDir = vaultLayout(vaultRoot).sourcesRoot;
+  const urlFetcher = createWebToolsUrlFetcher();
+
+  return deepResearchBatch(vaultRoot, {
+    searcher: createWebToolsSearcher(),
+    capturer: {
+      async captureUrl(url, signal) {
+        return captureSource({ sourceType: "url", url }, { sourcesDir, urlFetcher, signal });
+      },
+    },
+    ingester: {
+      async ingest(signal) {
+        const result = await runIngest({ ctx: args.ctx, signal });
+        if ("error" in result) throw new Error(result.error);
+        return result;
+      },
+    },
+    signal: args.signal,
+    maxResults,
+    ...(args.reviewItemId ? { itemId: args.reviewItemId } : {}),
+  });
+}
+
+function formatDeepResearchItemLine(outcome: ItemResearchOutcome): string {
+  const parts = [
+    `searched ${outcome.searched}`,
+    `captured ${outcome.captured}`,
+    `existed ${outcome.existed}`,
+    `ingested ${outcome.ingested}`,
+  ];
+  let line = `- ${outcome.itemId} [${outcome.status}] ${parts.join(", ")}`;
+  if (outcome.note) line += ` — ${outcome.note}`;
+  return line;
+}
+
+function formatDeepResearchSummary(result: DeepResearchBatchResult): string {
+  const lines = [
+    `Deep research: ${result.resolved} resolved, ${result.leftOpen} left open, ${result.skipped} skipped (${result.processed} item(s))`,
+    `vault: ${result.vaultRoot}`,
+  ];
+  for (const outcome of result.outcomes) lines.push(formatDeepResearchItemLine(outcome));
+  return lines.join("\n");
+}
+
+function formatResearchItemNotify(outcome: ItemResearchOutcome, position: number, total: number): string {
+  if (outcome.status === "skipped") {
+    return `skipped ${position}/${total}: ${outcome.itemId} — ${outcome.note ?? "no query"}`;
+  }
+  return `researched ${position}/${total}: ${outcome.itemId} captured ${outcome.captured}, ingested ${outcome.ingested}`;
+}
+
+function registerWikiDeepResearchTool(pi: ExtensionAPI): void {
+  pi.registerTool({
+    name: "wiki_deep_research",
+    label: "Wiki Deep Research",
+    description:
+      "Run the Deep Research pipeline for the active LLM Wiki vault: for each open `deep_research` Review Queue item with a pre-built query, search the web (via the configured web-tools provider chain), capture each result URL into a Source Packet (idempotent by URL), batch-ingest the new packets into cited Wiki Pages, and resolve the item when at least one packet ingests. " +
+      "Re-entrant: re-running skips already-captured URLs and already-ingested packets and continues the unfinished ones. " +
+      "Best-effort: an item is left open when every packet fails to ingest; items with no query are skipped (recorded, never blocking). " +
+      "Optional `reviewItemId` restricts the run to one item; optional `maxResults` overrides the configured top-N (default 5). `/wiki-review` stays a decision-only ledger — this tool performs the research.",
+    promptSnippet: "Auto-close open deep_research review items: web search -> capture -> ingest -> resolve",
+    parameters: Type.Object({
+      reviewItemId: Type.Optional(
+        Type.String({
+          description:
+            "Optional Review Queue item id (REV-...) to research. Omit to process every open deep_research item in the active vault.",
+        }),
+      ),
+      maxResults: Type.Optional(
+        Type.Integer({
+          description: "Optional top-N web results to capture per item (overrides the configured default of 5).",
+          minimum: 1,
+        }),
+      ),
+    }),
+
+    async execute(_toolCallId, params, signal, onUpdate, ctx) {
+      const result = await runDeepResearch({
+        ctx,
+        signal,
+        ...(typeof params.reviewItemId === "string" && params.reviewItemId.trim().length > 0
+          ? { reviewItemId: params.reviewItemId.trim() }
+          : {}),
+        ...(typeof params.maxResults === "number" ? { maxResults: params.maxResults } : {}),
+      });
+      if ("error" in result) {
+        return { content: [{ type: "text", text: result.error }], details: { error: result.error } };
+      }
+      const summary = formatDeepResearchSummary(result);
+      onUpdate?.({ content: [{ type: "text", text: summary }], details: result });
+      return { content: [{ type: "text", text: summary }], details: result };
+    },
+  });
+}
+
+function registerWikiResearchCommand(pi: ExtensionAPI): void {
+  pi.registerCommand("wiki-research", {
+    description:
+      "Run the Deep Research pipeline for every open deep_research Review Queue item in the active vault (search -> capture -> ingest -> resolve). Optional arg: a specific review item id.",
+    async handler(args, ctx) {
+      const reviewItemId = args.trim() || undefined;
+      ctx.ui.setWorkingMessage(
+        reviewItemId ? `researching ${reviewItemId}\u2026` : "researching deep_research items\u2026",
+      );
+      try {
+        const result = await runDeepResearch({ ctx, ...(reviewItemId ? { reviewItemId } : {}) });
+        if ("error" in result) {
+          ctx.ui.notify(result.error, "error");
+          return;
+        }
+        if (result.processed === 0) {
+          ctx.ui.notify("No open deep_research items in the active vault.", "info");
+          return;
+        }
+        const total = result.outcomes.length;
+        result.outcomes.forEach((outcome, i) => {
+          ctx.ui.notify(
+            formatResearchItemNotify(outcome, i + 1, total),
+            outcome.status === "open" ? "warning" : "info",
+          );
+        });
+        ctx.ui.notify(
+          `wiki research: ${result.resolved} resolved, ${result.leftOpen} left open, ${result.skipped} skipped`,
+          result.leftOpen > 0 ? "warning" : "info",
+        );
+        logger.info(`wiki deep research on ${result.vaultRoot}:\n${formatDeepResearchSummary(result)}`);
+      } finally {
+        ctx.ui.setWorkingMessage(undefined);
+      }
+    },
+  });
+}
+
 function emitSessionStartNotice(ctx: ExtensionContext): void {
   if (!loadLlmWikiConfig().sessionStartNotice) return;
   const vault = activeVaultOnDisk(ctx.cwd);
@@ -895,6 +1100,8 @@ export default function initLlmWiki(pi: ExtensionAPI): void {
   registerWikiRecallTool(pi);
   registerWikiIngestTool(pi);
   registerWikiIngestCommand(pi);
+  registerWikiDeepResearchTool(pi);
+  registerWikiResearchCommand(pi);
   registerWikiReviewTool(pi);
   registerWikiReviewCommand(pi);
   registerWikiLintTool(pi);
