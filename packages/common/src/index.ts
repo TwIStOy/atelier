@@ -71,6 +71,8 @@ export {
   clearGlobalState,
   getGlobalState,
 } from "./global-state.ts";
+export type { IsolatedSessionOptions, IsolatedSessionResult } from "./isolated-session.ts";
+export { runIsolatedSession } from "./isolated-session.ts";
 export type { CreateLoggerOptions, Logger, LogLevel } from "./log.ts";
 export {
   createLogger,

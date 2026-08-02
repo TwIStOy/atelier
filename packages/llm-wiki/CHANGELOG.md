@@ -62,3 +62,4 @@
 ### Changed
 
 - Bundled **llm-wiki** skill Review section: `deep_research` is now auto-closable end-to-end via `/wiki-research` (or `wiki_deep_research`); `/wiki-review` (and `wiki_review` resolve) stay a decision-only ledger, keeping the decision/execution separation. `create_page` and `skip` remain in-session agent actions. README tools/commands/configuration tables updated to list `wiki_deep_research`, `/wiki-research`, and `deepResearchMaxResults` ([#94](https://github.com/TwIStOy/pi-extensions/issues/94)).
+- `capture-session.ts` and `ingest-session.ts` now delegate their child-session spawn to the shared `runIsolatedSession` helper in `@htwang-contrib/common` (no behavior change; removes the duplicated spawn boilerplate between the two side-calls).

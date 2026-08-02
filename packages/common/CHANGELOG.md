@@ -5,6 +5,7 @@
 ### Added
 
 - `resolveNow(now?)` injectable-clock helper (`src/time.ts`): normalizes a `Date`, a `() => Date` thunk, or undefined→current time into a concrete `Date`. Exported from the main entry and also from a new pi-free sub-entry `@htwang-contrib/common/time` — the sub-entry loads only `time.ts` and does not pull in the pi-bound modules (e.g. `executeSideCall`) that the main entry re-exports, so pi-free cores (like llm-wiki's `src/core/*`) can use it without breaking their invariant. `package.json` gained an `exports` map (`"."` → existing entry, `"./time"` → `./src/time.ts`); no existing deep-import consumers are affected.
+- `runIsolatedSession(ctx, options, signal?)` (`src/isolated-session.ts`): spawns an isolated child agent session — a `DefaultResourceLoader` with `noExtensions` + the caller-supplied `extensionFactories` (and no skills/prompts/themes/context-files), a caller-supplied `systemPrompt`, and `createAgentSession({ tools: [] })` so the child exposes no built-in tools. Runs in the parent `cwd` (identical vault/path resolution), relays the parent session id, wires abort, and returns the child's final assistant text plus a tool-call count and the sub-session file path. Built for the "wiki op as an isolated side-call" pattern (llm-wiki `/wiki-capture` and `/wiki-ingest`) so the heavy LLM work and tool schemas stay out of the main conversation. Exports `IsolatedSessionOptions`/`IsolatedSessionResult`.
 
 ## [0.4.0] - 2026-07-31
 
