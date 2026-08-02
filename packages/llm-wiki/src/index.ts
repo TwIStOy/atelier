@@ -39,6 +39,7 @@ import {
 } from "./core/review.ts";
 import { renderSessionStartNotice, renderStatusSummary, type WikiStatus, wikiStatus } from "./core/status.ts";
 import { resolveVaults } from "./core/vault.ts";
+import { runIngestSession } from "./ingest-session.ts";
 
 const logger = createLogger("llm-wiki");
 
@@ -518,7 +519,7 @@ function formatIngestSummary(result: IngestBatchResult, vaultRoot: string): stri
   return lines.join("\n");
 }
 
-function registerWikiIngestTool(pi: ExtensionAPI): void {
+export function registerWikiIngestTool(pi: ExtensionAPI): void {
   pi.registerTool({
     name: "wiki_ingest",
     label: "Wiki Ingest",
@@ -552,22 +553,17 @@ function registerWikiIngestTool(pi: ExtensionAPI): void {
 function registerWikiIngestCommand(pi: ExtensionAPI): void {
   pi.registerCommand("wiki-ingest", {
     description:
-      "Run batch wiki ingest: analyze + generate Wiki Pages for every pending Source Packet via side-calls (off-conversation). Optional arg: a specific packet id. Interactive ingest is skill-guided.",
+      "Run batch wiki ingest in an isolated side-call: spawns a child session that registers ONLY the wiki_ingest tool (so the ingest tool never lives in the main conversation), analyzes + generates Wiki Pages for every pending Source Packet, and reports the summary. Optional arg: a specific packet id. Interactive ingest is skill-guided.",
     async handler(args, ctx) {
       const packetId = args.trim() || undefined;
       ctx.ui.setWorkingMessage(packetId ? `ingesting ${packetId}\u2026` : "ingesting pending sources\u2026");
       try {
-        const result = await runIngest({ ctx, ...(packetId ? { packetId } : {}) });
-        if ("error" in result) {
-          ctx.ui.notify(result.error, "error");
-          return;
-        }
-        const vaultRoot = targetVaultRoot(ctx.cwd);
+        const result = await runIngestSession(ctx, { ...(packetId ? { packetId } : {}) });
         ctx.ui.notify(
-          `wiki ingest: ${result.ingested} ingested, ${result.failed} failed, ${result.skipped} skipped`,
-          result.failed > 0 ? "warning" : "info",
+          result.isError ? (result.errorMessage ?? "wiki ingest failed") : result.text,
+          result.isError ? "error" : "info",
         );
-        logger.info(`wiki ingest batch on ${vaultRoot}:\n${formatIngestSummary(result, vaultRoot)}`);
+        logger.info(`wiki ingest side-call: ${result.toolCalls} tool call(s), session ${result.subSessionFile ?? "?"}`);
       } finally {
         ctx.ui.setWorkingMessage(undefined);
       }
@@ -1126,7 +1122,6 @@ export default function initLlmWiki(pi: ExtensionAPI): void {
   registerWikiEnsurePageTool(pi);
   registerWikiSearchTool(pi);
   registerWikiRecallTool(pi);
-  registerWikiIngestTool(pi);
   registerWikiIngestCommand(pi);
   registerWikiDeepResearchTool(pi);
   registerWikiResearchCommand(pi);

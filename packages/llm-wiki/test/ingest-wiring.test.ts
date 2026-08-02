@@ -23,7 +23,7 @@ import { bootstrapVault } from "../src/core/bootstrap.ts";
 import { captureSource } from "../src/core/packet.ts";
 import { vaultLayout } from "../src/core/paths.ts";
 import { listReviewItems } from "../src/core/review.ts";
-import initLlmWiki from "../src/index.ts";
+import initLlmWiki, { registerWikiIngestTool } from "../src/index.ts";
 
 const FIXED_DATE = () => new Date(Date.UTC(2024, 0, 5, 9, 0, 0));
 
@@ -139,12 +139,12 @@ const fakeCtx = (): Record<string, unknown> => ({
 });
 
 describe("llm-wiki wiring — registrations", () => {
-  it("registers the wiki_ingest tool and /wiki-ingest command", () => {
+  it("registers /wiki-ingest but NOT wiki_ingest (ingest moved to a side-call)", () => {
     const mock = createMockPi();
     initLlmWiki(mock.pi as never);
 
-    expect(mock.tools.has("wiki_ingest")).toBe(true);
     expect(mock.commands.has("wiki-ingest")).toBe(true);
+    expect(mock.tools.has("wiki_ingest")).toBe(false);
   });
 
   it("registers ingestModel and ingestMaxAttempts config items under llm-wiki", () => {
@@ -167,7 +167,7 @@ describe("llm-wiki wiring — wiki_ingest tool end-to-end", () => {
     sideCallReturnsAnalysisThenGeneration();
 
     const mock = createMockPi();
-    initLlmWiki(mock.pi as never);
+    registerWikiIngestTool(mock.pi as never);
 
     const tool = mock.tools.get("wiki_ingest")!;
     const result = await tool.execute("t1", {}, undefined, undefined, fakeCtx());
@@ -196,7 +196,7 @@ describe("llm-wiki wiring — wiki_ingest tool end-to-end", () => {
     sideCallReturnsAnalysisThenGeneration();
 
     const mock = createMockPi();
-    initLlmWiki(mock.pi as never);
+    registerWikiIngestTool(mock.pi as never);
 
     const result = await mock.tools
       .get("wiki_ingest")!
@@ -209,7 +209,7 @@ describe("llm-wiki wiring — wiki_ingest tool end-to-end", () => {
   it("returns an error result when no model is available", async () => {
     await captureTextSource("# Foo");
     const mock = createMockPi();
-    initLlmWiki(mock.pi as never);
+    registerWikiIngestTool(mock.pi as never);
 
     const result = await mock.tools.get("wiki_ingest")!.execute("t1", {}, undefined, undefined, {
       cwd: projectDir,
@@ -220,22 +220,5 @@ describe("llm-wiki wiring — wiki_ingest tool end-to-end", () => {
     expect(result.content[0].text).toMatch(/no model available/i);
     expect(result.details).toMatchObject({ error: expect.stringMatching(/no model/i) });
     expect(executeSideCallMock).not.toHaveBeenCalled();
-  });
-});
-
-describe("llm-wiki wiring — /wiki-ingest command", () => {
-  it("runs the batch and notifies the summary", async () => {
-    await captureTextSource("# Foo");
-    sideCallReturnsAnalysisThenGeneration();
-
-    const mock = createMockPi();
-    initLlmWiki(mock.pi as never);
-
-    const notify = vi.fn();
-    const ctx = { ...fakeCtx(), ui: { notify, setWorkingMessage() {} } };
-    await mock.commands.get("wiki-ingest")!.handler("", ctx);
-
-    expect(notify).toHaveBeenCalledWith(expect.stringMatching(/wiki ingest: 1 ingested/), "info");
-    expect(fs.existsSync(path.join(vaultRoot, "wiki", "sources", "the-foo-paper.md"))).toBe(true);
   });
 });

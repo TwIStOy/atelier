@@ -5,6 +5,7 @@
 ### Breaking Changes
 
 - `wiki_capture` is no longer registered in the main session. Capture now happens only through the `/wiki-capture` slash command, which spawns an isolated child session that registers `wiki_capture` alone — so the capture tool (and the source text it pulls in) never occupies the main conversation's context. Code or skills that called the `wiki_capture` tool directly from the main session must switch to `/wiki-capture`.
+- `wiki_ingest` is no longer registered in the main session either. Batch ingest now happens only through the `/wiki-ingest` slash command, which spawns an isolated child session that registers `wiki_ingest` alone. Code or skills that called the `wiki_ingest` tool directly from the main session must switch to `/wiki-ingest`. (`wiki_deep_research` / `/wiki-research` are unaffected — they call the internal `runIngest` function directly, not the tool.)
 
 ### Added
 
@@ -55,6 +56,8 @@
 - `deepResearchMaxResults` ConfigItem (`/config` → LLM Wiki, number, default 5, 1–10): top-N web results captured per `deep_research` item by `wiki_deep_research` / `/wiki-research`; per-call `maxResults` overrides it.
 - `src/capture-session.ts`: a focused child-session spawn for capture (modeled on the `subagents` `run-agent` pattern, trimmed). `runCaptureSession(ctx, { source })` builds a `DefaultResourceLoader` with `noExtensions` + a single purpose-built factory that registers ONLY `wiki_capture` (bypassing the global disable gate, since the child is explicitly invoked for capture), a capture-focused system prompt, and `createAgentSession({ tools: [] })` so the child exposes no built-in tools. It runs in the parent `cwd` (so project-vault resolution is identical), relays the parent session id, wires abort, and returns the child's final assistant text + tool-call count + sub-session file. URL fetch still works because `wiki_capture`'s web-tools `resolveApiKey` reads the global `extensions.json` directly — no need to load the web-tools extension in the child.
 - `/wiki-capture` slash command: the sole entry point for capture. `/wiki-capture <url | file path | text>` spawns the isolated capture side-call, shows a working message while it runs, and notifies the resulting packet id (or the error). `wiki_capture` is deliberately not registered in the main session — capture context stays isolated by design.
+- `src/ingest-session.ts`: a focused child-session spawn for ingest, isomorphic to `capture-session.ts`. `runIngestSession(ctx, { packetId? })` builds a `DefaultResourceLoader` with `noExtensions` + a single factory that registers ONLY `wiki_ingest` (bypassing the global disable gate), an ingest-focused system prompt, and `createAgentSession({ tools: [] })`. The child calls `wiki_ingest` once (optional `packetId` restricts the batch); `wiki_ingest`'s internal two-step pipeline + `resolveIngestModel` work unchanged because they read the global config. No web-tools extension needed (ingest processes already-captured packets).
+- `/wiki-ingest` slash command repurposed: it now spawns the isolated ingest side-call instead of running the batch in-process, and notifies the child's summary (or error). `wiki_ingest` is deliberately not registered in the main session. The internal `runIngest` function is retained for `wiki_deep_research` / `/wiki-research`, which call it directly.
 
 ### Changed
 
