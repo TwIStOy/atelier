@@ -36,7 +36,7 @@ vi.mock("@htwang-contrib/web-tools", () => ({
 import { bootstrapVault } from "../src/core/bootstrap.ts";
 import { vaultLayout } from "../src/core/paths.ts";
 import { listReviewItems } from "../src/core/review.ts";
-import initLlmWiki from "../src/index.ts";
+import initLlmWiki, { registerWikiDeepResearchTool } from "../src/index.ts";
 
 const FIXED_DATE = () => new Date(Date.UTC(2024, 0, 5, 9, 0, 0));
 
@@ -186,12 +186,12 @@ const fakeCtx = (): Record<string, unknown> => ({
 });
 
 describe("llm-wiki deep-research wiring — registrations", () => {
-  it("registers the wiki_deep_research tool and /wiki-research command", () => {
+  it("registers /wiki-research but NOT wiki_deep_research (research moved to a side-call)", () => {
     const mock = createMockPi();
     initLlmWiki(mock.pi as never);
 
-    expect(mock.tools.has("wiki_deep_research")).toBe(true);
     expect(mock.commands.has("wiki-research")).toBe(true);
+    expect(mock.tools.has("wiki_deep_research")).toBe(false);
   });
 
   it("registers the deepResearchMaxResults config item under llm-wiki", () => {
@@ -212,7 +212,7 @@ describe("llm-wiki deep-research wiring — wiki_deep_research tool", () => {
     sideCallIngestsSuccessfully();
 
     const mock = createMockPi();
-    initLlmWiki(mock.pi as never);
+    registerWikiDeepResearchTool(mock.pi as never);
 
     const result = await mock.tools.get("wiki_deep_research")!.execute("t1", {}, undefined, undefined, fakeCtx());
 
@@ -233,7 +233,7 @@ describe("llm-wiki deep-research wiring — wiki_deep_research tool", () => {
     sideCallIngestsSuccessfully();
 
     const mock = createMockPi();
-    initLlmWiki(mock.pi as never);
+    registerWikiDeepResearchTool(mock.pi as never);
 
     const result = await mock.tools.get("wiki_deep_research")!.execute("t1", {}, undefined, undefined, fakeCtx());
 
@@ -250,7 +250,7 @@ describe("llm-wiki deep-research wiring — wiki_deep_research tool", () => {
     sideCallIngestsSuccessfully();
 
     const mock = createMockPi();
-    initLlmWiki(mock.pi as never);
+    registerWikiDeepResearchTool(mock.pi as never);
 
     const result = await mock.tools
       .get("wiki_deep_research")!
@@ -285,7 +285,7 @@ describe("llm-wiki deep-research wiring — wiki_deep_research tool", () => {
     });
 
     const mock = createMockPi();
-    initLlmWiki(mock.pi as never);
+    registerWikiDeepResearchTool(mock.pi as never);
 
     await mock.tools.get("wiki_deep_research")!.execute("t1", { maxResults: 3 }, undefined, undefined, fakeCtx());
 
@@ -298,40 +298,11 @@ describe("llm-wiki deep-research wiring — wiki_deep_research tool", () => {
     webToolsMock.instantiateProviders.mockReturnValue({ providerNames: [], providers: [] });
 
     const mock = createMockPi();
-    initLlmWiki(mock.pi as never);
+    registerWikiDeepResearchTool(mock.pi as never);
 
     const result = await mock.tools.get("wiki_deep_research")!.execute("t1", {}, undefined, undefined, fakeCtx());
 
     expect(result.content[0].text).toMatch(/no search provider/i);
     expect(result.details).toMatchObject({ error: expect.stringMatching(/no search provider/i) });
-  });
-});
-
-describe("llm-wiki deep-research wiring — /wiki-research command", () => {
-  it("runs the batch and notifies a per-item then final summary", async () => {
-    fileDeepResearchItem("foo examples");
-    wireFakeProvider({ searchResults: [{ url: "https://a.example" }] });
-    sideCallIngestsSuccessfully();
-
-    const mock = createMockPi();
-    initLlmWiki(mock.pi as never);
-
-    const notify = vi.fn();
-    const ctx = { ...fakeCtx(), ui: { notify, setWorkingMessage() {} } };
-    await mock.commands.get("wiki-research")!.handler("", ctx);
-
-    expect(notify).toHaveBeenCalledWith(expect.stringMatching(/researched 1\/1: REV-.*captured 1, ingested 1/), "info");
-    expect(notify).toHaveBeenCalledWith(expect.stringMatching(/wiki research: 1 resolved/), "info");
-  });
-
-  it("notifies 'nothing to research' when there are no open deep_research items", async () => {
-    const mock = createMockPi();
-    initLlmWiki(mock.pi as never);
-
-    const notify = vi.fn();
-    const ctx = { ...fakeCtx(), ui: { notify, setWorkingMessage() {} } };
-    await mock.commands.get("wiki-research")!.handler("", ctx);
-
-    expect(notify).toHaveBeenCalledWith(expect.stringMatching(/no open deep_research items/i), "info");
   });
 });

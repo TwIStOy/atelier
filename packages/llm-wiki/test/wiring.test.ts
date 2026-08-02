@@ -4,7 +4,7 @@ import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { bootstrapVault } from "../src/core/bootstrap.ts";
 import { appendReviewItem, listReviewItems } from "../src/core/review.ts";
-import initLlmWiki from "../src/index.ts";
+import initLlmWiki, { registerWikiLintTool, registerWikiReviewTool } from "../src/index.ts";
 
 const mockConfig = vi.hoisted(() => ({ current: { ingestModel: "", sessionStartNotice: true } }));
 
@@ -358,14 +358,15 @@ describe("llm-wiki wiring — wiki_recall tool", () => {
 describe("llm-wiki wiring — wiki_review tool + /wiki-review command", () => {
   const FIXED_NOW = () => new Date(Date.UTC(2024, 0, 5, 9, 30, 0));
 
-  it("registers the wiki_review tool and the /wiki-review command", () => {
+  it("registers /wiki-review but NOT wiki_review (review tool moved out of the main session)", () => {
     const mock = setup();
-    expect(mock.tools.has("wiki_review")).toBe(true);
     expect(mock.commands.has("wiki-review")).toBe(true);
+    expect(mock.tools.has("wiki_review")).toBe(false);
   });
 
   it("lists open items and resolves one through the registered tool", async () => {
     const mock = setup();
+    registerWikiReviewTool(mock.pi as never);
     appendReviewItem(
       vaultRoot,
       { packetId: "SRC-2024-01-05-001", kind: "contradiction", title: "RSC vs client", action: "create_page" },
@@ -486,14 +487,15 @@ describe("llm-wiki wiring — wiki_lint tool", () => {
   function lintTool(mock: MockPi): {
     execute: (id: string, params: unknown, signal: unknown, onUpdate: unknown, ctx: unknown) => Promise<unknown>;
   } {
+    if (!mock.tools.has("wiki_lint")) registerWikiLintTool(mock.pi as never);
     return mock.tools.get("wiki_lint") as {
       execute: (id: string, params: unknown, signal: unknown, onUpdate: unknown, ctx: unknown) => Promise<unknown>;
     };
   }
 
-  it("registers the wiki_lint tool", () => {
+  it("does NOT register wiki_lint in the main session (lint moved to a side-call)", () => {
     const mock = setup();
-    expect(mock.tools.has("wiki_lint")).toBe(true);
+    expect(mock.tools.has("wiki_lint")).toBe(false);
   });
 
   it("writes meta/lint-report.md and reports findings", async () => {

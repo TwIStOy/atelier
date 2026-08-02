@@ -40,6 +40,8 @@ import {
 import { renderSessionStartNotice, renderStatusSummary, type WikiStatus, wikiStatus } from "./core/status.ts";
 import { resolveVaults } from "./core/vault.ts";
 import { runIngestSession } from "./ingest-session.ts";
+import { runLintSession } from "./lint-session.ts";
+import { runResearchSession } from "./research-session.ts";
 
 const logger = createLogger("llm-wiki");
 
@@ -603,7 +605,7 @@ function resolveActiveVault(cwd: string): { vaultRoot: string; scope: string } {
   return { vaultRoot: personalVault, scope: "personal vault" };
 }
 
-function registerWikiReviewTool(pi: ExtensionAPI): void {
+export function registerWikiReviewTool(pi: ExtensionAPI): void {
   pi.registerTool({
     name: "wiki_review",
     label: "Wiki Review",
@@ -852,14 +854,7 @@ function formatDeepResearchSummary(result: DeepResearchBatchResult): string {
   return lines.join("\n");
 }
 
-function formatResearchItemNotify(outcome: ItemResearchOutcome, position: number, total: number): string {
-  if (outcome.status === "skipped") {
-    return `skipped ${position}/${total}: ${outcome.itemId} — ${outcome.note ?? "no query"}`;
-  }
-  return `researched ${position}/${total}: ${outcome.itemId} captured ${outcome.captured}, ingested ${outcome.ingested}`;
-}
-
-function registerWikiDeepResearchTool(pi: ExtensionAPI): void {
+export function registerWikiDeepResearchTool(pi: ExtensionAPI): void {
   pi.registerTool({
     name: "wiki_deep_research",
     label: "Wiki Deep Research",
@@ -906,34 +901,21 @@ function registerWikiDeepResearchTool(pi: ExtensionAPI): void {
 function registerWikiResearchCommand(pi: ExtensionAPI): void {
   pi.registerCommand("wiki-research", {
     description:
-      "Run the Deep Research pipeline for every open deep_research Review Queue item in the active vault (search -> capture -> ingest -> resolve). Optional arg: a specific review item id.",
+      "Run the Deep Research pipeline in an isolated side-call for every open deep_research Review Queue item in the active vault (search -> capture -> ingest -> resolve). Optional arg: a specific review item id.",
     async handler(args, ctx) {
       const reviewItemId = args.trim() || undefined;
       ctx.ui.setWorkingMessage(
         reviewItemId ? `researching ${reviewItemId}\u2026` : "researching deep_research items\u2026",
       );
       try {
-        const result = await runDeepResearch({ ctx, ...(reviewItemId ? { reviewItemId } : {}) });
-        if ("error" in result) {
-          ctx.ui.notify(result.error, "error");
-          return;
-        }
-        if (result.processed === 0) {
-          ctx.ui.notify("No open deep_research items in the active vault.", "info");
-          return;
-        }
-        const total = result.outcomes.length;
-        result.outcomes.forEach((outcome, i) => {
-          ctx.ui.notify(
-            formatResearchItemNotify(outcome, i + 1, total),
-            outcome.status === "open" ? "warning" : "info",
-          );
-        });
+        const result = await runResearchSession(ctx, { ...(reviewItemId ? { reviewItemId } : {}) });
         ctx.ui.notify(
-          `wiki research: ${result.resolved} resolved, ${result.leftOpen} left open, ${result.skipped} skipped`,
-          result.leftOpen > 0 ? "warning" : "info",
+          result.isError ? (result.errorMessage ?? "wiki research failed") : result.text,
+          result.isError ? "error" : "info",
         );
-        logger.info(`wiki deep research on ${result.vaultRoot}:\n${formatDeepResearchSummary(result)}`);
+        logger.info(
+          `wiki research side-call: ${result.toolCalls} tool call(s), session ${result.subSessionFile ?? "?"}`,
+        );
       } finally {
         ctx.ui.setWorkingMessage(undefined);
       }
@@ -982,7 +964,7 @@ function formatLintSummary(report: LintReport, reportPath: string, fixResult: Li
   return lines.join("\n");
 }
 
-function registerWikiLintTool(pi: ExtensionAPI): void {
+export function registerWikiLintTool(pi: ExtensionAPI): void {
   pi.registerTool({
     name: "wiki_lint",
     label: "Wiki Lint",
@@ -1058,11 +1040,21 @@ function registerWikiCaptureCommand(pi: ExtensionAPI): void {
 
 function registerWikiSlashCommands(pi: ExtensionAPI): void {
   pi.registerCommand("wiki-lint", {
-    description: "Run wiki lint and write meta/lint-report.md. Append --fix to auto-capture uncaptured inbox files.",
+    description:
+      "Run wiki lint in an isolated side-call and write meta/lint-report.md. Append --fix to auto-capture uncaptured inbox files.",
     async handler(args, ctx) {
-      const vaultRoot = targetVaultRoot(ctx.cwd);
-      const run = await runLint(vaultRoot, /\b--fix\b/.test(args));
-      ctx.ui.notify(run.summary, run.report.summary.errors > 0 ? "warning" : "info");
+      const fix = /\b--fix\b/.test(args);
+      ctx.ui.setWorkingMessage(fix ? "linting + fixing\u2026" : "linting\u2026");
+      try {
+        const result = await runLintSession(ctx, { fix });
+        ctx.ui.notify(
+          result.isError ? (result.errorMessage ?? "wiki lint failed") : result.text,
+          result.isError ? "error" : "info",
+        );
+        logger.info(`wiki lint side-call: ${result.toolCalls} tool call(s), session ${result.subSessionFile ?? "?"}`);
+      } finally {
+        ctx.ui.setWorkingMessage(undefined);
+      }
     },
   });
 
@@ -1123,11 +1115,8 @@ export default function initLlmWiki(pi: ExtensionAPI): void {
   registerWikiSearchTool(pi);
   registerWikiRecallTool(pi);
   registerWikiIngestCommand(pi);
-  registerWikiDeepResearchTool(pi);
   registerWikiResearchCommand(pi);
-  registerWikiReviewTool(pi);
   registerWikiReviewCommand(pi);
-  registerWikiLintTool(pi);
   registerWikiStatusTool(pi);
   registerWikiSlashCommands(pi);
 }
