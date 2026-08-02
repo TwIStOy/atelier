@@ -553,6 +553,14 @@ describe("llm-wiki wiring — wiki_status tool", () => {
   });
 });
 
+describe("llm-wiki wiring — /wiki-capture command (capture moved to side-call)", () => {
+  it("registers /wiki-capture and does NOT register wiki_capture in the main session", () => {
+    const mock = setup();
+    expect(mock.commands.has("wiki-capture")).toBe(true);
+    expect(mock.tools.has("wiki_capture")).toBe(false);
+  });
+});
+
 describe("llm-wiki wiring — lint/status slash commands", () => {
   it("registers /wiki-lint and /wiki-status", () => {
     const mock = setup();

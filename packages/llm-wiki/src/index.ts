@@ -13,6 +13,7 @@ import {
   type SearchProvider,
 } from "@htwang-contrib/web-tools";
 import { Type } from "typebox";
+import { runCaptureSession } from "./capture-session.ts";
 import { loadLlmWikiConfig, registerLlmWikiConfigItems, resolveIngestModel, setCachedModelOptions } from "./config.ts";
 import { classifyPathOperation } from "./core/guardrail.ts";
 import { type IngestBatchResult, ingestBatch, type SideCaller } from "./core/ingest.ts";
@@ -173,7 +174,7 @@ function activeVaultOnDisk(cwd: string): string | null {
 
 const touchedVaults = new Set<string>();
 
-function registerWikiCaptureTool(pi: ExtensionAPI): void {
+export function registerWikiCaptureTool(pi: ExtensionAPI): void {
   pi.registerTool({
     name: "wiki_capture",
     label: "Wiki Capture",
@@ -1032,6 +1033,33 @@ function registerWikiStatusTool(pi: ExtensionAPI): void {
   });
 }
 
+function registerWikiCaptureCommand(pi: ExtensionAPI): void {
+  pi.registerCommand("wiki-capture", {
+    description:
+      "Capture a source into the LLM Wiki via an isolated side-call: spawns a child session that registers ONLY the wiki_capture tool (so the capture tool never lives in the main conversation), captures the source into an immutable Source Packet, and reports the packet id. Argument: a URL, a local .md/.txt path, or pasted text.",
+    async handler(args, ctx) {
+      const source = args.trim();
+      if (!source) {
+        ctx.ui.notify("Usage: /wiki-capture <url | file path | text>", "warning");
+        return;
+      }
+      ctx.ui.setWorkingMessage("capturing source\u2026");
+      try {
+        const result = await runCaptureSession(ctx, { source });
+        ctx.ui.notify(
+          result.isError ? (result.errorMessage ?? "wiki capture failed") : result.text,
+          result.isError ? "error" : "info",
+        );
+        logger.info(
+          `wiki capture side-call: ${result.toolCalls} tool call(s), session ${result.subSessionFile ?? "?"}`,
+        );
+      } finally {
+        ctx.ui.setWorkingMessage(undefined);
+      }
+    },
+  });
+}
+
 function registerWikiSlashCommands(pi: ExtensionAPI): void {
   pi.registerCommand("wiki-lint", {
     description: "Run wiki lint and write meta/lint-report.md. Append --fix to auto-capture uncaptured inbox files.",
@@ -1093,7 +1121,7 @@ export default function initLlmWiki(pi: ExtensionAPI): void {
     rebuildTouchedVaults();
   });
 
-  registerWikiCaptureTool(pi);
+  registerWikiCaptureCommand(pi);
   registerWikiRebuildMetaTool(pi);
   registerWikiEnsurePageTool(pi);
   registerWikiSearchTool(pi);

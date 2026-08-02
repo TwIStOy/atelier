@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Breaking Changes
+
+- `wiki_capture` is no longer registered in the main session. Capture now happens only through the `/wiki-capture` slash command, which spawns an isolated child session that registers `wiki_capture` alone — so the capture tool (and the source text it pulls in) never occupies the main conversation's context. Code or skills that called the `wiki_capture` tool directly from the main session must switch to `/wiki-capture`.
+
 ### Added
 
 - Package scaffold (`@htwang-contrib/llm-wiki`): standard monorepo layout (`main: src/index.ts`), devDeps aligned with sibling packages. The pi extension entry (`src/index.ts`) is an intentional no-op stub; the pi binding (config items, tools, commands) lands in #76+.
@@ -49,6 +53,8 @@
 - `wiki_deep_research` pi tool (snake_case): runs the Deep Research pipeline for the active vault (project if present, else personal). Optional `reviewItemId` restricts the run to one item; optional `maxResults` overrides the configured top-N. The search step reuses the `@htwang-contrib/web-tools` provider chain (`instantiateProviders()`, rate-limit fallback consistent with `web_search`, gated by a resolved API key); capture reuses the `wiki_capture` URL fetcher (idempotent by URL); ingest reuses the configured `ingestModel`. Returns a structured per-item summary (status, searched/captured/existed/ingested counts, per-URL outcomes) and a clear error when no search provider or no model is configured.
 - `/wiki-research` slash command: runs the same pipeline for every open `deep_research` item (optional arg = one item id), emitting a per-item `notify` (`researched i/m: REV-… captured x, ingested y`, or `skipped …` for query-less items) and a final resolved/left-open/skipped summary; reports "no open deep_research items" when the queue is empty. `/wiki-review` selecting Deep research stays a decision-only ledger — decision and execution are deliberately separate surfaces.
 - `deepResearchMaxResults` ConfigItem (`/config` → LLM Wiki, number, default 5, 1–10): top-N web results captured per `deep_research` item by `wiki_deep_research` / `/wiki-research`; per-call `maxResults` overrides it.
+- `src/capture-session.ts`: a focused child-session spawn for capture (modeled on the `subagents` `run-agent` pattern, trimmed). `runCaptureSession(ctx, { source })` builds a `DefaultResourceLoader` with `noExtensions` + a single purpose-built factory that registers ONLY `wiki_capture` (bypassing the global disable gate, since the child is explicitly invoked for capture), a capture-focused system prompt, and `createAgentSession({ tools: [] })` so the child exposes no built-in tools. It runs in the parent `cwd` (so project-vault resolution is identical), relays the parent session id, wires abort, and returns the child's final assistant text + tool-call count + sub-session file. URL fetch still works because `wiki_capture`'s web-tools `resolveApiKey` reads the global `extensions.json` directly — no need to load the web-tools extension in the child.
+- `/wiki-capture` slash command: the sole entry point for capture. `/wiki-capture <url | file path | text>` spawns the isolated capture side-call, shows a working message while it runs, and notifies the resulting packet id (or the error). `wiki_capture` is deliberately not registered in the main session — capture context stays isolated by design.
 
 ### Changed
 
