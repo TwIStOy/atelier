@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import * as path from "node:path";
 import { bootstrapVault } from "../src/core/bootstrap.ts";
+import { initGitRepo } from "../src/core/git.ts";
 import { VAULT_DIR_NAME } from "../src/core/paths.ts";
 
 interface ParsedArgs {
@@ -13,7 +14,9 @@ function printUsage(): void {
     [
       "Usage: bootstrap.ts [parent-dir] [--topic \"<text>\"]",
       "",
-      "Initializes an LLM Wiki vault at <parent-dir>/.llm-wiki (idempotent — safe to re-run).",
+      "Initializes an LLM Wiki vault at <parent-dir>/.llm-wiki and inits it as a git",
+      "repo (gpgsign off, ssh-agent stripped) so it is manageable in a remote env.",
+      "Idempotent — safe to re-run.",
       "parent-dir defaults to the current directory.",
       "",
       "Examples:",
@@ -46,7 +49,14 @@ function parseArgs(argv: string[]): ParsedArgs {
 const { parent, topic } = parseArgs(process.argv.slice(2));
 const vaultRoot = path.join(parent, VAULT_DIR_NAME);
 const result = bootstrapVault(vaultRoot, topic ? { topic } : {});
+const gitResult = initGitRepo(vaultRoot);
 const head = result.created
   ? `Initialized wiki at ${result.root} (${result.createdFiles.length} files created)`
   : `Wiki already initialized at ${result.root} (no changes)`;
-console.log(`${head}${result.topic ? `\ntopic: ${result.topic}` : ""}`);
+const shortSha = gitResult.commitSha ? ` ${gitResult.commitSha.slice(0, 7)}` : "";
+const gitLine = gitResult.initialized
+  ? gitResult.committed
+    ? `Initialized git repo at${shortSha} — commit.gpgsign off, ssh-agent disabled`
+    : "Initialized git repo — commit.gpgsign off, ssh-agent disabled"
+  : "Git repo already initialized (gpgsign off, ssh-agent disabled)";
+console.log(`${head}${result.topic ? `\ntopic: ${result.topic}` : ""}\n${gitLine}`);

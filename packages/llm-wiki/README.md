@@ -27,7 +27,7 @@ Enable the extension in pi (it registers under the **LLM Wiki** group in `/confi
 
 ## Quickstart
 
-Bootstrap a vault (one-time setup; idempotent):
+Bootstrap a vault (one-time setup; idempotent — also inits it as a git repo, see [Git-managed vault](#git-managed-vault)):
 
 ```sh
 node packages/llm-wiki/scripts/bootstrap.ts                  # creates ./.llm-wiki (project vault)
@@ -100,6 +100,20 @@ Created by `bootstrapVault` (idempotent — re-running only fills in what is mis
 ```
 
 The **active vault** for write/capture tools is the Project Vault if present, else the Personal Vault. Recall always searches both.
+
+## Git-managed vault
+
+`bootstrap.ts` inits each vault as its own git repo and makes a baseline `Initial wiki vault` commit, so a vault is version-controlled from creation. The repo is **hardened for a remote/headless environment** — local config that overrides the host's global git settings:
+
+| `git config --local` | Value | Why |
+| --- | --- | --- |
+| `commit.gpgsign` / `tag.gpgsign` | `false` | This repo's global config signs commits via an SSH key (`gpg.format = ssh`); signing needs a live `ssh-agent` that is often absent remotely. Disabled here so commits never reach the agent. |
+| `core.sshCommand` | `env -u SSH_AUTH_SOCK ssh` | Strips the agent socket from any git ssh call, so no operation can use the agent. |
+| `user.name` / `user.email` | `LLM Wiki` / `llm-wiki@local` | Neutral identity so the baseline commit succeeds with no global `user.*` configured. |
+
+Everything in the vault (including `meta/`) is tracked; the only `.gitignore` entries are `.DS_Store` and `*.tmp` (atomic-write leftovers). Re-running `bootstrap.ts` is a no-op for git (no second commit) but re-applies the hardening if it has drifted.
+
+> **Project-vault note:** the Project Vault lives at `<project>/.llm-wiki/`. If `<project>` is itself a git repo, this creates a nested repo. Add `.llm-wiki/` to the project's own `.gitignore` if you don't want the outer repo to see it.
 
 ## Relationship with the `memory` extension
 
