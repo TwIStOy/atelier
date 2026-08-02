@@ -1,6 +1,7 @@
 import type { ExtensionAPI, ExtensionContext, ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import { type IsolatedSessionResult, runIsolatedSession } from "@htwang-contrib/common";
 import { registerWikiCaptureTool } from "./index.ts";
+import { WIKI_SIDE_CALL_FACTORIES } from "./side-call-base.ts";
 
 const CAPTURE_SYSTEM_PROMPT = [
   "You are the LLM Wiki capture agent, running in an isolated session.",
@@ -37,7 +38,12 @@ export async function runCaptureSession(
   const task = `Capture the following source into the LLM Wiki as an immutable Source Packet using the wiki_capture tool, then report the packet id.\n\nSource:\n${source}`;
   return runIsolatedSession(
     ctx,
-    { label: "/wiki-capture", extensionFactories: [captureToolsFactory], systemPrompt: CAPTURE_SYSTEM_PROMPT, task },
+    {
+      label: "/wiki-capture",
+      extensionFactories: [...WIKI_SIDE_CALL_FACTORIES, captureToolsFactory],
+      systemPrompt: CAPTURE_SYSTEM_PROMPT,
+      task,
+    },
     signal,
   );
 }

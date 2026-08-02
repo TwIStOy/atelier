@@ -1,6 +1,7 @@
 import type { ExtensionAPI, ExtensionContext, ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import { type IsolatedSessionResult, runIsolatedSession } from "@htwang-contrib/common";
 import { registerWikiLintTool } from "./index.ts";
+import { WIKI_SIDE_CALL_FACTORIES } from "./side-call-base.ts";
 
 const LINT_SYSTEM_PROMPT = [
   "You are the LLM Wiki lint agent, running in an isolated session.",
@@ -30,7 +31,12 @@ export async function runLintSession(
   const task = `Run the wiki health check using the wiki_lint tool, then report the summary.${fixClause}`;
   return runIsolatedSession(
     ctx,
-    { label: "/wiki-lint", extensionFactories: [lintToolsFactory], systemPrompt: LINT_SYSTEM_PROMPT, task },
+    {
+      label: "/wiki-lint",
+      extensionFactories: [...WIKI_SIDE_CALL_FACTORIES, lintToolsFactory],
+      systemPrompt: LINT_SYSTEM_PROMPT,
+      task,
+    },
     signal,
   );
 }

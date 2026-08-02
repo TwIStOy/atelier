@@ -1,6 +1,7 @@
 import type { ExtensionAPI, ExtensionContext, ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import { type IsolatedSessionResult, runIsolatedSession } from "@htwang-contrib/common";
 import { registerWikiDeepResearchTool } from "./index.ts";
+import { WIKI_SIDE_CALL_FACTORIES } from "./side-call-base.ts";
 
 const RESEARCH_SYSTEM_PROMPT = [
   "You are the LLM Wiki deep research agent, running in an isolated session.",
@@ -32,7 +33,12 @@ export async function runResearchSession(
   const task = `Run the Deep Research pipeline using the wiki_deep_research tool, then report the summary.${itemClause}`;
   return runIsolatedSession(
     ctx,
-    { label: "/wiki-research", extensionFactories: [researchToolsFactory], systemPrompt: RESEARCH_SYSTEM_PROMPT, task },
+    {
+      label: "/wiki-research",
+      extensionFactories: [...WIKI_SIDE_CALL_FACTORIES, researchToolsFactory],
+      systemPrompt: RESEARCH_SYSTEM_PROMPT,
+      task,
+    },
     signal,
   );
 }

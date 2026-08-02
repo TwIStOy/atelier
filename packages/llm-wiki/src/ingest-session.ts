@@ -1,6 +1,7 @@
 import type { ExtensionAPI, ExtensionContext, ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import { type IsolatedSessionResult, runIsolatedSession } from "@htwang-contrib/common";
 import { registerWikiIngestTool } from "./index.ts";
+import { WIKI_SIDE_CALL_FACTORIES } from "./side-call-base.ts";
 
 const INGEST_SYSTEM_PROMPT = [
   "You are the LLM Wiki ingest agent, running in an isolated session.",
@@ -33,7 +34,12 @@ export async function runIngestSession(
   const task = `Ingest pending Source Packets into the LLM Wiki using the wiki_ingest tool, then report the summary.${packetClause}`;
   return runIsolatedSession(
     ctx,
-    { label: "/wiki-ingest", extensionFactories: [ingestToolsFactory], systemPrompt: INGEST_SYSTEM_PROMPT, task },
+    {
+      label: "/wiki-ingest",
+      extensionFactories: [...WIKI_SIDE_CALL_FACTORIES, ingestToolsFactory],
+      systemPrompt: INGEST_SYSTEM_PROMPT,
+      task,
+    },
     signal,
   );
 }
