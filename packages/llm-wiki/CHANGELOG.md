@@ -63,6 +63,7 @@
 - Side-call children now load the `inference-v2-self-host` provider via a shared `WIKI_SIDE_CALL_FACTORIES` base (`src/side-call-base.ts`), so the child agent loop and the tools' internal side-calls can resolve inference-v2-served models. `@htwang-contrib/inference-v2-self-host` added as a dependency.
 - Side-call children (`/wiki-capture`, `/wiki-ingest`, `/wiki-lint`, `/wiki-research`) now write a child-session link record (via `runIsolatedSession`), so they surface in the subagents `/view-subagents` picker — running side-calls show `⏳` and can be opened to watch the live child session. The viewer is command-triggered (`/view-subagents`); there is no auto-pop.
 - Side-call results are now delivered to the main agent: when a side-call finishes, `deliverSideCallToAgent` sends a brief `[llm-wiki] <op> side-call finished/failed` note to the main session via `pi.sendUserMessage` (triggering a turn), so the main agent is aware the wiki op ran and has its outcome in context. Falls back to a UI `notify` if the agent is busy. Previously the main agent had no record that a side-call happened.
+- `/wiki-capture` now accepts a directory: the capture child uses bash to recursively enumerate every `.md`/`.txt` file underneath it and calls `wiki_capture` once per file, then reports the count + packet ids. (Single URL/file/text behavior unchanged; `wiki_capture` dedups by path so re-captures are idempotent.)
 
 ### Changed
 

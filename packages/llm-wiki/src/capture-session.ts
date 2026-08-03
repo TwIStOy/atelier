@@ -6,15 +6,17 @@ import { WIKI_SIDE_CALL_BASE_TOOLS, WIKI_SIDE_CALL_FACTORIES } from "./side-call
 
 const CAPTURE_SYSTEM_PROMPT = [
   "You are the LLM Wiki capture agent, running in an isolated session.",
-  "Your only job is to capture ONE source into the wiki as an immutable Source Packet, then report the result.",
+  "Your job is to capture the given input into the wiki as immutable Source Packet(s), then report the result.",
   "",
-  "Call the `wiki_capture` tool exactly once. Pick sourceType from the source you are given:",
-  '- an http(s) URL -> sourceType "url" (pass it as `url`);',
-  '- a path to an existing local .md/.txt file -> sourceType "file" (pass it as `originPath`);',
-  '- otherwise treat the input as pasted text -> sourceType "text" (pass it as `text`).',
+  "Classify the input you are given, then act:",
+  '- an http(s) URL -> call `wiki_capture` once with sourceType "url" (pass it as `url`);',
+  '- a path to an existing local .md/.txt FILE -> call `wiki_capture` once with sourceType "file" (pass it as `originPath`);',
+  "- a path to a DIRECTORY -> use bash to recursively enumerate every .md and .txt file underneath it (e.g. `find <dir> -type f \\( -name '*.md' -o -name '*.txt' \\)`), then call `wiki_capture` once PER file with sourceType \"file\" and that file's path as `originPath`;",
+  '- otherwise (plain text) -> call `wiki_capture` once with sourceType "text" (pass it as `text`).',
   "",
-  "After the tool returns, reply with one short line: the Source Packet id and the vault it landed in.",
-  "Do not read files, do not ingest, do not create pages, do not do anything else.",
+  "For a single source call the tool once; for a directory call it once per discovered file.",
+  "After capturing, reply with a short summary: the Source Packet id and vault for a single source, or the count plus the ids for a directory.",
+  "Do not ingest, do not create wiki pages, and do not do anything else.",
 ].join("\n");
 
 const captureToolsFactory: ExtensionFactory = (pi: ExtensionAPI) => {
@@ -36,7 +38,7 @@ export async function runCaptureSession(
   if (!source) {
     return { text: "", isError: true, errorMessage: "/wiki-capture: source argument is empty", toolCalls: 0 };
   }
-  const task = `Capture the following source into the LLM Wiki as an immutable Source Packet using the wiki_capture tool, then report the packet id.\n\nSource:\n${source}`;
+  const task = `Capture the following input into the LLM Wiki using the wiki_capture tool, then report the result. The input may be a URL, a single .md/.txt file path, a directory (capture every .md/.txt file under it), or pasted text.\n\nInput:\n${source}`;
   return runIsolatedSession(
     ctx,
     {
