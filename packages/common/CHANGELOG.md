@@ -10,7 +10,7 @@
 
 ### Fixed
 
-- `runIsolatedSession`'s `lastAssistantText`: the message `content` field is now optional in the structural type so it accepts the full `AgentMessage` union (some members, e.g. `BashExecutionMessage`, carry no `content`). This was a latent `tsc --noEmit` error since the helper was introduced — `npm run check` is biome-only and vitest does not typecheck, so it slipped through.
+- `runIsolatedSession`'s `lastAssistantText`: the message `content` field is now optional and typed as `string | readonly parts[]` in the structural type so it accepts the full `AgentMessage` union (`BashExecutionMessage` carries no `content`; `CustomMessage` carries `string | (TextContent | ImageContent)[]`). String content is skipped. These were latent `tsc --noEmit` errors since the helper was introduced — `npm run check` is biome-only and vitest does not typecheck, so they slipped through.
 - `runIsolatedSession`: passing `tools: []` blocked ALL tools in the child (an empty allow-set disables every tool, including extension-registered ones), so isolated children could not call their tool. Replaced with an optional `allowedTools` (omit → all allowed; pass names → only those). Added an optional `model` override so callers can resolve the model themselves.
 
 ## [0.4.0] - 2026-07-31

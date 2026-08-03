@@ -36,13 +36,13 @@ export interface IsolatedSessionResult {
 
 type IsolatedMessageLike = {
   role: string;
-  content?: ReadonlyArray<{ type: string; text?: string }>;
+  content?: string | ReadonlyArray<{ type: string; text?: string }>;
 };
 
 function lastAssistantText(messages: readonly IsolatedMessageLike[]): string {
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i];
-    if (msg.role !== "assistant" || !msg.content) continue;
+    if (msg.role !== "assistant" || !msg.content || typeof msg.content === "string") continue;
     const chunks: string[] = [];
     for (const part of msg.content) {
       if (part.type === "text" && typeof part.text === "string") chunks.push(part.text);
