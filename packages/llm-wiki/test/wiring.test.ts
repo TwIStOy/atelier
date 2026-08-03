@@ -1,6 +1,7 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { runIsolatedSession } from "@htwang-contrib/common";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { bootstrapVault } from "../src/core/bootstrap.ts";
 import { appendReviewItem, listReviewItems } from "../src/core/review.ts";
@@ -15,6 +16,7 @@ vi.mock("@htwang-contrib/common", () => ({
   registerConfigItems: () => {},
   readConfig: () => mockConfig.current,
   resolveModel: () => undefined,
+  runIsolatedSession: vi.fn(async () => ({ isError: false, text: "side-call done", toolCalls: 0 })),
 }));
 
 type Handler = (...args: unknown[]) => unknown;
@@ -358,10 +360,70 @@ describe("llm-wiki wiring — wiki_recall tool", () => {
 describe("llm-wiki wiring — wiki_review tool + /wiki-review command", () => {
   const FIXED_NOW = () => new Date(Date.UTC(2024, 0, 5, 9, 30, 0));
 
-  it("registers /wiki-review but NOT wiki_review (review tool moved out of the main session)", () => {
+  it("registers both /wiki-review and the wiki_review tool (list/resolve/file in the main session)", () => {
     const mock = setup();
     expect(mock.commands.has("wiki-review")).toBe(true);
-    expect(mock.tools.has("wiki_review")).toBe(false);
+    expect(mock.tools.has("wiki_review")).toBe(true);
+  });
+
+  it("action=file files an agent item without a packet, dedups repeats, and requires a query for deep_research", async () => {
+    const mock = setup();
+    registerWikiReviewTool(mock.pi as never);
+    const tool = mock.tools.get("wiki_review") as {
+      execute: (id: string, params: unknown, signal: unknown, onUpdate: unknown, ctx: unknown) => Promise<unknown>;
+    };
+
+    const filed = (await tool.execute(
+      "f1",
+      {
+        action: "file",
+        kind: "question",
+        title: "Does the wiki cover X?",
+        suggestedAction: "deep_research",
+        query: "X explained",
+      },
+      undefined,
+      undefined,
+      { cwd: projectDir },
+    )) as { content: { text: string }[]; details: { filed: boolean; item: { id: string; packetId?: string } } };
+    expect(filed.details.filed).toBe(true);
+    expect(filed.details.item.packetId).toBeUndefined();
+    expect(filed.content[0].text).toContain(filed.details.item.id);
+
+    const dupe = (await tool.execute(
+      "f2",
+      {
+        action: "file",
+        kind: "question",
+        title: "Does the wiki cover X?",
+        suggestedAction: "deep_research",
+        query: "X explained",
+      },
+      undefined,
+      undefined,
+      { cwd: projectDir },
+    )) as { content: { text: string }[]; details: { filed: boolean; item: { id: string } } };
+    expect(dupe.details.filed).toBe(false);
+    expect(dupe.details.item.id).toBe(filed.details.item.id);
+    expect(dupe.content[0].text).toMatch(/already filed/i);
+
+    await expect(
+      tool.execute(
+        "f3",
+        { action: "file", kind: "question", title: "No query", suggestedAction: "deep_research" },
+        undefined,
+        undefined,
+        { cwd: projectDir },
+      ),
+    ).rejects.toThrow(/query.*required/i);
+
+    await expect(
+      tool.execute("f4", { action: "file", kind: "question", suggestedAction: "skip" }, undefined, undefined, {
+        cwd: projectDir,
+      }),
+    ).rejects.toThrow(/title.*required/i);
+
+    expect(listReviewItems(vaultRoot, { status: "open" })).toHaveLength(1);
   });
 
   it("lists open items and resolves one through the registered tool", async () => {
@@ -410,7 +472,7 @@ describe("llm-wiki wiring — wiki_review tool + /wiki-review command", () => {
     const mock = setup();
     appendReviewItem(
       vaultRoot,
-      { packetId: "SRC-2024-01-05-001", kind: "gap", title: "needs a page", action: "create_page" },
+      { packetId: "SRC-2024-01-05-001", kind: "gap", title: "needs a page", action: "deep_research", query: "q" },
       { now: FIXED_NOW() },
     );
     const cmd = mock.commands.get("wiki-review") as { handler: (args: string, ctx: unknown) => Promise<void> };
@@ -421,16 +483,53 @@ describe("llm-wiki wiring — wiki_review tool + /wiki-review command", () => {
     expect(notify.mock.calls[1][0]).toMatch(/interactive terminal/i);
   });
 
-  it("/wiki-review resolves items via the interactive select loop and records notes", async () => {
+  it("/wiki-review auto-resolves skip items and hands create_page items to a side-call", async () => {
     const mock = setup();
     appendReviewItem(
       vaultRoot,
-      { packetId: "SRC-1", kind: "gap", title: "first", action: "create_page" },
+      { packetId: "SRC-1", kind: "noise", title: "skippable", action: "skip" },
       { now: FIXED_NOW() },
     );
     appendReviewItem(
       vaultRoot,
-      { packetId: "SRC-1", kind: "gap", title: "second", action: "deep_research" },
+      { packetId: "SRC-1", kind: "gap", title: "needs a page", action: "create_page" },
+      { now: FIXED_NOW() },
+    );
+    const select = vi.fn();
+    const notify = vi.fn();
+    const cmd = mock.commands.get("wiki-review") as { handler: (args: string, ctx: unknown) => Promise<void> };
+
+    await cmd.handler("", {
+      cwd: projectDir,
+      hasUI: true,
+      ui: { select, input: vi.fn(), notify },
+      isIdle: () => false,
+    });
+
+    expect(select).not.toHaveBeenCalled();
+    expect(vi.mocked(runIsolatedSession)).toHaveBeenCalledTimes(1);
+    const task = vi.mocked(runIsolatedSession).mock.calls[0][1].task as string;
+    expect(task).toContain("needs a page");
+    expect(notify.mock.calls.some((c) => /Auto-resolved 1 item\(s\) suggested as skip/.test(c[0]))).toBe(true);
+    expect(notify.mock.calls.some((c) => /No deep_research items to review/.test(c[0]))).toBe(true);
+
+    const resolved = listReviewItems(vaultRoot, { status: "resolved" });
+    expect(resolved.map((e) => ({ title: e.title, action: e.resolvedAction }))).toEqual([
+      { title: "skippable", action: "skip" },
+    ]);
+    expect(listReviewItems(vaultRoot, { status: "open" }).map((e) => e.title)).toEqual(["needs a page"]);
+  });
+
+  it("/wiki-review walks only deep_research items interactively and records notes", async () => {
+    const mock = setup();
+    appendReviewItem(
+      vaultRoot,
+      { packetId: "SRC-1", kind: "gap", title: "first", action: "deep_research", query: "q1" },
+      { now: FIXED_NOW() },
+    );
+    appendReviewItem(
+      vaultRoot,
+      { packetId: "SRC-1", kind: "gap", title: "second", action: "deep_research", query: "q2" },
       { now: FIXED_NOW() },
     );
 
@@ -448,7 +547,7 @@ describe("llm-wiki wiring — wiki_review tool + /wiki-review command", () => {
 
     expect(select).toHaveBeenCalledTimes(2);
     expect(input).toHaveBeenCalledTimes(1);
-    expect(notify.mock.calls.some((c) => /All open review items resolved/.test(c[0]))).toBe(true);
+    expect(notify.mock.calls.some((c) => /All deep_research review items resolved/.test(c[0]))).toBe(true);
 
     expect(listReviewItems(vaultRoot, { status: "open" })).toEqual([]);
     const resolved = listReviewItems(vaultRoot, { status: "resolved" });
@@ -462,12 +561,12 @@ describe("llm-wiki wiring — wiki_review tool + /wiki-review command", () => {
     const mock = setup();
     appendReviewItem(
       vaultRoot,
-      { packetId: "SRC-1", kind: "gap", title: "first", action: "skip" },
+      { packetId: "SRC-1", kind: "gap", title: "first", action: "deep_research", query: "q1" },
       { now: FIXED_NOW() },
     );
     appendReviewItem(
       vaultRoot,
-      { packetId: "SRC-1", kind: "gap", title: "second", action: "skip" },
+      { packetId: "SRC-1", kind: "gap", title: "second", action: "deep_research", query: "q2" },
       { now: FIXED_NOW() },
     );
 

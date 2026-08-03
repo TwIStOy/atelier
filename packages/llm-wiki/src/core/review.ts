@@ -15,7 +15,7 @@ export interface ReviewItem {
   schemaVersion: typeof REVIEW_SCHEMA_VERSION;
   id: string;
   filedAt: string;
-  packetId: string;
+  packetId?: string;
   kind: string;
   title: string;
   action: ReviewAction;
@@ -28,7 +28,7 @@ export interface ReviewItem {
 }
 
 export interface AppendReviewInput {
-  packetId: string;
+  packetId?: string;
   kind: string;
   title: string;
   action: ReviewAction;
@@ -90,11 +90,11 @@ export function appendReviewItem(
     schemaVersion: REVIEW_SCHEMA_VERSION,
     id,
     filedAt: now.toISOString(),
-    packetId: input.packetId,
     kind: input.kind,
     title: input.title,
     action,
     status: "open",
+    ...(input.packetId !== undefined ? { packetId: input.packetId } : {}),
     ...(input.note !== undefined ? { note: input.note } : {}),
     ...(input.query !== undefined ? { query: input.query } : {}),
   };
@@ -168,7 +168,6 @@ function coerceReviewItem(raw: unknown): ReviewItem | null {
   if (
     typeof record.id !== "string" ||
     typeof record.filedAt !== "string" ||
-    typeof record.packetId !== "string" ||
     typeof record.kind !== "string" ||
     typeof record.title !== "string" ||
     typeof record.status !== "string" ||
@@ -180,11 +179,11 @@ function coerceReviewItem(raw: unknown): ReviewItem | null {
     schemaVersion: REVIEW_SCHEMA_VERSION,
     id: record.id,
     filedAt: record.filedAt,
-    packetId: record.packetId,
     kind: record.kind,
     title: record.title,
     action: record.action,
     status: record.status as ReviewStatus,
+    ...(typeof record.packetId === "string" ? { packetId: record.packetId } : {}),
     ...(typeof record.note === "string" ? { note: record.note } : {}),
     ...(typeof record.query === "string" ? { query: record.query } : {}),
     ...(typeof record.resolvedAt === "string" ? { resolvedAt: record.resolvedAt } : {}),

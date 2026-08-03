@@ -37,6 +37,7 @@ import {
   type ItemResearchOutcome,
 } from "./core/research.ts";
 import {
+  appendReviewItem,
   listReviewItems,
   REVIEW_ACTIONS,
   type ReviewAction,
@@ -49,6 +50,7 @@ import { resolveVaults } from "./core/vault.ts";
 import { runIngestSession } from "./ingest-session.ts";
 import { runLintSession } from "./lint-session.ts";
 import { runResearchSession } from "./research-session.ts";
+import { runReviewExecSession } from "./review-exec-session.ts";
 
 const logger = createLogger("llm-wiki");
 
@@ -263,7 +265,7 @@ function registerWikiRebuildMetaTool(pi: ExtensionAPI): void {
   });
 }
 
-function registerWikiEnsurePageTool(pi: ExtensionAPI): void {
+export function registerWikiEnsurePageTool(pi: ExtensionAPI): void {
   pi.registerTool({
     name: "wiki_ensure_page",
     label: "Wiki Ensure Page",
@@ -550,12 +552,12 @@ export function registerWikiIngestTool(pi: ExtensionAPI): void {
     }),
 
     async execute(_toolCallId, params, signal, onUpdate, ctx) {
-      const finishedLines: string[] = [];
+      const finishedOutcomes: PacketIngestOutcome[] = [];
       let currentLine = "";
       const pushProgress = (): void => {
-        const lines = ["Ingest batch in progress…", ...finishedLines];
+        const lines = ["Ingest batch in progress…", ...finishedOutcomes.map(formatOutcomeLine)];
         if (currentLine) lines.push(currentLine);
-        onUpdate?.({ content: [{ type: "text", text: lines.join("\n") }] });
+        onUpdate?.({ content: [{ type: "text", text: lines.join("\n") }], details: { outcomes: finishedOutcomes } });
       };
       const result = await runIngest({
         ctx,
@@ -568,7 +570,7 @@ export function registerWikiIngestTool(pi: ExtensionAPI): void {
             currentLine = `> ${event.packetId} "${event.packetTitle}" (${event.index + 1}/${event.total}) — ${event.step}, attempt ${event.attempt}/${event.maxAttempts}`;
           } else {
             currentLine = "";
-            finishedLines.push(formatOutcomeLine(event.outcome));
+            finishedOutcomes.push(event.outcome);
           }
           pushProgress();
         },
@@ -622,11 +624,15 @@ function formatSummary(result: CaptureResult, vaultRoot: string): string {
 }
 
 interface ReviewToolParams {
-  action: "list" | "resolve";
+  action: "list" | "resolve" | "file";
   status?: ReviewFilterStatus;
   itemId?: string;
   decision?: ReviewAction;
   note?: string;
+  kind?: string;
+  title?: string;
+  suggestedAction?: ReviewAction;
+  query?: string;
 }
 
 function resolveActiveVault(cwd: string): { vaultRoot: string; scope: string } {
@@ -640,17 +646,22 @@ export function registerWikiReviewTool(pi: ExtensionAPI): void {
     name: "wiki_review",
     label: "Wiki Review",
     description:
-      "List and resolve items in the LLM Wiki Review Queue (meta/review.jsonl) for the active vault " +
+      "List, resolve, or file items in the LLM Wiki Review Queue (meta/review.jsonl) for the active vault " +
       "(project vault if present, otherwise the personal vault). During ingest the agent files items needing human judgment " +
-      "(one per claim/gap, with a suggested action); this tool reads them back and records a decision.\n" +
+      "(one per claim/gap, with a suggested action); this tool reads them back, files new ones, and records decisions.\n" +
       "- action=list: returns open items by default. Pass status=all to include resolved entries, or status=resolved for only resolved.\n" +
+      "- action=file: file a NEW open item (kind + title + suggestedAction, optional note/query). Use it when a query or " +
+      "interactive ingest hits something needing follow-up — e.g. the wiki does not cover a question: file a deep_research item " +
+      "with a prebuilt search query and /wiki-research will execute it later. Filing dedups against open items with the same " +
+      "kind+title+suggestedAction. `query` is required when suggestedAction is deep_research.\n" +
       "- action=resolve: marks one item resolved with one of three constrained decisions: `create_page` | `deep_research` | `skip`. " +
       "Recording a decision only updates the queue; the actual page creation / web research is performed in-session by the agent " +
       "(guided by the bundled skill). Resolved items no longer appear in the default open list.",
-    promptSnippet: "List or resolve the LLM Wiki Review Queue (actions: create_page/deep_research/skip)",
+    promptSnippet: "List, file, or resolve LLM Wiki Review Queue items (actions: create_page/deep_research/skip)",
     parameters: Type.Object({
-      action: Type.Union([Type.Literal("list"), Type.Literal("resolve")], {
-        description: "Operation: list (read items) | resolve (record a decision on one item).",
+      action: Type.Union([Type.Literal("list"), Type.Literal("resolve"), Type.Literal("file")], {
+        description:
+          "Operation: list (read items) | resolve (record a decision on one item) | file (add a new open item).",
       }),
       status: Type.Optional(
         Type.Union([Type.Literal("open"), Type.Literal("resolved"), Type.Literal("all")], {
@@ -663,9 +674,25 @@ export function registerWikiReviewTool(pi: ExtensionAPI): void {
           description: "resolve only. The decision to record. One of create_page | deep_research | skip.",
         }),
       ),
+      kind: Type.Optional(
+        Type.String({ description: "file only. Category of the gap (e.g. coverage_gap, contradiction, question)." }),
+      ),
+      title: Type.Optional(Type.String({ description: "file only. One-line summary of what needs follow-up." })),
+      suggestedAction: Type.Optional(
+        Type.Union([Type.Literal("create_page"), Type.Literal("deep_research"), Type.Literal("skip")], {
+          description: "file only. The suggested action. One of create_page | deep_research | skip.",
+        }),
+      ),
+      query: Type.Optional(
+        Type.String({
+          description:
+            "file only. Prebuilt web-search query for a deep_research item (required when suggestedAction=deep_research).",
+        }),
+      ),
       note: Type.Optional(
         Type.String({
-          description: "resolve only. Optional free-text note recording what was done (e.g. created page path).",
+          description:
+            "resolve: optional free-text note recording what was done (e.g. created page path). file: optional context note.",
         }),
       ),
     }),
@@ -679,6 +706,46 @@ export function registerWikiReviewTool(pi: ExtensionAPI): void {
         const items = listReviewItems(vaultRoot, { status });
         const summary = formatReviewListSummary(scope, items, status);
         const details = { vaultRoot, scope, status, count: items.length, items };
+        onUpdate?.({ content: [{ type: "text", text: summary }], details });
+        return { content: [{ type: "text", text: summary }], details };
+      }
+
+      if (p.action === "file") {
+        const kind = requireReviewField(p.kind, "kind");
+        const title = requireReviewField(p.title, "title");
+        if (p.suggestedAction === undefined) {
+          throw new Error(
+            `wiki_review: \`suggestedAction\` is required when action=file (one of ${REVIEW_ACTIONS.join(", ")})`,
+          );
+        }
+        const query = p.query?.trim();
+        if (p.suggestedAction === "deep_research" && (query === undefined || query.length === 0)) {
+          throw new Error("wiki_review: `query` is required when action=file and suggestedAction=deep_research");
+        }
+        const open = listReviewItems(vaultRoot, { status: "open" });
+        const duplicate = open.find(
+          (item) => item.kind === kind && item.title === title && item.action === p.suggestedAction,
+        );
+        if (duplicate) {
+          const text = `Already filed as ${duplicate.id} (${scope}): ${title} [${duplicate.action}]`;
+          const details = { vaultRoot, scope, filed: false, item: duplicate };
+          onUpdate?.({ content: [{ type: "text", text }], details });
+          return { content: [{ type: "text", text }], details };
+        }
+        const note = p.note?.trim();
+        const item = appendReviewItem(vaultRoot, {
+          kind,
+          title,
+          action: p.suggestedAction,
+          ...(note !== undefined && note.length > 0 ? { note } : {}),
+          ...(query !== undefined && query.length > 0 ? { query } : {}),
+        });
+        const openCount = listReviewItems(vaultRoot, { status: "open" }).length;
+        const lines = [`Filed ${item.id} (${scope}): ${title} [${item.action}]`];
+        if (item.query) lines.push(`search: ${item.query}`);
+        lines.push(`open items: ${openCount}`);
+        const summary = lines.join("\n");
+        const details = { vaultRoot, scope, filed: true, item };
         onUpdate?.({ content: [{ type: "text", text: summary }], details });
         return { content: [{ type: "text", text: summary }], details };
       }
@@ -701,6 +768,13 @@ export function registerWikiReviewTool(pi: ExtensionAPI): void {
   });
 }
 
+function requireReviewField(value: string | undefined, field: string): string {
+  if (value === undefined || value.trim().length === 0) {
+    throw new Error(`wiki_review: \`${field}\` is required when action=file`);
+  }
+  return value.trim();
+}
+
 function requireReviewString(value: string | undefined, field: string): string {
   if (value === undefined || value.trim().length === 0) {
     throw new Error(`wiki_review: \`${field}\` is required when action=resolve`);
@@ -717,7 +791,7 @@ function formatReviewListSummary(scope: string, items: ReviewItem[], status: Rev
   for (const item of items) {
     const flag = item.status === "resolved" ? `[resolved=${item.resolvedAction ?? "?"}]` : `[${item.action}]`;
     lines.push(`- ${item.id} ${flag} ${item.title} (${item.kind})`);
-    lines.push(`  packet: ${item.packetId}`);
+    if (item.packetId) lines.push(`  packet: ${item.packetId}`);
     if (item.query) lines.push(`  search: ${item.query}`);
     if (item.note) lines.push(`  note: ${item.note}`);
   }
@@ -744,8 +818,9 @@ const REVIEW_CHOICES: ReadonlyArray<readonly [string, ReviewAction]> = [
 function registerWikiReviewCommand(pi: ExtensionAPI): void {
   pi.registerCommand("wiki-review", {
     description:
-      "Walk pending LLM Wiki Review Queue items one by one and record a decision " +
-      "(create_page / deep_research / skip) for the active vault.",
+      "Triage the LLM Wiki Review Queue for the active vault: items suggested as skip are auto-resolved, " +
+      "create_page items are executed by a background side-call (creates the pages and resolves the items), " +
+      "and only deep_research items are walked interactively for a decision.",
     async handler(_args, ctx) {
       const { vaultRoot, scope } = resolveActiveVault(ctx.cwd);
       const open = listReviewItems(vaultRoot, { status: "open" });
@@ -755,20 +830,50 @@ function registerWikiReviewCommand(pi: ExtensionAPI): void {
         return;
       }
 
+      const skipItems = open.filter((item) => item.action === "skip");
+      const createItems = open.filter((item) => item.action === "create_page");
+      const researchItems = open.filter((item) => item.action === "deep_research");
+
+      for (const item of skipItems) {
+        resolveReviewItem(vaultRoot, item.id, "skip");
+      }
+      if (skipItems.length > 0) {
+        ctx.ui.notify(`Auto-resolved ${skipItems.length} item(s) suggested as skip.`, "info");
+      }
+
+      if (createItems.length > 0) {
+        launchSideCall(
+          pi,
+          ctx,
+          "/wiki-review (create_page)",
+          runReviewExecSession(ctx, { items: createItems }, undefined, (n) =>
+            ctx.ui.notify(`/wiki-review (create_page): ${n} tool call(s)\u2026`, "info"),
+          ),
+          true,
+        );
+      }
+
+      if (researchItems.length === 0) {
+        ctx.ui.notify(`No deep_research items to review (${scope}).`, "info");
+        return;
+      }
+
       if (!ctx.hasUI) {
-        ctx.ui.notify(formatReviewListSummary(scope, open, "open"), "info");
-        ctx.ui.notify("Run /wiki-review in an interactive terminal to resolve items.", "info");
+        ctx.ui.notify(formatReviewListSummary(scope, researchItems, "open"), "info");
+        ctx.ui.notify("Run /wiki-review in an interactive terminal to resolve deep_research items.", "info");
         return;
       }
 
       const optionLabels = [...REVIEW_CHOICES.map(([label]) => label), REVIEW_CHOICE_STOP];
       let resolvedCount = 0;
 
-      for (let i = 0; i < open.length; i++) {
-        const entry = open[i]!;
-        const choice = await ctx.ui.select(formatReviewItemPrompt(scope, entry, i + 1, open.length), [...optionLabels]);
+      for (let i = 0; i < researchItems.length; i++) {
+        const entry = researchItems[i]!;
+        const choice = await ctx.ui.select(formatReviewItemPrompt(scope, entry, i + 1, researchItems.length), [
+          ...optionLabels,
+        ]);
         if (choice === undefined || choice === REVIEW_CHOICE_STOP) {
-          ctx.ui.notify(`Stopped. ${open.length - i} item(s) still open (${resolvedCount} resolved).`, "info");
+          ctx.ui.notify(`Stopped. ${researchItems.length - i} item(s) still open (${resolvedCount} resolved).`, "info");
           return;
         }
         const action = REVIEW_CHOICES.find(([label]) => label === choice)?.[1];
@@ -780,10 +885,10 @@ function registerWikiReviewCommand(pi: ExtensionAPI): void {
         const note = await promptReviewNote(ctx, entry.id, action);
         resolveReviewItem(vaultRoot, entry.id, action, note !== undefined ? { note } : {});
         resolvedCount += 1;
-        ctx.ui.notify(`Resolved ${entry.id} as ${action} (${resolvedCount}/${open.length}).`, "info");
+        ctx.ui.notify(`Resolved ${entry.id} as ${action} (${resolvedCount}/${researchItems.length}).`, "info");
       }
 
-      ctx.ui.notify(`All open review items resolved (${resolvedCount}).`, "info");
+      ctx.ui.notify(`All deep_research review items resolved (${resolvedCount}).`, "info");
     },
   });
 }
@@ -809,8 +914,8 @@ function formatReviewItemPrompt(scope: string, entry: ReviewItem, position: numb
     `Title: ${entry.title}`,
     `Kind: ${entry.kind}`,
     `Suggested action: ${entry.action}`,
-    `Packet: ${entry.packetId}`,
   ];
+  if (entry.packetId) lines.push(`Packet: ${entry.packetId}`);
   if (entry.query) lines.push(`Search: ${entry.query}`);
   if (entry.note) lines.push(`Note: ${entry.note}`);
   lines.push("Choose an action:");
@@ -1169,6 +1274,7 @@ export default function initLlmWiki(pi: ExtensionAPI): void {
   registerWikiEnsurePageTool(pi);
   registerWikiSearchTool(pi);
   registerWikiRecallTool(pi);
+  registerWikiReviewTool(pi);
   registerWikiIngestCommand(pi);
   registerWikiResearchCommand(pi);
   registerWikiReviewCommand(pi);

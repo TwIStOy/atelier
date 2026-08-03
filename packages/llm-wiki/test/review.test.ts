@@ -35,6 +35,23 @@ function baseInput(overrides: Partial<AppendReviewInput> = {}): AppendReviewInpu
   };
 }
 
+describe("appendReviewItem — agent-filed items without a packet", () => {
+  it("round-trips an item filed without a packetId", () => {
+    const item = appendReviewItem(
+      tmpRoot,
+      { kind: "question", title: "Does the wiki cover X?", action: "deep_research", query: "X explained" },
+      { now: FIXED_NOW },
+    );
+
+    expect(item.packetId).toBeUndefined();
+    const items = listReviewItems(tmpRoot);
+    expect(items).toHaveLength(1);
+    expect(items[0].packetId).toBeUndefined();
+    expect(items[0].title).toBe("Does the wiki cover X?");
+    expect(items[0].query).toBe("X explained");
+  });
+});
+
 describe("appendReviewItem", () => {
   it("appends a JSONL line with an auto-allocated id, filedAt, and status=open", () => {
     const item = appendReviewItem(tmpRoot, baseInput(), { now: FIXED_NOW });

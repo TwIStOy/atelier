@@ -24,6 +24,7 @@ vi.mock("@htwang-contrib/common", () => ({
   registerConfigItems: registerConfigItemsMock,
   readConfig: readConfigMock,
   resolveModel: resolveModelMock,
+  runIsolatedSession: vi.fn(async () => ({ isError: false, text: "side-call done", toolCalls: 0 })),
 }));
 
 vi.mock("@htwang-contrib/web-tools", () => ({
