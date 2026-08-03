@@ -1058,7 +1058,6 @@ function registerWikiCaptureCommand(pi: ExtensionAPI): void {
         logger.info(
           `wiki capture side-call: ${result.toolCalls} tool call(s), session ${result.subSessionFile ?? "?"}`,
         );
-        deliverSideCallToAgent(pi, ctx, "/wiki-capture", result);
       } finally {
         ctx.ui.setWorkingMessage(undefined);
       }
