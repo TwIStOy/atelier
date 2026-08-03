@@ -16,7 +16,14 @@ import { Type } from "typebox";
 import { runCaptureSession } from "./capture-session.ts";
 import { loadLlmWikiConfig, registerLlmWikiConfigItems, resolveIngestModel, setCachedModelOptions } from "./config.ts";
 import { classifyPathOperation } from "./core/guardrail.ts";
-import { type IngestBatchResult, ingestBatch, type SideCaller } from "./core/ingest.ts";
+import {
+  formatOutcomeDetails,
+  type IngestBatchResult,
+  type IngestProgress,
+  ingestBatch,
+  type PacketIngestOutcome,
+  type SideCaller,
+} from "./core/ingest.ts";
 import { applyLintFixes, type LintFixResult, type LintReport, lintVault, writeLintReport } from "./core/lint.ts";
 import { rebuildMeta } from "./core/meta.ts";
 import { type CaptureInput, type CaptureResult, captureSource, type UrlFetcher } from "./core/packet.ts";
@@ -485,6 +492,7 @@ async function runIngest(args: {
   ctx: ExtensionContext;
   signal?: AbortSignal;
   packetId?: string;
+  onProgress?: (event: IngestProgress) => void;
 }): Promise<RunIngestOutcome> {
   const vaultRoot = targetVaultRoot(args.ctx.cwd);
   const model = resolveIngestModel(args.ctx);
@@ -501,7 +509,15 @@ async function runIngest(args: {
     signal,
     maxAttempts: ingestMaxAttempts,
     ...(args.packetId ? { packetId: args.packetId } : {}),
+    ...(args.onProgress ? { onProgress: args.onProgress } : {}),
   });
+}
+
+function formatOutcomeLine(outcome: PacketIngestOutcome): string {
+  const details = formatOutcomeDetails(outcome);
+  const extra = details.length > 0 ? ` — ${details}` : "";
+  const reason = outcome.reason ? ` — ${outcome.reason}` : "";
+  return `- ${outcome.packetId}: ${outcome.status}${reason}${extra}`;
 }
 
 function formatIngestSummary(result: IngestBatchResult, vaultRoot: string): string {
@@ -510,13 +526,7 @@ function formatIngestSummary(result: IngestBatchResult, vaultRoot: string): stri
     `vault: ${vaultRoot}`,
   ];
   for (const outcome of result.outcomes) {
-    const details: string[] = [];
-    if (outcome.pagesCreated > 0) details.push(`${outcome.pagesCreated} page(s) created`);
-    if (outcome.pagesExisted > 0) details.push(`${outcome.pagesExisted} existed`);
-    if (outcome.reviewFiled > 0) details.push(`${outcome.reviewFiled} review item(s)`);
-    const extra = details.length > 0 ? ` — ${details.join(", ")}` : "";
-    const reason = outcome.reason ? ` — ${outcome.reason}` : "";
-    lines.push(`- ${outcome.packetId}: ${outcome.status}${reason}${extra}`);
+    lines.push(formatOutcomeLine(outcome));
   }
   return lines.join("\n");
 }
@@ -540,7 +550,29 @@ export function registerWikiIngestTool(pi: ExtensionAPI): void {
     }),
 
     async execute(_toolCallId, params, signal, onUpdate, ctx) {
-      const result = await runIngest({ ctx, signal, ...(params.packetId ? { packetId: params.packetId } : {}) });
+      const finishedLines: string[] = [];
+      let currentLine = "";
+      const pushProgress = (): void => {
+        const lines = ["Ingest batch in progress…", ...finishedLines];
+        if (currentLine) lines.push(currentLine);
+        onUpdate?.({ content: [{ type: "text", text: lines.join("\n") }] });
+      };
+      const result = await runIngest({
+        ctx,
+        signal,
+        ...(params.packetId ? { packetId: params.packetId } : {}),
+        onProgress: (event) => {
+          if (event.kind === "packet_started") {
+            currentLine = `> ${event.packetId} "${event.packetTitle}" (${event.index + 1}/${event.total})`;
+          } else if (event.kind === "step_started") {
+            currentLine = `> ${event.packetId} "${event.packetTitle}" (${event.index + 1}/${event.total}) — ${event.step}, attempt ${event.attempt}/${event.maxAttempts}`;
+          } else {
+            currentLine = "";
+            finishedLines.push(formatOutcomeLine(event.outcome));
+          }
+          pushProgress();
+        },
+      });
       if ("error" in result) {
         return { content: [{ type: "text", text: result.error }], details: { error: result.error } };
       }
