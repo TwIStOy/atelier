@@ -2,7 +2,16 @@ import type { Message, Model } from "@earendil-works/pi-ai";
 import type { ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import type { SideCallResult } from "@htwang-contrib/common";
 import { executeSideCall } from "@htwang-contrib/common";
-import { commit, countChanges, getDiff, isGitRepo, stageAll, stageFiles, unstageAll } from "./git.ts";
+import {
+  commit,
+  countChanges,
+  getDiff,
+  getRepoRoot,
+  hasStagedChanges,
+  stageAll,
+  stageFiles,
+  unstageAll,
+} from "./git.ts";
 import { loadConfig, resolveCommitModel } from "./model-select.ts";
 import { GROUPING_PROMPT, GROUPING_RETRY_PROMPT, SINGLE_COMMIT_PROMPT } from "./prompt.ts";
 import type { CommitterOverlayController, CommitterProgress } from "./widget.ts";
@@ -36,8 +45,8 @@ export async function handleCommit(args: string, ctx: ExtensionCommandContext): 
     progress.statusMessage = "Checking repository...";
     ctrl.invalidate();
 
-    const isRepo = await isGitRepo(ctx.cwd, controller.signal);
-    if (!isRepo) {
+    const repoRoot = await getRepoRoot(ctx.cwd, controller.signal);
+    if (!repoRoot) {
       progress.phase = "error";
       progress.errorMessage = "Not a git repository.";
       ctrl.invalidate();
@@ -61,7 +70,7 @@ export async function handleCommit(args: string, ctx: ExtensionCommandContext): 
     progress.statusMessage = "Checking changes...";
     ctrl.invalidate();
 
-    const changeCount = await countChanges(ctx.cwd, controller.signal);
+    const changeCount = await countChanges(repoRoot, controller.signal);
     if (changeCount === 0) {
       progress.phase = "error";
       progress.errorMessage = "No changes to commit.";
@@ -73,9 +82,9 @@ export async function handleCommit(args: string, ctx: ExtensionCommandContext): 
     progress.statusMessage = "Staging changes...";
     ctrl.invalidate();
 
-    await stageAll(ctx.cwd, controller.signal);
+    await stageAll(repoRoot, controller.signal);
 
-    const diff = await getDiff(ctx.cwd, 1_000_000, controller.signal);
+    const diff = await getDiff(repoRoot, 1_000_000, controller.signal);
     progress.filesTotal = diff.files.length;
     progress.diffStat = diff.stat;
     ctrl.invalidate();
@@ -85,9 +94,9 @@ export async function handleCommit(args: string, ctx: ExtensionCommandContext): 
     const shouldGroup = diff.files.length >= loadConfig().groupingThreshold && !args.includes("--single");
 
     if (shouldGroup) {
-      await commitGrouped(ctx.cwd, diff.diff, model, ctx, progress, ctrl, controller.signal);
+      await commitGrouped(repoRoot, diff.diff, model, ctx, progress, ctrl, controller.signal);
     } else {
-      await commitSingle(ctx.cwd, diff.diff, model, ctx, progress, ctrl, controller.signal);
+      await commitSingle(repoRoot, diff.diff, model, ctx, progress, ctrl, controller.signal);
     }
   } catch (err) {
     if (controller.signal.aborted) {
@@ -198,32 +207,42 @@ async function commitGrouped(
     return;
   }
 
-  if (groups.length === 0) {
+  const validGroups = sanitizeGroups(groups, allFiles);
+
+  if (validGroups.length === 0) {
     await commitSingle(cwd, diffText, model, ctx, progress, ctrl, signal);
     return;
   }
 
-  const assigned = new Set(groups.flatMap((g) => g.files));
+  const assigned = new Set(validGroups.flatMap((g) => g.files));
   const unassigned = allFiles.filter((f) => !assigned.has(f));
-  if (unassigned.length > 0 && groups.length > 0) {
-    const last = groups[groups.length - 1]!;
+  if (unassigned.length > 0) {
+    const last = validGroups[validGroups.length - 1]!;
     last.files = [...last.files, ...unassigned];
   }
 
   progress.phase = "committing";
-  progress.commitsTotal = groups.length;
+  progress.commitsTotal = validGroups.length;
   ctrl.invalidate();
 
-  for (let i = 0; i < groups.length; i++) {
+  for (let i = 0; i < validGroups.length; i++) {
     if (signal.aborted) {
       progress.phase = "cancelled";
       ctrl.invalidate();
       return;
     }
 
-    const group = groups[i];
+    const group = validGroups[i]!;
     await unstageAll(cwd, signal);
     await stageFiles(cwd, group.files, signal);
+
+    if (!(await hasStagedChanges(cwd, signal))) {
+      progress.commitLog.push({ hash: "", message: group.message, success: false });
+      progress.phase = "error";
+      progress.errorMessage = `nothing staged for group ${i + 1}; its files may have been committed by another process: ${group.files.join(", ")}`;
+      ctrl.invalidate();
+      return;
+    }
 
     try {
       const hash = await commit(cwd, group.message, signal);
@@ -256,6 +275,23 @@ async function commitGrouped(
 
   progress.phase = "done";
   ctrl.invalidate();
+}
+
+function sanitizeGroups(groups: CommitGroup[], allFiles: string[]): CommitGroup[] {
+  const changed = new Set(allFiles);
+  const seen = new Set<string>();
+  const valid: CommitGroup[] = [];
+
+  for (const group of groups) {
+    const files = group.files.filter((f) => {
+      if (!changed.has(f) || seen.has(f)) return false;
+      seen.add(f);
+      return true;
+    });
+    if (files.length > 0) valid.push({ files, message: group.message });
+  }
+
+  return valid;
 }
 
 async function groupingWithRetry(

@@ -9,13 +9,34 @@ interface GitOptions {
 }
 
 async function git(cwd: string, args: string[], opts?: GitOptions): Promise<string> {
-  const { stdout } = await exec("git", args, {
-    cwd,
-    encoding: "utf-8",
-    maxBuffer: opts?.maxBuffer ?? 1_000_000,
-    signal: opts?.signal,
-  });
-  return stdout;
+  try {
+    const { stdout } = await exec("git", args, {
+      cwd,
+      encoding: "utf-8",
+      maxBuffer: opts?.maxBuffer ?? 1_000_000,
+      signal: opts?.signal,
+    });
+    return stdout;
+  } catch (err) {
+    throw enrichGitError(err);
+  }
+}
+
+function enrichGitError(err: unknown): unknown {
+  if (!err || typeof err !== "object") return err;
+  const e = err as { message?: unknown; stderr?: unknown; stdout?: unknown };
+  if (typeof e.message !== "string") return err;
+
+  const extra: string[] = [];
+  for (const stream of [e.stderr, e.stdout]) {
+    if (typeof stream !== "string") continue;
+    const text = stream.trim();
+    if (text && !e.message.includes(text)) extra.push(text);
+  }
+  if (extra.length === 0) return err;
+
+  const enriched = new Error(`${e.message.trimEnd()}\n${extra.join("\n")}`);
+  return Object.assign(enriched, err);
 }
 
 export interface GitStatus {
@@ -30,12 +51,12 @@ export interface DiffResult {
   files: string[];
 }
 
-export async function isGitRepo(cwd: string, signal?: AbortSignal): Promise<boolean> {
+export async function getRepoRoot(cwd: string, signal?: AbortSignal): Promise<string | null> {
   try {
-    await git(cwd, ["rev-parse", "--is-inside-work-tree"], { signal });
-    return true;
+    const out = await git(cwd, ["rev-parse", "--show-toplevel"], { signal });
+    return out.trim() || null;
   } catch {
-    return false;
+    return null;
   }
 }
 
