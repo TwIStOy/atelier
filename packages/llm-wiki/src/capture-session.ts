@@ -1,5 +1,6 @@
 import type { ExtensionAPI, ExtensionContext, ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import { type IsolatedSessionResult, runIsolatedSession } from "@htwang-contrib/common";
+import webTools from "@htwang-contrib/web-tools";
 import { resolveIngestModel } from "./config.ts";
 import { registerWikiCaptureTool } from "./index.ts";
 import { WIKI_SIDE_CALL_BASE_TOOLS, WIKI_SIDE_CALL_FACTORIES } from "./side-call-base.ts";
@@ -13,6 +14,7 @@ const CAPTURE_SYSTEM_PROMPT = [
   '- a path to an existing local .md/.txt FILE -> call `wiki_capture` once with sourceType "file" (pass it as `originPath`);',
   "- a path to a DIRECTORY -> use bash to recursively enumerate every .md and .txt file underneath it (e.g. `find <dir> -type f \\( -name '*.md' -o -name '*.txt' \\)`), then call `wiki_capture` once PER file with sourceType \"file\" and that file's path as `originPath`;",
   '- otherwise (plain text) -> call `wiki_capture` once with sourceType "text" (pass it as `text`).',
+  "- a topic or search query (not a direct URL/file/dir/text) -> use `web_search` to find relevant URLs and `web_fetch` to read pages as needed, then capture the useful sources with `wiki_capture`;",
   "",
   "For a single source call the tool once; for a directory call it once per discovered file.",
   "After capturing, reply with a short summary: the Source Packet id and vault for a single source, or the count plus the ids for a directory.",
@@ -43,11 +45,11 @@ export async function runCaptureSession(
     ctx,
     {
       label: "/wiki-capture",
-      extensionFactories: [...WIKI_SIDE_CALL_FACTORIES, captureToolsFactory],
+      extensionFactories: [...WIKI_SIDE_CALL_FACTORIES, webTools, captureToolsFactory],
       systemPrompt: CAPTURE_SYSTEM_PROMPT,
       task,
       model: resolveIngestModel(ctx) ?? undefined,
-      allowedTools: [...WIKI_SIDE_CALL_BASE_TOOLS, "wiki_capture"],
+      allowedTools: [...WIKI_SIDE_CALL_BASE_TOOLS, "wiki_capture", "web_fetch", "web_search"],
     },
     signal,
   );
