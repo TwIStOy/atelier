@@ -1,5 +1,6 @@
 import type { ExtensionAPI, ExtensionContext, ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import { type IsolatedSessionResult, runIsolatedSession } from "@htwang-contrib/common";
+import { resolveIngestModel } from "./config.ts";
 import { registerWikiLintTool } from "./index.ts";
 import { WIKI_SIDE_CALL_FACTORIES } from "./side-call-base.ts";
 
@@ -36,6 +37,8 @@ export async function runLintSession(
       extensionFactories: [...WIKI_SIDE_CALL_FACTORIES, lintToolsFactory],
       systemPrompt: LINT_SYSTEM_PROMPT,
       task,
+      model: resolveIngestModel(ctx) ?? undefined,
+      allowedTools: ["wiki_lint"],
     },
     signal,
   );

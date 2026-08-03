@@ -1,5 +1,6 @@
 import type { ExtensionAPI, ExtensionContext, ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import { type IsolatedSessionResult, runIsolatedSession } from "@htwang-contrib/common";
+import { resolveIngestModel } from "./config.ts";
 import { registerWikiCaptureTool } from "./index.ts";
 import { WIKI_SIDE_CALL_FACTORIES } from "./side-call-base.ts";
 
@@ -43,6 +44,8 @@ export async function runCaptureSession(
       extensionFactories: [...WIKI_SIDE_CALL_FACTORIES, captureToolsFactory],
       systemPrompt: CAPTURE_SYSTEM_PROMPT,
       task,
+      model: resolveIngestModel(ctx) ?? undefined,
+      allowedTools: ["wiki_capture"],
     },
     signal,
   );

@@ -67,3 +67,7 @@
 
 - Bundled **llm-wiki** skill Review section: `deep_research` is now auto-closable end-to-end via `/wiki-research` (or `wiki_deep_research`); `/wiki-review` (and `wiki_review` resolve) stay a decision-only ledger, keeping the decision/execution separation. `create_page` and `skip` remain in-session agent actions. README tools/commands/configuration tables updated to list `wiki_deep_research`, `/wiki-research`, and `deepResearchMaxResults` ([#94](https://github.com/TwIStOy/pi-extensions/issues/94)).
 - `capture-session.ts` and `ingest-session.ts` now delegate their child-session spawn to the shared `runIsolatedSession` helper in `@htwang-contrib/common` (no behavior change; removes the duplicated spawn boilerplate between the two side-calls).
+
+### Fixed
+
+- Side-call children (`/wiki-capture`, `/wiki-ingest`, `/wiki-lint`, `/wiki-research`) now actually expose their wiki tool and respect the configured model. Previously `runIsolatedSession` passed `tools: []`, whose empty allow-set blocked EVERY tool in the child (including the extension-registered wiki tool), so the child could not call anything; and the children used the raw session model (`ctx.model`) instead of the configured `ingestModel`. Fixed by giving each child an `allowedTools` of just its wiki tool (least privilege) and resolving the model via `resolveIngestModel` (ingestModel config, else session model).

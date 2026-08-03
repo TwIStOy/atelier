@@ -21,6 +21,8 @@ export interface IsolatedSessionOptions {
   task: string;
   label: string;
   sessionDir?: string;
+  model?: ExtensionContext["model"];
+  allowedTools?: string[];
 }
 
 export interface IsolatedSessionResult {
@@ -55,7 +57,8 @@ export async function runIsolatedSession(
   options: IsolatedSessionOptions,
   signal?: AbortSignal,
 ): Promise<IsolatedSessionResult> {
-  if (!ctx.model) {
+  const model = options.model ?? ctx.model;
+  if (!model) {
     return {
       text: "",
       isError: true,
@@ -96,8 +99,8 @@ export async function runIsolatedSession(
     cwd,
     agentDir,
     modelRuntime,
-    model: ctx.model,
-    tools: [],
+    model,
+    tools: options.allowedTools,
     resourceLoader: loader,
     sessionManager,
     settingsManager,
