@@ -27,6 +27,7 @@ export async function runLintSession(
   ctx: ExtensionContext,
   input: LintSessionInput,
   signal?: AbortSignal,
+  onProgress?: (toolCalls: number) => void,
 ): Promise<LintSessionResult> {
   const fixClause = input.fix ? " Pass `fix: true` to auto-capture uncaptured Inbox files." : "";
   const task = `Run the wiki health check using the wiki_lint tool, then report the summary.${fixClause}`;
@@ -39,6 +40,7 @@ export async function runLintSession(
       task,
       model: resolveIngestModel(ctx) ?? undefined,
       allowedTools: [...WIKI_SIDE_CALL_BASE_TOOLS, "wiki_lint"],
+      onProgress,
     },
     signal,
   );

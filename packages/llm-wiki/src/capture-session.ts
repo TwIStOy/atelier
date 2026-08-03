@@ -37,6 +37,7 @@ export async function runCaptureSession(
   ctx: ExtensionContext,
   input: CaptureSessionInput,
   signal?: AbortSignal,
+  onProgress?: (toolCalls: number) => void,
 ): Promise<CaptureSessionResult> {
   const source = input.source.trim();
   if (!source) {
@@ -52,6 +53,7 @@ export async function runCaptureSession(
       task,
       model: resolveIngestModel(ctx) ?? undefined,
       allowedTools: [...WIKI_SIDE_CALL_BASE_TOOLS, "wiki_capture", "web_fetch", "web_search"],
+      onProgress,
     },
     signal,
   );

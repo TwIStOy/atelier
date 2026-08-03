@@ -23,6 +23,7 @@ export interface IsolatedSessionOptions {
   sessionDir?: string;
   model?: ExtensionContext["model"];
   allowedTools?: string[];
+  onProgress?: (toolCalls: number) => void;
 }
 
 export interface IsolatedSessionResult {
@@ -117,7 +118,10 @@ export async function runIsolatedSession(
 
   let toolCalls = 0;
   const unsub = session.subscribe((event: AgentSessionEvent) => {
-    if (event.type === "tool_execution_end") toolCalls += 1;
+    if (event.type === "tool_execution_end") {
+      toolCalls += 1;
+      options.onProgress?.(toolCalls);
+    }
   });
 
   const onAbort = () => {

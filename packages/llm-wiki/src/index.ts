@@ -558,9 +558,12 @@ function registerWikiIngestCommand(pi: ExtensionAPI): void {
       "Run batch wiki ingest in an isolated side-call: spawns a child session that registers ONLY the wiki_ingest tool (so the ingest tool never lives in the main conversation), analyzes + generates Wiki Pages for every pending Source Packet, and reports the summary. Optional arg: a specific packet id. Interactive ingest is skill-guided.",
     async handler(args, ctx) {
       const packetId = args.trim() || undefined;
+      ctx.ui.notify("/wiki-ingest: starting side-call\u2026", "info");
       ctx.ui.setWorkingMessage(packetId ? `ingesting ${packetId}\u2026` : "ingesting pending sources\u2026");
       try {
-        const result = await runIngestSession(ctx, { ...(packetId ? { packetId } : {}) });
+        const result = await runIngestSession(ctx, { ...(packetId ? { packetId } : {}) }, undefined, (n) =>
+          ctx.ui.notify(`/wiki-ingest: ${n} tool call(s)\u2026`, "info"),
+        );
         ctx.ui.notify(
           result.isError ? (result.errorMessage ?? "wiki ingest failed") : result.text,
           result.isError ? "error" : "info",
@@ -905,11 +908,14 @@ function registerWikiResearchCommand(pi: ExtensionAPI): void {
       "Run the Deep Research pipeline in an isolated side-call for every open deep_research Review Queue item in the active vault (search -> capture -> ingest -> resolve). Optional arg: a specific review item id.",
     async handler(args, ctx) {
       const reviewItemId = args.trim() || undefined;
+      ctx.ui.notify("/wiki-research: starting side-call\u2026", "info");
       ctx.ui.setWorkingMessage(
         reviewItemId ? `researching ${reviewItemId}\u2026` : "researching deep_research items\u2026",
       );
       try {
-        const result = await runResearchSession(ctx, { ...(reviewItemId ? { reviewItemId } : {}) });
+        const result = await runResearchSession(ctx, { ...(reviewItemId ? { reviewItemId } : {}) }, undefined, (n) =>
+          ctx.ui.notify(`/wiki-research: ${n} tool call(s)\u2026`, "info"),
+        );
         ctx.ui.notify(
           result.isError ? (result.errorMessage ?? "wiki research failed") : result.text,
           result.isError ? "error" : "info",
@@ -1039,9 +1045,12 @@ function registerWikiCaptureCommand(pi: ExtensionAPI): void {
         ctx.ui.notify("Usage: /wiki-capture <url | file path | text>", "warning");
         return;
       }
+      ctx.ui.notify("/wiki-capture: starting side-call\u2026", "info");
       ctx.ui.setWorkingMessage("capturing source\u2026");
       try {
-        const result = await runCaptureSession(ctx, { source });
+        const result = await runCaptureSession(ctx, { source }, undefined, (n) =>
+          ctx.ui.notify(`/wiki-capture: ${n} tool call(s)\u2026`, "info"),
+        );
         ctx.ui.notify(
           result.isError ? (result.errorMessage ?? "wiki capture failed") : result.text,
           result.isError ? "error" : "info",
@@ -1063,9 +1072,12 @@ function registerWikiSlashCommands(pi: ExtensionAPI): void {
       "Run wiki lint in an isolated side-call and write meta/lint-report.md. Append --fix to auto-capture uncaptured inbox files.",
     async handler(args, ctx) {
       const fix = /\b--fix\b/.test(args);
+      ctx.ui.notify("/wiki-lint: starting side-call\u2026", "info");
       ctx.ui.setWorkingMessage(fix ? "linting + fixing\u2026" : "linting\u2026");
       try {
-        const result = await runLintSession(ctx, { fix });
+        const result = await runLintSession(ctx, { fix }, undefined, (n) =>
+          ctx.ui.notify(`/wiki-lint: ${n} tool call(s)\u2026`, "info"),
+        );
         ctx.ui.notify(
           result.isError ? (result.errorMessage ?? "wiki lint failed") : result.text,
           result.isError ? "error" : "info",

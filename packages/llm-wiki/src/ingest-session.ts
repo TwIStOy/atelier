@@ -28,6 +28,7 @@ export async function runIngestSession(
   ctx: ExtensionContext,
   input: IngestSessionInput,
   signal?: AbortSignal,
+  onProgress?: (toolCalls: number) => void,
 ): Promise<IngestSessionResult> {
   const packetClause = input.packetId
     ? ` Restrict the run to the Source Packet ${input.packetId} by passing \`packetId: "${input.packetId}"\` to wiki_ingest.`
@@ -42,6 +43,7 @@ export async function runIngestSession(
       task,
       model: resolveIngestModel(ctx) ?? undefined,
       allowedTools: [...WIKI_SIDE_CALL_BASE_TOOLS, "wiki_ingest"],
+      onProgress,
     },
     signal,
   );

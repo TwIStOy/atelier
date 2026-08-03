@@ -27,6 +27,7 @@ export async function runResearchSession(
   ctx: ExtensionContext,
   input: ResearchSessionInput,
   signal?: AbortSignal,
+  onProgress?: (toolCalls: number) => void,
 ): Promise<ResearchSessionResult> {
   const itemClause = input.reviewItemId
     ? ` Restrict the run to Review Queue item ${input.reviewItemId} by passing \`reviewItemId: "${input.reviewItemId}"\` to wiki_deep_research.`
@@ -41,6 +42,7 @@ export async function runResearchSession(
       task,
       model: resolveIngestModel(ctx) ?? undefined,
       allowedTools: [...WIKI_SIDE_CALL_BASE_TOOLS, "wiki_deep_research"],
+      onProgress,
     },
     signal,
   );
