@@ -6,6 +6,7 @@ import { bootstrapVault } from "../src/core/bootstrap.ts";
 import {
   DEFAULT_INGEST_MAX_ATTEMPTS,
   type IngestBatchResult,
+  type IngestProgress,
   ingestBatch,
   type SideCaller,
 } from "../src/core/ingest.ts";
@@ -325,6 +326,85 @@ const CONCEPT_ONLY_GENERATION = [
   "# Foo",
   "```",
 ].join("\n");
+
+describe("ingestBatch — progress events", () => {
+  it("emits packet_started, step_started (analysis then generation), and packet_finished in order", async () => {
+    const packetId = await captureTextSource("# Foo");
+    const events: IngestProgress[] = [];
+    const caller = fakeCaller(ANALYSIS_TEXT, GENERATION_TEXT);
+
+    await ingestBatch(vaultRoot, { caller, now: FIXED_DATE, onProgress: (e) => events.push(e) });
+
+    expect(events.map((e) => e.kind)).toEqual(["packet_started", "step_started", "step_started", "packet_finished"]);
+    const steps = events.filter((e) => e.kind === "step_started");
+    expect(steps.map((e) => (e.kind === "step_started" ? e.step : ""))).toEqual(["analysis", "generation"]);
+    for (const e of events) {
+      expect(e.packetId).toBe(packetId);
+      expect(e.index).toBe(0);
+      expect(e.total).toBe(1);
+      if (e.kind !== "packet_finished") expect(e.packetTitle).toBe("The Foo Paper");
+    }
+    const finished = events.find((e) => e.kind === "packet_finished");
+    expect(finished?.kind === "packet_finished" && finished.outcome.status).toBe("ingested");
+    expect(finished?.kind === "packet_finished" && finished.outcome.createdByType).toEqual({ source: 1, concept: 1 });
+  });
+
+  it("reports retry attempts in step_started events", async () => {
+    await captureTextSource("# Foo");
+    const events: IngestProgress[] = [];
+    let analysisCalls = 0;
+    const caller: SideCaller = {
+      async call(input) {
+        if (input.systemPrompt.includes("STEP: analysis")) {
+          analysisCalls += 1;
+          return analysisCalls < 3 ? { ok: true, text: "no fence" } : { ok: true, text: ANALYSIS_TEXT };
+        }
+        return { ok: true, text: GENERATION_TEXT };
+      },
+    };
+
+    await ingestBatch(vaultRoot, { caller, now: FIXED_DATE, maxAttempts: 3, onProgress: (e) => events.push(e) });
+
+    const attempts = events
+      .filter((e) => e.kind === "step_started" && e.step === "analysis")
+      .map((e) => (e.kind === "step_started" ? `${e.attempt}/${e.maxAttempts}` : ""));
+    expect(attempts).toEqual(["1/3", "2/3", "3/3"]);
+  });
+});
+
+describe("ingestBatch — per-packet events.jsonl", () => {
+  function readEventSummaries(): string[] {
+    return fs
+      .readFileSync(vaultLayout(vaultRoot).events, "utf8")
+      .trim()
+      .split("\n")
+      .map((line) => (JSON.parse(line) as { kind: string; summary: string }).summary);
+  }
+
+  it("appends one ingest event per packet plus the batch summary", async () => {
+    const packetId = await captureTextSource("# Foo");
+    const caller = fakeCaller(ANALYSIS_TEXT, GENERATION_TEXT);
+
+    await ingestBatch(vaultRoot, { caller, now: FIXED_DATE });
+
+    const summaries = readEventSummaries();
+    expect(summaries).toContain(`ingest ${packetId}: ingested — created 1 source, 1 concept, 1 review item(s)`);
+    expect(summaries[summaries.length - 1]).toBe("batch ingest: 1 packet(s) ingested");
+  });
+
+  it("records failed packets even when nothing ingests (no batch summary event)", async () => {
+    const packetId = await captureTextSource("# Foo");
+    const caller = fakeCaller("no fence here", GENERATION_TEXT);
+
+    await ingestBatch(vaultRoot, { caller, now: FIXED_DATE });
+
+    const summaries = readEventSummaries();
+    const packetEvents = summaries.filter((s) => s.startsWith(`ingest ${packetId}: failed`));
+    expect(packetEvents).toHaveLength(1);
+    expect(packetEvents[0]).toMatch(/analysis/i);
+    expect(summaries.some((s) => s.startsWith("batch ingest:"))).toBe(false);
+  });
+});
 
 describe("ingestBatch — retry on bad output", () => {
   it("retries the analysis step when the format is wrong, then succeeds within maxAttempts", async () => {

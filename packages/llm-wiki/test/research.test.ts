@@ -97,6 +97,7 @@ function fakeIngester(opts: { failIf?: (packetId: string) => boolean } = {}): De
               pagesCreated: 0,
               pagesExisted: 0,
               reviewFiled: 0,
+              createdByType: {},
             });
             continue;
           }
@@ -111,6 +112,7 @@ function fakeIngester(opts: { failIf?: (packetId: string) => boolean } = {}): De
             pagesCreated: 1,
             pagesExisted: 0,
             reviewFiled: 0,
+            createdByType: { source: 1 },
           });
         }
       }
