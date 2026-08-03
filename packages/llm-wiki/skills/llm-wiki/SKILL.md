@@ -52,7 +52,7 @@ When a source adds to an **existing** page, ingest unions the packet id into the
 1. `wiki_recall` (Layered Recall: keyword search + four-signal **Graph Relevance** across both vaults) — or `wiki_search` for a single-vault keyword lookup.
 2. `read` the highest-value hits (and the packets they cite via `[[sources/SRC-…]]`).
 3. Synthesize a direct answer. **Cite every claim** to its Source Packet with a wikilink, e.g. `[[sources/SRC-2024-01-05-001]]`.
-4. If the wiki does not cover it, say so plainly — do not fabricate citations. Suggest a capture + ingest or a Deep Research loop instead.
+4. If the wiki does not cover it, say so plainly — do not fabricate citations. File a `deep_research` Review item with a prebuilt search query (`wiki_review` with `action=file`) so `/wiki-research` can close the gap later, and suggest a capture + ingest or a Deep Research loop as the immediate next step.
 
 **Queries are read-only by default.** Never write to the wiki during a query. Only file the answer as a new **Analysis** page (Page Type `analysis`) when the **user explicitly asks** (e.g. "file this", "save this as a page"). To file: `wiki_ensure_page({ type: "analysis", title: <the question>, sources: [<packet ids>], ... })` and fill the answer/reasoning into the body, keeping the citations. Valuable answers filing back is how exploration compounds — but it is opt-in, not automatic.
 
@@ -68,13 +68,13 @@ When a source adds to an **existing** page, ingest unions the packet id into the
 
 During Ingest the agent files items needing human judgment into the **Review Queue** (`meta/review.jsonl`), each with a suggested action (`create_page` | `deep_research` | `skip`) and a pre-built search query. Resolve them at your convenience:
 
-- `wiki_review` (`action=list` to read, `action=resolve` to record a decision + optional note), or
-- `/wiki-review` to walk open items one by one interactively.
+- `wiki_review` (`action=list` to read, `action=file` to file a new open item — `kind` + `title` + `suggestedAction`, optional `note`/`query`; `query` is required for `deep_research` items. Filing dedups against open items with the same kind+title+action. Agent-filed items carry no `packetId`), `action=resolve` to record a decision + optional note), or
+- `/wiki-review` triages the queue instead of walking everything: items suggested as `skip` are auto-resolved, `create_page` items are handed to a background side-call that creates the pages (`wiki_ensure_page`, grounded in the cited packet) and resolves the items, and only `deep_research` items are walked interactively for a decision.
 
-**Resolving only records the decision** — the queue is a ledger, not an executor. `/wiki-review` (and `wiki_review` resolve) deliberately stay decision-only, keeping the ledger separate from execution. The actions are then carried out separately:
+**Resolving only records the decision** — the queue is a ledger, not an executor. `wiki_review` resolve deliberately stays decision-only, keeping the ledger separate from execution. The actions are then carried out separately:
 
 - **`deep_research`** — automated end-to-end by `/wiki-research` (or the `wiki_deep_research` tool): for each open `deep_research` item it runs the item's pre-built query through the configured web-search provider chain, captures each result URL into a Source Packet (idempotent by URL), batch-ingests them, and **resolves the item once at least one packet ingests**. Re-entrant: re-running skips already-captured URLs and already-ingested packets; an item where every packet fails stays open, and items with no query are skipped (recorded, never blocking). Override the top-N per run via the `deepResearchMaxResults` config item or a per-call `maxResults`.
-- **`create_page`** — performed in-session by the agent: create the page with `wiki_ensure_page`.
+- **`create_page`** — executed by the `/wiki-review` side-call (or in-session by the agent after a manual resolve): create the page with `wiki_ensure_page`.
 - **`skip`** — closes the item with no action.
 
 ## Citation discipline
