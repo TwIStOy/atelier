@@ -68,6 +68,8 @@
 
 ### Changed
 
+- Side-call commands (`/wiki-capture`, `/wiki-ingest`, `/wiki-lint`, `/wiki-research`) now run **non-blocking (background)**: the handler launches the child session and returns immediately instead of `await`ing it. The main session stays usable, so you can run `/view-subagents` to watch the side-call while it runs; a `notify` fires when it finishes (and `/wiki-ingest`/`/wiki-lint`/`/wiki-research` still deliver their result to the main agent). Previously the command blocked the session for the whole side-call, which is why `/view-subagents` couldn't be opened mid-run.
+
 - Bundled **llm-wiki** skill Review section: `deep_research` is now auto-closable end-to-end via `/wiki-research` (or `wiki_deep_research`); `/wiki-review` (and `wiki_review` resolve) stay a decision-only ledger, keeping the decision/execution separation. `create_page` and `skip` remain in-session agent actions. README tools/commands/configuration tables updated to list `wiki_deep_research`, `/wiki-research`, and `deepResearchMaxResults` ([#94](https://github.com/TwIStOy/pi-extensions/issues/94)).
 - `capture-session.ts` and `ingest-session.ts` now delegate their child-session spawn to the shared `runIsolatedSession` helper in `@htwang-contrib/common` (no behavior change; removes the duplicated spawn boilerplate between the two side-calls).
 
