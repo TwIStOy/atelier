@@ -9,6 +9,18 @@ function padToVisible(line: string, width: number): string {
   return vw >= width ? line : line + " ".repeat(width - vw);
 }
 
+function wrapLine(line: string, width: number): string[] {
+  if (line.length === 0) return [""];
+  const lines: string[] = [];
+  let rest = line;
+  while (visibleWidth(rest) > width) {
+    lines.push(rest.slice(0, width));
+    rest = rest.slice(width);
+  }
+  lines.push(rest);
+  return lines;
+}
+
 const OVERLAY_OPTIONS: OverlayOptions = {
   anchor: "bottom-center",
   width: "100%",
@@ -148,9 +160,14 @@ export class CommitterOverlayController implements Component {
         content.push(this.theme.fg("warning", "  ○ Cancelled"));
         break;
 
-      case "error":
-        content.push(this.theme.fg("error", `  ✗ ${this.progress.errorMessage ?? "Unknown error"}`));
+      case "error": {
+        const msg = this.progress.errorMessage ?? "Unknown error";
+        const errLines = msg.split("\n").flatMap((l) => wrapLine(l, innerW - 4));
+        for (const [i, l] of errLines.entries()) {
+          content.push(this.theme.fg("error", i === 0 ? `  ✗ ${l}` : `    ${l}`));
+        }
         break;
+      }
     }
 
     content.push("");
