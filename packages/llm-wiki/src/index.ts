@@ -566,6 +566,7 @@ function registerWikiIngestCommand(pi: ExtensionAPI): void {
           result.isError ? "error" : "info",
         );
         logger.info(`wiki ingest side-call: ${result.toolCalls} tool call(s), session ${result.subSessionFile ?? "?"}`);
+        deliverSideCallToAgent(pi, ctx, "/wiki-ingest", result);
       } finally {
         ctx.ui.setWorkingMessage(undefined);
       }
@@ -916,6 +917,7 @@ function registerWikiResearchCommand(pi: ExtensionAPI): void {
         logger.info(
           `wiki research side-call: ${result.toolCalls} tool call(s), session ${result.subSessionFile ?? "?"}`,
         );
+        deliverSideCallToAgent(pi, ctx, "/wiki-research", result);
       } finally {
         ctx.ui.setWorkingMessage(undefined);
       }
@@ -1011,6 +1013,22 @@ function registerWikiStatusTool(pi: ExtensionAPI): void {
   });
 }
 
+function deliverSideCallToAgent(
+  pi: ExtensionAPI,
+  ctx: ExtensionContext,
+  label: string,
+  result: { isError: boolean; text: string; errorMessage?: string },
+): void {
+  const note = result.isError
+    ? `[llm-wiki] ${label} side-call failed: ${result.errorMessage ?? "unknown error"}`
+    : `[llm-wiki] ${label} side-call finished.\n${result.text}`;
+  if (ctx.isIdle()) {
+    pi.sendUserMessage(note);
+  } else {
+    ctx.ui.notify(note, result.isError ? "error" : "info");
+  }
+}
+
 function registerWikiCaptureCommand(pi: ExtensionAPI): void {
   pi.registerCommand("wiki-capture", {
     description:
@@ -1031,6 +1049,7 @@ function registerWikiCaptureCommand(pi: ExtensionAPI): void {
         logger.info(
           `wiki capture side-call: ${result.toolCalls} tool call(s), session ${result.subSessionFile ?? "?"}`,
         );
+        deliverSideCallToAgent(pi, ctx, "/wiki-capture", result);
       } finally {
         ctx.ui.setWorkingMessage(undefined);
       }
@@ -1052,6 +1071,7 @@ function registerWikiSlashCommands(pi: ExtensionAPI): void {
           result.isError ? "error" : "info",
         );
         logger.info(`wiki lint side-call: ${result.toolCalls} tool call(s), session ${result.subSessionFile ?? "?"}`);
+        deliverSideCallToAgent(pi, ctx, "/wiki-lint", result);
       } finally {
         ctx.ui.setWorkingMessage(undefined);
       }
