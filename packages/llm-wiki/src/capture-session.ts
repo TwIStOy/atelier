@@ -1,6 +1,6 @@
 import type { ExtensionAPI, ExtensionContext, ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import { type IsolatedSessionResult, runIsolatedSession } from "@htwang-contrib/common";
-import webTools from "@htwang-contrib/web-tools";
+import { registerWebFetchTool, registerWebSearchTool } from "@htwang-contrib/web-tools";
 import { resolveIngestModel } from "./config.ts";
 import { registerWikiCaptureTool } from "./index.ts";
 import { WIKI_SIDE_CALL_BASE_TOOLS, WIKI_SIDE_CALL_FACTORIES } from "./side-call-base.ts";
@@ -23,6 +23,8 @@ const CAPTURE_SYSTEM_PROMPT = [
 
 const captureToolsFactory: ExtensionFactory = (pi: ExtensionAPI) => {
   registerWikiCaptureTool(pi);
+  registerWebSearchTool(pi);
+  registerWebFetchTool(pi);
 };
 
 export interface CaptureSessionInput {
@@ -45,7 +47,7 @@ export async function runCaptureSession(
     ctx,
     {
       label: "/wiki-capture",
-      extensionFactories: [...WIKI_SIDE_CALL_FACTORIES, webTools, captureToolsFactory],
+      extensionFactories: [...WIKI_SIDE_CALL_FACTORIES, captureToolsFactory],
       systemPrompt: CAPTURE_SYSTEM_PROMPT,
       task,
       model: resolveIngestModel(ctx) ?? undefined,
