@@ -11,6 +11,7 @@ import {
   DEFAULT_DEEP_RESEARCH_MAX_RESULTS,
   type DeepResearchCapturer,
   type DeepResearchIngester,
+  type DeepResearchProgress,
   type DeepResearchSearcher,
   deepResearchBatch,
   type ItemResearchOutcome,
@@ -403,5 +404,81 @@ describe("deepResearchBatch — selection and re-entrancy", () => {
     expect(outcome.ingested).toBe(1);
     expect(outcome.status).toBe("resolved");
     expect(listReviewItems(vaultRoot).find((i) => i.id === itemId)?.status).toBe("resolved");
+  });
+});
+
+describe("deepResearchBatch — progress events", () => {
+  it("emits item_started, search_finished, url_finished per URL, ingest_started, item_finished in order", async () => {
+    const itemId = fileDeepResearchItem("foo");
+    const events: DeepResearchProgress[] = [];
+
+    await deepResearchBatch(vaultRoot, {
+      searcher: fakeSearcher({ foo: [{ url: "https://a.example" }, { url: "https://b.example" }] }),
+      capturer: fakeCapturer(),
+      ingester: fakeIngester(),
+      now: FIXED_DATE,
+      onProgress: (e) => events.push(e),
+    });
+
+    expect(events.map((e) => e.kind)).toEqual([
+      "item_started",
+      "search_finished",
+      "url_finished",
+      "url_finished",
+      "ingest_started",
+      "item_finished",
+    ]);
+    for (const e of events) {
+      expect(e.itemId).toBe(itemId);
+      expect(e.index).toBe(0);
+      expect(e.total).toBe(1);
+    }
+    const search = events.find((e) => e.kind === "search_finished");
+    expect(search?.kind === "search_finished" && search.results).toBe(2);
+    const urlIndexes = events
+      .filter((e) => e.kind === "url_finished")
+      .map((e) => (e.kind === "url_finished" ? `${e.urlIndex}/${e.urlTotal}:${e.outcome.status}` : ""));
+    expect(urlIndexes).toEqual(["0/2:captured", "1/2:captured"]);
+    const finished = events.find((e) => e.kind === "item_finished");
+    expect(finished?.kind === "item_finished" && finished.outcome.status).toBe("resolved");
+  });
+
+  it("emits only item_started and item_finished for a query-less (skipped) item", async () => {
+    const itemId = fileDeepResearchItem(undefined);
+    const events: DeepResearchProgress[] = [];
+
+    await deepResearchBatch(vaultRoot, {
+      searcher: fakeSearcher({}),
+      capturer: fakeCapturer(),
+      ingester: fakeIngester(),
+      now: FIXED_DATE,
+      onProgress: (e) => events.push(e),
+    });
+
+    expect(events.map((e) => e.kind)).toEqual(["item_started", "item_finished"]);
+    const finished = events[1];
+    expect(finished?.kind === "item_finished" && finished.outcome.status).toBe("skipped");
+    expect(events[0]?.itemId).toBe(itemId);
+  });
+});
+
+describe("deepResearchBatch — per-item events.jsonl", () => {
+  it("appends one deep_research event per item plus the batch summary", async () => {
+    const itemId = fileDeepResearchItem("foo");
+
+    await deepResearchBatch(vaultRoot, {
+      searcher: fakeSearcher({ foo: [{ url: "https://a.example" }, { url: "https://b.example" }] }),
+      capturer: fakeCapturer(),
+      ingester: fakeIngester(),
+      now: FIXED_DATE,
+    });
+
+    const summaries = fs
+      .readFileSync(vaultLayout(vaultRoot).events, "utf8")
+      .trim()
+      .split("\n")
+      .map((line) => (JSON.parse(line) as { kind: string; summary: string }).summary);
+    expect(summaries).toContain(`deep research ${itemId}: resolved — searched 2, captured 2, existed 0, ingested 2`);
+    expect(summaries[summaries.length - 1]).toBe("deep research: 1 resolved, 0 left open, 0 skipped (1 item(s))");
   });
 });

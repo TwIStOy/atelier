@@ -32,6 +32,7 @@ import { vaultLayout } from "./core/paths.ts";
 import { type RecallHit, type RecallResult, recallAcross, recallVault } from "./core/recall.ts";
 import {
   type DeepResearchBatchResult,
+  type DeepResearchProgress,
   type DeepResearchSearcher,
   deepResearchBatch,
   type ItemResearchOutcome,
@@ -929,6 +930,7 @@ async function runDeepResearch(args: {
   signal?: AbortSignal;
   reviewItemId?: string;
   maxResults?: number;
+  onProgress?: (event: DeepResearchProgress) => void;
 }): Promise<RunDeepResearchOutcome> {
   const model = resolveIngestModel(args.ctx);
   if (!model) {
@@ -965,6 +967,7 @@ async function runDeepResearch(args: {
     signal: args.signal,
     maxResults,
     ...(args.reviewItemId ? { itemId: args.reviewItemId } : {}),
+    ...(args.onProgress ? { onProgress: args.onProgress } : {}),
   });
 }
 
@@ -1015,6 +1018,13 @@ export function registerWikiDeepResearchTool(pi: ExtensionAPI): void {
     }),
 
     async execute(_toolCallId, params, signal, onUpdate, ctx) {
+      const finishedOutcomes: ItemResearchOutcome[] = [];
+      let currentLine = "";
+      const pushProgress = (): void => {
+        const lines = ["Deep research in progress…", ...finishedOutcomes.map(formatDeepResearchItemLine)];
+        if (currentLine) lines.push(currentLine);
+        onUpdate?.({ content: [{ type: "text", text: lines.join("\n") }], details: { outcomes: finishedOutcomes } });
+      };
       const result = await runDeepResearch({
         ctx,
         signal,
@@ -1022,6 +1032,22 @@ export function registerWikiDeepResearchTool(pi: ExtensionAPI): void {
           ? { reviewItemId: params.reviewItemId.trim() }
           : {}),
         ...(typeof params.maxResults === "number" ? { maxResults: params.maxResults } : {}),
+        onProgress: (event) => {
+          const pos = `(${event.index + 1}/${event.total})`;
+          if (event.kind === "item_started") {
+            currentLine = `> ${event.itemId} ${pos} — searching: ${event.query}`;
+          } else if (event.kind === "search_finished") {
+            currentLine = `> ${event.itemId} ${pos} — ${event.results} result(s), capturing…`;
+          } else if (event.kind === "url_finished") {
+            currentLine = `> ${event.itemId} ${pos} — captured ${event.urlIndex + 1}/${event.urlTotal}: ${event.outcome.url} [${event.outcome.status}]`;
+          } else if (event.kind === "ingest_started") {
+            currentLine = `> ${event.itemId} ${pos} — ingesting…`;
+          } else {
+            currentLine = "";
+            finishedOutcomes.push(event.outcome);
+          }
+          pushProgress();
+        },
       });
       if ("error" in result) {
         return { content: [{ type: "text", text: result.error }], details: { error: result.error } };

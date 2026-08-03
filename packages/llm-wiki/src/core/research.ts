@@ -52,6 +52,21 @@ export interface DeepResearchBatchResult {
   outcomes: ItemResearchOutcome[];
 }
 
+export type DeepResearchProgress =
+  | { kind: "item_started"; itemId: string; query: string; index: number; total: number }
+  | { kind: "search_finished"; itemId: string; index: number; total: number; results: number }
+  | {
+      kind: "url_finished";
+      itemId: string;
+      index: number;
+      total: number;
+      urlIndex: number;
+      urlTotal: number;
+      outcome: UrlResearchOutcome;
+    }
+  | { kind: "ingest_started"; itemId: string; index: number; total: number }
+  | { kind: "item_finished"; itemId: string; index: number; total: number; outcome: ItemResearchOutcome };
+
 export interface DeepResearchOptions {
   searcher: DeepResearchSearcher;
   capturer: DeepResearchCapturer;
@@ -60,6 +75,7 @@ export interface DeepResearchOptions {
   maxResults?: number;
   now?: Date | (() => Date);
   itemId?: string;
+  onProgress?: (event: DeepResearchProgress) => void;
 }
 
 export async function deepResearchBatch(
@@ -74,8 +90,17 @@ export async function deepResearchBatch(
   }
 
   const outcomes: ItemResearchOutcome[] = [];
-  for (const item of items) {
-    outcomes.push(await researchOneItem(vaultRoot, item, opts));
+  const total = items.length;
+  for (const [index, item] of items.entries()) {
+    opts.onProgress?.({ kind: "item_started", itemId: item.id, query: item.query ?? "", index, total });
+    const outcome = await researchOneItem(vaultRoot, item, opts, index, total);
+    outcomes.push(outcome);
+    appendJsonl(vaultLayout(vaultRoot).events, {
+      ts: now.toISOString(),
+      kind: "deep_research",
+      summary: itemEventSummary(outcome),
+    });
+    opts.onProgress?.({ kind: "item_finished", itemId: item.id, index, total, outcome });
   }
 
   const resolved = outcomes.filter((o) => o.status === "resolved").length;
@@ -91,10 +116,24 @@ export async function deepResearchBatch(
   return { vaultRoot, processed: outcomes.length, resolved, leftOpen, skipped, outcomes };
 }
 
+function itemEventSummary(outcome: ItemResearchOutcome): string {
+  const parts = [
+    `searched ${outcome.searched}`,
+    `captured ${outcome.captured}`,
+    `existed ${outcome.existed}`,
+    `ingested ${outcome.ingested}`,
+  ];
+  let line = `deep research ${outcome.itemId}: ${outcome.status} — ${parts.join(", ")}`;
+  if (outcome.note) line += ` — ${outcome.note}`;
+  return line;
+}
+
 async function researchOneItem(
   vaultRoot: string,
   item: ReviewItem,
   opts: DeepResearchOptions,
+  index: number,
+  total: number,
 ): Promise<ItemResearchOutcome> {
   const now = resolveNow(opts.now);
   const signal = opts.signal ?? new AbortController().signal;
@@ -120,31 +159,44 @@ async function researchOneItem(
   } catch (err) {
     return { ...base, status: "open", note: `search failed: ${err instanceof Error ? err.message : String(err)}` };
   }
+  opts.onProgress?.({ kind: "search_finished", itemId: item.id, index, total, results: results.length });
 
   const packetDirs: string[] = [];
   const urls: UrlResearchOutcome[] = [];
   let captured = 0;
   let existed = 0;
-  for (const result of results) {
+  for (const [urlIndex, result] of results.entries()) {
+    let outcome: UrlResearchOutcome;
     try {
       const cap = await opts.capturer.captureUrl(result.url, signal);
       packetDirs.push(cap.manifest.packetDir);
-      urls.push({
+      outcome = {
         url: result.url,
         status: cap.created ? "captured" : "existed",
         ...(cap.manifest.id !== undefined ? { packetId: cap.manifest.id } : {}),
-      });
+      };
       if (cap.created) captured += 1;
       else existed += 1;
     } catch (err) {
-      urls.push({
+      outcome = {
         url: result.url,
         status: "failed",
         reason: err instanceof Error ? err.message : String(err),
-      });
+      };
     }
+    urls.push(outcome);
+    opts.onProgress?.({
+      kind: "url_finished",
+      itemId: item.id,
+      index,
+      total,
+      urlIndex,
+      urlTotal: results.length,
+      outcome,
+    });
   }
 
+  opts.onProgress?.({ kind: "ingest_started", itemId: item.id, index, total });
   await opts.ingester.ingest(signal);
 
   const ingestedIds: string[] = [];
