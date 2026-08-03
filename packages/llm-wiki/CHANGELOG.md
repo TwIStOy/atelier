@@ -61,6 +61,7 @@
 - `/wiki-ingest` slash command repurposed: it now spawns the isolated ingest side-call instead of running the batch in-process, and notifies the child's summary (or error). `wiki_ingest` is deliberately not registered in the main session. The internal `runIngest` function is retained for `wiki_deep_research` / `/wiki-research`, which call it directly.
 - `src/lint-session.ts` + `src/research-session.ts`: focused side-call spawns isomorphic to capture/ingest, delegating to `runIsolatedSession`. `/wiki-lint [--fix]` and `/wiki-research [itemId]` spawn them; the tools run unchanged inside the child (lint's inbox fix uses the core `captureSource`; deep research reuses the internal `runIngest` + the web-tools search chain via the global config).
 - Side-call children now load the `inference-v2-self-host` provider via a shared `WIKI_SIDE_CALL_FACTORIES` base (`src/side-call-base.ts`), so the child agent loop and the tools' internal side-calls can resolve inference-v2-served models. `@htwang-contrib/inference-v2-self-host` added as a dependency.
+- Side-call children (`/wiki-capture`, `/wiki-ingest`, `/wiki-lint`, `/wiki-research`) now write a child-session link record (via `runIsolatedSession`), so they surface in the subagents `/view-subagents` picker — running side-calls show `⏳` and can be opened to watch the live child session. The viewer is command-triggered (`/view-subagents`); there is no auto-pop.
 
 ### Changed
 

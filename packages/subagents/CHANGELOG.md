@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Child-session link-record helpers (`recordSubagentStarted`/`appendSubagentLinkRecord`/`subagentParentIndexPath`) moved to `@htwang-contrib/common` (`src/session-links.ts`) as `recordChildSessionStarted`/`recordChildSessionFinished`/`childSessionIndexPath`; `runSubAgent` and the viewer import them from common. `src/paths.ts` now only holds `SUBAGENT_SESSION_DIR`. No behavior change.
+
 ## [0.4.0] - 2026-07-31
 
 ### Changed

@@ -16,7 +16,7 @@ import {
   SettingsManager,
   truncateHead,
 } from "@earendil-works/pi-coding-agent";
-import { resolveModel } from "@htwang-contrib/common";
+import { recordChildSessionFinished, recordChildSessionStarted, resolveModel } from "@htwang-contrib/common";
 import extraTools from "@htwang-contrib/extra-tools";
 import inferenceSelfHost from "@htwang-contrib/inference-self-host";
 import inferenceV2SelfHost from "@htwang-contrib/inference-v2-self-host";
@@ -30,7 +30,7 @@ import {
 } from "./agent-catalog.ts";
 import { resolveChildToolNames } from "./child-tools.ts";
 import { registerGitCloneTool } from "./git-clone/index.ts";
-import { appendSubagentLinkRecord, recordSubagentStarted, SUBAGENT_SESSION_DIR } from "./paths.ts";
+import { SUBAGENT_SESSION_DIR } from "./paths.ts";
 
 const gitCloneExtension = (pi: ExtensionAPI) => {
   registerGitCloneTool(pi);
@@ -300,9 +300,9 @@ export async function runSubAgent(
     });
     session = created;
 
-    recordSubagentStarted(parentSessionId, {
-      parent_session_file: parentSessionFile,
-      sub_session_file: created.sessionManager.getSessionFile() ?? "",
+    recordChildSessionStarted(parentSessionId, {
+      parentSessionFile,
+      childSessionFile: created.sessionManager.getSessionFile() ?? "",
     });
 
     await created.bindExtensions({});
@@ -386,11 +386,10 @@ export async function runSubAgent(
   } finally {
     const subFile = session?.sessionManager.getSessionFile();
     if (subFile) {
-      appendSubagentLinkRecord(parentSessionId, {
-        parent_session_file: parentSessionFile,
-        sub_session_file: subFile,
-        tool_calls: toolCallCount,
-        ended_at: new Date().toISOString(),
+      recordChildSessionFinished(parentSessionId, {
+        parentSessionFile,
+        childSessionFile: subFile,
+        toolCalls: toolCallCount,
       });
     }
   }

@@ -4,8 +4,8 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { initTheme, type Theme } from "@earendil-works/pi-coding-agent";
 import type { TUI } from "@earendil-works/pi-tui";
+import { childSessionIndexPath, recordChildSessionStarted } from "@htwang-contrib/common";
 import { describe, expect, it, vi } from "vitest";
-import { recordSubagentStarted, subagentParentIndexPath } from "../../src/paths.ts";
 import type { SubagentRunSummary } from "../../src/viewer/index.ts";
 import { SubagentViewerOverlay } from "../../src/viewer/overlay.ts";
 
@@ -163,9 +163,9 @@ describe("SubagentViewerOverlay scroll + sticky-bottom", () => {
   it("when sticky, appending to the child file keeps the view at the latest line", () => {
     const file = makeChildSession(5);
     const sessionId = `test-scroll-live-${crypto.randomBytes(4).toString("hex")}`;
-    recordSubagentStarted(sessionId, {
-      parent_session_file: "",
-      sub_session_file: file,
+    recordChildSessionStarted(sessionId, {
+      parentSessionFile: "",
+      childSessionFile: file,
     });
     try {
       const overlay = new SubagentViewerOverlay({
@@ -198,7 +198,7 @@ describe("SubagentViewerOverlay scroll + sticky-bottom", () => {
       overlay.dispose();
     } finally {
       fs.rmSync(path.dirname(file), { recursive: true, force: true });
-      fs.rmSync(subagentParentIndexPath(sessionId), { force: true });
+      fs.rmSync(childSessionIndexPath(sessionId), { force: true });
     }
   });
 });

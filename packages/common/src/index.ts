@@ -95,6 +95,12 @@ export {
   isStaleCtxError,
 } from "./session-cache.ts";
 export { SessionLifecycle } from "./session-lifecycle.ts";
+export type { ChildSessionLinkRecord } from "./session-links.ts";
+export {
+  childSessionIndexPath,
+  recordChildSessionFinished,
+  recordChildSessionStarted,
+} from "./session-links.ts";
 export type { SideCallResult } from "./side-call.ts";
 export { executeSideCall } from "./side-call.ts";
 export { getAvailableSkillNames } from "./skills.ts";

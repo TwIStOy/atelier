@@ -7,7 +7,7 @@ import {
   type SessionEntry,
   type SessionHeader,
 } from "@earendil-works/pi-coding-agent";
-import { subagentParentIndexPath } from "../paths.ts";
+import { childSessionIndexPath } from "@htwang-contrib/common";
 
 export type SubagentLinkRecord = {
   parent_session_id: string;
@@ -20,7 +20,7 @@ export type SubagentLinkRecord = {
 };
 
 function readLinkRecords(parentSessionId: string): SubagentLinkRecord[] {
-  const file = subagentParentIndexPath(parentSessionId);
+  const file = childSessionIndexPath(parentSessionId);
   if (!fs.existsSync(file)) return [];
   let text: string;
   try {

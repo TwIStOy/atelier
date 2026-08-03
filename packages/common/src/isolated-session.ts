@@ -11,6 +11,7 @@ import {
   SessionManager,
   SettingsManager,
 } from "@earendil-works/pi-coding-agent";
+import { recordChildSessionFinished, recordChildSessionStarted } from "./session-links.ts";
 
 const DEFAULT_SESSION_DIR = path.join(homedir(), ".agent", "isolated-sessions");
 
@@ -104,6 +105,13 @@ export async function runIsolatedSession(
 
   await session.bindExtensions({});
 
+  const parentSessionId = ctx.sessionManager.getHeader()?.id;
+  const parentSessionFile = ctx.sessionManager.getSessionFile() ?? "";
+  const childSessionFile = session.sessionManager.getSessionFile() ?? "";
+  if (parentSessionId) {
+    recordChildSessionStarted(parentSessionId, { parentSessionFile, childSessionFile });
+  }
+
   let toolCalls = 0;
   const unsub = session.subscribe((event: AgentSessionEvent) => {
     if (event.type === "tool_execution_end") toolCalls += 1;
@@ -114,9 +122,11 @@ export async function runIsolatedSession(
   };
   signal?.addEventListener("abort", onAbort, { once: true });
 
+  let errored = false;
   try {
     await session.prompt(options.task);
   } catch (e) {
+    errored = true;
     const msg = e instanceof Error ? e.message : String(e);
     return {
       text: "",
@@ -128,6 +138,14 @@ export async function runIsolatedSession(
   } finally {
     unsub();
     signal?.removeEventListener("abort", onAbort);
+    if (parentSessionId) {
+      recordChildSessionFinished(parentSessionId, {
+        parentSessionFile,
+        childSessionFile,
+        toolCalls,
+        status: errored ? "error" : "done",
+      });
+    }
   }
 
   const text = lastAssistantText(session.messages);

@@ -3,8 +3,8 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { initTheme } from "@earendil-works/pi-coding-agent";
+import { childSessionIndexPath, recordChildSessionFinished, recordChildSessionStarted } from "@htwang-contrib/common";
 import { describe, expect, it } from "vitest";
-import { appendSubagentLinkRecord, recordSubagentStarted, subagentParentIndexPath } from "../../src/paths.ts";
 import { loadSubagentRuns, refreshRunRunning } from "../../src/viewer/index.ts";
 
 initTheme(undefined, false);
@@ -49,9 +49,9 @@ describe("subagents live index (running state)", () => {
 
     // hijack the index path by writing directly via the exported helpers
     // (they target ~/.agent/subagents/by-parent/<id>.jsonl)
-    recordSubagentStarted(sessionId, {
-      parent_session_file: "",
-      sub_session_file: subFile,
+    recordChildSessionStarted(sessionId, {
+      parentSessionFile: "",
+      childSessionFile: subFile,
     });
 
     // child file has no messages yet -> run filtered out (messages.length === 0)
@@ -72,11 +72,10 @@ describe("subagents live index (running state)", () => {
     expect(runs[0]!.running).toBe(true);
 
     // finalize: done record supersedes running
-    appendSubagentLinkRecord(sessionId, {
-      parent_session_file: "",
-      sub_session_file: subFile,
-      tool_calls: 2,
-      ended_at: new Date().toISOString(),
+    recordChildSessionFinished(sessionId, {
+      parentSessionFile: "",
+      childSessionFile: subFile,
+      toolCalls: 2,
     });
     runs = loadSubagentRuns(sessionId);
     expect(runs[0]!.running).toBe(false);
@@ -84,6 +83,6 @@ describe("subagents live index (running state)", () => {
     expect(refreshRunRunning(sessionId, subFile).running).toBe(false);
 
     fs.rmSync(tmp, { recursive: true, force: true });
-    fs.rmSync(subagentParentIndexPath(sessionId), { force: true });
+    fs.rmSync(childSessionIndexPath(sessionId), { force: true });
   });
 });
