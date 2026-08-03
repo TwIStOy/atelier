@@ -2,7 +2,7 @@ import type { ExtensionAPI, ExtensionContext, ExtensionFactory } from "@earendil
 import { type IsolatedSessionResult, runIsolatedSession } from "@htwang-contrib/common";
 import { resolveIngestModel } from "./config.ts";
 import { registerWikiCaptureTool } from "./index.ts";
-import { WIKI_SIDE_CALL_FACTORIES } from "./side-call-base.ts";
+import { WIKI_SIDE_CALL_BASE_TOOLS, WIKI_SIDE_CALL_FACTORIES } from "./side-call-base.ts";
 
 const CAPTURE_SYSTEM_PROMPT = [
   "You are the LLM Wiki capture agent, running in an isolated session.",
@@ -45,7 +45,7 @@ export async function runCaptureSession(
       systemPrompt: CAPTURE_SYSTEM_PROMPT,
       task,
       model: resolveIngestModel(ctx) ?? undefined,
-      allowedTools: ["wiki_capture"],
+      allowedTools: [...WIKI_SIDE_CALL_BASE_TOOLS, "wiki_capture"],
     },
     signal,
   );

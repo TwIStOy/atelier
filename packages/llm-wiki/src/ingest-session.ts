@@ -2,7 +2,7 @@ import type { ExtensionAPI, ExtensionContext, ExtensionFactory } from "@earendil
 import { type IsolatedSessionResult, runIsolatedSession } from "@htwang-contrib/common";
 import { resolveIngestModel } from "./config.ts";
 import { registerWikiIngestTool } from "./index.ts";
-import { WIKI_SIDE_CALL_FACTORIES } from "./side-call-base.ts";
+import { WIKI_SIDE_CALL_BASE_TOOLS, WIKI_SIDE_CALL_FACTORIES } from "./side-call-base.ts";
 
 const INGEST_SYSTEM_PROMPT = [
   "You are the LLM Wiki ingest agent, running in an isolated session.",
@@ -41,7 +41,7 @@ export async function runIngestSession(
       systemPrompt: INGEST_SYSTEM_PROMPT,
       task,
       model: resolveIngestModel(ctx) ?? undefined,
-      allowedTools: ["wiki_ingest"],
+      allowedTools: [...WIKI_SIDE_CALL_BASE_TOOLS, "wiki_ingest"],
     },
     signal,
   );
