@@ -238,6 +238,27 @@ export interface PacketIngestOutcome {
   pagesCreated: number;
   pagesExisted: number;
   reviewFiled: number;
+  createdByType: Partial<Record<PageType, number>>;
+}
+
+function pluralPageType(type: PageType, count: number): string {
+  if (count === 1) return type;
+  if (type === "synthesis") return "syntheses";
+  if (type === "analysis") return "analyses";
+  return `${type}s`;
+}
+
+export function formatOutcomeDetails(outcome: PacketIngestOutcome): string {
+  const details: string[] = [];
+  if (outcome.pagesCreated > 0) {
+    const byType = PAGE_TYPES.filter((t) => (outcome.createdByType[t] ?? 0) > 0)
+      .map((t) => `${outcome.createdByType[t]} ${pluralPageType(t, outcome.createdByType[t] ?? 0)}`)
+      .join(", ");
+    details.push(`created ${byType}`);
+  }
+  if (outcome.pagesExisted > 0) details.push(`${outcome.pagesExisted} existed`);
+  if (outcome.reviewFiled > 0) details.push(`${outcome.reviewFiled} review item(s)`);
+  return details.join(", ");
 }
 
 export interface IngestBatchResult {
@@ -248,6 +269,20 @@ export interface IngestBatchResult {
   outcomes: PacketIngestOutcome[];
 }
 
+export type IngestProgress =
+  | { kind: "packet_started"; packetId: string; packetTitle: string; index: number; total: number }
+  | {
+      kind: "step_started";
+      packetId: string;
+      packetTitle: string;
+      index: number;
+      total: number;
+      step: "analysis" | "generation";
+      attempt: number;
+      maxAttempts: number;
+    }
+  | { kind: "packet_finished"; packetId: string; index: number; total: number; outcome: PacketIngestOutcome };
+
 export const DEFAULT_INGEST_MAX_ATTEMPTS = 3;
 
 export interface IngestBatchOptions {
@@ -256,6 +291,7 @@ export interface IngestBatchOptions {
   now?: Date | (() => Date);
   packetId?: string;
   maxAttempts?: number;
+  onProgress?: (event: IngestProgress) => void;
 }
 
 export function listPendingPackets(vaultRoot: string): SourcePacketManifest[] {
@@ -526,10 +562,12 @@ async function attemptStepWithRetry<T>(
   label: string,
   maxAttempts: number,
   signal: AbortSignal,
+  onAttempt?: (attempt: number) => void,
 ): Promise<StepOutcome<T>> {
   let lastReason = `${label} was not attempted`;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     if (signal.aborted) return { ok: false, reason: `${label} aborted` };
+    onAttempt?.(attempt);
     const res = await caller.call(build(), signal);
     if (!res.ok) {
       lastReason = `${label} side-call failed: ${res.error}`;
@@ -568,6 +606,7 @@ async function ingestOnePacket(
   maxAttempts: number,
   now: Date,
   signal: AbortSignal,
+  onStep?: (step: "analysis" | "generation", attempt: number) => void,
 ): Promise<PacketIngestOutcome> {
   const packetId = manifest.id;
   const purpose = readPurpose(vaultRoot);
@@ -585,6 +624,7 @@ async function ingestOnePacket(
     "analysis",
     maxAttempts,
     signal,
+    onStep ? (attempt) => onStep("analysis", attempt) : undefined,
   );
   if (!analysisStep.ok) {
     return outcomeFailed(packetId, analysisStep.reason);
@@ -602,6 +642,7 @@ async function ingestOnePacket(
     "generation",
     maxAttempts,
     signal,
+    onStep ? (attempt) => onStep("generation", attempt) : undefined,
   );
   if (!generationStep.ok) {
     return outcomeFailed(packetId, generationStep.reason);
@@ -610,10 +651,15 @@ async function ingestOnePacket(
 
   let pagesCreated = 0;
   let pagesExisted = 0;
+  const createdByType: Partial<Record<PageType, number>> = {};
   for (const spec of generation.pages) {
     const applied = applyPageSpec(vaultRoot, spec, packetId);
-    if (applied.created) pagesCreated += 1;
-    else pagesExisted += 1;
+    if (applied.created) {
+      pagesCreated += 1;
+      createdByType[spec.type] = (createdByType[spec.type] ?? 0) + 1;
+    } else {
+      pagesExisted += 1;
+    }
   }
   applyOverview(vaultRoot, generation.overview, packetId, analysis.summary);
   const reviewFiled = fileAnalysisReviewItems(vaultRoot, packetId, analysis, now);
@@ -624,11 +670,25 @@ async function ingestOnePacket(
   };
   writeManifest(manifest.packetDir, updated);
 
-  return { packetId, status: "ingested", pagesCreated, pagesExisted, reviewFiled };
+  return { packetId, status: "ingested", pagesCreated, pagesExisted, reviewFiled, createdByType };
 }
 
 function outcomeFailed(packetId: string, reason: string): PacketIngestOutcome {
-  return { packetId, status: "failed", reason, pagesCreated: 0, pagesExisted: 0, reviewFiled: 0 };
+  return { packetId, status: "failed", reason, pagesCreated: 0, pagesExisted: 0, reviewFiled: 0, createdByType: {} };
+}
+
+function packetEventSummary(outcome: PacketIngestOutcome): string {
+  const details = formatOutcomeDetails(outcome);
+  const extra = details.length > 0 ? ` — ${details}` : "";
+  const reason = outcome.reason ? ` — ${outcome.reason}` : "";
+  return `ingest ${outcome.packetId}: ${outcome.status}${reason}${extra}`;
+}
+
+function packetLabel(manifest: SourcePacketManifest): string {
+  const origin = manifest.origin;
+  if (origin.sourceType === "url") return origin.title ?? origin.url;
+  if (origin.sourceType === "file") return manifest.originalName ?? origin.title ?? origin.originPath;
+  return origin.title ?? "text";
 }
 
 export async function ingestBatch(vaultRoot: string, opts: IngestBatchOptions): Promise<IngestBatchResult> {
@@ -642,9 +702,24 @@ export async function ingestBatch(vaultRoot: string, opts: IngestBatchOptions): 
   }
 
   const outcomes: PacketIngestOutcome[] = [];
-  for (const manifest of pending) {
-    const outcome = await ingestOnePacket(vaultRoot, manifest, opts, maxAttempts, now, signal);
+  const total = pending.length;
+  for (const [index, manifest] of pending.entries()) {
+    const packetId = manifest.id;
+    const packetTitle = packetLabel(manifest);
+    opts.onProgress?.({ kind: "packet_started", packetId, packetTitle, index, total });
+    const onStep = opts.onProgress
+      ? (step: "analysis" | "generation", attempt: number): void => {
+          opts.onProgress?.({ kind: "step_started", packetId, packetTitle, index, total, step, attempt, maxAttempts });
+        }
+      : undefined;
+    const outcome = await ingestOnePacket(vaultRoot, manifest, opts, maxAttempts, now, signal, onStep);
     outcomes.push(outcome);
+    appendJsonl(vaultLayout(vaultRoot).events, {
+      ts: now.toISOString(),
+      kind: "ingest",
+      summary: packetEventSummary(outcome),
+    });
+    opts.onProgress?.({ kind: "packet_finished", packetId, index, total, outcome });
   }
 
   if (outcomes.some((o) => o.status === "ingested")) {
