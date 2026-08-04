@@ -54,6 +54,14 @@ One snapshot model (`WorkflowSnapshot`: phases, agents, capped logs, status) fee
 - **TUI** — `ctx.ui.setWidget(key, lines, { placement: "belowEditor" })`, throttled to ~100 ms with a trailing update; final state stays visible 15 s, then the widget clears.
 - **No UI** — throttled `onUpdate` partial results with the same rendered lines and the raw snapshot in `details`.
 
+## Persistence and resume
+
+**Saved scripts** (`script-store.ts`): `*.js` files discovered from `~/.config/pi/workflows` (user) and `<cwd>/.pi/workflows` (project; wins on name conflicts), validated with the same parser. `save_as` on a successful run writes the script atomically (tmp + rename, symlink-refusing) and it becomes a slash command on the next `session_start` (re-registration is overwrite-safe). Command arguments are JSON-parsed and exposed as `args`. The `/workflows` picker lists saved commands (run with args input) and resumable runs.
+
+**Run records** (`run-store.ts`): every run writes `~/.agent/workflow/runs/<id>.json` at start, after each settled agent (`onAgentSettled` from the engine), and at finish; newest 20 are kept. A record holds the script, args, status, and per-agent outcomes keyed by invocation sequence.
+
+**Resume semantics** (mirrors Claude Code): replay follows agent **start order**. `resumeCheckpoint(agents)` finds the first sequence without an `ok` record; only agents before it may be served from cache, and only when the replayed call deep-equals the recorded one — everything after re-runs even if it completed. In-flight agents at abort time are never cached, so pausing mid fan-out discards their partial work by design. Cached agents appear in snapshots with `cached: true`.
+
 ## What we deliberately dropped from the upstream prototype
 
 - `Date.now`/`Math.random` determinism bans (no replay/persistence exists to justify them).
@@ -62,7 +70,7 @@ One snapshot model (`WorkflowSnapshot`: phases, agents, capped logs, status) fee
 
 ## Known limitations
 
-- No persistence, resume, or `/workflow` manager command.
-- `vm` sandbox escapable by a determined script; acceptable while scripts are model-generated, revisit before accepting user-supplied scripts.
+- `vm` sandbox escapable by a determined script; acceptable while scripts are model-generated, revisit before accepting user-supplied scripts. Saved workflow commands raise the stakes slightly (a saved script is user-reviewed, but edits to `.js` files on disk are arbitrary code) — the save path refuses symlinks, nothing more.
 - No wall-clock timeout (per-call `max_turns` and Esc remain the guards).
 - Every `agent()` creates a fresh child session (no pooling); fan-out beyond the caps should batch work into fewer agents.
+- Resume replays the script, so scripts must be deterministic up to the resume point (`Date.now()`/randomness/side effects diverge); the call deep-equal check catches changed `agent()` calls, not changed control flow.

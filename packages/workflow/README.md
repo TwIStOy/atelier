@@ -81,6 +81,24 @@ return report;
 
 Children run through the shared `runChildAgent` runner (`@htwang-contrib/common`): real token-usage accounting, sessions under `~/.agent/workflow/session`, and by-parent link records — so workflow children appear in the subagents **`/view-subagents`** viewer like any other child run. Children never receive the `workflow` or `subagent` tools (no recursive orchestration), and `protect-secrets` / `extra-tools` / `web-tools` / inference factories are loaded exactly as for `subagent` children.
 
+## Persistence: save and resume
+
+**Save a script as a slash command.** Run the tool with `save_as: "nightly-audit"` (plus optional `save_scope: "project"`); after a successful run the script is written to:
+
+- `~/.config/pi/workflows/<name>.js` — user scope, every project (default)
+- `<cwd>/.pi/workflows/<name>.js` — project scope, shareable via the repo
+
+Saved workflows are registered as slash commands on `session_start` (run `/reload` after saving). Invoke as `/nightly-audit` with an optional JSON argument string, exposed to the script as the `args` global. Project scope wins over user scope on a name conflict. Invalid scripts are skipped; saving refuses to write through symlinks.
+
+**Pause and resume.** Every run persists its state to `~/.agent/workflow/runs/<run_id>.json` (script, args, per-agent outcomes in start order; newest 20 kept). Every tool result carries the `run_id`.
+
+- Pressing **Esc** pauses the run: in-flight agents are aborted and not cached.
+- Resume with `workflow({ resume_run_id: "<id>" })` (no script needed) or pick the run from the **`/workflows`** picker.
+- Replay follows agent **start order**: cached results are served only up to the first agent that didn't finish; everything after it re-runs, even agents that had completed (same rule as Claude Code). A cached entry is only used when the replayed `agent()` call is identical (`callsMatch`); a mismatch silently re-runs live. Cached agents render with a `· cached` marker.
+- Scripts with side effects or nondeterminism (`Date.now()`, randomness) may diverge on resume — many small agents preserve more progress than one long agent.
+
+**`/workflows`** lists saved workflow commands (run with optional JSON args) and resumable runs (aborted/failed, newest first).
+
 ## When to use which
 
 - **`workflow`** — the fan-out shape is known up front: audits, multi-perspective reviews, batch transforms, parallel research with a synthesis step.
@@ -93,7 +111,11 @@ Children run through the shared `runChildAgent` runner (`@htwang-contrib/common`
 | `script.ts`   | Markdown-fence normalization, acorn parse, meta literal evaluation, banned-reference validation. |
 | `engine.ts`   | `node:vm` sandbox runtime: injected globals, concurrency semaphore, agent cap, abort wiring, snapshot events. |
 | `display.ts`  | Snapshot → text lines; TUI widget display and `onUpdate` streaming display (both throttled). |
-| `tool.ts`     | `workflow` tool definition: parameters, prompt guidelines, runner wiring to `runChildAgent`, result truncation. |
+| `tool.ts`     | `workflow` tool definition: parameters, prompt guidelines. |
+| `run-executor.ts` | Shared run path for the tool and slash commands: script/resume resolution, run-record persistence, `save_as`, display selection, result text. |
+| `script-store.ts` | Saved workflow discovery (`~/.config/pi/workflows`, `.pi/workflows`) and saving (atomic, symlink-safe). |
+| `run-store.ts`  | Run records under `~/.agent/workflow/runs/`: atomic writes, list/prune, resume cutoff. |
+| `commands.ts`   | Saved workflows as slash commands + the `/workflows` picker. |
 | `config.ts`   | `maxConcurrency` / `maxAgents` config items (`/config`). |
 | `paths.ts`    | Child session directory. |
 

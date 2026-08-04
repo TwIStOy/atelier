@@ -27,6 +27,7 @@ function elapsedSeconds(snapshot: WorkflowSnapshot): number {
 function formatAgentLine(agent: WorkflowAgentSnapshot): string {
   const icon = AGENT_ICONS[agent.status];
   const parts = [`#${agent.id} ${agent.label}`];
+  if (agent.cached) parts.push("cached");
   if (agent.toolCalls > 0) parts.push(`${agent.toolCalls} tool calls`);
   if (agent.status === "error" && agent.detail) parts.push(agent.detail);
   return `${icon} ${parts.join(" · ")}`;
@@ -87,6 +88,9 @@ function themedAgentGlyph(agent: WorkflowAgentSnapshot, theme: Theme, now: numbe
 
 function formatAgentLineThemed(agent: WorkflowAgentSnapshot, theme: Theme, now: number): string {
   let line = `${themedAgentGlyph(agent, theme, now)} ${theme.fg("toolOutput", `#${agent.id} ${agent.label}`)}`;
+  if (agent.cached) {
+    line += theme.fg("dim", " · cached");
+  }
   if (agent.toolCalls > 0) {
     line += theme.fg("dim", ` · ${agent.toolCalls} tool calls`);
   }

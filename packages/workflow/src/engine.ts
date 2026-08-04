@@ -34,6 +34,7 @@ export type WorkflowAgentSnapshot = {
   status: WorkflowAgentStatus;
   toolCalls: number;
   detail?: string;
+  cached?: boolean;
   startedAt: number;
   endedAt?: number;
 };
@@ -59,12 +60,37 @@ export type WorkflowSnapshot = {
   error?: string;
 };
 
+export type ResumeAgentRecord = {
+  seq: number;
+  call: WorkflowAgentCall;
+  ok: boolean;
+  value?: unknown;
+  text?: string;
+};
+
+export type ResumeState = {
+  agents: ResumeAgentRecord[];
+  cutoff: number;
+};
+
+export type AgentSettledRecord = {
+  seq: number;
+  call: WorkflowAgentCall;
+  ok: boolean;
+  value?: unknown;
+  text?: string;
+  error?: string;
+  endedAt: number;
+};
+
 export type RunWorkflowOptions = {
   args?: unknown;
   signal?: AbortSignal;
   runAgent: WorkflowAgentRunner;
   maxConcurrency: number;
   maxAgents: number;
+  resume?: ResumeState;
+  onAgentSettled?: (record: AgentSettledRecord) => void;
   onSnapshot?: (snapshot: WorkflowSnapshot) => void;
 };
 
@@ -185,9 +211,37 @@ export async function runWorkflow(rawScript: string, options: RunWorkflowOptions
       throw new Error(`workflow agent limit exceeded: more than ${maxAgents} agent() calls`);
     }
 
+    const label = call.label.trim();
+    if (options.resume && agentSeq < options.resume.cutoff) {
+      const cached = options.resume.agents.find((r) => r.seq === agentSeq);
+      if (cached?.ok && JSON.stringify(cached.call) === JSON.stringify(call)) {
+        const entry: WorkflowAgentSnapshot = {
+          id: agentSeq,
+          label,
+          phase: currentPhase,
+          status: "done",
+          toolCalls: 0,
+          cached: true,
+          startedAt: Date.now(),
+          endedAt: Date.now(),
+        };
+        snapshot.agents.push(entry);
+        emit();
+        options.onAgentSettled?.({
+          seq: agentSeq,
+          call,
+          ok: true,
+          value: cached.value,
+          text: cached.text,
+          endedAt: entry.endedAt!,
+        });
+        return cached.value !== undefined ? cached.value : (cached.text ?? null);
+      }
+    }
+
     const entry: WorkflowAgentSnapshot = {
       id: agentSeq,
-      label: call.label.trim(),
+      label,
       phase: currentPhase,
       status: "queued",
       toolCalls: 0,
@@ -197,10 +251,12 @@ export async function runWorkflow(rawScript: string, options: RunWorkflowOptions
     emit();
 
     await semaphore.acquire();
+    let outcome: { ok: boolean; value?: unknown; text?: string; error?: string };
     try {
       if (aborted) {
         entry.status = "aborted";
         entry.endedAt = Date.now();
+        outcome = { ok: false, error: "aborted" };
         return null;
       }
       entry.status = "running";
@@ -214,20 +270,24 @@ export async function runWorkflow(rawScript: string, options: RunWorkflowOptions
       });
       if (result.ok) {
         entry.status = "done";
+        outcome = { ok: true, value: result.value, text: result.text };
         return result.value !== undefined ? result.value : (result.text ?? null);
       }
       entry.status = aborted ? "aborted" : "error";
       entry.detail = result.error;
+      outcome = { ok: false, error: result.error };
       pushLog("error", [`agent("${entry.label}") failed: ${result.error ?? "unknown error"}`]);
       return null;
     } catch (e) {
       entry.status = aborted ? "aborted" : "error";
       entry.detail = e instanceof Error ? e.message : String(e);
+      outcome = { ok: false, error: entry.detail };
       pushLog("error", [`agent("${entry.label}") threw: ${entry.detail}`]);
       return null;
     } finally {
       entry.endedAt = Date.now();
       semaphore.release();
+      options.onAgentSettled?.({ seq: agentSeq, call, ...outcome!, endedAt: entry.endedAt });
       emit();
     }
   };
