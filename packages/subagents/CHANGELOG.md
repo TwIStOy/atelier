@@ -4,7 +4,8 @@
 
 ### Changed
 
-- Child-session link-record helpers (`recordSubagentStarted`/`appendSubagentLinkRecord`/`subagentParentIndexPath`) moved to `@htwang-contrib/common` (`src/session-links.ts`) as `recordChildSessionStarted`/`recordChildSessionFinished`/`childSessionIndexPath`; `runSubAgent` and the viewer import them from common. `src/paths.ts` now only holds `SUBAGENT_SESSION_DIR`. No behavior change.
+- Child-session link-record helpers (`recordSubagentStarted`/`appendSubagentLinkRecord`/`subagentParentIndexPath`) moved to `@htwang-contrib/common` (`src/agents/session-links.ts`) as `recordChildSessionStarted`/`recordChildSessionFinished`/`childSessionIndexPath`; `runSubAgent` and the viewer import them from common. `src/paths.ts` now only holds `SUBAGENT_SESSION_DIR`. No behavior change.
+- The persona catalog (`src/agent-catalog.ts`), child tool allowlists (`src/child-tools.ts`), and the `runSubAgent` execution core (`src/run-agent.ts`) moved to `@htwang-contrib/common` (`agents/agent-personas.ts`, `agents/child-tools.ts`, `agents/child-agent.ts` as `runChildAgent`) so the new `workflow` extension shares the same runner. `src/agent-catalog.ts` remains as a thin wrapper that injects this package's shipped `agents/` directory and keeps the existing `Subagent*` names; `run-agent.ts` keeps its exported surface (`runSubAgent`, `RunSubAgentInput`, `SubagentRunDetails`, message helpers) as a delegating alias. Child sessions now also exclude the `workflow` tool alongside `subagent`/`subagent_status`. No behavior change for `subagent` callers.
 
 ## [0.4.0] - 2026-07-31
 

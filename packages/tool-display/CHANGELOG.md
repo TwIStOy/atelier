@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- `workflow` tool display adapter: the `Workflow` tool row now matches the Read/Bash/Subagent styling. The header shows the workflow's `meta.name` (parsed from the script with the shared acorn parser via `@htwang-contrib/workflow/script`, falling back to the first script line) plus live `settled/total agents` stats. While the run is in flight the collapsed view renders per-agent rows (`├`/`└` branches, spinner/✓/✗/◌/– status glyphs, tool-call counts, error details) from the run snapshot in `details.workflow`; once finished it collapses to the standard truncated output preview (tail lines + "more lines" expand hint). The expanded view renders the full script with syntax-highlighted line numbers, followed by the full output summary. `tool-call-display.ts` now treats `workflow` like `subagent` for adapter gating (collapsed rows render from details even before text output exists) and derives the header status icon from `details.ok`.
+
 ### Fixed
 
 - Multi-task `Subagent` tool calls no longer crash pi on narrow terminals. The per-task and batch summary rows in the collapsed tool display now truncate the task description against the terminal width (width- and ANSI-aware via `truncateToWidth`/`visibleWidth`) and apply a safety-net truncation so no rendered row can exceed the terminal width. Previously the description was capped at a fixed 56 characters and the composed row was never bounded, producing lines wider than the terminal and triggering `Rendered line exceeds terminal width`.
