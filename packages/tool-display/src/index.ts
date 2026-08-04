@@ -28,6 +28,7 @@ export {
 } from "./adapters/memory.ts";
 export { readAdapter } from "./adapters/read.ts";
 export { todoAdapter } from "./adapters/todo.ts";
+export { workflowAdapter } from "./adapters/workflow.ts";
 export { writeAdapter } from "./adapters/write.ts";
 export {
   formatDuration,

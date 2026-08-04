@@ -24,6 +24,7 @@ import { subagentStatusAdapter } from "./adapters/subagent-status.ts";
 import { todoAdapter } from "./adapters/todo.ts";
 import { webFetchAdapter } from "./adapters/web-fetch.ts";
 import { webSearchAdapter } from "./adapters/web-search.ts";
+import { workflowAdapter } from "./adapters/workflow.ts";
 import { writeAdapter } from "./adapters/write.ts";
 import { ToolDisplayRegistry } from "./tool-call-display.ts";
 
@@ -57,3 +58,4 @@ globalToolDisplayRegistry.register("journal-read", journalReadAdapter);
 globalToolDisplayRegistry.register("journal-search", journalSearchAdapter);
 globalToolDisplayRegistry.register("web_search", webSearchAdapter);
 globalToolDisplayRegistry.register("web_fetch", webFetchAdapter);
+globalToolDisplayRegistry.register("workflow", workflowAdapter);

@@ -131,6 +131,13 @@ function makeHeader(
     } else {
       statusIcon = theme.fg("success", "◆");
     }
+  } else if (toolName === "workflow") {
+    const d = details && typeof details === "object" ? (details as Record<string, unknown>) : undefined;
+    if (d?.ok === true) statusIcon = theme.fg("success", "◆");
+    else if (d?.ok === false) statusIcon = theme.fg("error", "◆");
+    else if (isPartial) statusIcon = spinnerGlyph(theme, spinAt);
+    else if (isError) statusIcon = theme.fg("error", "◆");
+    else statusIcon = theme.fg("success", "◆");
   } else {
     statusIcon = isPartial ? spinnerGlyph(theme, spinAt) : isError ? theme.fg("error", "◆") : theme.fg("success", "◆");
   }
@@ -248,7 +255,8 @@ export function renderToolCall(
           grepCollapsedPartial ||
           globCollapsedPartial ||
           lsCollapsedPartial ||
-          (opts.toolName === "subagent" && !opts.expanded));
+          (opts.toolName === "subagent" && !opts.expanded) ||
+          (opts.toolName === "workflow" && !opts.expanded));
 
       const erroredReason = opts.isError && !opts.isPartial && out.trim().length > 0;
 
