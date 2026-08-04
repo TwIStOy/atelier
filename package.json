@@ -36,7 +36,8 @@
       "packages/truncate-outputs",
       "packages/experience",
       "packages/htw-producer",
-      "packages/agents-mirror"
+      "packages/agents-mirror",
+      "packages/workflow"
     ],
     "skills": [
       "skills/code-philosophy",
