@@ -35,7 +35,7 @@ The body then runs as an async function with these injected globals:
 | ----- | -------- | ---- |
 | `label` | yes | Unique short label shown in the progress UI. |
 | `task` | yes | Instructions for the child agent. |
-| `agent_type` | no | Persona id from the subagents Markdown catalog (`explore`, `plan`, `scout`, user/project personas); unknown ids fall back to `general-purpose`. |
+| `agent_type` | no | Persona id from the subagents Markdown catalog (`explore`, `plan`, `scout`, user/project personas); unknown ids fall back to `general-purpose`. Unset `model`/`thinking`/`isolated`/`max_turns`/`inherit_context` inherit the persona's frontmatter and then `defaults_by_agent_type` from `~/.agent/subagents/settings.json` before falling back to runner defaults. |
 | `model` | no | Model pattern resolved against the parent's registry; defaults to the parent model. |
 | `thinking` | no | Thinking level (`off` … `max`). |
 | `isolated` | no | Default `true` (read-only tools); `false` enables bash/edit/write. |

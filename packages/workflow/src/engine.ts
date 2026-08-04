@@ -7,6 +7,7 @@ export type WorkflowAgentCall = {
   agent_type?: string;
   model?: string;
   thinking?: string;
+  inherit_context?: boolean;
   isolated?: boolean;
   max_turns?: number;
   schema?: Record<string, unknown>;
