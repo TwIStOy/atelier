@@ -135,7 +135,8 @@ export type WorkflowDisplay = {
 };
 
 const MIN_UPDATE_INTERVAL_MS = 100;
-const ELAPSED_TICK_INTERVAL_MS = 1_000;
+const UI_TICK_INTERVAL_MS = SPINNER.intervalMs;
+const STREAM_TICK_INTERVAL_MS = 1_000;
 const WIDGET_CLEAR_DELAY_MS = 15_000;
 
 type TickerState = {
@@ -143,17 +144,17 @@ type TickerState = {
   latest: WorkflowSnapshot | undefined;
 };
 
-function startElapsedTicker(state: TickerState, push: (snapshot: WorkflowSnapshot) => void): void {
+function startUiTicker(state: TickerState, push: (snapshot: WorkflowSnapshot) => void, intervalMs: number): void {
   if (state.interval !== undefined) return;
   state.interval = setInterval(() => {
     const snapshot = state.latest;
     if (snapshot?.status !== "running") return;
     push(snapshot);
-  }, ELAPSED_TICK_INTERVAL_MS);
+  }, intervalMs);
   if (typeof state.interval.unref === "function") state.interval.unref();
 }
 
-function stopElapsedTicker(state: TickerState): void {
+function stopUiTicker(state: TickerState): void {
   if (state.interval === undefined) return;
   clearInterval(state.interval);
   state.interval = undefined;
@@ -189,7 +190,7 @@ export function createWidgetWorkflowDisplay(ui: WidgetUi, key = "workflow"): Wor
     update(snapshot) {
       cancelClearer();
       ticker.latest = snapshot;
-      startElapsedTicker(ticker, push);
+      startUiTicker(ticker, push, UI_TICK_INTERVAL_MS);
       if (trailing !== undefined) return;
       const since = Date.now() - lastPush;
       if (since >= MIN_UPDATE_INTERVAL_MS) {
@@ -204,7 +205,7 @@ export function createWidgetWorkflowDisplay(ui: WidgetUi, key = "workflow"): Wor
     },
     finish(snapshot) {
       cancelClearer();
-      stopElapsedTicker(ticker);
+      stopUiTicker(ticker);
       if (trailing !== undefined) {
         clearTimeout(trailing);
         trailing = undefined;
@@ -238,7 +239,7 @@ export function createStreamingWorkflowDisplay(
     update(snapshot) {
       if (!onUpdate) return;
       ticker.latest = snapshot;
-      startElapsedTicker(ticker, push);
+      startUiTicker(ticker, push, STREAM_TICK_INTERVAL_MS);
       if (trailing !== undefined) return;
       const since = Date.now() - lastPush;
       if (since >= MIN_UPDATE_INTERVAL_MS) {
@@ -252,7 +253,7 @@ export function createStreamingWorkflowDisplay(
       if (typeof trailing.unref === "function") trailing.unref();
     },
     finish(_snapshot) {
-      stopElapsedTicker(ticker);
+      stopUiTicker(ticker);
       if (trailing !== undefined) {
         clearTimeout(trailing);
         trailing = undefined;

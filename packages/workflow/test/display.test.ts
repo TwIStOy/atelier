@@ -158,11 +158,11 @@ describe("createWidgetWorkflowDisplay", () => {
     display.update(snapshot({ name: "third" }));
     expect(calls).toHaveLength(1);
     vi.advanceTimersByTime(150);
-    expect(calls).toHaveLength(2);
-    expect(calls[1]?.join("\n")).toContain("third");
+    expect(calls.length).toBeGreaterThanOrEqual(2);
+    expect(calls[calls.length - 1]?.join("\n")).toContain("third");
   });
 
-  it("re-renders once per second while running and stops after finish", () => {
+  it("re-renders at the spinner frame rate while running and stops after finish", () => {
     const calls: Array<string[] | undefined> = [];
     const ui = makeMockWidgetUi(calls);
     const display = createWidgetWorkflowDisplay(ui);
