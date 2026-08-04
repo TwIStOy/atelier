@@ -68,6 +68,22 @@ pi.registerTool({
 
 > **Important:** Every tool `execute` return MUST include a `details` field. The `AgentToolResult<unknown>` type requires it. Use `{}` for empty, `{ error: "..." }` for error cases, or structured data.
 
+Optional fields: `promptSnippet` (one-liner for the Available tools section of
+the system prompt) and `promptGuidelines` (string[] appended to the Guidelines
+section while the tool is active) — the main lever for teaching the model a
+tool-specific DSL. `execute` may also return `terminate: true` to end the agent
+loop after the current tool batch (every result in the batch must set it).
+
+### Child agent sessions
+
+Spawn in-process child agents with
+`createAgentSession({ customTools: [defineTool(...)], tools: [...names] })`.
+Gotcha: the `tools` allowlist gates `customTools` too — a custom tool whose name
+is absent from the allowlist is silently dropped. In this monorepo, prefer
+`runChildAgent` / `runIsolatedSession` from `@htwang-contrib/common`
+(`src/agents/`) over hand-rolling sessions — they wire personas, usage
+accounting, by-parent records, and abort forwarding.
+
 ## Event Handlers
 
 ### Session Events

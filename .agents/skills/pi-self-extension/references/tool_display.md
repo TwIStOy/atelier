@@ -51,6 +51,28 @@ Consequences for adapter authors:
 - Don't rely on `details` to signal errors in collapsed content; use the standard
   error result path instead.
 
+## Details-Driven Collapsed Rows (live progress)
+
+`renderToolCall` only consults the adapter's collapsed content when
+`expanded || hasTextOutput || <explicit per-tool clause>`. If your tool streams
+progress via `details` before any text output exists (e.g. `subagent`,
+`workflow`), add a clause in `packages/tool-display/src/tool-call-display.ts`:
+
+```typescript
+(opts.toolName === "my_tool" && !opts.expanded)
+```
+
+Likewise, `makeHeader` derives the status icon only from `isPartial`/`isError`.
+If your tool reports failure via `details.ok === false` (without setting result
+`isError`), add a per-tool branch there or failures show a green ◆.
+
+## defaultCollapsedRenderer Semantics
+
+- Shows the **tail** `previewLines` lines, not the head (bash-output convention).
+- `previewLines` comes from the user's live `~/.config/pi/extensions.json`
+  (`tool-display` section, default 3). Tests must not hard-code the preview
+  count — use large fixtures (100 lines) and assert the hint plus tail presence.
+
 ## Conventions
 
 ### Header
