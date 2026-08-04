@@ -73,7 +73,7 @@ return report;
 
 ### Progress UI
 
-- **TUI**: an `aboveEditor` widget renders live phases, per-agent status (colored spinner/✓/✗/◌/– glyphs via the active theme), tool-call counts, and recent log lines. Updates are event-driven with a 100ms throttle, plus a 1s tick that keeps the elapsed-time counter moving while agents think. It clears itself 15s after the run finishes. **Esc** aborts the workflow and every in-flight child.
+- **TUI**: an `aboveEditor` widget renders live phases, per-agent status (colored spinner/✓/✗/◌/– glyphs via the active theme), tool-call counts, and recent log lines. Updates are event-driven with a 100ms throttle, plus a tick at the spinner frame rate (`dots`, 80ms) that keeps the spinner animating and the elapsed-time counter moving while agents think. (The no-UI streaming channel ticks at 1s instead — no spinner to animate there.) It clears itself 15s after the run finishes. **Esc** aborts the workflow and every in-flight child.
 - **No UI**: the same snapshot streams through `onUpdate` partial tool results.
 - **Tool row**: load **`packages/tool-display`** in your Pi config; it registers a `workflow` display adapter so the tool row matches Read/Bash/Subagent styling — the header shows the workflow's `meta.name` with live agent stats; while running, the collapsed view lists per-agent status rows; once finished, collapsed shows a truncated preview of the result summary; the expanded view shows the full script with line numbers plus the full summary.
 
