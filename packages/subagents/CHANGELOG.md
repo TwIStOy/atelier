@@ -4,6 +4,9 @@
 
 ### Changed
 
+- Shipped personas moved from `packages/subagents/src/agents/` to the monorepo root `agents/` (registered via the root `package.json` `pi.agents`). Discovery is unchanged because `@htwang-contrib/common`'s catalog now includes that shared directory by default; `src/agent-catalog.ts` no longer injects a package-local shipped dir, and this package's `pi.agents` manifest entry was removed.
+
+
 - Child-session link-record helpers (`recordSubagentStarted`/`appendSubagentLinkRecord`/`subagentParentIndexPath`) moved to `@htwang-contrib/common` (`src/agents/session-links.ts`) as `recordChildSessionStarted`/`recordChildSessionFinished`/`childSessionIndexPath`; `runSubAgent` and the viewer import them from common. `src/paths.ts` now only holds `SUBAGENT_SESSION_DIR`. No behavior change.
 - `defaults_by_agent_type` parsing/resolution in `settings.ts` now delegates to `@htwang-contrib/common` (`agents/persona-defaults.ts`); the settings file location and precedence are unchanged.
 - The persona catalog (`src/agent-catalog.ts`), child tool allowlists (`src/child-tools.ts`), and the `runSubAgent` execution core (`src/run-agent.ts`) moved to `@htwang-contrib/common` (`agents/agent-personas.ts`, `agents/child-tools.ts`, `agents/child-agent.ts` as `runChildAgent`) so the new `workflow` extension shares the same runner. `src/agent-catalog.ts` remains as a thin wrapper that injects this package's shipped `agents/` directory and keeps the existing `Subagent*` names; `run-agent.ts` keeps its exported surface (`runSubAgent`, `RunSubAgentInput`, `SubagentRunDetails`, message helpers) as a delegating alias. Child sessions now also exclude the `workflow` tool alongside `subagent`/`subagent_status`. No behavior change for `subagent` callers.

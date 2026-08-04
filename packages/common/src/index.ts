@@ -11,6 +11,7 @@ export {
   personaSystemPrompt,
   personasCatalogXml,
   resolvePersonaId,
+  sharedPersonasDir,
 } from "./agents/agent-personas.ts";
 export type {
   ChildAgentProgress,

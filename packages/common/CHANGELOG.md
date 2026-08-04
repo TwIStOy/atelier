@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- The shipped persona directory moved out of `subagents` to the **monorepo root** `agents/` (explore / general-purpose / plan / scout). `buildAgentPersonaCatalog` now always prepends that shared directory to the first discovery layer (resolved relative to the module via `sharedPersonasDir()`, exported), so every caller — subagents, the `workflow` tool, or any future extension — gets the shipped personas for any cwd without injecting `shippedDirs`. The `shippedDirs` option still appends extra caller-specific directories after it.
+
 ### Added
 
 - `src/agents/agent-personas.ts`: the Markdown persona catalog promoted out of `subagents` (`buildAgentPersonaCatalog` / `resolvePersonaId` / `personaSystemPrompt` / `personasCatalogXml` / `normalizePersonaId`, types `AgentPersonaCatalog`/`AgentPersonaEntry`/`AgentPersonaFileOptions`). Discovery layers are unchanged (shipped dirs → `~/.config/pi/agents` → `<cwd>/.pi/agents` → project `pi.agents` → project extensions' `pi.agents`), except the shipped-agents directory is now caller-supplied via `buildAgentPersonaCatalog(cwd, { shippedDirs })` so any extension can inject its own bundled personas.

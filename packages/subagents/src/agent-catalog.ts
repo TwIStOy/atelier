@@ -1,4 +1,3 @@
-import { fileURLToPath } from "node:url";
 import {
   type AgentPersonaCatalog,
   type AgentPersonaEntry,
@@ -18,12 +17,8 @@ export type SubagentAgentEntry = AgentPersonaEntry;
 export type SubagentAgentCatalog = AgentPersonaCatalog;
 export type SubagentAgentType = string;
 
-function shippedAgentsDir(): string {
-  return fileURLToPath(new URL("./agents/", import.meta.url));
-}
-
 export function buildSubagentAgentCatalog(cwd: string): SubagentAgentCatalog {
-  return buildAgentPersonaCatalog(cwd, { shippedDirs: [shippedAgentsDir()] });
+  return buildAgentPersonaCatalog(cwd);
 }
 
 export const normalizeSubagentAgentId = normalizePersonaId;

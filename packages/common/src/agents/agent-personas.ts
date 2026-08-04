@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, extname, join, resolve as resolvePath } from "node:path";
+import { fileURLToPath } from "node:url";
 import { parseFrontmatter } from "@earendil-works/pi-coding-agent";
 
 export const FALLBACK_PERSONA_ID = "general-purpose" as const;
@@ -250,9 +251,13 @@ function projectManifestAgentDirs(cwd: string): string[] {
 
 type ScanLayer = { dirs: string[] };
 
+export function sharedPersonasDir(): string {
+  return fileURLToPath(new URL("../../../../agents/", import.meta.url));
+}
+
 export function buildAgentPersonaCatalog(cwd: string, opts?: BuildAgentPersonaCatalogOptions): AgentPersonaCatalog {
   const layers: ScanLayer[] = [
-    { dirs: opts?.shippedDirs ?? [] },
+    { dirs: [sharedPersonasDir(), ...(opts?.shippedDirs ?? [])] },
     { dirs: [join(homedir(), ".config", "pi", "agents")] },
     { dirs: [join(cwd, ".pi", "agents")] },
     { dirs: projectManifestAgentDirs(cwd) },

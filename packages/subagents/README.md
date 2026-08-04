@@ -45,7 +45,7 @@ Rendering reuses Pi’s own components (`AssistantMessageComponent`, `UserMessag
 
 At each `subagent` run, prompts are merged from layers in order (**later layers override** the same id):
 
-1. Shipped **`agents/*.md`** in this package (see `package.json` → `pi.agents`).
+1. Shared **`agents/*.md`** at the **monorepo root** (see the root `package.json` → `pi.agents`), resolved by `@htwang-contrib/common`'s catalog via `sharedPersonasDir()` so every child-agent caller (this extension, `workflow`, …) sees the same shipped personas regardless of cwd.
 2. **`$HOME/.config/pi/agents`** — one Markdown file per agent; id from `foo.md` → `foo` unless frontmatter overrides.
 3. **`<cwd>/.pi/agents`** — project-local agents (same file rules).
 4. **`pi.agents`** on the **project** `package.json` (paths relative to the repo root), same array shape as **`pi.skills`**.
