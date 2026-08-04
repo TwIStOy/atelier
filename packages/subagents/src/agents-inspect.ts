@@ -1,7 +1,6 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { resolveModel } from "@htwang-contrib/common";
+import { resolveChildToolNames, resolveModel } from "@htwang-contrib/common";
 import { buildSubagentAgentCatalog, type SubagentAgentCatalog } from "./agent-catalog.ts";
-import { resolveChildToolNames } from "./child-tools.ts";
 import { defaultsForAgentType, readSubagentSettings, type SubagentSettings } from "./settings.ts";
 
 function formatResolvedModel(rawPattern: string | undefined, ctx: ExtensionContext): string {
