@@ -1,3 +1,52 @@
+export type {
+  AgentPersonaCatalog,
+  AgentPersonaEntry,
+  AgentPersonaFileOptions,
+  BuildAgentPersonaCatalogOptions,
+} from "./agents/agent-personas.ts";
+export {
+  buildAgentPersonaCatalog,
+  FALLBACK_PERSONA_ID,
+  normalizePersonaId,
+  personaSystemPrompt,
+  personasCatalogXml,
+  resolvePersonaId,
+} from "./agents/agent-personas.ts";
+export type {
+  ChildAgentProgress,
+  ChildAgentUsageSnapshot,
+  EffectiveChildOptions,
+  RunChildAgentInput,
+  RunChildAgentResult,
+} from "./agents/child-agent.ts";
+export {
+  extractAssistantText,
+  finalTurnError,
+  parseThinking,
+  resolveEffectiveChildOptions,
+  runChildAgent,
+  STRUCTURED_OUTPUT_TOOL_NAME,
+} from "./agents/child-agent.ts";
+export {
+  CHILD_DELEGATION_TOOL_NAMES,
+  childSessionToolNames,
+  resolveChildToolNames,
+} from "./agents/child-tools.ts";
+export type { IsolatedSessionOptions, IsolatedSessionResult } from "./agents/isolated-session.ts";
+export { runIsolatedSession } from "./agents/isolated-session.ts";
+export {
+  type PersonaTypeDefaults,
+  parsePersonaDefaultsByType,
+  personaDefaultsFilePath,
+  personaDefaultsForType,
+  readPersonaDefaultsByType,
+} from "./agents/persona-defaults.ts";
+export type { ChildSessionLinkRecord } from "./agents/session-links.ts";
+export {
+  childSessionIndexPath,
+  recordChildSessionFinished,
+  recordChildSessionStarted,
+} from "./agents/session-links.ts";
 export { mapConcurrent } from "./concurrency.ts";
 export type {
   BooleanConfigItem,
@@ -71,8 +120,6 @@ export {
   clearGlobalState,
   getGlobalState,
 } from "./global-state.ts";
-export type { IsolatedSessionOptions, IsolatedSessionResult } from "./isolated-session.ts";
-export { runIsolatedSession } from "./isolated-session.ts";
 export type { CreateLoggerOptions, Logger, LogLevel } from "./log.ts";
 export {
   createLogger,
@@ -95,12 +142,6 @@ export {
   isStaleCtxError,
 } from "./session-cache.ts";
 export { SessionLifecycle } from "./session-lifecycle.ts";
-export type { ChildSessionLinkRecord } from "./session-links.ts";
-export {
-  childSessionIndexPath,
-  recordChildSessionFinished,
-  recordChildSessionStarted,
-} from "./session-links.ts";
 export type { SideCallResult } from "./side-call.ts";
 export { executeSideCall } from "./side-call.ts";
 export { getAvailableSkillNames } from "./skills.ts";
