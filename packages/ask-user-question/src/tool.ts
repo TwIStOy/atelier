@@ -24,6 +24,8 @@ const DEFAULT_PROMPT_GUIDELINES: string[] = [
   "Do not stack multiple ask_user_question calls back-to-back — group all clarifying questions into one invocation.",
 ];
 
+export const ASK_USER_QUESTION_TOOL_NAME = "ask_user_question";
+
 const ERROR_NO_UI =
   "Error: ask_user_question has no interactive UI in this session. Ask the user your question directly in your reply instead of calling this tool.";
 
@@ -49,7 +51,7 @@ Preview content is rendered as markdown in a monospace box. Multi-line text with
 
 export function registerAskUserQuestionTool(pi: ExtensionAPI): void {
   pi.registerTool({
-    name: "ask_user_question",
+    name: ASK_USER_QUESTION_TOOL_NAME,
     label: "Ask User Question",
     description: TOOL_DESCRIPTION,
     promptSnippet: DEFAULT_PROMPT_SNIPPET,
