@@ -57,6 +57,27 @@ export type AskUserPromptPayload = {
 };
 
 /**
+ * Cross-extension channel emitted by `ask_user_question` to signal that the
+ * agent is blocked waiting for the user to answer a questionnaire.
+ *
+ * Producers (currently `packages/ask-user-question`) emit `{ active: true }`
+ * right before the editor-occupying modal mounts and `{ active: false }` once
+ * it has closed — including cancel and UI-throw paths, guaranteed via the same
+ * try/finally that brackets `ctx.ui.custom`. External state listeners (e.g.
+ * `moshi-hooks-extra`) subscribe on this channel to flip a session status from
+ * "working" to "blocked", distinct from the generic `MODAL_ACTIVE_EVENT`
+ * boolean (which fires for any editor-occupying modal, not just
+ * `ask_user_question`).
+ *
+ * Payload: `AskUserBlockedPayload` (`{ active: boolean }`).
+ */
+export const ASK_USER_BLOCKED_EVENT = "ask_user_question:blocked" as const;
+
+export type AskUserBlockedPayload = {
+  active: boolean;
+};
+
+/**
  * Cross-extension channel for transient hint messages rendered inside the
  * input editor's border (e.g. "esc again to abort").
  *

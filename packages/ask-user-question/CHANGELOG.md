@@ -6,6 +6,7 @@
 
 - RPC host native dialogs: when `ctx.mode === "rpc"`, the tool now drives `ctx.ui.select` (native dropdown for single-select, with option previews/descriptions folded into the title/options) and `ctx.ui.input` (comma-separated-index input for multi-select) per question, instead of silently declining via the unusable `ctx.ui.custom` slot. The answer envelope is identical to the TUI path. ([#103](https://github.com/TwIStOy/pi-extensions/issues/103))
 - The `ask_user_question` tool is now hidden from the model in non-interactive runs (print/json modes). A `before_agent_start` reconcile strips or restores the tool from the active set based on `ctx.hasUI`, so it no longer appears in the tool list and wastes a call that returns a `no_ui` error. The `!hasUI` guard inside `execute` stays as a backstop. ([#102](https://github.com/TwIStOy/pi-extensions/issues/102))
+- Emit a paired `ask_user_question:blocked` event (`{ active: boolean }`) around the questionnaire interaction so external state listeners (e.g. `moshi-hooks-extra`) can flip a session from "working" to "blocked". The event contract (`ASK_USER_BLOCKED_EVENT` / `AskUserBlockedPayload`) is defined in `@htwang-contrib/common` alongside `MODAL_ACTIVE_EVENT` and `ASK_USER_PROMPT_EVENT`. `{ active: true }` fires before the questionnaire runs (both the TUI `ctx.ui.custom` path and the RPC native-dialog path) and `{ active: false }` in the `finally`, so cancel and UI-throw paths clear it too. ([#105](https://github.com/TwIStOy/pi-extensions/issues/105))
 
 ### Changed
 

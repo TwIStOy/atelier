@@ -85,12 +85,14 @@ export {
   getEditorFactoryParent,
 } from "./editor-chain.ts";
 export type {
+  AskUserBlockedPayload,
   AskUserPromptOption,
   AskUserPromptPayload,
   AskUserPromptQuestion,
   EditorHintPayload,
 } from "./events.ts";
 export {
+  ASK_USER_BLOCKED_EVENT,
   ASK_USER_PROMPT_EVENT,
   EDITOR_HINT_EVENT,
   MODAL_ACTIVE_EVENT,
