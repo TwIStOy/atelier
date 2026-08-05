@@ -9,6 +9,7 @@
   "pi": {
     "extensions": [
       "packages/tool-call-fixer",
+      "packages/loop-guard",
       "packages/zai-coding-plan",
       "packages/inference-v2-self-host",
       "packages/statusline",
