@@ -18,6 +18,13 @@ export interface QuestionnaireState {
    * pass otherwise). Merged into the answer at confirm time.
    */
   notesByTab: ReadonlyMap<number, string>;
+  /**
+   * Uncommitted "Type something." buffer, keyed by tab index. Captured whenever focus
+   * leaves the input row (nav / tab switch) so browsing other options or switching
+   * questions does not lose or leak in-flight text. A confirmed `custom` answer
+   * supersedes the draft; confirming any answer for a tab drops its entry.
+   */
+  customDraftsByTab: ReadonlyMap<number, string>;
   /** Focused row in the Submit-tab picker (0 = Submit, 1 = Cancel). Reset on tab switch. */
   submitChoiceIndex: number;
   /** Canonical mirror of the in-flight notes editor; runtime mirrors after `forward_notes_keystroke`. */

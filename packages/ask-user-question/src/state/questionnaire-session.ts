@@ -35,6 +35,7 @@ function initialState(): QuestionnaireState {
     answers: new Map(),
     multiSelectChecked: new Set(),
     notesByTab: new Map(),
+    customDraftsByTab: new Map(),
     submitChoiceIndex: 0,
     notesDraft: "",
   };
@@ -172,6 +173,7 @@ export class QuestionnaireSession {
     return {
       questions: this.questions,
       itemsByTab: this.itemsByTab,
+      inputBuffer: this.inlineInput.getValue(),
     };
   }
 

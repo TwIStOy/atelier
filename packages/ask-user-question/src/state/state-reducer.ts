@@ -8,6 +8,12 @@ import type { QuestionnaireState } from "./state.ts";
 export interface ApplyContext {
   questions: readonly QuestionData[];
   itemsByTab: ReadonlyArray<readonly WrappingSelectItem[]>;
+  /**
+   * Live "Type something." buffer snapshot, read from the headless `inlineInput` at
+   * dispatch time. The reducer never mutates it directly — it persists the snapshot into
+   * `customDraftsByTab` on focus-leaving transitions and rehydrates via effects.
+   */
+  inputBuffer: string;
 }
 
 /**
@@ -82,21 +88,55 @@ function persistMultiSelectAnswer(state: QuestionnaireState, ctx: ApplyContext):
   return out;
 }
 
+/**
+ * Persist the live `ctx.inputBuffer` into `customDraftsByTab` for the current tab when
+ * focus is about to leave the input row. No-op unless `inputMode` is set, so callers can
+ * invoke it unconditionally on any focus-leaving transition (nav / tab switch). Empty
+ * buffers are dropped rather than stored, keeping the map leak-free.
+ */
+function captureDraft(state: QuestionnaireState, ctx: ApplyContext): QuestionnaireState {
+  if (!state.inputMode) return state;
+  const buf = ctx.inputBuffer;
+  if (buf.length === 0) {
+    if (!state.customDraftsByTab.has(state.currentTab)) return state;
+    const cleared = new Map(state.customDraftsByTab);
+    cleared.delete(state.currentTab);
+    return { ...state, customDraftsByTab: cleared };
+  }
+  if (state.customDraftsByTab.get(state.currentTab) === buf) return state;
+  const updated = new Map(state.customDraftsByTab);
+  updated.set(state.currentTab, buf);
+  return { ...state, customDraftsByTab: updated };
+}
+
+/**
+ * Buffer to rehydrate for a tab's input row. A confirmed `custom` answer wins over a
+ * stale draft; otherwise the draft (or empty) is returned.
+ */
+function inputDraftForTab(state: QuestionnaireState, tab: number): string {
+  const prior = state.answers.get(tab);
+  if (prior?.kind === "custom" && typeof prior.answer === "string") return prior.answer;
+  return state.customDraftsByTab.get(tab) ?? "";
+}
+
 function switchTabResult(state: QuestionnaireState, nextTab: number, ctx: ApplyContext): ApplyResult {
-  const notesValue = notesValueFor(state, nextTab);
+  const captured = captureDraft(state, ctx);
+  const notesValue = notesValueFor(captured, nextTab);
+  const inputDraft = inputDraftForTab(captured, nextTab);
   const transitioned: QuestionnaireState = {
-    ...state,
+    ...captured,
     currentTab: nextTab,
     optionIndex: 0,
     inputMode: false,
     notesVisible: false,
     submitChoiceIndex: 0,
-    multiSelectChecked: syncMultiSelectFromAnswers(state.answers, ctx.questions, nextTab),
+    multiSelectChecked: syncMultiSelectFromAnswers(captured.answers, ctx.questions, nextTab),
     notesDraft: notesValue,
   };
   return {
     state: transitioned,
     effects: [
+      { kind: "set_input_buffer", value: inputDraft },
       { kind: "set_notes_focused", focused: false },
       { kind: "set_notes_value", value: notesValue },
     ],
@@ -125,18 +165,15 @@ const navHandler: Handler<"nav"> = (state, action, ctx) => {
   const items = ctx.itemsByTab[state.currentTab] ?? [];
   const item = items[action.nextIndex];
   const inputMode = item ? ROW_INTENT_META[item.kind].activatesInputMode : false;
-  const next: QuestionnaireState = { ...state, optionIndex: action.nextIndex, inputMode };
-  if (!inputMode) {
-    return { state: next, effects: [{ kind: "clear_input_buffer" }] };
-  }
-  const prior = state.answers.get(state.currentTab);
-  if (prior?.kind === "custom" && typeof prior.answer === "string") {
+  const captured = captureDraft(state, ctx);
+  const next: QuestionnaireState = { ...captured, optionIndex: action.nextIndex, inputMode };
+  if (inputMode) {
     return {
       state: next,
-      effects: [{ kind: "set_input_buffer", value: prior.answer }],
+      effects: [{ kind: "set_input_buffer", value: inputDraftForTab(captured, state.currentTab) }],
     };
   }
-  return { state: next, effects: [] };
+  return { state: next, effects: [{ kind: "clear_input_buffer" }] };
 };
 
 const tabSwitchHandler: Handler<"tab_switch"> = (state, action, ctx) => switchTabResult(state, action.nextTab, ctx);
@@ -156,7 +193,9 @@ const confirmHandler: Handler<"confirm"> = (state, action, ctx) => {
   }
   const answers = new Map(state.answers);
   answers.set(answer.questionIndex, answer);
-  const next: QuestionnaireState = { ...state, answers };
+  const drafts = new Map(state.customDraftsByTab);
+  drafts.delete(answer.questionIndex);
+  const next: QuestionnaireState = { ...state, answers, customDraftsByTab: drafts, inputMode: false };
   if (action.autoAdvanceTab !== undefined) return switchTabResult(next, action.autoAdvanceTab, ctx);
   return doneFor(next, ctx, false);
 };
