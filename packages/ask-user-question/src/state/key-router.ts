@@ -22,12 +22,6 @@ export type QuestionnaireAction =
   | { kind: "notes_exit" }
   | { kind: "submit" }
   | { kind: "submit_nav"; nextIndex: 0 | 1 }
-  | { kind: "focus_chat" }
-  /**
-   * Carries the target index so UP/DOWN form a continuous cycle through
-   * `[chat, option0, …, optionLast]`.
-   */
-  | { kind: "focus_options"; optionIndex: number }
   | { kind: "notes_forward"; data: string }
   | { kind: "ignore" };
 
@@ -62,19 +56,7 @@ function buildSingleSelectAnswer(state: QuestionnaireState, runtime: Questionnai
   const q = runtime.questions[state.currentTab];
   if (!q) return null;
 
-  // Chat sentinel takes priority over inputMode: when chatFocused=true, the host overrides
-  // currentItem() to return the chat sentinel even if inputMode is still true (e.g. user
-  // navigated from "Type something." and DOWN focused the chat row).
   const item = runtime.currentItem;
-  if (item?.kind === "chat") {
-    return {
-      questionIndex: state.currentTab,
-      question: q.question,
-      kind: "chat",
-      answer: item.label,
-    };
-  }
-
   if (state.inputMode) {
     const label = runtime.inputBuffer;
     return {
@@ -134,22 +116,16 @@ function tabSwitchAction(
   return null;
 }
 
-// DOWN at the last item emits focus_chat so the cycle [chat, option0, …, optionLast] wraps.
+// DOWN wraps within the options list: last → first.
 function nextNavOnDown(state: QuestionnaireState, runtime: QuestionnaireRuntime): QuestionnaireAction {
-  if (runtime.items.length > 0 && state.optionIndex === runtime.items.length - 1) {
-    return { kind: "focus_chat" };
-  }
   return {
     kind: "nav",
     nextIndex: wrapTab(state.optionIndex + 1, Math.max(1, runtime.items.length)),
   };
 }
 
-// UP at the top item emits focus_chat (symmetric with nextNavOnDown).
+// UP wraps within the options list: first → last.
 function prevNavOnUp(state: QuestionnaireState, runtime: QuestionnaireRuntime): QuestionnaireAction {
-  if (runtime.items.length > 0 && state.optionIndex === 0) {
-    return { kind: "focus_chat" };
-  }
   return {
     kind: "nav",
     nextIndex: wrapTab(state.optionIndex - 1, Math.max(1, runtime.items.length)),
@@ -163,33 +139,6 @@ export function routeKey(data: string, state: QuestionnaireState, runtime: Quest
     if (kb.matches(data, KEYBIND_CANCEL)) return { kind: "notes_exit" };
     if (kb.matches(data, KEYBIND_CONFIRM)) return { kind: "notes_exit" };
     return { kind: "notes_forward", data };
-  }
-
-  if (state.chatFocused) {
-    if (kb.matches(data, KEYBIND_CANCEL)) return { kind: "cancel" };
-    if (kb.matches(data, KEYBIND_CONFIRM)) {
-      const answer = buildSingleSelectAnswer(state, runtime);
-      if (!answer) return { kind: "ignore" };
-      return {
-        kind: "confirm",
-        answer,
-        autoAdvanceTab: computeAutoAdvanceTab(state, runtime),
-      };
-    }
-    // Continuous cycle: UP from chat → bottom of options (last navigable row), DOWN from
-    // chat → top of options (option 0). Symmetric with UP-at-top → focus_chat and
-    // DOWN-at-bottom → focus_chat below; together they form one wrapping cycle through
-    // `[chat, option0, …, optionLast]`.
-    if (kb.matches(data, KEYBIND_UP)) {
-      const last = Math.max(0, runtime.items.length - 1);
-      return { kind: "focus_options", optionIndex: last };
-    }
-    if (kb.matches(data, KEYBIND_DOWN)) {
-      return { kind: "focus_options", optionIndex: 0 };
-    }
-    const tab = tabSwitchAction(data, state, runtime);
-    if (tab) return tab;
-    return { kind: "ignore" };
   }
 
   if (state.inputMode) {

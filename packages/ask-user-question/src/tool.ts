@@ -1,9 +1,10 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionUIContext } from "@earendil-works/pi-coding-agent";
 import { MODAL_ACTIVE_EVENT } from "@htwang-contrib/common";
 import { buildItemsForQuestion } from "./build-items.ts";
 import { emitAskUserPrompt } from "./events.ts";
 import { QuestionnaireSession } from "./state/questionnaire-session.ts";
 import { buildQuestionnaireResponse, buildToolResult } from "./tool/response-envelope.ts";
+import { runRpcQuestionnaire } from "./tool/rpc-native.ts";
 import {
   MAX_OPTIONS,
   MAX_QUESTIONS,
@@ -18,12 +19,13 @@ const DEFAULT_PROMPT_SNIPPET = `Ask the user up to ${MAX_QUESTIONS} structured q
 
 const DEFAULT_PROMPT_GUIDELINES: string[] = [
   `Use ask_user_question whenever the user's request is underspecified and you cannot proceed without concrete decisions — you can ask up to ${MAX_QUESTIONS} questions per invocation.`,
-  `Each question MUST have ${MIN_OPTIONS}-${MAX_OPTIONS} options. Every option requires a concise label (1-5 words) and a description explaining what the choice means or its trade-offs. The user can additionally type a custom answer ("Type something." row is appended automatically to single-select questions) or pick "Chat about this" to abandon the questionnaire.`,
-  `Set multiSelect: true when multiple answers are valid; this suppresses the "Type something." row. Provide an options[].preview markdown string when an option benefits from richer side-by-side context (mockups, code snippets, diagrams, configs) — single-select only. NOTE: any non-empty preview on a single-select question ALSO suppresses the "Type something." row (no room in the side-by-side layout); "Chat about this" remains the escape hatch. If you recommend a specific option, make it the first option and append "(Recommended)" to its label.`,
+  `Each question MUST have ${MIN_OPTIONS}-${MAX_OPTIONS} options. Every option requires a concise label (1-5 words) and a description explaining what the choice means or its trade-offs. The user can additionally type a custom answer ("Type something." row is appended automatically to single-select questions) or press Esc to cancel and continue in free-form conversation.`,
+  `Set multiSelect: true when multiple answers are valid; this suppresses the "Type something." row. Provide an options[].preview markdown string when an option benefits from richer side-by-side context (mockups, code snippets, diagrams, configs) — single-select only. NOTE: any non-empty preview on a single-select question ALSO suppresses the "Type something." row (no room in the side-by-side layout). If you recommend a specific option, make it the first option and append "(Recommended)" to its label.`,
   "Do not stack multiple ask_user_question calls back-to-back — group all clarifying questions into one invocation.",
 ];
 
-const ERROR_NO_UI = "Error: UI not available (running in non-interactive mode)";
+const ERROR_NO_UI =
+  "Error: ask_user_question has no interactive UI in this session. Ask the user your question directly in your reply instead of calling this tool.";
 
 const TOOL_DESCRIPTION = `Ask the user one or more structured questions during execution. Use when you need to:
 1. Gather user preferences or requirements
@@ -32,8 +34,8 @@ const TOOL_DESCRIPTION = `Ask the user one or more structured questions during e
 4. Offer choices to the user about what direction to take
 
 Usage notes:
-- Users will always be able to type a custom answer ("Type something." row is appended automatically to every single-select question) or pick "Chat about this" to abandon the questionnaire and continue in free-form conversation. Do NOT author "Other" / "Type something." / "Chat about this" labels yourself — duplicates are rejected at runtime.
-- Use multiSelect: true to allow multiple answers to be selected for a question. The "Type something." row is suppressed on multi-select questions, and is ALSO suppressed on single-select questions where any option carries a \`preview\` (the side-by-side layout has no room for inline custom text — "Chat about this" remains as the free-form escape hatch).
+- Users will always be able to type a custom answer ("Type something." row is appended automatically to every single-select question) or press Esc to cancel and continue in free-form conversation. Do NOT author "Other" / "Type something." labels yourself — duplicates are rejected at runtime.
+- Use multiSelect: true to allow multiple answers to be selected for a question. The "Type something." row is suppressed on multi-select questions, and is ALSO suppressed on single-select questions where any option carries a \`preview\` (the side-by-side layout has no room for inline custom text).
 - If you recommend a specific option, make that the first option in the list and add "(Recommended)" at the end of the label.
 
 Preview feature:
@@ -75,25 +77,28 @@ export function registerAskUserQuestionTool(pi: ExtensionAPI): void {
 
       emitAskUserPrompt(pi, typed);
 
-      const itemsByTab = typed.questions.map((q) => buildItemsForQuestion(q));
-
       pi.events.emit(MODAL_ACTIVE_EVENT, true);
       try {
-        const result = await ctx.ui.custom<QuestionnaireResult>((tui, theme, _keybindings, done) => {
-          const session = new QuestionnaireSession({
-            tui,
-            theme,
-            params: typed,
-            itemsByTab,
-            done,
-          });
-          return session.component;
-        });
-
+        const result =
+          ctx.mode === "rpc" ? await runRpcQuestionnaire(ctx.ui, typed) : await runTuiQuestionnaire(ctx.ui, typed);
         return buildQuestionnaireResponse(result, typed);
       } finally {
         pi.events.emit(MODAL_ACTIVE_EVENT, false);
       }
     },
+  });
+}
+
+async function runTuiQuestionnaire(ui: ExtensionUIContext, params: QuestionParams): Promise<QuestionnaireResult> {
+  const itemsByTab = params.questions.map((q) => buildItemsForQuestion(q));
+  return ui.custom<QuestionnaireResult>((tui, theme, _keybindings, done) => {
+    const session = new QuestionnaireSession({
+      tui,
+      theme,
+      params,
+      itemsByTab,
+      done,
+    });
+    return session.component;
   });
 }

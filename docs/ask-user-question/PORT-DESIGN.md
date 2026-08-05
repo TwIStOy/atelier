@@ -31,23 +31,23 @@
 1. `!ctx.hasUI` → `buildToolResult` + `details.error: "no_ui"`。
 2. `validateQuestionnaire`（纯函数，不含 schema 解析）→ 失败则 `cancelled: true` + 具体 `error` 枚举。
 3. **`pi.events.emit(ASK_USER_PROMPT_EVENT, payload)`**：payload 只含题面摘要（`hasPreview` 布尔，不含 preview 正文），见 `events.ts` 稳定性注释。
-4. **`itemsByTab`**：`typed.questions.map((q) => buildItemsForQuestion(q))`；`buildItemsForQuestion` 先把作者 `options` 映射为 `WrappingSelectItem` 的 `kind:"option"`，再按 `sentinelsToAppend(question, hasAnyPreview)` 追加 **`other` / `next`**（`chat` 因 `livesInMainList:false` 不会进主列表）。
+4. **`itemsByTab`**：`typed.questions.map((q) => buildItemsForQuestion(q))`；`buildItemsForQuestion` 先把作者 `options` 映射为 `WrappingSelectItem` 的 `kind:"option"`，再按 `sentinelsToAppend(question, hasAnyPreview)` 追加 **`other` / `next`**。
 5. （上游 rpiv）**`await ctx.ui.custom<QuestionnaireResult>(factory, { overlay: true, overlayOptions: { anchor: "bottom-center", width: "100%", maxHeight: "100%", margin: … } })`**：factory 内 `new QuestionnaireSession({ tui, theme, params, itemsByTab, done })`，返回 **`session.component`**（实现 `render` / `invalidate` / `handleInput`）。**本仓库**改为 **`await ctx.ui.custom<QuestionnaireResult>(factory)`**（仅编辑器槽），会话组件与 `done` 语义不变。
 6. **`buildQuestionnaireResponse(result, typed)`**：把 `QuestionnaireResult` 转成 LLM 可见 `content[0].text`（`ENVELOPE_PREFIX` + 各题 `buildAnswerSegment` + `ENVELOPE_SUFFIX`）；取消或空段统一 **`DECLINE_MESSAGE`** 文案策略在 `response-envelope.ts` 注释中写明。
 
 ### 2.3 行协议与类型（`state/row-intent.ts` + `tool/types.ts` + `view/components/wrapping-select.ts`）
 
-- **`WrappingSelectItem`** 四态：`option` | `other` | `chat` | `next`\*\*，与 reducer 动作、列表渲染、多选行为强绑定。
+- **`WrappingSelectItem`** 三态：`option` | `other` | `next`\*\*，与 reducer 动作、列表渲染、多选行为强绑定。
 - **`ROW_INTENT_META`** 是**单一真相表**：描述每类的 `reserved`、`livesInMainList`、`numbered`、`activatesInputMode`、`blocksMultiToggle`、`autoSubmitsInMulti`、以及何种问卷模式下自动追加 sentinel（`autoAppendOnSingleSelectNoPreview` / `autoAppendOnMultiSelect`）。**新增 sentinel 必须同时改 union + META**，编译器用 `Record<RowKind, …>` 强制成对修改。
-- **`RESERVED_LABELS` / `RESERVED_LABEL_SET`**：`types.ts` 显式包含 `"Other"`（与 CC 习惯对齐但运行时拒绝）+ 三 sentinel 的 canonical 英文 label；`validateQuestionnaire` **必须先判 reserved 再判 duplicate**（文件注释写明顺序）。
+- **`RESERVED_LABELS` / `RESERVED_LABEL_SET`**：`types.ts` 显式包含 `"Other"`（与 CC 习惯对齐但运行时拒绝）+ 两 sentinel 的 canonical 英文 label；`validateQuestionnaire` **必须先判 reserved 再判 duplicate**（文件注释写明顺序）。
 
 ### 2.4 键盘路由（`state/key-router.ts`）
 
-- 产出 **`QuestionnaireAction`** 判别联合（`nav`、`tab_switch`、`confirm`、`toggle`、`multi_confirm`、`cancel`、`notes_enter`/`exit`、`submit`、`submit_nav`、`focus_chat`、`focus_options`、`notes_forward`、`ignore`）。**hawtian-pi-extensions**：无上游的 **`toggle_collapsed`**。
+- 产出 **`QuestionnaireAction`** 判别联合（`nav`、`tab_switch`、`confirm`、`toggle`、`multi_confirm`、`cancel`、`notes_enter`/`exit`、`submit`、`submit_nav`、`notes_forward`、`ignore`）。**hawtian-pi-extensions**：无上游的 **`toggle_collapsed`**；**已移除上游的 `focus_chat` / `focus_options`**（"Chat about this" 逃生出口删除后，UP/DOWN 直接在选项列表内 `wrapTab` 循环）。
 - **（仅上游 rpiv）** **最外层拦截**：`Ctrl+]` → `toggle_collapsed`；**hawtian-pi-extensions 已删除**。
 - **（仅上游 rpiv）`collapsed`**：`routeKey` 在折叠态几乎吞掉所有键，仅 **`KEYBIND_CANCEL` → `cancel`**；`QuestionnaireSession` 折叠时只渲染单行 hint。**hawtian-pi-extensions 已删除折叠态与 `Ctrl+]`**。
-- **焦点优先级**与 **`selectActiveView`（`state/selectors/focus.ts`）** 一致：`notes` > `submit` tab > `chat` > `options`\*\*。
-- **单选列表**：`UP/DOWN` 在顶/底与 **`focus_chat` 闭环**（注释描述 `[chat, option0, …, optionLast]` 循环）；`Enter` 在 `chatFocused` / 普通列表都会走 `buildSingleSelectAnswer` → `confirm`（可带 `autoAdvanceTab`）。
+- **焦点优先级**与 **`selectActiveView`（`state/selectors/focus.ts`）** 一致：`notes` > `submit` tab > `options`\*\*。
+- **单选列表**：`UP/DOWN` 在顶/底直接 `wrapTab` 在选项列表内循环；`Enter` 在普通列表走 `buildSingleSelectAnswer` → `confirm`（可带 `autoAdvanceTab`）。**`Esc`（`KEYBIND_CANCEL`）是唯一放弃问卷的方式**。
 - **多选**：`Space` / `Enter` 在选项行上 **toggle**；在 **`ROW_INTENT_META.autoSubmitsInMulti`** 的行（即 `next`）上 `Enter` → `multi_confirm` 并带 `autoAdvanceTab`；`Space` 在 `blocksMultiToggle` 行被吞掉。
 - **`notes`**：`n` 键入口在「单选 + `focusedOptionHasPreview`」分支；`notesVisible` 时大部分键 `notes_forward` 进 notes `Input`。
 
@@ -63,14 +63,14 @@
 - **`QuestionnaireBuilder`**（一次性 builder 类）：`buildTabFor` 每题构造 **`OptionListView` + `PreviewBlockRenderer` + `PreviewPane`**；若 `question.multiSelect` 则多一个 **`MultiSelectView`**（勾选与 Next/Submit 行的纯展示，见 **§2.9**）；`bodyHeights` 在单选走 preview 自然高度、多选走 `MultiSelectView.naturalHeight`。
 - **`injectGlobalLeftWidth`**：调用 **`crossTabLeftWidthWithDonation`**，让所有 tab 的 `PreviewPane` 共享同一套「左侧选项列宽度」逻辑，保证多 tab 切换时侧栏对齐。
 - **多题 UI**：**`isMulti = questions.length > 1`**（不是 `multiSelect`）；为 true 时才有 **`TabBar` + `SubmitPicker` + Submit 策略**。
-- **`buildDialog`**：`DialogView` + `QuestionTabStrategy` / `SubmitTabStrategy`；`globalBinding` 绑定 dialog、chatRow、submitPicker、tabBar；`perTabBinding` 绑定 optionList、preview、multiSelect。
+- **`buildDialog`**：`DialogView` + `QuestionTabStrategy` / `SubmitTabStrategy`；`globalBinding` 绑定 dialog、submitPicker、tabBar；`perTabBinding` 绑定 optionList、preview、multiSelect。
 - **`QuestionnairePropsAdapter`**：每 tick 计算 **`BindingContext`**（含从 **`inlineInput.getValue()`** 读入的 `inputBuffer`、以及通过 **非公开 `cursor` 字段** 反射读取的 `inputCursorOffset`），再对 global / per-tab bindings `setProps`；**`invalidate`** 遍历所有 binding 与 `extraInvalidatables`（含 `notesInput`）。
 
 ### 2.7 布局与溢出（`view/dialog-builder.ts` + `view/tab-content-strategy.ts`）
 
 - **`DialogView.render`**：先按策略生成「自然高度」行数组；若 **`natural + spacer ≤ terminalRows`** 则底部补 **residual spacer** 使各 tab 总高度一致；否则做 **三区（顶固定 / 中间滚动 / 底固定）**，中间按 **`focusedItemRowRange`** 垂直居中滚动，边界用 `↑` `↓` `↕` 提示。
-- **`QuestionTabStrategy.footerRowCount = 4` 不变量**：底部 hint 必须用 **`OneLineClippedText` + `truncateToWidth`**，避免 `Text` 自动换行破坏 footer 行数假设（代码注释明确写出这是 regression 根因类约束）。
-- **`SubmitTabStrategy`**：展示每题 `formatAnswerScalar(..., "summary")`；Submit/Cancel 行为：**不再用「全答完才能提交」门闩**（`key-router` 注释 D1：警告条仅信息性，部分答案仍提交）。
+- **`QuestionTabStrategy.footerRowCount = 2` 不变量**：底部 hint 必须用 **`OneLineClippedText` + `truncateToWidth`**，避免 `Text` 自动换行破坏 footer 行数假设（代码注释明确写出这是 regression 根因类约束）。
+- **`SubmitTabStrategy`**：展示每题 `formatAnswerScalar(...)`；Submit/Cancel 行为：**不再用「全答完才能提交」门闩**（`key-router` 注释 D1：警告条仅信息性，部分答案仍提交）。
 
 ### 2.8 Markdown 预览链路（`view/components/preview/*`）
 

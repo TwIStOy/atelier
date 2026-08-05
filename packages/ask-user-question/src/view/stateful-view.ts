@@ -4,4 +4,4 @@ export interface StatefulView<P> extends Component {
   setProps(props: P): void;
 }
 
-export type ActiveView = "notes" | "chat" | "options" | "submit";
+export type ActiveView = "notes" | "options" | "submit";

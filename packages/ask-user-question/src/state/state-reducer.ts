@@ -96,7 +96,6 @@ function switchTabResult(state: QuestionnaireState, nextTab: number, ctx: ApplyC
     optionIndex: 0,
     inputMode: false,
     notesVisible: false,
-    chatFocused: false,
     submitChoiceIndex: 0,
     multiSelectChecked: syncMultiSelectFromAnswers(state.answers, ctx.questions, nextTab),
     notesDraft: notesValue,
@@ -165,7 +164,6 @@ const confirmHandler: Handler<"confirm"> = (state, action, ctx) => {
   const answers = new Map(state.answers);
   answers.set(answer.questionIndex, answer);
   const next: QuestionnaireState = { ...state, answers };
-  if (answer.kind === "chat") return doneFor(next, ctx, false);
   if (action.autoAdvanceTab !== undefined) return switchTabResult(next, action.autoAdvanceTab, ctx);
   return doneFor(next, ctx, false);
 };
@@ -238,33 +236,10 @@ const notesExitHandler: Handler<"notes_exit"> = (state, _action, _ctx) => {
   };
 };
 
-const focusOptionsHandler: Handler<"focus_options"> = (state, action, ctx) => {
-  const items = ctx.itemsByTab[state.currentTab] ?? [];
-  const focused = items[action.optionIndex];
-  const inputMode = focused ? ROW_INTENT_META[focused.kind].activatesInputMode : false;
-  const next = withFocusedOptionHasPreview(
-    {
-      ...state,
-      chatFocused: false,
-      optionIndex: action.optionIndex,
-      inputMode,
-    },
-    ctx.questions,
-  );
-  return {
-    state: next,
-    effects: inputMode ? [] : [{ kind: "clear_input_buffer" }],
-  };
-};
-
 const cancelHandler: Handler<"cancel"> = (s, _a, c) => doneFor(s, c, true);
 const submitHandler: Handler<"submit"> = (s, _a, c) => doneFor(s, c, false);
 const submitNavHandler: Handler<"submit_nav"> = (s, a, _c) => ({
   state: { ...s, submitChoiceIndex: a.nextIndex },
-  effects: [],
-});
-const focusChatHandler: Handler<"focus_chat"> = (s, _a, _c) => ({
-  state: { ...s, chatFocused: true },
   effects: [],
 });
 const notesForwardHandler: Handler<"notes_forward"> = (s, a, _c) => ({
@@ -275,7 +250,6 @@ const ignoreHandler: Handler<"ignore"> = (s, _a, _c) => ({
   state: s,
   effects: [],
 });
-
 /**
  * Compile-time-exhaustive dispatch table. `{ [K in Kind]: Handler<K> }` requires
  * an entry per union member — adding a new `QuestionnaireAction` variant fails to
@@ -294,8 +268,6 @@ const HANDLERS: { [K in QuestionnaireAction["kind"]]: Handler<K> } = {
   notes_forward: notesForwardHandler,
   submit: submitHandler,
   submit_nav: submitNavHandler,
-  focus_chat: focusChatHandler,
-  focus_options: focusOptionsHandler,
   ignore: ignoreHandler,
 };
 

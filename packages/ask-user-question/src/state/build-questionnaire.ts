@@ -7,7 +7,6 @@ import {
   globalBinding,
   perTabBinding,
 } from "../view/component-binding.ts";
-import { ChatRowView } from "../view/components/chat-row-view.ts";
 import { MultiSelectView } from "../view/components/multi-select-view.ts";
 import { OptionListView } from "../view/components/option-list-view.ts";
 import { PreviewBlockRenderer } from "../view/components/preview/preview-block-renderer.ts";
@@ -21,11 +20,9 @@ import { DialogView } from "../view/dialog-builder.ts";
 import { QuestionnairePropsAdapter } from "../view/props-adapter.ts";
 import type { StatefulView } from "../view/stateful-view.ts";
 import type { TabBodyHeights, TabComponents } from "../view/tab-components.ts";
-import { ROW_INTENT_META } from "./row-intent.ts";
 import type { PerTabSelector } from "./selectors/contract.ts";
 import { selectActivePreviewPaneIndex } from "./selectors/derivations.ts";
 import {
-  selectChatRowProps,
   selectDialogProps,
   selectMultiSelectProps,
   selectOptionListProps,
@@ -102,7 +99,6 @@ class QuestionnaireBuilder {
 
   private readonly selectTheme: WrappingSelectTheme;
   private readonly markdownTheme = getMarkdownTheme();
-  private readonly chatRow: ChatRowView;
   private readonly notesInput = new Input();
   private readonly inlineInput = new Input();
   private readonly getTerminalWidth = () => this.tui.terminal.columns;
@@ -118,10 +114,6 @@ class QuestionnaireBuilder {
     this.getCurrentTab = config.getCurrentTab;
 
     this.selectTheme = this.makeSelectTheme();
-    this.chatRow = new ChatRowView({
-      item: { kind: "chat", label: ROW_INTENT_META.chat.label },
-      theme: this.selectTheme,
-    });
   }
 
   build(): QuestionnaireBuilt {
@@ -239,7 +231,6 @@ class QuestionnaireBuilder {
         questions: this.questions,
         tabBar,
         notesInput: this.notesInput,
-        chatRow: this.chatRow,
         isMulti: this.isMulti,
         tabsByIndex: tabs,
         submitPicker,
@@ -261,7 +252,6 @@ class QuestionnaireBuilder {
   ): ReadonlyArray<BoundGlobalBinding> {
     return [
       globalBinding({ component: dialog, select: selectDialogProps }),
-      globalBinding({ component: this.chatRow, select: selectChatRowProps }),
       ...(submitPicker
         ? [
             globalBinding({

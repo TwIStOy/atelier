@@ -5,7 +5,6 @@ import type { WrappingSelectItem } from "../view/components/wrapping-select.ts";
 import type { QuestionnairePropsAdapter } from "../view/props-adapter.ts";
 import { buildQuestionnaire } from "./build-questionnaire.ts";
 import { type QuestionnaireAction, routeKey } from "./key-router.ts";
-import { ROW_INTENT_META } from "./row-intent.ts";
 import { computeFocusedOptionHasPreview } from "./selectors/derivations.ts";
 import type { QuestionnaireRuntime, QuestionnaireState } from "./state.ts";
 import { type ApplyContext, type Effect, reduce } from "./state-reducer.ts";
@@ -34,7 +33,6 @@ function initialState(): QuestionnaireState {
     optionIndex: 0,
     inputMode: false,
     notesVisible: false,
-    chatFocused: false,
     answers: new Map(),
     multiSelectChecked: new Set(),
     notesByTab: new Map(),
@@ -185,9 +183,7 @@ export class QuestionnaireSession {
   }
 
   private currentItem(): WrappingSelectItem | undefined {
-    if (this.state.chatFocused) return { kind: "chat", label: ROW_INTENT_META.chat.label };
     const arr = this.itemsByTab[this.state.currentTab] ?? [];
-    if (this.state.optionIndex < arr.length) return arr[this.state.optionIndex];
-    return { kind: "chat", label: ROW_INTENT_META.chat.label };
+    return arr[this.state.optionIndex];
   }
 }
