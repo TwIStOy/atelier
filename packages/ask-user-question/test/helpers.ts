@@ -1,5 +1,6 @@
 import type { ExtensionAPI, ExtensionContext, ExtensionUIContext } from "@earendil-works/pi-coding-agent";
 import { vi } from "vitest";
+import type { QuestionnaireState } from "../src/state/state.ts";
 import type { OptionData, QuestionData, QuestionParams } from "../src/tool/types.ts";
 
 type Tool = Record<string, unknown>;
@@ -81,4 +82,21 @@ export function oneQuestion(opts: { multiSelect?: boolean; previews?: string[] }
   const question: QuestionData = { question: "Which option?", header: "Pick", options };
   if (opts.multiSelect) question.multiSelect = true;
   return { questions: [question] };
+}
+
+/** Canonical base state for router/view tests. Override only the fields under test. */
+export function baseState(overrides: Partial<QuestionnaireState> = {}): QuestionnaireState {
+  return {
+    currentTab: 0,
+    optionIndex: 0,
+    inputMode: false,
+    notesVisible: false,
+    answers: new Map(),
+    multiSelectChecked: new Set(),
+    notesByTab: new Map(),
+    customDraftsByTab: new Map(),
+    submitChoiceIndex: 0,
+    notesDraft: "",
+    ...overrides,
+  };
 }

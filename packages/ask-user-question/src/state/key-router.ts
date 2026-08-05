@@ -8,11 +8,16 @@ const KEYBIND_DOWN = "tui.select.down";
 const KEYBIND_CONFIRM = "tui.select.confirm";
 const KEYBIND_CANCEL = "tui.select.cancel";
 
+/** Pi's built-in app-level binding for "open external editor" (default `ctrl+g`). Resolved via the app `KeybindingsManager` injected from the `ctx.ui.custom` factory, which also spreads the TUI bindings — so the same manager covers `tui.select.*`. */
+const KEYBIND_EXTERNAL_EDITOR = "app.editor.external";
+
 const NOTES_ACTIVATE_KEY = "n";
 const SPACE_KEY = " ";
 
 export type QuestionnaireAction =
   | { kind: "nav"; nextIndex: number }
+  | { kind: "input_edit"; value: string }
+  | { kind: "input_replace"; value: string }
   | { kind: "tab_switch"; nextTab: number }
   | { kind: "confirm"; answer: QuestionAnswer; autoAdvanceTab?: number }
   | { kind: "toggle"; index: number }
@@ -163,6 +168,7 @@ export function routeKey(data: string, state: QuestionnaireState, runtime: Quest
         autoAdvanceTab: computeAutoAdvanceTab(state, runtime),
       };
     }
+    if (kb.matches(data, KEYBIND_EXTERNAL_EDITOR)) return { kind: "input_edit", value: runtime.inputBuffer };
     if (kb.matches(data, KEYBIND_CANCEL)) return { kind: "cancel" };
     if (kb.matches(data, KEYBIND_UP)) {
       return prevNavOnUp(state, runtime);

@@ -48,6 +48,7 @@ function makeState(over: Partial<QuestionnaireState> = {}): QuestionnaireState {
     answers: new Map(),
     multiSelectChecked: new Set(),
     notesByTab: new Map(),
+    customDraftsByTab: new Map(),
     submitChoiceIndex: 0,
     notesDraft: "",
     ...over,
@@ -70,6 +71,7 @@ function makeCtx(over: Partial<ApplyContext> = {}): ApplyContext {
   return {
     questions: [singleSelectQuestion],
     itemsByTab: [[]],
+    inputBuffer: "",
     ...over,
   };
 }

@@ -25,6 +25,7 @@ export interface ApplyContext {
 export type Effect =
   | { kind: "set_input_buffer"; value: string }
   | { kind: "clear_input_buffer" }
+  | { kind: "open_input_editor"; value: string }
   | { kind: "set_notes_value"; value: string }
   | { kind: "set_notes_focused"; focused: boolean }
   | { kind: "forward_notes_keystroke"; data: string }
@@ -278,6 +279,23 @@ const notesForwardHandler: Handler<"notes_forward"> = (s, a, _c) => ({
   state: s,
   effects: [{ kind: "forward_notes_keystroke", data: a.data }],
 });
+
+/** Hand the current draft to the host so it can launch Pi's configured external editor. Pure: emits the effect, touches no state (the draft lives in the runtime `inlineInput`). */
+const inputEditHandler: Handler<"input_edit"> = (state, action, _ctx) => ({
+  state,
+  effects: [{ kind: "open_input_editor", value: action.value }],
+});
+
+/** Write the editor's result back: persist into `customDraftsByTab` (dropping empty values to stay leak-free, matching `captureDraft`) and rehydrate the live buffer via `set_input_buffer`. */
+const inputReplaceHandler: Handler<"input_replace"> = (state, action, _ctx) => {
+  const drafts = new Map(state.customDraftsByTab);
+  if (action.value.length === 0) drafts.delete(state.currentTab);
+  else drafts.set(state.currentTab, action.value);
+  return {
+    state: { ...state, customDraftsByTab: drafts },
+    effects: [{ kind: "set_input_buffer", value: action.value }],
+  };
+};
 const ignoreHandler: Handler<"ignore"> = (s, _a, _c) => ({
   state: s,
   effects: [],
@@ -290,6 +308,8 @@ const ignoreHandler: Handler<"ignore"> = (s, _a, _c) => ({
  */
 const HANDLERS: { [K in QuestionnaireAction["kind"]]: Handler<K> } = {
   nav: navHandler,
+  input_edit: inputEditHandler,
+  input_replace: inputReplaceHandler,
   tab_switch: tabSwitchHandler,
   confirm: confirmHandler,
   toggle: toggleHandler,

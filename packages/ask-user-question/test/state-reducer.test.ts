@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { buildItemsForQuestion } from "../src/build-items.ts";
+import type { QuestionnaireAction } from "../src/state/key-router.ts";
 import type { QuestionnaireState } from "../src/state/state.ts";
-import type { ApplyContext, ApplyResult } from "../src/state/state-reducer.ts";
-import { reduce } from "../src/state/state-reducer.ts";
+import { type ApplyContext, type ApplyResult, type Effect, reduce } from "../src/state/state-reducer.ts";
 import type { QuestionData } from "../src/tool/types.ts";
 
 function singleSelectQuestion(question: string, ...labels: string[]): QuestionData {
@@ -194,5 +194,45 @@ describe("confirming an answer discards the uncommitted draft", () => {
     const returning = reduce(answered, { kind: "nav", nextIndex: otherRow }, ctx);
 
     expect(inputValue(returning)).toBe("committed");
+  });
+});
+
+describe("reduce — external editor actions", () => {
+  it("input_edit emits an open_input_editor effect carrying the draft and leaves state untouched", () => {
+    const ctx = makeCtx(QUESTIONS, "my draft");
+    const before = freshState({ optionIndex: INPUT_ROW, inputMode: true });
+    const action: QuestionnaireAction = { kind: "input_edit", value: "my draft" };
+
+    const result = reduce(before, action, ctx);
+
+    expect(result.state).toStrictEqual(before);
+    expect(result.effects).toEqual<readonly Effect[]>([{ kind: "open_input_editor", value: "my draft" }]);
+  });
+
+  it("input_replace writes the editor result into customDraftsByTab and rehydrates the buffer", () => {
+    const ctx = makeCtx(QUESTIONS, "");
+    const before = freshState({ currentTab: 0, optionIndex: INPUT_ROW, inputMode: true });
+    const action: QuestionnaireAction = { kind: "input_replace", value: "edited text" };
+
+    const result = reduce(before, action, ctx);
+
+    expect(result.state.customDraftsByTab.get(0)).toBe("edited text");
+    expect(inputValue(result)).toBe("edited text");
+  });
+
+  it("input_replace with an empty value drops the draft and clears the buffer", () => {
+    const ctx = makeCtx(QUESTIONS, "");
+    const before = freshState({
+      currentTab: 0,
+      optionIndex: INPUT_ROW,
+      inputMode: true,
+      customDraftsByTab: new Map([[0, "old"]]),
+    });
+    const action: QuestionnaireAction = { kind: "input_replace", value: "" };
+
+    const result = reduce(before, action, ctx);
+
+    expect(result.state.customDraftsByTab.has(0)).toBe(false);
+    expect(inputValue(result)).toBe("");
   });
 });

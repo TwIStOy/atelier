@@ -6,6 +6,7 @@ import type { PreviewPane, PreviewPaneProps } from "./components/preview/preview
 import {
   type DialogState,
   HINT_PART_CANCEL,
+  HINT_PART_EDIT,
   HINT_PART_ENTER,
   HINT_PART_NAV,
   HINT_PART_NOTES,
@@ -220,6 +221,7 @@ export class SubmitTabStrategy implements TabContentStrategy {
  */
 export function buildHintText(question: QuestionData | undefined, isMulti: boolean, state: DialogState): string {
   const parts: string[] = [HINT_PART_ENTER, HINT_PART_NAV];
+  if (state.inputMode) parts.push(HINT_PART_EDIT);
   if (question?.multiSelect === true) parts.push(HINT_PART_TOGGLE);
   if (!state.inputMode && !state.notesVisible) {
     parts.push(HINT_PART_NOTES);
