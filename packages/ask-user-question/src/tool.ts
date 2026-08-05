@@ -1,9 +1,10 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionUIContext } from "@earendil-works/pi-coding-agent";
 import { MODAL_ACTIVE_EVENT } from "@htwang-contrib/common";
 import { buildItemsForQuestion } from "./build-items.ts";
 import { emitAskUserPrompt } from "./events.ts";
 import { QuestionnaireSession } from "./state/questionnaire-session.ts";
 import { buildQuestionnaireResponse, buildToolResult } from "./tool/response-envelope.ts";
+import { runRpcQuestionnaire } from "./tool/rpc-native.ts";
 import {
   MAX_OPTIONS,
   MAX_QUESTIONS,
@@ -23,7 +24,8 @@ const DEFAULT_PROMPT_GUIDELINES: string[] = [
   "Do not stack multiple ask_user_question calls back-to-back — group all clarifying questions into one invocation.",
 ];
 
-const ERROR_NO_UI = "Error: UI not available (running in non-interactive mode)";
+const ERROR_NO_UI =
+  "Error: ask_user_question has no interactive UI in this session. Ask the user your question directly in your reply instead of calling this tool.";
 
 const TOOL_DESCRIPTION = `Ask the user one or more structured questions during execution. Use when you need to:
 1. Gather user preferences or requirements
@@ -75,25 +77,28 @@ export function registerAskUserQuestionTool(pi: ExtensionAPI): void {
 
       emitAskUserPrompt(pi, typed);
 
-      const itemsByTab = typed.questions.map((q) => buildItemsForQuestion(q));
-
       pi.events.emit(MODAL_ACTIVE_EVENT, true);
       try {
-        const result = await ctx.ui.custom<QuestionnaireResult>((tui, theme, _keybindings, done) => {
-          const session = new QuestionnaireSession({
-            tui,
-            theme,
-            params: typed,
-            itemsByTab,
-            done,
-          });
-          return session.component;
-        });
-
+        const result =
+          ctx.mode === "rpc" ? await runRpcQuestionnaire(ctx.ui, typed) : await runTuiQuestionnaire(ctx.ui, typed);
         return buildQuestionnaireResponse(result, typed);
       } finally {
         pi.events.emit(MODAL_ACTIVE_EVENT, false);
       }
     },
+  });
+}
+
+async function runTuiQuestionnaire(ui: ExtensionUIContext, params: QuestionParams): Promise<QuestionnaireResult> {
+  const itemsByTab = params.questions.map((q) => buildItemsForQuestion(q));
+  return ui.custom<QuestionnaireResult>((tui, theme, _keybindings, done) => {
+    const session = new QuestionnaireSession({
+      tui,
+      theme,
+      params,
+      itemsByTab,
+      done,
+    });
+    return session.component;
   });
 }
