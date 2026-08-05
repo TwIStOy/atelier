@@ -5,6 +5,7 @@
 ### Added
 
 - RPC host native dialogs: when `ctx.mode === "rpc"`, the tool now drives `ctx.ui.select` (native dropdown for single-select, with option previews/descriptions folded into the title/options) and `ctx.ui.input` (comma-separated-index input for multi-select) per question, instead of silently declining via the unusable `ctx.ui.custom` slot. The answer envelope is identical to the TUI path. ([#103](https://github.com/TwIStOy/pi-extensions/issues/103))
+- The `ask_user_question` tool is now hidden from the model in non-interactive runs (print/json modes). A `before_agent_start` reconcile strips or restores the tool from the active set based on `ctx.hasUI`, so it no longer appears in the tool list and wastes a call that returns a `no_ui` error. The `!hasUI` guard inside `execute` stays as a backstop. ([#102](https://github.com/TwIStOy/pi-extensions/issues/102))
 
 ### Changed
 
