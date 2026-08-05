@@ -12,6 +12,7 @@ export const HINT_PART_ENTER = "Enter to select";
 export const HINT_PART_NAV = "↑/↓ to navigate";
 export const HINT_PART_TOGGLE = "Space to toggle";
 export const HINT_PART_NOTES = "n to add notes";
+export const HINT_PART_EDIT = "Ctrl+G to edit in external editor";
 export const HINT_PART_TAB = "Tab to switch questions";
 export const HINT_PART_CANCEL = "Esc to cancel";
 /**

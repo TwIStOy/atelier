@@ -1,5 +1,5 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { getKeybindings, type Input } from "@earendil-works/pi-tui";
+import type { Input } from "@earendil-works/pi-tui";
 import type { QuestionData, QuestionnaireResult, QuestionParams } from "../tool/types.ts";
 import type { WrappingSelectItem } from "../view/components/wrapping-select.ts";
 import type { QuestionnairePropsAdapter } from "../view/props-adapter.ts";
@@ -17,6 +17,10 @@ export interface QuestionnaireSessionConfig {
   theme: Theme;
   params: QuestionParams;
   itemsByTab: WrappingSelectItem[][];
+  /** App-level `KeybindingsManager` injected from the `ctx.ui.custom` factory. Resolves both `tui.select.*` and `app.editor.external` (the factory-provided manager spreads the TUI bindings). */
+  keybindings: { matches(data: string, name: string): boolean };
+  /** Open Pi's configured external editor on `value`; resolve the edited text, or `undefined` to keep the draft (e.g. launch failure). Owned by the host so this class stays free of `SettingsManager`/TUI-lifecycle coupling. */
+  editInput: (value: string) => Promise<string | undefined>;
   done: (result: QuestionnaireResult) => void;
 }
 
@@ -58,6 +62,11 @@ export class QuestionnaireSession {
   private readonly inlineInput: Input;
   private readonly viewAdapter: QuestionnairePropsAdapter;
 
+  private readonly keybindings: QuestionnaireSessionConfig["keybindings"];
+  private readonly editInput: QuestionnaireSessionConfig["editInput"];
+  /** Reentry guard: while the external editor owns the terminal, all dispatch is a no-op. */
+  private inputEditorOpen = false;
+
   private readonly tui: QuestionnaireSessionConfig["tui"];
   private readonly done: QuestionnaireSessionConfig["done"];
 
@@ -66,6 +75,8 @@ export class QuestionnaireSession {
   constructor(config: QuestionnaireSessionConfig) {
     this.tui = config.tui;
     this.done = config.done;
+    this.keybindings = config.keybindings;
+    this.editInput = config.editInput;
     this.questions = config.params.questions;
     this.isMulti = this.questions.length > 1;
     this.itemsByTab = config.itemsByTab;
@@ -94,6 +105,7 @@ export class QuestionnaireSession {
   }
 
   dispatch(data: string): void {
+    if (this.inputEditorOpen) return;
     const action = routeKey(data, this.state, this.runtime());
     if (action.kind === "ignore") {
       this.handleIgnoreInline(data);
@@ -123,6 +135,21 @@ export class QuestionnaireSession {
         return;
       case "clear_input_buffer":
         this.inlineInput.setValue("");
+        return;
+      case "open_input_editor":
+        if (this.inputEditorOpen) return;
+        this.inputEditorOpen = true;
+        void this.editInput(effect.value).then(
+          (value) => {
+            this.inputEditorOpen = false;
+            // `undefined` means the host reported a launch failure (or the user made no
+            // editable change worth committing) — retain the existing draft and resume.
+            if (value !== undefined) this.commit({ kind: "input_replace", value });
+          },
+          () => {
+            this.inputEditorOpen = false;
+          },
+        );
         return;
       case "set_notes_value":
         this.notesInput.setValue(effect.value);
@@ -160,7 +187,7 @@ export class QuestionnaireSession {
 
   private runtime(): QuestionnaireRuntime {
     return {
-      keybindings: getKeybindings(),
+      keybindings: this.keybindings,
       inputBuffer: this.inlineInput.getValue(),
       questions: this.questions,
       isMulti: this.isMulti,
