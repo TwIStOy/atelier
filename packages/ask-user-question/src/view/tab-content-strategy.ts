@@ -221,7 +221,7 @@ export class SubmitTabStrategy implements TabContentStrategy {
 export function buildHintText(question: QuestionData | undefined, isMulti: boolean, state: DialogState): string {
   const parts: string[] = [HINT_PART_ENTER, HINT_PART_NAV];
   if (question?.multiSelect === true) parts.push(HINT_PART_TOGGLE);
-  if (question && question.multiSelect !== true && state.focusedOptionHasPreview && !state.notesVisible) {
+  if (!state.inputMode && !state.notesVisible) {
     parts.push(HINT_PART_NOTES);
   }
   if (isMulti) parts.push(HINT_PART_TAB);

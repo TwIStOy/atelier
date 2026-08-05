@@ -141,6 +141,18 @@ export function routeKey(data: string, state: QuestionnaireState, runtime: Quest
     return { kind: "notes_forward", data };
   }
 
+  // `n` opens the notes editor on every question tab. Hoisted above the
+  // options / submit cascade so it cannot be swallowed by the Space/Enter
+  // branches; gated only by inputMode (where `n` is a literal character typed
+  // into the custom-answer field) and the submit tab (no per-question notes).
+  if (
+    data === NOTES_ACTIVATE_KEY &&
+    !state.inputMode &&
+    !(runtime.isMulti && state.currentTab === runtime.questions.length)
+  ) {
+    return { kind: "notes_enter" };
+  }
+
   if (state.inputMode) {
     if (kb.matches(data, KEYBIND_CONFIRM)) {
       const answer = buildSingleSelectAnswer(state, runtime);
@@ -184,10 +196,6 @@ export function routeKey(data: string, state: QuestionnaireState, runtime: Quest
 
   const q = runtime.questions[state.currentTab];
   if (!q) return { kind: "ignore" };
-
-  if (data === NOTES_ACTIVATE_KEY && !q.multiSelect && state.focusedOptionHasPreview) {
-    return { kind: "notes_enter" };
-  }
 
   if (kb.matches(data, KEYBIND_UP)) {
     return prevNavOnUp(state, runtime);

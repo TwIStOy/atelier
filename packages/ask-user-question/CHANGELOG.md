@@ -12,11 +12,13 @@
 - Single-select option lists now wrap on UP/DOWN at the boundaries (last → first, first → last) instead of routing through the removed chat focus row.
 - `formatAnswerScalar` no longer takes a `variant` argument; the only variant-differing branch (chat) is gone, so summary and envelope now share one output path.
 - Hosts with no interactive UI (`!ctx.hasUI`, i.e. JSON/print mode) now receive an explicit error instructing the model to ask the user in chat, replacing the generic "UI not available" message. ([#103](https://github.com/TwIStOy/pi-extensions/issues/103))
+- Notes (`n`) are now available on every question tab — single- and multi-select, with or without an option preview. The controls hint advertises `n to add notes` everywhere except `inputMode`. ([#101](https://github.com/TwIStOy/pi-extensions/issues/101))
 
 ### Fixed
 
 - RPC mode no longer fake-declines: previously `ctx.ui.custom` returned `undefined` in RPC, so every questionnaire looked like the user declined. RPC now uses the extension UI subprotocol's native dialogs. ([#103](https://github.com/TwIStOy/pi-extensions/issues/103))
 - Preview questionnaires now rebalance after terminal resizing: option descriptions gain usable width without exceeding half the dialog, while content-sized previews align with the right edge of their column ([#104](https://github.com/TwIStOy/pi-extensions/issues/104)).
+- Notes written without confirming an option no longer vanish on reopen or tab switch. Unconfirmed drafts persist in a `notesByTab` side-band and take priority over a confirmed answer's notes when re-entering the editor; clearing the draft now also strips the notes from the confirmed answer. ([#101](https://github.com/TwIStOy/pi-extensions/issues/101))
 
 ### Removed
 

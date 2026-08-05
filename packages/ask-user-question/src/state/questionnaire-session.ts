@@ -5,7 +5,6 @@ import type { WrappingSelectItem } from "../view/components/wrapping-select.ts";
 import type { QuestionnairePropsAdapter } from "../view/props-adapter.ts";
 import { buildQuestionnaire } from "./build-questionnaire.ts";
 import { type QuestionnaireAction, routeKey } from "./key-router.ts";
-import { computeFocusedOptionHasPreview } from "./selectors/derivations.ts";
 import type { QuestionnaireRuntime, QuestionnaireState } from "./state.ts";
 import { type ApplyContext, type Effect, reduce } from "./state-reducer.ts";
 
@@ -36,7 +35,6 @@ function initialState(): QuestionnaireState {
     answers: new Map(),
     multiSelectChecked: new Set(),
     notesByTab: new Map(),
-    focusedOptionHasPreview: false,
     submitChoiceIndex: 0,
     notesDraft: "",
   };
@@ -70,11 +68,6 @@ export class QuestionnaireSession {
     this.questions = config.params.questions;
     this.isMulti = this.questions.length > 1;
     this.itemsByTab = config.itemsByTab;
-    // Seed from the focused option at start; the reducer keeps it in sync via withFocusedOptionHasPreview.
-    this.state = {
-      ...this.state,
-      focusedOptionHasPreview: computeFocusedOptionHasPreview(this.questions, 0, 0),
-    };
 
     const built = buildQuestionnaire({
       tui: this.tui,

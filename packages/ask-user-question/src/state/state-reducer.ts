@@ -2,7 +2,6 @@ import type { QuestionAnswer, QuestionData, QuestionnaireResult } from "../tool/
 import type { WrappingSelectItem } from "../view/components/wrapping-select.ts";
 import type { QuestionnaireAction } from "./key-router.ts";
 import { ROW_INTENT_META } from "./row-intent.ts";
-import { computeFocusedOptionHasPreview } from "./selectors/derivations.ts";
 import type { QuestionnaireState } from "./state.ts";
 
 /** Session-lifetime constants. No live-component reads — peripheral values live on canonical state. */
@@ -39,13 +38,8 @@ function orderedAnswers(state: QuestionnaireState, questions: readonly QuestionD
   return out;
 }
 
-function withFocusedOptionHasPreview(
-  state: QuestionnaireState,
-  questions: readonly QuestionData[],
-): QuestionnaireState {
-  const focusedOptionHasPreview = computeFocusedOptionHasPreview(questions, state.currentTab, state.optionIndex);
-  if (state.focusedOptionHasPreview === focusedOptionHasPreview) return state;
-  return { ...state, focusedOptionHasPreview };
+function notesValueFor(state: QuestionnaireState, tab: number): string {
+  return state.notesByTab.get(tab) ?? state.answers.get(tab)?.notes ?? "";
 }
 
 function syncMultiSelectFromAnswers(
@@ -89,7 +83,7 @@ function persistMultiSelectAnswer(state: QuestionnaireState, ctx: ApplyContext):
 }
 
 function switchTabResult(state: QuestionnaireState, nextTab: number, ctx: ApplyContext): ApplyResult {
-  const notesValue = state.notesByTab.get(nextTab) ?? state.answers.get(nextTab)?.notes ?? "";
+  const notesValue = notesValueFor(state, nextTab);
   const transitioned: QuestionnaireState = {
     ...state,
     currentTab: nextTab,
@@ -100,9 +94,8 @@ function switchTabResult(state: QuestionnaireState, nextTab: number, ctx: ApplyC
     multiSelectChecked: syncMultiSelectFromAnswers(state.answers, ctx.questions, nextTab),
     notesDraft: notesValue,
   };
-  const finalState = withFocusedOptionHasPreview(transitioned, ctx.questions);
   return {
-    state: finalState,
+    state: transitioned,
     effects: [
       { kind: "set_notes_focused", focused: false },
       { kind: "set_notes_value", value: notesValue },
@@ -132,7 +125,7 @@ const navHandler: Handler<"nav"> = (state, action, ctx) => {
   const items = ctx.itemsByTab[state.currentTab] ?? [];
   const item = items[action.nextIndex];
   const inputMode = item ? ROW_INTENT_META[item.kind].activatesInputMode : false;
-  const next = withFocusedOptionHasPreview({ ...state, optionIndex: action.nextIndex, inputMode }, ctx.questions);
+  const next: QuestionnaireState = { ...state, optionIndex: action.nextIndex, inputMode };
   if (!inputMode) {
     return { state: next, effects: [{ kind: "clear_input_buffer" }] };
   }
@@ -203,7 +196,7 @@ const multiConfirmHandler: Handler<"multi_confirm"> = (state, action, ctx) => {
 };
 
 const notesEnterHandler: Handler<"notes_enter"> = (state, _action, _ctx) => {
-  const value = state.answers.get(state.currentTab)?.notes ?? "";
+  const value = notesValueFor(state, state.currentTab);
   return {
     state: { ...state, notesVisible: true, notesDraft: value },
     effects: [
