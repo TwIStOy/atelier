@@ -1,4 +1,3 @@
-import type { ChatRowViewProps } from "../../view/components/chat-row-view.ts";
 import { MULTI_SUBMIT_LABEL, type MultiSelectViewProps } from "../../view/components/multi-select-view.ts";
 import type { OptionListViewProps } from "../../view/components/option-list-view.ts";
 import type { PreviewPaneProps } from "../../view/components/preview/preview-pane.ts";
@@ -7,7 +6,7 @@ import type { TabBarProps } from "../../view/components/tab-bar.ts";
 import type { DialogProps } from "../../view/dialog-builder.ts";
 import { ROW_INTENT_META } from "../row-intent.ts";
 import type { GlobalSelector, PerTabSelector } from "./contract.ts";
-import { chatNumberingFor, selectActiveTabItems, selectConfirmedIndicator } from "./derivations.ts";
+import { selectConfirmedIndicator } from "./derivations.ts";
 
 export const selectMultiSelectProps: PerTabSelector<MultiSelectViewProps> = (state, ctx) => {
   const question = ctx.questions[ctx.i];
@@ -69,14 +68,6 @@ export const selectTabBarProps: GlobalSelector<TabBarProps> = (state, ctx) => {
       active: state.currentTab === ctx.questions.length,
       allAnswered: state.answers.size === ctx.questions.length && ctx.questions.length > 0,
     },
-  };
-};
-
-export const selectChatRowProps: GlobalSelector<ChatRowViewProps> = (state, ctx) => {
-  const activeItems = selectActiveTabItems(ctx.itemsByTab, state.currentTab, ctx.totalQuestions);
-  return {
-    focused: ctx.activeView === "chat",
-    numbering: chatNumberingFor(activeItems),
   };
 };
 

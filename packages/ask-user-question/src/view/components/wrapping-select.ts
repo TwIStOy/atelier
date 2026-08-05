@@ -20,14 +20,12 @@ const graphemeSegmenter = new Intl.Segmenter(undefined, {
  * - `option`: a regular author-defined option row.
  * - `other`: the inline free-text input row appended to single-select questions
  *   (label is "Type something."). Renders as inline `Input` when active.
- * - `chat`: the abandon-questionnaire escape-hatch row (label is "Chat about this").
  * - `next`: the explicit commit-and-advance row appended to multi-select questions
  *   (label is "Next"). Renders without a number / checkbox.
  */
 export type WrappingSelectItem =
   | { kind: "option"; label: string; description?: string }
   | { kind: "other"; label: string; description?: string }
-  | { kind: "chat"; label: string; description?: string }
   | { kind: "next"; label: string; description?: string };
 
 export interface WrappingSelectTheme {
@@ -40,9 +38,9 @@ export interface WrappingSelectTheme {
  * Numbering controls.
  *
  * Use `numberStartOffset` + `totalItemsForNumbering` when a list is logically a slice of a
- * larger numbered sequence — e.g. the chat row lives in its own WrappingSelect but should
- * render as `(N+1).` where N is the previous list's item count, with the column padded as
- * if both lists were one continuous numbered sequence.
+ * larger numbered sequence and should render as `(N+1).` where N is the previous list's
+ * item count, with the column padded as if both lists were one continuous numbered
+ * sequence.
  */
 export interface WrappingSelectOptions {
   /** Start numbering at this offset + 1 (default 0 → rows labeled 1, 2, 3 …). */
@@ -93,16 +91,6 @@ export class WrappingSelect implements Component {
     this.theme = theme;
     this.numberStartOffset = options.numberStartOffset ?? 0;
     this.totalItemsForNumbering = options.totalItemsForNumbering ?? items.length;
-  }
-
-  /**
-   * Update the numbering offset + total padding width without rebuilding the component.
-   * Used by the host to keep the chat-row WrappingSelect's number aligned with the active tab's
-   * options list when the user switches tabs (each tab can have a different items count).
-   */
-  setNumbering(numberStartOffset: number, totalItemsForNumbering: number): void {
-    this.numberStartOffset = numberStartOffset;
-    this.totalItemsForNumbering = Math.max(1, totalItemsForNumbering);
   }
 
   setSelectedIndex(index: number): void {

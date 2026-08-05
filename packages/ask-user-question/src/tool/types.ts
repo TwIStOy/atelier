@@ -29,17 +29,8 @@ export type SentinelLabel = (typeof SENTINEL_LABELS)[SentinelKind];
  *
  * Reserved unconditionally — multiSelect questions also reject these labels
  * even though the runtime sentinel is suppressed there.
- *
- * Order is pinned by `types.test.ts:292` — keep the explicit
- * `["Other", other, chat, next]` literal so consumers using
- * `RESERVED_LABELS[i]` indexing or `Set` membership see no behavior change.
  */
-export const RESERVED_LABELS = [
-  "Other",
-  ROW_INTENT_META.other.label,
-  ROW_INTENT_META.chat.label,
-  ROW_INTENT_META.next.label,
-] as const;
+export const RESERVED_LABELS = ["Other", ROW_INTENT_META.other.label, ROW_INTENT_META.next.label] as const;
 export type ReservedLabel = (typeof RESERVED_LABELS)[number];
 
 export const OptionSchema = Type.Object({
@@ -106,13 +97,12 @@ export type QuestionParams = Static<typeof QuestionParamsSchema>;
  * Variant semantics:
  * - `option`: user picked one of the author-defined options. `answer` is the option's label.
  * - `custom`: user typed free-text via the "Type something." row. `answer` is the typed text or null.
- * - `chat`: user picked the chat sentinel. `answer` is the literal "Chat about this".
  * - `multi`: user committed multi-select choices. `selected` carries chosen labels; `answer` is null.
  */
 export interface QuestionAnswer {
   questionIndex: number;
   question: string;
-  kind: "option" | "custom" | "chat" | "multi";
+  kind: "option" | "custom" | "multi";
   answer: string | null;
   selected?: string[];
   notes?: string;
@@ -120,8 +110,8 @@ export interface QuestionAnswer {
    * Markdown text from the matched option's `preview` field, populated only
    * when the user lands on a single-select option carrying a `preview`.
    * Used by `buildQuestionnaireResponse` to echo `selected preview: <preview>`
-   * into the LLM-facing envelope. Undefined for multi-select, custom-text
-   * (`kind: "custom"`), and chat (`kind: "chat"`) answers.
+   * into the LLM-facing envelope. Undefined for multi-select and custom-text
+   * (`kind: "custom"`) answers.
    */
   preview?: string;
 }
