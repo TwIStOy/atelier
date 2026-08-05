@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Preview questionnaires now rebalance after terminal resizing: option descriptions gain usable width without exceeding half the dialog, while content-sized previews align with the right edge of their column ([#104](https://github.com/TwIStOy/pi-extensions/issues/104)).
+
 ## [0.4.0] - 2026-07-31
 
 ### Changed
