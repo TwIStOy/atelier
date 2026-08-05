@@ -47,6 +47,7 @@ const ZAI_COMPAT: NonNullable<ProviderModelConfig["compat"]> = {
   supportsStore: false,
   supportsDeveloperRole: false,
   supportsReasoningEffort: false,
+  maxTokensField: "max_tokens",
   thinkingFormat: "zai",
   zaiToolStream: true,
 };

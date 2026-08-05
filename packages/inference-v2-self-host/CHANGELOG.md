@@ -5,6 +5,7 @@
 ### Changed
 
 - `kimi-k3` now uses the `anthropic-messages` API (against the gateway root base URL) with `headers: { "User-Agent": "KimiCLI/1.5" }` and `compat: { allowEmptySignature: true, forceAdaptiveThinking: true }`, mirroring pi's built-in `kimi-coding` provider. Its `thinkingLevelMap` now enables `low`/`high`/`max` to match the built-in `k3` model.
+- GLM models (incl. `glm-5.2`) now set `compat.maxTokensField: "max_tokens"`, matching pi's built-in `zai` / `zai-coding-cn` catalog entries.
 
 ## [0.4.0] - 2026-07-31
 
