@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Removed
+
+- Removed the "Chat about this" escape-hatch row from the questionnaire dialog (upstream v2.0.0 / commit `32520050` made the same removal). Esc is now the only way to abandon the dialog and continue in free-form conversation. Deleted the `chat` `WrappingSelectItem` variant, the `kind: "chat"` answer, the `chatFocused` state field, the `focus_chat` / `focus_options` actions, the standalone `ChatRowView` component, and the `CHAT_CONTINUATION_MESSAGE` / `CHAT_SUMMARY_MESSAGE` formatting ([#106](https://github.com/earendil-works/pi-mono/issues/106)).
+
+### Changed
+
+- Single-select option lists now wrap on UP/DOWN at the boundaries (last → first, first → last) instead of routing through the removed chat focus row.
+- `formatAnswerScalar` no longer takes a `variant` argument; the only variant-differing branch (chat) is gone, so summary and envelope now share one output path.
+
 ## [0.4.0] - 2026-07-31
 
 ### Changed

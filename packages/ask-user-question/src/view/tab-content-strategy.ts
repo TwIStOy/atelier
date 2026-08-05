@@ -2,7 +2,6 @@ import type { Theme } from "@earendil-works/pi-coding-agent";
 import { type Component, Container, type Input, Spacer, Text, truncateToWidth } from "@earendil-works/pi-tui";
 import { formatAnswerScalar } from "../tool/format-answer.ts";
 import type { QuestionData } from "../tool/types.ts";
-import type { ChatRowView } from "./components/chat-row-view.ts";
 import type { PreviewPane, PreviewPaneProps } from "./components/preview/preview-pane.ts";
 import {
   type DialogState,
@@ -81,14 +80,13 @@ export interface QuestionTabStrategyConfig {
   getPreviewPane: () => StatefulView<PreviewPaneProps>;
   tabsByIndex: ReadonlyArray<TabComponents>;
   notesInput: Input;
-  chatRow: ChatRowView;
   isMulti: boolean;
   getCurrentBodyHeight: (width: number) => number;
 }
 
 export class QuestionTabStrategy implements TabContentStrategy {
-  /** Spacer(1) + chatRow(1) + Spacer(1) + Text(hint, 1) = 4 rendered rows. */
-  readonly footerRowCount = 4;
+  /** Spacer(1) + Text(hint, 1) = 2 rendered rows. */
+  readonly footerRowCount = 2;
 
   constructor(private readonly config: QuestionTabStrategyConfig) {}
 
@@ -126,11 +124,9 @@ export class QuestionTabStrategy implements TabContentStrategy {
   footerRows(state: DialogState): Component[] {
     const question = this.config.questions[state.currentTab];
     // OneLineClippedText (not pi-tui `Text`) — long hints would wrap and break the
-    // strategy's `footerRowCount = 4` invariant. Clipping on narrow terminals drops
+    // strategy's `footerRowCount = 2` invariant. Clipping on narrow terminals drops
     // trailing parts with `…`.
     return [
-      new Spacer(1),
-      this.config.chatRow,
       new Spacer(1),
       new OneLineClippedText(this.config.theme.fg("dim", buildHintText(question, this.config.isMulti, state)), 1),
     ];
@@ -167,7 +163,7 @@ export class SubmitTabStrategy implements TabContentStrategy {
       const a = state.answers.get(i);
       if (!a) continue;
       const label = q.header && q.header.length > 0 ? q.header : `Q${i + 1}`;
-      const answerText = formatAnswerScalar(a, "summary");
+      const answerText = formatAnswerScalar(a);
       c.addChild(new Text(this.config.theme.fg("muted", ` ● ${label}`), 1, 0));
       c.addChild(
         new Text(`   ${this.config.theme.fg("muted", "→")} ${this.config.theme.fg("text", answerText)}`, 1, 0),

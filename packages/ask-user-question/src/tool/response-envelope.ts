@@ -36,7 +36,7 @@ export function buildQuestionnaireResponse(result: QuestionnaireResult | null | 
  * the optional `selected preview:` / `user notes:` suffixes are pinned by envelope tests.
  */
 export function buildAnswerSegment(a: QuestionAnswer): string {
-  const parts: string[] = [`"${a.question}"="${formatAnswerScalar(a, "envelope")}"`];
+  const parts: string[] = [`"${a.question}"="${formatAnswerScalar(a)}"`];
   if (a.preview && a.preview.length > 0) parts.push(`selected preview: ${a.preview}`);
   if (a.notes && a.notes.length > 0) parts.push(`user notes: ${a.notes}`);
   return `${parts.join(". ")}.`;
