@@ -1,5 +1,5 @@
 import type { ExtensionAPI, ExtensionUIContext } from "@earendil-works/pi-coding-agent";
-import { MODAL_ACTIVE_EVENT } from "@htwang-contrib/common";
+import { ASK_USER_BLOCKED_EVENT, MODAL_ACTIVE_EVENT } from "@htwang-contrib/common";
 import { buildItemsForQuestion } from "./build-items.ts";
 import { emitAskUserPrompt } from "./events.ts";
 import { QuestionnaireSession } from "./state/questionnaire-session.ts";
@@ -79,6 +79,7 @@ export function registerAskUserQuestionTool(pi: ExtensionAPI): void {
 
       emitAskUserPrompt(pi, typed);
 
+      pi.events.emit(ASK_USER_BLOCKED_EVENT, { active: true });
       pi.events.emit(MODAL_ACTIVE_EVENT, true);
       try {
         const result =
@@ -86,6 +87,7 @@ export function registerAskUserQuestionTool(pi: ExtensionAPI): void {
         return buildQuestionnaireResponse(result, typed);
       } finally {
         pi.events.emit(MODAL_ACTIVE_EVENT, false);
+        pi.events.emit(ASK_USER_BLOCKED_EVENT, { active: false });
       }
     },
   });
