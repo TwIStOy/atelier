@@ -13,6 +13,12 @@ export interface LoopGuardConfig {
   thinkingMinChunkChars: number;
   thinkingAcrossRepeatLimit: number;
   thinkingHistoryMessages: number;
+  thinkingInjectRecovery: boolean;
+  thinkingMaxInjections: number;
+  streamDetectionEnabled: boolean;
+  streamMinWindow: number;
+  streamMaxWindow: number;
+  streamStride: number;
   notifyOnDetect: boolean;
 }
 
@@ -25,6 +31,12 @@ export const DEFAULT_CONFIG: LoopGuardConfig = {
   thinkingMinChunkChars: 200,
   thinkingAcrossRepeatLimit: 1,
   thinkingHistoryMessages: 20,
+  thinkingInjectRecovery: true,
+  thinkingMaxInjections: 3,
+  streamDetectionEnabled: true,
+  streamMinWindow: 80,
+  streamMaxWindow: 2000,
+  streamStride: 50,
   notifyOnDetect: true,
 };
 
@@ -107,6 +119,28 @@ export function registerConfig(): void {
       order: 40,
     },
     {
+      key: "thinkingInjectRecovery",
+      type: "boolean",
+      label: "Inject Recovery Message",
+      value: () => loadConfig().thinkingInjectRecovery,
+      description:
+        "When a thinking loop is detected and the response has no pending tool calls, inject a recovery message that starts a new turn so the model can course-correct.",
+      extensionLabel: "Loop Guard",
+      order: 45,
+    },
+    {
+      key: "thinkingMaxInjections",
+      type: "number",
+      label: "Max Recovery Injections",
+      value: () => loadConfig().thinkingMaxInjections,
+      min: 1,
+      max: 10,
+      description:
+        "Stop injecting recovery messages after this many consecutive thinking-loop detections (notifications continue) until a clean response resets the counter.",
+      extensionLabel: "Loop Guard",
+      order: 46,
+    },
+    {
       key: "thinkingMinChunkChars",
       type: "number",
       label: "Thinking Min Chunk Chars",
@@ -138,6 +172,49 @@ export function registerConfig(): void {
       description: "How many recent assistant messages are kept for across-turn thinking comparison.",
       extensionLabel: "Loop Guard",
       order: 70,
+    },
+    {
+      key: "streamDetectionEnabled",
+      type: "boolean",
+      label: "Stream Loop Detection",
+      value: () => loadConfig().streamDetectionEnabled,
+      description:
+        "Detect verbatim repetition while a response is still streaming and abort it mid-generation. This is the only intervention that works when the model loops forever and the message never finalizes.",
+      extensionLabel: "Loop Guard",
+      order: 90,
+    },
+    {
+      key: "streamMinWindow",
+      type: "number",
+      label: "Stream Min Block Chars",
+      value: () => loadConfig().streamMinWindow,
+      min: 20,
+      max: 1000,
+      description: "Minimum size of a repeated block that aborts the stream.",
+      extensionLabel: "Loop Guard",
+      order: 91,
+    },
+    {
+      key: "streamMaxWindow",
+      type: "number",
+      label: "Stream Max Block Chars",
+      value: () => loadConfig().streamMaxWindow,
+      min: 200,
+      max: 10000,
+      description: "Maximum size of a repeated block considered; only the last 2x this many characters are examined.",
+      extensionLabel: "Loop Guard",
+      order: 92,
+    },
+    {
+      key: "streamStride",
+      type: "number",
+      label: "Stream Check Stride",
+      value: () => loadConfig().streamStride,
+      min: 10,
+      max: 500,
+      description: "Run the repetition check every N newly streamed characters.",
+      extensionLabel: "Loop Guard",
+      order: 93,
     },
     {
       key: "notifyOnDetect",
