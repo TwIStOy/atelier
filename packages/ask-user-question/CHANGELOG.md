@@ -15,6 +15,7 @@
 ### Fixed
 
 - RPC mode no longer fake-declines: previously `ctx.ui.custom` returned `undefined` in RPC, so every questionnaire looked like the user declined. RPC now uses the extension UI subprotocol's native dialogs. ([#103](https://github.com/TwIStOy/pi-extensions/issues/103))
+- Preview questionnaires now rebalance after terminal resizing: option descriptions gain usable width without exceeding half the dialog, while content-sized previews align with the right edge of their column ([#104](https://github.com/TwIStOy/pi-extensions/issues/104)).
 
 ### Removed
 
