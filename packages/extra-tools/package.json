@@ -6,7 +6,7 @@
   "types": "src/index.ts",
   "dependencies": {
     "@htwang-contrib/common": "*",
-    "typebox": "1.3.8"
+    "typebox": "1.3.10"
   },
   "devDependencies": {
     "@earendil-works/pi-coding-agent": "latest",
