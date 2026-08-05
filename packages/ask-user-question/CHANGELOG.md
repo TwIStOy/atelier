@@ -20,6 +20,7 @@
 - RPC mode no longer fake-declines: previously `ctx.ui.custom` returned `undefined` in RPC, so every questionnaire looked like the user declined. RPC now uses the extension UI subprotocol's native dialogs. ([#103](https://github.com/TwIStOy/pi-extensions/issues/103))
 - Preview questionnaires now rebalance after terminal resizing: option descriptions gain usable width without exceeding half the dialog, while content-sized previews align with the right edge of their column ([#104](https://github.com/TwIStOy/pi-extensions/issues/104)).
 - Notes written without confirming an option no longer vanish on reopen or tab switch. Unconfirmed drafts persist in a `notesByTab` side-band and take priority over a confirmed answer's notes when re-entering the editor; clearing the draft now also strips the notes from the confirmed answer. ([#101](https://github.com/TwIStOy/pi-extensions/issues/101))
+- Custom-text drafts typed in the "Type something." row are now preserved across option navigation and isolated per question, instead of being cleared on nav and leaking across questions via the shared inline-input buffer ([#98](https://github.com/TwIStOy/pi-extensions/issues/98)).
 
 ### Removed
 
