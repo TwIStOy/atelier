@@ -89,16 +89,20 @@ const MOONSHOT_COMPAT: NonNullable<ProviderModelConfig["compat"]> = {
 };
 
 const KIMI_K3_COMPAT: NonNullable<ProviderModelConfig["compat"]> = {
-  ...MOONSHOT_COMPAT,
-  requiresReasoningContentOnAssistantMessages: true,
+  allowEmptySignature: true,
+  forceAdaptiveThinking: true,
+};
+
+const KIMI_K3_HEADERS: NonNullable<ProviderModelConfig["headers"]> = {
+  "User-Agent": "KimiCLI/1.5",
 };
 
 const KIMI_K3_THINKING_LEVEL_MAP: NonNullable<ProviderModelConfig["thinkingLevelMap"]> = {
   off: null,
   minimal: null,
-  low: null,
+  low: "low",
   medium: null,
-  high: null,
+  high: "high",
   xhigh: null,
   max: "max",
 };
@@ -155,6 +159,9 @@ function applyFamilyOverrides(config: ProviderModelConfig, api: Api): void {
     return;
   }
   if (id === "kimi-k3") {
+    config.api = "anthropic-messages";
+    config.baseUrl = GATEWAY_ROOT_BASE_URL;
+    config.headers = KIMI_K3_HEADERS;
     config.compat = KIMI_K3_COMPAT;
     config.thinkingLevelMap = KIMI_K3_THINKING_LEVEL_MAP;
     return;
