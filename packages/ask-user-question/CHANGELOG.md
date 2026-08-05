@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Added
+
+- RPC host native dialogs: when `ctx.mode === "rpc"`, the tool now drives `ctx.ui.select` (native dropdown for single-select, with option previews/descriptions folded into the title/options) and `ctx.ui.input` (comma-separated-index input for multi-select) per question, instead of silently declining via the unusable `ctx.ui.custom` slot. The answer envelope is identical to the TUI path. ([#103](https://github.com/TwIStOy/pi-extensions/issues/103))
+
+### Changed
+
+- Hosts with no interactive UI (`!ctx.hasUI`, i.e. JSON/print mode) now receive an explicit error instructing the model to ask the user in chat, replacing the generic "UI not available" message. ([#103](https://github.com/TwIStOy/pi-extensions/issues/103))
+
+### Fixed
+
+- RPC mode no longer fake-declines: previously `ctx.ui.custom` returned `undefined` in RPC, so every questionnaire looked like the user declined. RPC now uses the extension UI subprotocol's native dialogs. ([#103](https://github.com/TwIStOy/pi-extensions/issues/103))
+
 ## [0.4.0] - 2026-07-31
 
 ### Changed
