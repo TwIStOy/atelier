@@ -287,19 +287,20 @@ export async function fetchCatalog(
 const REFRESH_INTERVAL_MS = 4 * 60 * 60 * 1000;
 
 export async function refreshCatalog(context: RefreshModelsContext): Promise<ProviderModelConfig[]> {
-  const stored = await context.store.read();
   if (!context.allowNetwork || context.signal?.aborted) {
-    return storedAsConfig(stored);
+    return storedAsConfig(context.stored);
   }
-  if (!context.force && stored?.checkedAt !== undefined && Date.now() - stored.checkedAt < REFRESH_INTERVAL_MS) {
-    return storedAsConfig(stored);
+  if (!context.force && context.stored?.checkedAt !== undefined && Date.now() - context.stored.checkedAt < REFRESH_INTERVAL_MS) {
+    return storedAsConfig(context.stored);
   }
   const refreshed = await fetchCatalog(context);
-  if (context.signal?.aborted) return storedAsConfig(stored);
-  await context.store.write({
-    models: refreshed as unknown as ModelsStoreEntry["models"],
-    checkedAt: Date.now(),
-  });
+  if (context.signal?.aborted) return storedAsConfig(context.stored);
+  await context.publish({
+    persist: {
+      models: refreshed as unknown as ModelsStoreEntry["models"],
+      checkedAt: Date.now(),
+    },
+  })
   return refreshed;
 }
 
