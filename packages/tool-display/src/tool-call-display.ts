@@ -60,7 +60,7 @@ export function formatGenericToolHeader(
 
   const wrapped = wrapTextWithAnsi(styledArg, Math.max(1, width - INDENT.length));
   const firstLine = truncateToWidth(prefix + wrapped[0], width, "…");
-  const contLines = wrapped.slice(1).map((line) => INDENT + truncateToWidth(line, width - INDENT.length, "…"));
+  const contLines = wrapped.slice(1).map((line) => truncateToWidth(line, width - INDENT.length, "…"));
   return [firstLine, ...contLines].join("\n");
 }
 
@@ -152,8 +152,9 @@ function makeHeader(
     : formatGenericToolHeader(toolName, args, theme, innerWidth);
 
   const headerLines = headerText.split("\n");
+  const contPrefix = `${theme.fg("muted", "│")}   `;
   return headerLines.map((line, i) => {
-    const prefix = i === 0 ? `${statusIcon} ${timerPart}` : INDENT;
+    const prefix = i === 0 ? `${statusIcon} ${timerPart}` : contPrefix;
     return truncateToWidth(prefix + line, width, "…");
   });
 }

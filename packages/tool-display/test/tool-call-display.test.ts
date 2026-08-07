@@ -166,7 +166,7 @@ describe("bash adapter command display width", () => {
     }
     const joined = lines.join(" ");
     expect(joined).not.toContain("…");
-    expect(joined.replace(/\s+/g, " ")).toContain(LONG_CMD);
+    expect(joined.replaceAll("│", "").replace(/\s+/g, " ")).toContain(LONG_CMD);
   });
 
   it("produces multiple header lines when the command is wider than the terminal", () => {
@@ -185,6 +185,26 @@ describe("bash adapter command display width", () => {
     ).render(40);
     expect(lines.length).toBeGreaterThan(1);
     expect(lines[0]).toContain("Bash");
+  });
+
+  it("prefixes continuation lines of a multi-line command with a tree bar", () => {
+    globalToolDisplayRegistry.register("bash", bashAdapter);
+    const lines = renderToolCall(
+      {
+        toolName: "bash",
+        args: { command: 'set -e\nfor slug in a b; do\n  echo "$slug"\ndone' },
+        output: "ok",
+        expanded: false,
+        isPartial: false,
+        isError: false,
+        registry: globalToolDisplayRegistry,
+      },
+      PLAIN_THEME,
+    ).render(80);
+    expect(lines[0]).toContain("Bash set -e");
+    expect(lines[1]).toBe("│   for slug in a b; do");
+    expect(lines[2]).toBe('│     echo "$slug"');
+    expect(lines[3]).toBe("│   done");
   });
 
   it("fits on one line with no ellipsis on a wide terminal", () => {
@@ -226,7 +246,7 @@ describe("bash adapter command display width", () => {
     expect(joined).toContain("in /r");
     expect(joined).toContain("build the package");
     expect(joined).not.toContain("…");
-    expect(joined.replace(/\s+/g, " ")).toContain(LONG_CMD);
+    expect(joined.replaceAll("│", "").replace(/\s+/g, " ")).toContain(LONG_CMD);
     for (const line of lines) {
       expect(visibleWidth(line)).toBeLessThanOrEqual(width);
     }
@@ -245,6 +265,50 @@ describe("bash adapter command display width", () => {
     expect(header).not.toContain("…");
     for (const line of header.split("\n")) {
       expect(visibleWidth(`◆ ${line}`)).toBeLessThanOrEqual(60);
+    }
+  });
+});
+
+describe("multi-line headers of other tools", () => {
+  it("prefixes wrapped generic-tool args with a tree bar", () => {
+    const lines = renderToolCall(
+      {
+        toolName: "some_unknown_tool",
+        args: { path: "a/very/long/path/that/keeps/going/and/going/to/force/wrapping.json", filter: "x" },
+        output: "",
+        expanded: false,
+        isPartial: true,
+        isError: false,
+        registry: globalToolDisplayRegistry,
+      },
+      PLAIN_THEME,
+    ).render(40);
+    expect(lines.length).toBeGreaterThan(1);
+    for (const line of lines.slice(1)) {
+      expect(line.startsWith("│   ")).toBe(true);
+      expect(visibleWidth(line)).toBeLessThanOrEqual(40);
+    }
+  });
+
+  it("prefixes a wrapped todo subject with a tree bar", () => {
+    globalToolDisplayRegistry.register("todo", todoAdapter);
+    const lines = renderToolCall(
+      {
+        toolName: "todo",
+        args: { action: "create", subject: "Fix todo adapter collapsed-content overflow crash in narrow terminals" },
+        output: "",
+        expanded: false,
+        isPartial: true,
+        isError: false,
+        registry: globalToolDisplayRegistry,
+      },
+      PLAIN_THEME,
+    ).render(40);
+    expect(lines.length).toBeGreaterThan(1);
+    expect(lines[0]).toContain("Todo create");
+    for (const line of lines.slice(1)) {
+      expect(line.startsWith("│   ")).toBe(true);
+      expect(visibleWidth(line)).toBeLessThanOrEqual(40);
     }
   });
 });
