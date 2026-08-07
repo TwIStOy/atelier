@@ -290,7 +290,11 @@ export async function refreshCatalog(context: RefreshModelsContext): Promise<Pro
   if (!context.allowNetwork || context.signal?.aborted) {
     return storedAsConfig(context.stored);
   }
-  if (!context.force && context.stored?.checkedAt !== undefined && Date.now() - context.stored.checkedAt < REFRESH_INTERVAL_MS) {
+  if (
+    !context.force &&
+    context.stored?.checkedAt !== undefined &&
+    Date.now() - context.stored.checkedAt < REFRESH_INTERVAL_MS
+  ) {
     return storedAsConfig(context.stored);
   }
   const refreshed = await fetchCatalog(context);
@@ -300,7 +304,7 @@ export async function refreshCatalog(context: RefreshModelsContext): Promise<Pro
       models: refreshed as unknown as ModelsStoreEntry["models"],
       checkedAt: Date.now(),
     },
-  })
+  });
   return refreshed;
 }
 

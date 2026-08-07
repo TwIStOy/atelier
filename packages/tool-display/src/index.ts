@@ -151,10 +151,7 @@ function patchToolExecutionRender(getTheme: () => Theme, registry: typeof global
 export default function (pi: ExtensionAPI) {
   if (isExtensionDisabled("tool-display")) return;
   let activeTheme: Theme = FALLBACK_THEME;
-
-  registerToolDisplayConfigItems();
-
-  patchToolExecutionRender(() => activeTheme, globalToolDisplayRegistry);
+  let isTui = false;
 
   pi.events.on("tool-display:register", (data) => {
     const { toolName, adapter } = data as {
@@ -167,6 +164,9 @@ export default function (pi: ExtensionAPI) {
   pi.events.emit("tool-display:ready", undefined);
 
   pi.on("session_start", (_event, ctx) => {
+    if (ctx.mode !== "tui") return;
+    isTui = true;
+    registerToolDisplayConfigItems();
     if (ctx.ui?.theme) {
       activeTheme = ctx.ui.theme;
     }
@@ -174,6 +174,7 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.on("before_agent_start", () => {
+    if (!isTui) return;
     patchToolExecutionRender(() => activeTheme, globalToolDisplayRegistry);
   });
 }

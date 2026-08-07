@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- The extension now only activates in TUI mode. All TUI-specific setup (config item registration, `ToolExecutionComponent` render patching, theme capture) is deferred to `session_start` and guarded by `ctx.mode === "tui"`, so running under `--mode rpc`/`json`/`print` no longer patches the component prototype or registers config items. The cross-extension `tool-display:register`/`tool-display:ready` event bus stays active in every mode so adapter registration keeps working.
+
 ### Added
 
 - `workflow` tool display adapter: the `Workflow` tool row now matches the Read/Bash/Subagent styling. The header shows the workflow's `meta.name` (parsed from the script with the shared acorn parser via `@htwang-contrib/workflow/script`, falling back to the first script line) plus live `settled/total agents` stats. While the run is in flight the collapsed view renders per-agent rows (`├`/`└` branches, spinner/✓/✗/◌/– status glyphs, tool-call counts, error details) from the run snapshot in `details.workflow`; once finished it collapses to the standard truncated output preview (tail lines + "more lines" expand hint). The expanded view renders the full script with syntax-highlighted line numbers, followed by the full output summary. `tool-call-display.ts` now treats `workflow` like `subagent` for adapter gating (collapsed rows render from details even before text output exists) and derives the header status icon from `details.ok`.
