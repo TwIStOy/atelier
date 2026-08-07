@@ -18,12 +18,14 @@ function getThinkingToggleHint(): string | undefined {
 }
 
 export class StrictThinkingPreview implements Component {
+  private heading: string;
   private text: string;
   private padding: number;
   private style: (text: string) => string;
   private previewLines: number;
 
-  constructor(text: string, padding: number, style: (text: string) => string, previewLines: number) {
+  constructor(heading: string, text: string, padding: number, style: (text: string) => string, previewLines: number) {
+    this.heading = heading;
     this.text = text;
     this.padding = padding;
     this.style = style;
@@ -31,16 +33,18 @@ export class StrictThinkingPreview implements Component {
   }
 
   render(width: number): string[] {
-    const previewLines = this.previewLines;
     const lines = new Text(this.style(this.text), this.padding, 0).render(width);
-    if (lines.length <= previewLines) return lines;
 
-    const hiddenLines = lines.length - previewLines;
-    const noun = hiddenLines === 1 ? "line" : "lines";
-    const toggleHint = getThinkingToggleHint();
-    const hint = `... (${hiddenLines} more ${noun}${toggleHint ? `, ${toggleHint}` : ""})`;
-    const hintLines = new Text(this.style(hint), this.padding, 0).render(width);
-    return [...hintLines, ...lines.slice(-previewLines)];
+    let hint: string | undefined;
+    const hiddenLines = lines.length - this.previewLines;
+    if (hiddenLines > 0) {
+      const noun = hiddenLines === 1 ? "line" : "lines";
+      const toggleHint = getThinkingToggleHint();
+      hint = ` ... (${hiddenLines} more ${noun}${toggleHint ? `, ${toggleHint}` : ""})`;
+    }
+
+    const heading = new Text(this.heading + (hint ? this.style(hint) : ""), this.padding, 0).render(width);
+    return [...heading, ...lines.slice(-this.previewLines)];
   }
 
   invalidate(): void {}

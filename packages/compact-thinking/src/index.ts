@@ -4,12 +4,14 @@ import { Markdown, Spacer, Text, type TUI } from "@earendil-works/pi-tui";
 import { isExtensionDisabled } from "@htwang-contrib/common";
 import { loadConfig, registerCompactThinkingConfigItems } from "./config.ts";
 import { DURATION_ENTRY_TYPE, restoreDurationEntries } from "./durations.ts";
+import { Gutter } from "./gutter.ts";
 import { formatThoughtDuration, StrictThinkingPreview } from "./preview.ts";
 import type { ActiveThinking, AssistantInternals, PatchedPrototype } from "./types.ts";
 
 const WIDGET_ID = "compact-thinking-render-loop";
 
 const THINKING_INDENT = 2;
+const THINKING_BAR = "▌";
 
 export default function compactThinking(pi: ExtensionAPI) {
   if (isExtensionDisabled("compact-thinking")) return;
@@ -46,6 +48,10 @@ export default function compactThinking(pi: ExtensionAPI) {
 
   function thinkingStyle(text: string) {
     return activeTheme ? activeTheme.italic(activeTheme.fg("thinkingText", text)) : text;
+  }
+
+  function thinkingBar() {
+    return activeTheme ? activeTheme.fg("borderMuted", THINKING_BAR) : THINKING_BAR;
   }
 
   function animatedText(text: string, baseStyle: (value: string) => string, animate: boolean) {
@@ -95,6 +101,11 @@ export default function compactThinking(pi: ExtensionAPI) {
 
     if (!self.hideThinkingBlock) {
       originalUpdateContent.call(this, message);
+      for (const child of self.contentContainer.children) {
+        if (child instanceof Markdown && (child as unknown as { defaultTextStyle?: unknown }).defaultTextStyle) {
+          child.paddingX = self.outputPad + THINKING_INDENT;
+        }
+      }
       return;
     }
 
@@ -162,19 +173,18 @@ export default function compactThinking(pi: ExtensionAPI) {
           durationText ? `Thought for ${durationText}` : self.hiddenThinkingLabel || "Thinking...",
         );
       }
-      self.contentContainer.addChild(new Text(heading, self.outputPad + THINKING_INDENT, 0));
-
       const previewSource = thinkingBlocks.join("\n\n");
-      if (config.previewLines > 0 && previewSource.trim()) {
-        self.contentContainer.addChild(
-          new StrictThinkingPreview(
-            previewSource.trim(),
-            self.outputPad + THINKING_INDENT,
-            thinkingStyle,
-            config.previewLines,
-          ),
-        );
-      }
+      const block =
+        config.previewLines > 0 && previewSource.trim()
+          ? new StrictThinkingPreview(
+              heading,
+              previewSource.trim(),
+              self.outputPad + THINKING_INDENT,
+              thinkingStyle,
+              config.previewLines,
+            )
+          : new Text(heading, self.outputPad + THINKING_INDENT, 0);
+      self.contentContainer.addChild(new Gutter(block, self.outputPad, thinkingBar()));
 
       const hasVisibleContentAfter = message.content
         .slice(i + 1)

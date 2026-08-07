@@ -21,6 +21,7 @@ export interface ActiveThinking {
 
 export interface AssistantInternals {
   contentContainer: {
+    children: Component[];
     clear(): void;
     addChild(component: Component): void;
   };
