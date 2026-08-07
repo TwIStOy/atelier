@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- The user-prompt `▌` bar now maps the `max` thinking level to the `thinkingMax` theme color. The level switch predated the `max` level, so running at `max` fell through to the default `thinkingOff` and every prompt bar rendered gray.
+
 ## [0.4.0] - 2026-07-31
 
 ### Changed
