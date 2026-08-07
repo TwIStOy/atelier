@@ -51,7 +51,7 @@ export default function compactThinking(pi: ExtensionAPI) {
   }
 
   function thinkingBar() {
-    return activeTheme ? activeTheme.fg("borderMuted", THINKING_BAR) : THINKING_BAR;
+    return activeTheme ? activeTheme.fg("mdHeading", THINKING_BAR) : THINKING_BAR;
   }
 
   function animatedText(text: string, baseStyle: (value: string) => string, animate: boolean) {
