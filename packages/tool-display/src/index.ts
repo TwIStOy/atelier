@@ -143,7 +143,7 @@ function patchToolExecutionRender(getTheme: () => Theme, registry: typeof global
 
     const theme = proto.__tdGetTheme?.() ?? FALLBACK_THEME;
     const rendered = renderToolCall(opts, theme);
-    return rendered.render(width);
+    return ["", ...rendered.render(width)];
   };
   proto.__tdPatched = true;
 }
