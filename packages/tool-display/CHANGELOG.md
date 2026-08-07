@@ -12,7 +12,7 @@
 
 ### Fixed
 
-- The patched `ToolExecutionComponent.render` now prepends the blank separator line that the stock component renders via its leading `Spacer(1)` child. The override bypassed the container's children entirely, so tool call rows were glued directly to the preceding assistant text or compact thinking block with no empty line in between.
+- The patched `ToolExecutionComponent.render` now prepends the blank separator line that the stock component renders via its leading `Spacer(1)` child. The override bypassed the container's children entirely, so tool call rows were glued directly to the preceding assistant text or compact thinking block with no empty line in between. Consecutive tool calls from the same assistant message are exempt: when the previous chat sibling is another `ToolExecutionComponent`, the separator is omitted so parallel tool calls render as one glued group.
 - Multi-task `Subagent` tool calls no longer crash pi on narrow terminals. The per-task and batch summary rows in the collapsed tool display now truncate the task description against the terminal width (width- and ANSI-aware via `truncateToWidth`/`visibleWidth`) and apply a safety-net truncation so no rendered row can exceed the terminal width. Previously the description was capped at a fixed 56 characters and the composed row was never bounded, producing lines wider than the terminal and triggering `Rendered line exceeds terminal width`.
 
 ## [0.4.0] - 2026-07-31

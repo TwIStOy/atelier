@@ -91,6 +91,19 @@ const FALLBACK_THEME: Theme = {
   bold: (text: string) => text,
 } as Theme;
 
+function findPreviousSibling(root: unknown, target: object): unknown {
+  if (!root || typeof root !== "object") return undefined;
+  const children = (root as { children?: unknown }).children;
+  if (!Array.isArray(children)) return undefined;
+  const index = children.indexOf(target);
+  if (index >= 0) return index > 0 ? children[index - 1] : null;
+  for (const child of children) {
+    const found = findPreviousSibling(child, target);
+    if (found !== undefined) return found;
+  }
+  return undefined;
+}
+
 function patchToolExecutionRender(getTheme: () => Theme, registry: typeof globalToolDisplayRegistry) {
   const proto: any = ToolExecutionComponent.prototype;
   proto.__tdGetTheme = getTheme;
@@ -99,6 +112,7 @@ function patchToolExecutionRender(getTheme: () => Theme, registry: typeof global
   if (proto.__tdPatched) return;
 
   const timings = new WeakMap<object, { startedAtMs?: number; endedAtMs?: number }>();
+  const previousSiblings = new WeakMap<object, unknown>();
 
   const originalSetExpanded = proto.setExpanded as (this: ToolExecutionPatchThis, expanded: boolean) => void;
   proto.setExpanded = function (this: ToolExecutionPatchThis, expanded: boolean) {
@@ -143,7 +157,19 @@ function patchToolExecutionRender(getTheme: () => Theme, registry: typeof global
 
     const theme = proto.__tdGetTheme?.() ?? FALLBACK_THEME;
     const rendered = renderToolCall(opts, theme);
-    return ["", ...rendered.render(width)];
+    const lines = rendered.render(width);
+
+    let previous = previousSiblings.get(this);
+    if (previous === undefined) {
+      const ui = (this as { ui?: unknown }).ui;
+      const found = ui ? findPreviousSibling(ui, this) : undefined;
+      if (found !== undefined) {
+        previousSiblings.set(this, found);
+        previous = found;
+      }
+    }
+    if (previous instanceof ToolExecutionComponent) return lines;
+    return ["", ...lines];
   };
   proto.__tdPatched = true;
 }
