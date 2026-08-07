@@ -9,6 +9,8 @@ import type { ActiveThinking, AssistantInternals, PatchedPrototype } from "./typ
 
 const WIDGET_ID = "compact-thinking-render-loop";
 
+const THINKING_INDENT = 2;
+
 export default function compactThinking(pi: ExtensionAPI) {
   if (isExtensionDisabled("compact-thinking")) return;
 
@@ -160,12 +162,17 @@ export default function compactThinking(pi: ExtensionAPI) {
           durationText ? `Thought for ${durationText}` : self.hiddenThinkingLabel || "Thinking...",
         );
       }
-      self.contentContainer.addChild(new Text(heading, self.outputPad, 0));
+      self.contentContainer.addChild(new Text(heading, self.outputPad + THINKING_INDENT, 0));
 
       const previewSource = thinkingBlocks.join("\n\n");
       if (config.previewLines > 0 && previewSource.trim()) {
         self.contentContainer.addChild(
-          new StrictThinkingPreview(previewSource.trim(), self.outputPad, thinkingStyle, config.previewLines),
+          new StrictThinkingPreview(
+            previewSource.trim(),
+            self.outputPad + THINKING_INDENT,
+            thinkingStyle,
+            config.previewLines,
+          ),
         );
       }
 
