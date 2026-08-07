@@ -10,7 +10,8 @@ import type { ActiveThinking, AssistantInternals, PatchedPrototype } from "./typ
 
 const WIDGET_ID = "compact-thinking-render-loop";
 
-const THINKING_INDENT = 2;
+const THINKING_INDENT = 3;
+const THINKING_BAR_COLUMN = 1;
 const THINKING_BAR = "▌";
 
 export default function compactThinking(pi: ExtensionAPI) {
@@ -51,7 +52,7 @@ export default function compactThinking(pi: ExtensionAPI) {
   }
 
   function thinkingBar() {
-    return activeTheme ? activeTheme.fg("mdHeading", THINKING_BAR) : THINKING_BAR;
+    return activeTheme ? activeTheme.fg("borderMuted", THINKING_BAR) : THINKING_BAR;
   }
 
   function animatedText(text: string, baseStyle: (value: string) => string, animate: boolean) {
@@ -184,7 +185,7 @@ export default function compactThinking(pi: ExtensionAPI) {
               config.previewLines,
             )
           : new Text(heading, self.outputPad + THINKING_INDENT, 0);
-      self.contentContainer.addChild(new Gutter(block, self.outputPad, thinkingBar()));
+      self.contentContainer.addChild(new Gutter(block, self.outputPad + THINKING_BAR_COLUMN, thinkingBar()));
 
       const hasVisibleContentAfter = message.content
         .slice(i + 1)
