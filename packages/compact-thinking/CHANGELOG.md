@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- `StrictThinkingPreview.render` re-wrapped the entire thinking text via a fresh `Text` component on every frame for every assistant message, dominating transcript frame time (~5-30ms per message per frame, ~90% of total render cost in a measured session). The rendered lines are now memoized per width and dropped on `invalidate`.
+
 ### Changed
 
 - The "... (N more lines, key to expand)" truncation hint now renders on the same line as the heading (e.g. `Thought for 8s ... (7 more lines, ctrl+t to expand)`) instead of taking its own line.

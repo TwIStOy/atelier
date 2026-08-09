@@ -23,6 +23,8 @@ export class StrictThinkingPreview implements Component {
   private padding: number;
   private style: (text: string) => string;
   private previewLines: number;
+  private cachedWidth = -1;
+  private cachedLines: string[] | undefined;
 
   constructor(heading: string, text: string, padding: number, style: (text: string) => string, previewLines: number) {
     this.heading = heading;
@@ -33,6 +35,8 @@ export class StrictThinkingPreview implements Component {
   }
 
   render(width: number): string[] {
+    if (this.cachedLines !== undefined && width === this.cachedWidth) return this.cachedLines;
+
     const lines = new Text(this.style(this.text), this.padding, 0).render(width);
 
     let hint: string | undefined;
@@ -44,8 +48,14 @@ export class StrictThinkingPreview implements Component {
     }
 
     const heading = new Text(this.heading + (hint ? this.style(hint) : ""), this.padding, 0).render(width);
-    return [...heading, ...lines.slice(-this.previewLines)];
+    const result = [...heading, ...lines.slice(-this.previewLines)];
+    this.cachedWidth = width;
+    this.cachedLines = result;
+    return result;
   }
 
-  invalidate(): void {}
+  invalidate(): void {
+    this.cachedWidth = -1;
+    this.cachedLines = undefined;
+  }
 }
