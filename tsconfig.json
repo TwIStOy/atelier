@@ -27,6 +27,7 @@
     { "path": "packages/read-tracker" },
     { "path": "packages/working-indicator" },
     { "path": "packages/moshi-hooks-extra" },
-    { "path": "packages/llm-wiki" }
+    { "path": "packages/llm-wiki" },
+    { "path": "packages/heap-probe" }
   ]
 }

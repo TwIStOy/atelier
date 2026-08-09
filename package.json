@@ -39,7 +39,8 @@
       "packages/experience",
       "packages/htw-producer",
       "packages/agents-mirror",
-      "packages/workflow"
+      "packages/workflow",
+      "packages/heap-probe"
     ],
     "skills": [
       "skills/code-philosophy",
