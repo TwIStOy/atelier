@@ -5,12 +5,20 @@ import type { Component, Markdown } from "@earendil-works/pi-tui";
 export interface CompactThinkingConfig {
   previewLines: number;
   animationIntervalMs: number;
+  summaryEnabled: boolean;
+  summaryModel: string;
 }
 
 export interface DurationEntryData {
   messageTimestamp: number;
   contentIndex: number;
   durationMs: number;
+}
+
+export interface SummaryEntryData {
+  messageTimestamp: number;
+  contentIndex: number;
+  summary: string;
 }
 
 export interface ActiveThinking {

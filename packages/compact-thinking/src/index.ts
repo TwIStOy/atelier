@@ -1,12 +1,27 @@
 import type { AssistantMessage } from "@earendil-works/pi-ai";
-import { AssistantMessageComponent, type ExtensionAPI, type Theme } from "@earendil-works/pi-coding-agent";
+import {
+  AssistantMessageComponent,
+  type ExtensionAPI,
+  type ExtensionContext,
+  type Theme,
+} from "@earendil-works/pi-coding-agent";
 import { Markdown, Spacer, Text, type TUI } from "@earendil-works/pi-tui";
-import { isExtensionDisabled } from "@htwang-contrib/common";
-import { loadConfig, registerCompactThinkingConfigItems } from "./config.ts";
+import { createLogger, isExtensionDisabled, isStaleCtxError, resolveModel } from "@htwang-contrib/common";
+import { loadConfig, registerCompactThinkingConfigItems, setCachedModelOptions } from "./config.ts";
 import { DURATION_ENTRY_TYPE, restoreDurationEntries } from "./durations.ts";
 import { Gutter } from "./gutter.ts";
 import { formatThoughtDuration, StrictThinkingPreview } from "./preview.ts";
+import {
+  extractThinkingRun,
+  getRunSummary,
+  restoreSummaryEntries,
+  SUMMARY_ENTRY_TYPE,
+  storeRunSummary,
+} from "./summaries.ts";
+import { summarizeThinking } from "./summary.ts";
 import type { ActiveThinking, AssistantInternals, PatchedPrototype } from "./types.ts";
+
+const logger = createLogger("compact-thinking");
 
 const WIDGET_ID = "compact-thinking-render-loop";
 
@@ -23,11 +38,14 @@ export default function compactThinking(pi: ExtensionAPI) {
   const originalUpdateContent = prototype.updateContent;
 
   const completedDurations = new Map<number, Map<number, number>>();
+  const completedSummaries = new Map<number, Map<number, string>>();
   const renderedComponents = new Set<AssistantMessageComponent>();
   const streamingComponents = new Set<AssistantMessageComponent>();
   let activeThinking: ActiveThinking | undefined;
   let activeTheme: Theme | undefined;
   let activeTui: TUI | undefined;
+  let activeCtx: ExtensionContext | undefined;
+  let sessionAbort: AbortController | undefined;
   let latestComponent: AssistantMessageComponent | undefined;
   let latestComponentTimestamp: number | undefined;
   let animationTimer: ReturnType<typeof setInterval> | undefined;
@@ -175,16 +193,27 @@ export default function compactThinking(pi: ExtensionAPI) {
         );
       }
       const previewSource = thinkingBlocks.join("\n\n");
+      const summary = active
+        ? undefined
+        : getRunSummary(completedSummaries, message.timestamp, runStartIndex, runEndIndex);
       const block =
-        config.previewLines > 0 && previewSource.trim()
+        summary !== undefined
           ? new StrictThinkingPreview(
               heading,
-              previewSource.trim(),
+              summary,
               self.outputPad + THINKING_INDENT,
               thinkingStyle,
-              config.previewLines,
+              Math.max(config.previewLines, 1),
             )
-          : new Text(heading, self.outputPad + THINKING_INDENT, 0);
+          : config.previewLines > 0 && previewSource.trim()
+            ? new StrictThinkingPreview(
+                heading,
+                previewSource.trim(),
+                self.outputPad + THINKING_INDENT,
+                thinkingStyle,
+                config.previewLines,
+              )
+            : new Text(heading, self.outputPad + THINKING_INDENT, 0);
       self.contentContainer.addChild(new Gutter(block, self.outputPad + THINKING_BAR_COLUMN, thinkingBar()));
 
       const hasVisibleContentAfter = message.content
@@ -263,7 +292,33 @@ export default function compactThinking(pi: ExtensionAPI) {
     }, config.animationIntervalMs);
   }
 
-  function finishThinking() {
+  function requestSummary(messageTimestamp: number, contentIndex: number, thinkingText: string) {
+    const ctx = activeCtx;
+    const summaryConfig = loadConfig();
+    if (!ctx || !summaryConfig.summaryEnabled) return;
+    const resolved = summaryConfig.summaryModel
+      ? resolveModel(ctx.modelRegistry.getAvailable(), summaryConfig.summaryModel)
+      : undefined;
+    const model = resolved ?? ctx.model;
+    if (!model) return;
+    const modelRegistry = ctx.modelRegistry;
+    const signal = sessionAbort?.signal ?? new AbortController().signal;
+
+    void (async () => {
+      try {
+        const summary = await summarizeThinking({ thinkingText, model, modelRegistry, signal });
+        if (!summary || signal.aborted) return;
+        storeRunSummary(completedSummaries, messageTimestamp, contentIndex, summary);
+        pi.appendEntry(SUMMARY_ENTRY_TYPE, { messageTimestamp, contentIndex, summary });
+        refreshRenderedComponents();
+      } catch (err) {
+        if (isStaleCtxError(err)) return;
+        logger.debug(`summary request failed: ${String(err).slice(0, 300)}`);
+      }
+    })();
+  }
+
+  function finishThinking(options?: { summarize?: boolean }) {
     if (!activeThinking) return;
     const finished = activeThinking;
     const durationMs = Math.max(1, Date.now() - finished.startedAt);
@@ -278,6 +333,24 @@ export default function compactThinking(pi: ExtensionAPI) {
       contentIndex: finished.contentIndex,
       durationMs,
     });
+
+    if (options?.summarize) {
+      let message: AssistantMessage | undefined;
+      for (const component of streamingComponents) {
+        const lastMessage = (component as unknown as AssistantInternals).lastMessage;
+        if (lastMessage?.timestamp === finished.messageTimestamp) {
+          message = lastMessage;
+          break;
+        }
+      }
+      if (!message && latestComponentTimestamp === finished.messageTimestamp) {
+        message = (latestComponent as unknown as AssistantInternals | undefined)?.lastMessage;
+      }
+      if (message) {
+        const thinkingText = extractThinkingRun(message, finished.contentIndex);
+        if (thinkingText) requestSummary(finished.messageTimestamp, finished.contentIndex, thinkingText);
+      }
+    }
 
     activeThinking = undefined;
     if (animationTimer) clearInterval(animationTimer);
@@ -300,7 +373,7 @@ export default function compactThinking(pi: ExtensionAPI) {
       if (activeThinking?.messageTimestamp === event.message.timestamp) {
         activeThinking.contentIndex = update.contentIndex;
       } else {
-        if (activeThinking) finishThinking();
+        if (activeThinking) finishThinking({ summarize: true });
         startThinking(event.message, update.contentIndex);
       }
     } else if (update.type === "thinking_delta") {
@@ -310,13 +383,13 @@ export default function compactThinking(pi: ExtensionAPI) {
         activeThinking.contentIndex = update.contentIndex;
       }
     } else if (update.type === "text_start" || update.type === "toolcall_start" || update.type === "toolcall_delta") {
-      finishThinking();
+      finishThinking({ summarize: true });
     }
   });
 
-  pi.on("tool_execution_start", finishThinking);
+  pi.on("tool_execution_start", () => finishThinking({ summarize: true }));
   pi.on("message_end", (event) => {
-    if (event.message.role === "assistant") finishThinking();
+    if (event.message.role === "assistant") finishThinking({ summarize: true });
   });
 
   pi.on("session_start", (_event, ctx) => {
@@ -324,7 +397,16 @@ export default function compactThinking(pi: ExtensionAPI) {
     prototype.updateContent = patchedUpdateContent;
     patchInstalled = true;
     restoreDurationEntries(ctx.sessionManager.getBranch(), completedDurations);
+    restoreSummaryEntries(ctx.sessionManager.getBranch(), completedSummaries);
     activeTheme = ctx.ui.theme;
+    activeCtx = ctx;
+    sessionAbort = new AbortController();
+    setCachedModelOptions(
+      ctx.modelRegistry.getAvailable().map((m) => ({
+        label: `${m.provider}/${m.id}`,
+        value: `${m.provider}/${m.id}`,
+      })),
+    );
 
     ctx.ui.setWidget(WIDGET_ID, (tui) => {
       activeTui = tui;
@@ -336,6 +418,7 @@ export default function compactThinking(pi: ExtensionAPI) {
 
   pi.on("session_tree", (_event, ctx) => {
     restoreDurationEntries(ctx.sessionManager.getBranch(), completedDurations);
+    restoreSummaryEntries(ctx.sessionManager.getBranch(), completedSummaries);
     refreshRenderedComponents();
   });
 
@@ -343,11 +426,15 @@ export default function compactThinking(pi: ExtensionAPI) {
     finishThinking();
     if (animationTimer) clearInterval(animationTimer);
     animationTimer = undefined;
+    sessionAbort?.abort();
+    sessionAbort = undefined;
+    activeCtx = undefined;
     activeTui = undefined;
     activeTheme = undefined;
     latestComponent = undefined;
     latestComponentTimestamp = undefined;
     completedDurations.clear();
+    completedSummaries.clear();
     renderedComponents.clear();
     streamingComponents.clear();
     if (ctx.mode === "tui") ctx.ui.setWidget(WIDGET_ID, undefined);

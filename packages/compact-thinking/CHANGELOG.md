@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Optional thinking summaries: when enabled (`Summary Enabled` config item), each finished thinking run is sent to a configurable side model (`Summary Model`, empty = session model) for a one-line summary via `executeSideCall`. The summary replaces the raw thinking preview in the compact block once it arrives; expanding thinking still shows the original content. Summaries are persisted as session entries and restored on session load, mirroring the duration entries.
+
 ### Fixed
 
 - `StrictThinkingPreview.render` re-wrapped the entire thinking text via a fresh `Text` component on every frame for every assistant message, dominating transcript frame time (~5-30ms per message per frame, ~90% of total render cost in a measured session). The rendered lines are now memoized per width and dropped on `invalidate`.
