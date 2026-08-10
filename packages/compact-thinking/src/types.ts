@@ -7,6 +7,7 @@ export interface CompactThinkingConfig {
   animationIntervalMs: number;
   summaryEnabled: boolean;
   summaryModel: string;
+  summaryMinChars: number;
 }
 
 export interface DurationEntryData {

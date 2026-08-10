@@ -10,7 +10,7 @@ import { createLogger, isExtensionDisabled, isStaleCtxError, resolveModel } from
 import { loadConfig, registerCompactThinkingConfigItems, setCachedModelOptions } from "./config.ts";
 import { DURATION_ENTRY_TYPE, restoreDurationEntries } from "./durations.ts";
 import { Gutter } from "./gutter.ts";
-import { formatThoughtDuration, StrictThinkingPreview } from "./preview.ts";
+import { formatThoughtDuration, StrictThinkingPreview, SUMMARY_DISPLAY_PREFIX } from "./preview.ts";
 import {
   extractThinkingRun,
   getRunSummary,
@@ -200,7 +200,7 @@ export default function compactThinking(pi: ExtensionAPI) {
         summary !== undefined
           ? new StrictThinkingPreview(
               heading,
-              summary,
+              `${SUMMARY_DISPLAY_PREFIX}${summary}`,
               self.outputPad + THINKING_INDENT,
               thinkingStyle,
               Math.max(config.previewLines, 1),
@@ -296,6 +296,7 @@ export default function compactThinking(pi: ExtensionAPI) {
     const ctx = activeCtx;
     const summaryConfig = loadConfig();
     if (!ctx || !summaryConfig.summaryEnabled) return;
+    if (thinkingText.length < summaryConfig.summaryMinChars) return;
     const resolved = summaryConfig.summaryModel
       ? resolveModel(ctx.modelRegistry.getAvailable(), summaryConfig.summaryModel)
       : undefined;

@@ -5,6 +5,7 @@
 ### Added
 
 - Optional thinking summaries: when enabled (`Summary Enabled` config item), each finished thinking run is sent to a configurable side model (`Summary Model`, empty = session model) for a one-line summary via `executeSideCall`. The summary replaces the raw thinking preview in the compact block once it arrives; expanding thinking still shows the original content. Summaries are persisted as session entries and restored on session load, mirroring the duration entries.
+- Summary display is prefixed with `✦ Summary:` so summarized blocks are clearly distinguishable from raw thinking previews, and only runs longer than `Summary Min Chars` (default 2000) are summarized.
 
 ### Fixed
 
@@ -12,6 +13,7 @@
 
 ### Changed
 
+- The compact thinking block now leaves a blank line between the heading (`Thought for Xs`) and the preview/summary lines below it; the gutter bar stays continuous across the blank line.
 - The "... (N more lines, key to expand)" truncation hint now renders on the same line as the heading (e.g. `Thought for 8s ... (7 more lines, ctrl+t to expand)`) instead of taking its own line.
 
 ### Added

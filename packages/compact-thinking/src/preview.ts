@@ -1,5 +1,7 @@
 import { type Component, getKeybindings, Text } from "@earendil-works/pi-tui";
 
+export const SUMMARY_DISPLAY_PREFIX = "✦ Summary: ";
+
 export function formatThoughtDuration(durationMs: number): string {
   if (durationMs < 1_000) {
     return `${Math.max(1, Math.round(durationMs))}ms`;
@@ -48,7 +50,8 @@ export class StrictThinkingPreview implements Component {
     }
 
     const heading = new Text(this.heading + (hint ? this.style(hint) : ""), this.padding, 0).render(width);
-    const result = [...heading, ...lines.slice(-this.previewLines)];
+    const separator = " ".repeat(this.padding);
+    const result = [...heading, separator, ...lines.slice(-this.previewLines)];
     this.cachedWidth = width;
     this.cachedLines = result;
     return result;

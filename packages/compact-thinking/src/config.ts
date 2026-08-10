@@ -8,6 +8,7 @@ export const DEFAULT_CONFIG: CompactThinkingConfig = {
   animationIntervalMs: 90,
   summaryEnabled: false,
   summaryModel: "",
+  summaryMinChars: 2000,
 };
 
 export const CONFIG_SCHEMA: ExtensionConfigSchema<CompactThinkingConfig> = {
@@ -57,6 +58,17 @@ export function registerCompactThinkingConfigItems(): void {
         "After a thinking run finishes, send it to a side model for a one-line summary that replaces the compact preview.",
       extensionLabel: "Compact Thinking",
       order: 20,
+    },
+    {
+      key: "summaryMinChars",
+      type: "number",
+      label: "Summary Min Chars",
+      value: () => loadConfig().summaryMinChars,
+      min: 0,
+      max: 200000,
+      description: "Only summarize thinking runs longer than this many characters. Shorter runs keep the raw preview.",
+      extensionLabel: "Compact Thinking",
+      order: 25,
     },
     {
       key: "summaryModel",

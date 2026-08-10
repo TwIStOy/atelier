@@ -40,4 +40,12 @@ describe("StrictThinkingPreview render cache", () => {
     expect(second).not.toBe(first);
     expect([...second]).toEqual([...first]);
   });
+
+  it("separates the heading from the preview with a padded blank line", () => {
+    const preview = makePreview();
+    const rendered = preview.render(80);
+    expect(rendered[0]).toContain("Thought for 3s");
+    expect(rendered[1]).toBe("   ");
+    expect(rendered[2]).toContain("line4");
+  });
 });
