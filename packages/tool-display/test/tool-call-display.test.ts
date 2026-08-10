@@ -43,7 +43,8 @@ describe("renderToolCall collapsed error reason", () => {
     expect(joined).toContain("Edit");
     expect(joined).toContain("src/foo.ts");
     expect(joined).toContain("Read the file before editing");
-    expect(joined).not.toContain("diff");
+    expect(joined).toContain("diff");
+    expect(joined.indexOf("Read the file before editing")).toBeLessThan(joined.indexOf("diff"));
   });
 
   it("shows block reason for write when collapsed and errored", () => {

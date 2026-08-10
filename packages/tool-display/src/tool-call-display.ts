@@ -263,19 +263,22 @@ export function renderToolCall(
 
       if (erroredReason) {
         const reason = out.replace(/\n+/g, " ").trim();
-        const innerWidth = Math.max(1, width - INDENT.length - 2);
+        const innerWidth = Math.max(1, width - 2);
         if (opts.expanded) {
           const icon = theme.fg("error", " ");
           const cont = " ".repeat(visibleWidth(icon));
           const wrapped = wrapTextWithAnsi(reason, innerWidth);
           wrapped.forEach((wl, i) => {
             const prefix = i === 0 ? icon : cont;
-            lines.push(INDENT + prefix + theme.fg("muted", truncateToWidth(wl, innerWidth, "\u2026")));
+            lines.push(prefix + theme.fg("muted", truncateToWidth(wl, innerWidth, "\u2026")));
           });
         } else {
-          lines.push(
-            INDENT + theme.fg("error", " ") + theme.fg("muted", truncateToWidth(reason, innerWidth, "\u2026")),
-          );
+          lines.push(theme.fg("error", " ") + theme.fg("muted", truncateToWidth(reason, innerWidth, "\u2026")));
+          if (adapter) {
+            lines.push(
+              ...adapter.formatCollapsedContent(opts.args, out, theme, width, opts.details, opts.isPartial, spinAt),
+            );
+          }
         }
       } else if (useAdapter) {
         const contentLines = opts.expanded
