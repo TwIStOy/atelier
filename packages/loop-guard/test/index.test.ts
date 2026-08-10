@@ -31,6 +31,7 @@ function mockPi() {
       sent.push({ message, options });
       return Promise.resolve();
     },
+    registerMessageRenderer() {},
   };
   return { pi: pi as unknown as ExtensionAPI, onHandlers, sent };
 }

@@ -13,6 +13,7 @@ import { buildStreamRecovery, buildThinkingRecovery } from "./recovery.ts";
 import { detectRepeatingSuffix } from "./stream-loop.ts";
 import { type ThinkingLoopDetection, ThinkingLoopDetector } from "./thinking-loop.ts";
 import { type ToolLoopDetection, ToolLoopDetector } from "./tool-loop.ts";
+import { RECOVERY_MESSAGE_TYPE, registerRecoveryRenderer } from "./ui.ts";
 
 type StreamKind = "thinking" | "output";
 
@@ -74,6 +75,7 @@ function notifySafely(ctx: ExtensionContext, message: string): void {
 export default function (pi: ExtensionAPI) {
   if (isExtensionDisabled(CONFIG_ID)) return;
   registerConfig();
+  registerRecoveryRenderer(pi);
 
   const toolDetector = new ToolLoopDetector();
   const thinkingDetector = new ThinkingLoopDetector();
@@ -182,7 +184,7 @@ export default function (pi: ExtensionAPI) {
       ) {
         pi.sendMessage(
           {
-            customType: "loop-guard:recovery",
+            customType: RECOVERY_MESSAGE_TYPE,
             content: buildStreamRecovery(pending.stream, consecutiveThinkingDetections),
             display: true,
           },
@@ -220,7 +222,7 @@ export default function (pi: ExtensionAPI) {
     ) {
       pi.sendMessage(
         {
-          customType: "loop-guard:recovery",
+          customType: RECOVERY_MESSAGE_TYPE,
           content: buildThinkingRecovery(detection, consecutiveThinkingDetections),
           display: true,
         },

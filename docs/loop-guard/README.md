@@ -35,6 +35,8 @@ Reasoning paragraphs (blank-line separated, whitespace-normalized, at least `thi
 | Streaming loop | Stream aborted via `ctx.abort()`. On `message_end` the repeated section is truncated to a single copy with a `[loop-guard: ... truncated]` label (so the model does not re-read its own loop), a stream-specific recovery message (`THINKING LOOP DETECTED` / `OUTPUT LOOP DETECTED`) is injected through the same escalation/cap path as thinking loops, plus a notification. |
 | Thinking loop | **Recovery-message injection** plus a warning notification. Pi cannot block an already-finalized message, so instead loop-guard injects a recovery message (`customType: "loop-guard:recovery"`, visible in the transcript) with `triggerTurn: true` — the model gets explicit "you are looping" feedback and course-corrects in a new turn. Consecutive detections escalate the wording (`LOOP PERSISTS (Nx)` → tell the user and ask how to proceed). To prevent a runaway, injections stop after `thinkingMaxInjections` consecutive detections until a clean response resets the counter. Injection is skipped when the response still has pending tool calls (the tool-call guard owns that path). |
 
+In the transcript, recovery messages render as a rounded, warning-colored box titled `loop-guard` (via `registerMessageRenderer`), sized to fit the content; the `[loop-guard]` prefix is display-only stripped. The model-facing content is unchanged.
+
 Blocked calls never execute, so they are not recorded in the detection history (pi does not fire `tool_result` for blocked calls).
 
 ## Configuration
@@ -70,6 +72,7 @@ src/
   thinking-loop.ts  ThinkingLoopDetector — pure, paragraph hashing
   stream-loop.ts    detectRepeatingSuffix — Z-array verbatim tail repetition detector
   recovery.ts       thinking/stream recovery message wording (escalation-aware)
+  ui.ts             transcript renderer for loop-guard:recovery (warning-bordered box)
   config.ts         LoopGuardConfig, defaults, ConfigItem registration
   index.ts          wiring: session_start/turn_start reset, tool_call block, tool_result record, message_update stream abort, message_end thinking scan + sanitize + recovery injection
 ```
