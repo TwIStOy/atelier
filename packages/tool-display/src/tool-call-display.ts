@@ -272,13 +272,11 @@ export function renderToolCall(
             const prefix = i === 0 ? icon : cont;
             lines.push(prefix + theme.fg("muted", truncateToWidth(wl, innerWidth, "\u2026")));
           });
-        } else {
-          lines.push(theme.fg("error", " ") + theme.fg("muted", truncateToWidth(reason, innerWidth, "\u2026")));
           if (adapter) {
-            lines.push(
-              ...adapter.formatCollapsedContent(opts.args, out, theme, width, opts.details, opts.isPartial, spinAt),
-            );
+            lines.push(...adapter.formatExpandedContent(opts.args, out, theme, width, opts.details));
           }
+        } else {
+          lines.push(theme.fg("muted", truncateToWidth(`└ ${reason}`, width, "\u2026")));
         }
       } else if (useAdapter) {
         const contentLines = opts.expanded

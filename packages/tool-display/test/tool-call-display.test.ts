@@ -42,9 +42,9 @@ describe("renderToolCall collapsed error reason", () => {
     const joined = lines.join("\n");
     expect(joined).toContain("Edit");
     expect(joined).toContain("src/foo.ts");
+    expect(joined).toContain("└");
     expect(joined).toContain("Read the file before editing");
-    expect(joined).toContain("diff");
-    expect(joined.indexOf("Read the file before editing")).toBeLessThan(joined.indexOf("diff"));
+    expect(joined).not.toContain("diff");
   });
 
   it("shows block reason for write when collapsed and errored", () => {
@@ -78,7 +78,7 @@ describe("renderToolCall collapsed error reason", () => {
     expect(joined).not.toContain("Read the file before editing");
   });
 
-  it("shows the reason when errored and expanded (no diff)", () => {
+  it("shows the reason when errored and expanded", () => {
     globalToolDisplayRegistry.register("edit", editAdapter);
     const lines = renderToolCall(
       {
