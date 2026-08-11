@@ -51,6 +51,7 @@ export default function compactThinking(pi: ExtensionAPI) {
   let animationTimer: ReturnType<typeof setInterval> | undefined;
   let animationFrame = 0;
   let patchInstalled = false;
+  let tuiSession = false;
 
   function refreshRenderedComponents() {
     if (activeTui) {
@@ -274,6 +275,8 @@ export default function compactThinking(pi: ExtensionAPI) {
     streamingComponents.clear();
     animationFrame = 0;
 
+    if (!tuiSession) return;
+
     if (latestComponent && latestComponentTimestamp === message.timestamp) {
       streamingComponents.add(latestComponent);
       const self = latestComponent as unknown as AssistantInternals;
@@ -395,6 +398,7 @@ export default function compactThinking(pi: ExtensionAPI) {
 
   pi.on("session_start", (_event, ctx) => {
     if (ctx.mode !== "tui") return;
+    tuiSession = true;
     prototype.updateContent = patchedUpdateContent;
     patchInstalled = true;
     restoreDurationEntries(ctx.sessionManager.getBranch(), completedDurations);
@@ -425,6 +429,7 @@ export default function compactThinking(pi: ExtensionAPI) {
 
   pi.on("session_shutdown", (_event, ctx) => {
     finishThinking();
+    tuiSession = false;
     if (animationTimer) clearInterval(animationTimer);
     animationTimer = undefined;
     sessionAbort?.abort();

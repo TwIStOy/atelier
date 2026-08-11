@@ -9,6 +9,7 @@
 
 ### Fixed
 
+- The thinking animation `setInterval` no longer starts in non-TUI modes (print/json), where it previously spun headlessly for the whole session doing no-op work. Component refresh and the render loop are now gated on the session being a TUI session; duration entry recording still runs in all modes.
 - `StrictThinkingPreview.render` re-wrapped the entire thinking text via a fresh `Text` component on every frame for every assistant message, dominating transcript frame time (~5-30ms per message per frame, ~90% of total render cost in a measured session). The rendered lines are now memoized per width and dropped on `invalidate`.
 
 ### Changed
