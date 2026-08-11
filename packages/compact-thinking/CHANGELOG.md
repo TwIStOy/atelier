@@ -6,6 +6,7 @@
 
 - Optional thinking summaries: when enabled (`Summary Enabled` config item), each finished thinking run is sent to a configurable side model (`Summary Model`, empty = session model) for a one-line summary via `executeSideCall`. The summary replaces the raw thinking preview in the compact block once it arrives; expanding thinking still shows the original content. Summaries are persisted as session entries and restored on session load, mirroring the duration entries.
 - Summary display is prefixed with `✦ Summary:` so summarized blocks are clearly distinguishable from raw thinking previews, and only runs longer than `Summary Min Chars` (default 2000) are summarized.
+- While a summary side-call is in flight, the finished thinking block's heading shows an animated `[ Summarizing... ]` indicator (e.g. `Thought for 9s [ Summarizing... ]`); the animation timer now stays alive until all pending summaries settle.
 
 ### Fixed
 

@@ -39,8 +39,10 @@ export default function compactThinking(pi: ExtensionAPI) {
 
   const completedDurations = new Map<number, Map<number, number>>();
   const completedSummaries = new Map<number, Map<number, string>>();
+  const pendingSummaries = new Map<number, Set<number>>();
   const renderedComponents = new Set<AssistantMessageComponent>();
   const streamingComponents = new Set<AssistantMessageComponent>();
+  const summarizingComponents = new Set<AssistantMessageComponent>();
   let activeThinking: ActiveThinking | undefined;
   let activeTheme: Theme | undefined;
   let activeTui: TUI | undefined;
@@ -101,6 +103,15 @@ export default function compactThinking(pi: ExtensionAPI) {
       if (duration !== undefined) return duration;
     }
     return undefined;
+  }
+
+  function isRunSummarizing(messageTimestamp: number, startIndex: number, endIndex: number) {
+    const pending = pendingSummaries.get(messageTimestamp);
+    if (!pending) return false;
+    for (let index = endIndex; index >= startIndex; index--) {
+      if (pending.has(index)) return true;
+    }
+    return false;
   }
 
   function isActiveRun(message: AssistantMessage, startIndex: number, endIndex: number) {
@@ -192,6 +203,9 @@ export default function compactThinking(pi: ExtensionAPI) {
         heading = thinkingStyle(
           durationText ? `Thought for ${durationText}` : self.hiddenThinkingLabel || "Thinking...",
         );
+        if (isRunSummarizing(message.timestamp, runStartIndex, runEndIndex)) {
+          heading += thinkingStyle(" [ ") + animatedText("Summarizing...", thinkingStyle, true) + thinkingStyle(" ]");
+        }
       }
       const previewSource = thinkingBlocks.join("\n\n");
       const summary = active
@@ -284,15 +298,66 @@ export default function compactThinking(pi: ExtensionAPI) {
       activeTui?.requestRender();
     }
 
+    ensureAnimationTimer();
+  }
+
+  function tickAnimation() {
+    animationFrame++;
+    for (const component of streamingComponents) {
+      const self = component as unknown as AssistantInternals;
+      if (self.lastMessage) self.updateContent(self.lastMessage);
+    }
+    for (const component of summarizingComponents) {
+      if (streamingComponents.has(component)) continue;
+      const self = component as unknown as AssistantInternals;
+      if (self.lastMessage) self.updateContent(self.lastMessage);
+    }
+    activeTui?.requestRender();
+  }
+
+  function ensureAnimationTimer() {
+    if (!tuiSession || animationTimer) return;
+    animationTimer = setInterval(tickAnimation, config.animationIntervalMs);
+  }
+
+  function maybeStopAnimationTimer() {
+    if (activeThinking || pendingSummaries.size > 0) return;
     if (animationTimer) clearInterval(animationTimer);
-    animationTimer = setInterval(() => {
-      animationFrame++;
-      for (const component of streamingComponents) {
-        const self = component as unknown as AssistantInternals;
-        if (self.lastMessage) self.updateContent(self.lastMessage);
-      }
-      activeTui?.requestRender();
-    }, config.animationIntervalMs);
+    animationTimer = undefined;
+  }
+
+  function markRunSummarizing(messageTimestamp: number, contentIndex: number) {
+    let pending = pendingSummaries.get(messageTimestamp);
+    if (!pending) {
+      pending = new Set();
+      pendingSummaries.set(messageTimestamp, pending);
+    }
+    pending.add(contentIndex);
+    for (const component of renderedComponents) {
+      const self = component as unknown as AssistantInternals;
+      if (self.lastMessage?.timestamp !== messageTimestamp) continue;
+      summarizingComponents.add(component);
+      self.updateContent(self.lastMessage);
+    }
+    ensureAnimationTimer();
+    activeTui?.requestRender();
+  }
+
+  function unmarkRunSummarizing(messageTimestamp: number, contentIndex: number) {
+    const pending = pendingSummaries.get(messageTimestamp);
+    if (pending) {
+      pending.delete(contentIndex);
+      if (pending.size === 0) pendingSummaries.delete(messageTimestamp);
+    }
+    if (pendingSummaries.has(messageTimestamp)) return;
+    for (const component of [...summarizingComponents]) {
+      const self = component as unknown as AssistantInternals;
+      if (self.lastMessage?.timestamp !== messageTimestamp) continue;
+      summarizingComponents.delete(component);
+      self.updateContent(self.lastMessage);
+    }
+    maybeStopAnimationTimer();
+    activeTui?.requestRender();
   }
 
   function requestSummary(messageTimestamp: number, contentIndex: number, thinkingText: string) {
@@ -308,16 +373,20 @@ export default function compactThinking(pi: ExtensionAPI) {
     const modelRegistry = ctx.modelRegistry;
     const signal = sessionAbort?.signal ?? new AbortController().signal;
 
+    markRunSummarizing(messageTimestamp, contentIndex);
     void (async () => {
       try {
         const summary = await summarizeThinking({ thinkingText, model, modelRegistry, signal });
         if (!summary || signal.aborted) return;
         storeRunSummary(completedSummaries, messageTimestamp, contentIndex, summary);
         pi.appendEntry(SUMMARY_ENTRY_TYPE, { messageTimestamp, contentIndex, summary });
-        refreshRenderedComponents();
       } catch (err) {
-        if (isStaleCtxError(err)) return;
-        logger.debug(`summary request failed: ${String(err).slice(0, 300)}`);
+        if (!isStaleCtxError(err)) {
+          logger.debug(`summary request failed: ${String(err).slice(0, 300)}`);
+        }
+      } finally {
+        unmarkRunSummarizing(messageTimestamp, contentIndex);
+        refreshRenderedComponents();
       }
     })();
   }
@@ -357,8 +426,7 @@ export default function compactThinking(pi: ExtensionAPI) {
     }
 
     activeThinking = undefined;
-    if (animationTimer) clearInterval(animationTimer);
-    animationTimer = undefined;
+    maybeStopAnimationTimer();
 
     const components = [...streamingComponents];
     streamingComponents.clear();
@@ -441,8 +509,10 @@ export default function compactThinking(pi: ExtensionAPI) {
     latestComponentTimestamp = undefined;
     completedDurations.clear();
     completedSummaries.clear();
+    pendingSummaries.clear();
     renderedComponents.clear();
     streamingComponents.clear();
+    summarizingComponents.clear();
     if (ctx.mode === "tui") ctx.ui.setWidget(WIDGET_ID, undefined);
 
     if (patchInstalled) {
