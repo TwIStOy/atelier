@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-12
+
 ### Fixed
 
 - `/commit` now runs all git operations at the repository root (`git rev-parse --show-toplevel`) instead of pi's cwd — previously, running pi from a subdirectory made grouped mode fail with `fatal: pathspec ... did not match any files`, because diff paths are repo-root-relative while `git add`/`git reset` resolved them against the subdirectory.

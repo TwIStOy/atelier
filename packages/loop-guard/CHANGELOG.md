@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-12
+
 ### Added
 
 - Initial `loop-guard` extension. Detects LLM "doom loops" and circular reasoning, then interrupts them with feedback. Pure detector cores (`ToolLoopDetector`, `ThinkingLoopDetector`) wired to pi events in `src/index.ts`.

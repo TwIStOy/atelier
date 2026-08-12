@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-12
+
 ### Breaking Changes
 
 - `wiki_capture` is no longer registered in the main session. Capture now happens only through the `/wiki-capture` slash command, which spawns an isolated child session that registers `wiki_capture` alone — so the capture tool (and the source text it pulls in) never occupies the main conversation's context. Code or skills that called the `wiki_capture` tool directly from the main session must switch to `/wiki-capture`.

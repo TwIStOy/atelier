@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-12
+
 ### Changed
 
 - `kimi-k3` now uses the `anthropic-messages` API (against the gateway root base URL) with `headers: { "User-Agent": "KimiCLI/1.5" }` and `compat: { allowEmptySignature: true, forceAdaptiveThinking: true }`, mirroring pi's built-in `kimi-coding` provider. Its `thinkingLevelMap` now enables `low`/`high`/`max` to match the built-in `k3` model.

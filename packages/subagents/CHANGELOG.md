@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-12
+
 ### Changed
 
 - Shipped personas moved from `packages/subagents/src/agents/` to the monorepo root `agents/` (registered via the root `package.json` `pi.agents`). Discovery is unchanged because `@htwang-contrib/common`'s catalog now includes that shared directory by default; `src/agent-catalog.ts` no longer injects a package-local shipped dir, and this package's `pi.agents` manifest entry was removed.

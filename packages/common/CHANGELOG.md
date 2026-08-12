@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-12
+
 ### Changed
 
 - The shipped persona directory moved out of `subagents` to the **monorepo root** `agents/` (explore / general-purpose / plan / scout). `buildAgentPersonaCatalog` now always prepends that shared directory to the first discovery layer (resolved relative to the module via `sharedPersonasDir()`, exported), so every caller — subagents, the `workflow` tool, or any future extension — gets the shipped personas for any cwd without injecting `shippedDirs`. The `shippedDirs` option still appends extra caller-specific directories after it.

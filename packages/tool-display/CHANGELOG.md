@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-12
+
 ### Changed
 
 - Multi-line tool call headers now prefix continuation lines with a tree gutter `│` instead of plain indentation, visually connecting the header to the collapsed `└ N lines` footer. This covers multi-line `Bash` commands, wrapped `Todo` subjects, and wrapped generic tool args (the generic header no longer adds its own extra indent on continuation lines).
