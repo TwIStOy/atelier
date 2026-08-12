@@ -1,36 +1,53 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { isExtensionDisabled } from "@htwang-contrib/common";
-import { checkBashCommand } from "./bash-check.ts";
-
-const PROTECTED_PREFIX = "/run/agenix";
+import { checkBashCommand, DEFAULT_PROTECTED_PATHS } from "./bash-check.ts";
+import { loadProjectConfig } from "./config.ts";
 
 const READ_LIKE_TOOLS = new Set(["read", "glob", "grep"]);
 
-function isProtectedPath(p: string): boolean {
+function matchProtectedPath(p: string, protectedPaths: readonly string[]): string | null {
   const resolved = p.startsWith("/") ? p : `/${p}`;
-  return resolved === PROTECTED_PREFIX || resolved.startsWith(`${PROTECTED_PREFIX}/`);
+  for (const prefix of protectedPaths) {
+    if (resolved === prefix || resolved.startsWith(`${prefix}/`)) return prefix;
+  }
+  return null;
 }
 
-function checkPath(input: Record<string, unknown>): string | null {
-  if (typeof input.filePath === "string" && isProtectedPath(input.filePath)) {
-    return input.filePath;
-  }
-  if (typeof input.path === "string" && isProtectedPath(input.path)) {
-    return input.path;
+function checkPath(
+  input: Record<string, unknown>,
+  protectedPaths: readonly string[],
+): { path: string; matched: string } | null {
+  for (const key of ["filePath", "path"]) {
+    const value = input[key];
+    if (typeof value === "string") {
+      const matched = matchProtectedPath(value, protectedPaths);
+      if (matched) return { path: value, matched };
+    }
   }
   return null;
 }
 
 export default function (pi: ExtensionAPI) {
   if (isExtensionDisabled("protect-secrets")) return;
+
+  pi.on("session_start", (_event, ctx) => {
+    const { issues } = loadProjectConfig(ctx.cwd);
+    for (const issue of issues) {
+      ctx.ui.notify(issue, "warning");
+    }
+  });
+
   pi.on("tool_call", async (event, ctx) => {
+    const { paths } = loadProjectConfig(ctx.cwd);
+    const protectedPaths = paths.length > 0 ? [...DEFAULT_PROTECTED_PATHS, ...paths] : DEFAULT_PROTECTED_PATHS;
+
     if (READ_LIKE_TOOLS.has(event.toolName)) {
-      const matched = checkPath(event.input as Record<string, unknown>);
-      if (matched) {
-        ctx.ui.notify(`Blocked: ${event.toolName} targeting protected path ${matched}`, "warning");
+      const hit = checkPath(event.input as Record<string, unknown>, protectedPaths);
+      if (hit) {
+        ctx.ui.notify(`Blocked: ${event.toolName} targeting protected path ${hit.matched}`, "warning");
         return {
           block: true,
-          reason: `Access denied: path "${matched}" is under protected directory "${PROTECTED_PREFIX}". Secrets managed by agenix must not be read.`,
+          reason: `Access denied: "${hit.path}" is under "${hit.matched}", which is a protected secrets location. Its contents are secrets and must not be read.`,
         };
       }
     }
@@ -38,12 +55,12 @@ export default function (pi: ExtensionAPI) {
     if (event.toolName === "bash") {
       const command = (event.input as Record<string, unknown>).command;
       if (typeof command !== "string") return;
-      const reason = checkBashCommand(command);
+      const reason = checkBashCommand(command, protectedPaths);
       if (reason) {
         ctx.ui.notify(`Blocked: bash command accesses protected path`, "warning");
         return {
           block: true,
-          reason: `Access denied: ${reason}. Secrets managed by agenix must not be exposed to stdout.`,
+          reason: `Access denied: ${reason}. The command touches a protected secrets location; secrets must not be exposed to stdout.`,
         };
       }
     }

@@ -43,3 +43,22 @@ describe("checkBashCommand", () => {
     expect(checkBashCommand(cmd)).toBeNull();
   });
 });
+
+describe("checkBashCommand with extra protected paths", () => {
+  const paths = ["/run/agenix", "/srv/vault"];
+
+  test.each(["cat /srv/vault/key", "echo $(cat /srv/vault/key)", "cat /srv/vault/key | grep x", "cat /run/agenix/foo"])(
+    "BLOCK: %s",
+    (cmd) => {
+      expect(checkBashCommand(cmd, paths)).not.toBeNull();
+    },
+  );
+
+  test.each(["cat /srv/other/key", "ls /srv/vault/", "cp /srv/vault/key /tmp/k"])("ALLOW: %s", (cmd) => {
+    expect(checkBashCommand(cmd, paths)).toBeNull();
+  });
+
+  test("default paths do not cover extra paths", () => {
+    expect(checkBashCommand("cat /srv/vault/key")).toBeNull();
+  });
+});
