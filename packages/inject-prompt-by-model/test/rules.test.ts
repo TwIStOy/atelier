@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { MODEL_PROMPT_RULES, type ModelPromptRule, modelTarget, resolveModelPrompt } from "../src/rules.ts";
+import { type ModelPromptRule, modelTarget, resolveModelPrompts } from "../src/resolve.ts";
+import { MODEL_PROMPT_RULES } from "../src/rules/index.ts";
 
 describe("modelTarget", () => {
   it("joins provider and id with a slash", () => {
@@ -7,26 +8,28 @@ describe("modelTarget", () => {
   });
 });
 
-describe("resolveModelPrompt", () => {
+describe("resolveModelPrompts", () => {
   const rules: ModelPromptRule[] = [
     { name: "glm", pattern: /^zai\/glm-/, prompt: "GLM prompt" },
     { name: "zai-any", pattern: /^zai\//, prompt: "ZAI prompt" },
   ];
 
-  it("returns the first matching rule when several match", () => {
-    expect(resolveModelPrompt("zai/glm-4.7", rules)?.name).toBe("glm");
+  it("returns all matching rules in registration order", () => {
+    expect(resolveModelPrompts("zai/glm-4.7", rules).map((rule) => rule.name)).toEqual(["glm", "zai-any"]);
   });
 
-  it("falls through to a later rule when earlier ones miss", () => {
-    expect(resolveModelPrompt("zai/coding-plan", rules)?.name).toBe("zai-any");
+  it("returns only the matching subset", () => {
+    expect(resolveModelPrompts("zai/coding-plan", rules).map((rule) => rule.name)).toEqual(["zai-any"]);
   });
 
-  it("returns null when nothing matches", () => {
-    expect(resolveModelPrompt("openai/gpt-5", rules)).toBeNull();
+  it("returns an empty list when nothing matches", () => {
+    expect(resolveModelPrompts("openai/gpt-5", rules)).toEqual([]);
   });
 
-  it("returns null for the empty built-in rule list", () => {
-    expect(MODEL_PROMPT_RULES).toEqual([]);
-    expect(resolveModelPrompt("zai/glm-4.7")).toBeNull();
+  it("matches kimi-k3 models with the built-in rule list", () => {
+    expect(MODEL_PROMPT_RULES.map((rule) => rule.name)).toEqual(["kimi-k3"]);
+    const matched = resolveModelPrompts("moonshot/kimi-k3");
+    expect(matched.map((rule) => rule.name)).toEqual(["kimi-k3"]);
+    expect(matched[0]?.prompt).toContain("edit");
   });
 });
