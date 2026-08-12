@@ -40,7 +40,8 @@
       "packages/htw-producer",
       "packages/agents-mirror",
       "packages/workflow",
-      "packages/heap-probe"
+      "packages/heap-probe",
+      "packages/inject-prompt-by-model"
     ],
     "skills": [
       "skills/code-philosophy",
