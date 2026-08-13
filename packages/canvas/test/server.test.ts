@@ -70,7 +70,24 @@ describe("CanvasServer", () => {
     const body = await (await fetch(`${base}/p/styled`)).text();
     expect(body).toContain('id="pi-canvas-base"');
     expect(body).toContain("--canvas-bg");
+    expect(body).toContain("--canvas-series-1");
+    expect(body).toContain(".card{");
+    expect(body).toContain(".pill-danger{");
     expect(body.indexOf('id="pi-canvas-base"')).toBeLessThan(body.indexOf('id="mine"'));
+  });
+
+  it("serves the vendored chart libraries", async () => {
+    const echarts = await fetch(`${base}/lib/echarts.min.js`);
+    expect(echarts.status).toBe(200);
+    expect(echarts.headers.get("content-type")).toContain("text/javascript");
+    expect((await echarts.text()).length).toBeGreaterThan(100_000);
+
+    const wrapper = await fetch(`${base}/lib/canvas.js`);
+    expect(wrapper.status).toBe(200);
+    expect(await wrapper.text()).toContain("window.PiCanvas");
+
+    expect((await fetch(`${base}/lib/nope.js`)).status).toBe(404);
+    expect((await fetch(`${base}/lib/../secret`)).status).toBe(404);
   });
 
   it("prepends the base style when the page has no <head>", async () => {

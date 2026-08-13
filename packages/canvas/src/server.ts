@@ -1,6 +1,8 @@
-import { type FSWatcher, mkdirSync, watch } from "node:fs";
+import { type FSWatcher, mkdirSync, readFileSync, watch } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { networkInterfaces } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { type CanvasPage, type PageStore, pageNameFromFile } from "./store.ts";
 
 export interface CanvasServerOptions {
@@ -12,6 +14,9 @@ export interface CanvasServerOptions {
 
 export const SSE_PATH = "/__canvas/events";
 
+const LIB_DIR = fileURLToPath(new URL("./lib", import.meta.url));
+const LIB_FILES = new Set(["echarts.min.js", "canvas.js"]);
+
 const HEARTBEAT_MS = 25_000;
 const WATCH_DEBOUNCE_MS = 120;
 
@@ -22,6 +27,16 @@ const BASE_STYLE = `<style id="pi-canvas-base">:root{
 --canvas-muted:#8a8f99;
 --canvas-accent:#7aa2f7;
 --canvas-border:#2a2e37;
+--canvas-success:#9ece6a;
+--canvas-warning:#e0af68;
+--canvas-danger:#f7768e;
+--canvas-info:#7aa2f7;
+--canvas-series-1:#7aa2f7;
+--canvas-series-2:#4fd6be;
+--canvas-series-3:#bb9af7;
+--canvas-series-4:#ff9e64;
+--canvas-series-5:#9ece6a;
+--canvas-series-6:#f7768e;
 }
 *,*::before,*::after{box-sizing:border-box}
 body{margin:0;padding:2rem 1.5rem;background:var(--canvas-bg);color:var(--canvas-fg);font-family:ui-sans-serif,system-ui,sans-serif;line-height:1.5;font-size:15px}
@@ -36,6 +51,23 @@ code{font-family:ui-monospace,monospace;background:var(--canvas-surface);padding
 pre{font-family:ui-monospace,monospace;background:var(--canvas-surface);padding:.8rem 1rem;border-radius:6px;overflow-x:auto}
 pre code{background:none;padding:0}
 hr{border:none;border-top:1px solid var(--canvas-border);margin:1.5rem 0}
+.grid{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));margin:1rem 0}
+.card{background:var(--canvas-surface);border:1px solid var(--canvas-border);border-radius:8px;padding:1rem 1.25rem}
+.card-title{margin:0 0 .5rem;font-size:.85rem;font-weight:600;color:var(--canvas-muted)}
+.stat{display:flex;flex-direction:column;gap:.15rem}
+.stat-value{font-size:1.5rem;font-weight:600;color:var(--canvas-fg)}
+.stat-label{font-size:.8rem;color:var(--canvas-muted)}
+.pill{display:inline-block;padding:.05rem .55rem;border-radius:999px;font-size:.75rem;border:1px solid var(--canvas-border);color:var(--canvas-muted)}
+.pill-success{color:var(--canvas-success);border-color:var(--canvas-success)}
+.pill-warning{color:var(--canvas-warning);border-color:var(--canvas-warning)}
+.pill-danger{color:var(--canvas-danger);border-color:var(--canvas-danger)}
+.pill-info{color:var(--canvas-info);border-color:var(--canvas-info)}
+.callout{margin:1rem 0;padding:.55rem .9rem;background:var(--canvas-surface);border-left:2px solid var(--canvas-border)}
+.callout-success{border-left-color:var(--canvas-success)}
+.callout-warning{border-left-color:var(--canvas-warning)}
+.callout-danger{border-left-color:var(--canvas-danger)}
+.callout-info{border-left-color:var(--canvas-info)}
+.chart{width:100%}
 </style>`;
 
 function liveReloadSnippet(pageName: string | null): string {
@@ -227,6 +259,10 @@ export class CanvasServer {
       this.sendHtml(res, injectBaseStyle(renderIndex(this.options.store.list())));
       return;
     }
+    if (url.pathname.startsWith("/lib/")) {
+      this.serveLib(url.pathname.slice("/lib/".length), res);
+      return;
+    }
     const match = /^\/p\/([a-zA-Z0-9][a-zA-Z0-9_-]{0,63})$/.exec(url.pathname);
     if (match) {
       const page = this.options.store.get(match[1]);
@@ -250,6 +286,24 @@ export class CanvasServer {
     res.on("close", () => {
       this.clients.delete(res);
     });
+  }
+
+  private serveLib(filename: string, res: ServerResponse): void {
+    let content: string | undefined;
+    if (LIB_FILES.has(filename)) {
+      try {
+        content = readFileSync(join(LIB_DIR, filename), "utf8");
+      } catch {
+        content = undefined;
+      }
+    }
+    if (content === undefined) {
+      res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
+      res.end("not found");
+      return;
+    }
+    res.writeHead(200, { "content-type": "text/javascript; charset=utf-8", "cache-control": "no-cache" });
+    res.end(content);
   }
 
   private sendHtml(res: ServerResponse, html: string): void {

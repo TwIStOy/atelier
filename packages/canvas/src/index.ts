@@ -2,7 +2,8 @@ import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, MessageRenderer } from "@earendil-works/pi-coding-agent";
+import { Text } from "@earendil-works/pi-tui";
 import {
   type ExtensionConfigSchema,
   isExtensionDisabled,
@@ -14,6 +15,7 @@ import { CanvasServer, externalIPv4Addresses } from "./server.ts";
 import { isValidPageName, PageStore } from "./store.ts";
 
 const CONFIG_ID = "canvas";
+const GUIDANCE_MESSAGE_TYPE = "canvas:guidance";
 
 interface CanvasConfig {
   port: number;
@@ -69,6 +71,14 @@ type ToolError = { content: [{ type: "text"; text: string }]; details: { error: 
 export default function (pi: ExtensionAPI): void {
   if (isExtensionDisabled(CONFIG_ID)) return;
   registerConfig();
+
+  const guidanceRenderer: MessageRenderer = (_message, _options, theme) =>
+    new Text(
+      theme.fg("dim", "Canvas guidance loaded — design rules and publishing conventions are now in context."),
+      0,
+      0,
+    );
+  pi.registerMessageRenderer(GUIDANCE_MESSAGE_TYPE, guidanceRenderer);
 
   let store: PageStore | null = null;
   let server: CanvasServer | null = null;
@@ -194,7 +204,10 @@ export default function (pi: ExtensionAPI): void {
     // attached to the next user prompt (no turn triggered).
     try {
       const guidance = readFileSync(fileURLToPath(new URL("./guidance.md", import.meta.url)), "utf8");
-      pi.sendMessage({ customType: "canvas:guidance", content: guidance, display: false }, { deliverAs: "nextTurn" });
+      pi.sendMessage(
+        { customType: GUIDANCE_MESSAGE_TYPE, content: guidance, display: true },
+        { deliverAs: "nextTurn" },
+      );
     } catch {
       // guidance missing or unreadable: tools still work without it
     }

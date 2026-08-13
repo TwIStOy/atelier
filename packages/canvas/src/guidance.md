@@ -25,10 +25,67 @@ If you catch yourself about to write a large markdown table, stop and consider a
 
 ## Authoring rules
 
-- **Self-contained HTML.** Embed all data inline — no `fetch()`, no network calls from the page. Inline CSS/JS. CDN links (Chart.js, ECharts, D3, Tailwind) are allowed but require internet on the viewing device; for simple charts prefer hand-built inline SVG.
+- **Self-contained HTML.** Embed all data inline — no `fetch()`, no network calls from the page. Inline CSS/JS. Charts must use the built-in `PiCanvas` library (below) — do not pull chart libraries from a CDN. CDN links for anything else are allowed but require internet on the viewing device, so prefer the built-ins.
 - **One page per artifact.** One `canvas_publish` call carries the full document. Republish the same `name` to update it in place (browsers auto-reload). Never split one artifact across multiple pages.
 - **Never render empty states.** A canvas exists to show real content. If a section has no data, omit it — no placeholders, "No data" messages, zeroed rows, or empty chart frames. If the whole page would be empty, don't publish; ask the user for the missing data.
-- **Label every plot.** Charts and tables must be self-describing: a title naming the specific metric, axis labels with units, a legend when more than one series is shown, and a small caption with source and time range (e.g. "Source: Datadog · last 7 days"). If a value is transformed (mean, p95, smoothed), say so in the label.
+- **Label every plot.** Always pass `title`, `xLabel`/`yLabel` (with units), and `source` (e.g. "Datadog · last 7 days") to `PiCanvas` calls. `xLabel`/`yLabel` name the **visual** horizontal/vertical axes — for `horizontal` bar charts the wrapper maps them automatically (`xLabel` goes to the value axis on top, `yLabel` to the category axis). Legends appear automatically for multi-series charts. If a value is transformed (mean, p95, smoothed), say so in the title or source.
+
+## Charts (`PiCanvas`)
+
+The server vendors ECharts and a thin themed wrapper. Load both in `<head>`:
+
+```html
+<script src="/lib/echarts.min.js"></script>
+<script src="/lib/canvas.js"></script>
+```
+
+Then call with a container (`<div class="chart"></div>` or any element; height defaults to 320px, override via `height`):
+
+```js
+PiCanvas.lineChart("#latency", {
+  categories: ["Mon", "Tue", "Wed"],
+  series: [{ name: "p95", data: [120, 98, 143] }, { name: "p50", data: [40, 35, 52], tone: "success" }],
+  title: "API latency by day",
+  yLabel: "Latency (ms)",
+  xLabel: "Date",
+  source: "Datadog · last 3 days",
+  fill: true,                    // soft area tint under lines
+  referenceLines: [{ value: 200, label: "SLO", tone: "danger" }],
+});
+
+PiCanvas.barChart("#errors", {
+  categories: [...],
+  series: [{ name: "5xx", data: [...] }],
+  stacked: true,                 // or horizontal: true, or normalized: true (100% stack)
+  valueSuffix: " ms",            // valuePrefix: "$" also available
+  showValues: true,              // print values on bars/points
+  yMin: 0, yMax: 500,            // or beginAtZero: false to auto-fit
+});
+
+PiCanvas.pieChart("#share", {
+  data: [{ label: "us-east", value: 62 }, { label: "eu-west", value: 38, tone: "warning" }],
+  donut: true,                   // hollow center shows the total
+  title: "Traffic share by region",
+});
+```
+
+- `tone` is `"success" | "danger" | "warning" | "info" | "neutral"`. Omit it to auto-assign from the series palette; set it only when the value carries semantic meaning that should match tonal elements elsewhere on the page.
+- Colors, gridlines, tooltips, and typography come from the page's CSS variables — never pass ECharts options directly or hardcode colors.
+
+## Layout component classes
+
+Use these instead of hand-rolling containers (they map to the design tokens):
+
+| Class | Purpose |
+| --- | --- |
+| `.grid` | Responsive auto-fit grid of columns; wrap cards/stats in it |
+| `.card` + `.card-title` | Bordered surface panel |
+| `.stat`, `.stat-value`, `.stat-label` | Big-number metric block |
+| `.pill`, `.pill-success/warning/danger/info` | Inline status/tag chip |
+| `.callout`, `.callout-success/warning/danger/info` | Highlighted note block |
+| `.chart` | Full-width chart container |
+
+Mix open sections (bare `h2` + content) with `.card` panels — do not wrap every section in a card.
 
 ## Design language
 
@@ -42,6 +99,8 @@ The server injects a base stylesheet into every page exposing these CSS variable
 | `--canvas-muted` | Secondary text, captions |
 | `--canvas-accent` | Links, highlights, primary series color |
 | `--canvas-border` | Structural borders |
+| `--canvas-success/warning/danger/info` | Semantic tones (match `tone` in `PiCanvas`) |
+| `--canvas-series-1` … `--canvas-series-6` | Categorical chart palette |
 
 Use `var(--canvas-*)` for all colors — no hardcoded hex. The base stylesheet also styles `body`, headings, `table`, `code`, `pre`, `hr`; your page's own `<style>` comes after it and can override. Flat, minimal, purposeful.
 
