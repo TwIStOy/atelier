@@ -82,9 +82,18 @@ describe("CanvasServer", () => {
     expect(echarts.headers.get("content-type")).toContain("text/javascript");
     expect((await echarts.text()).length).toBeGreaterThan(100_000);
 
+    const mermaid = await fetch(`${base}/lib/mermaid.min.js`);
+    expect(mermaid.status).toBe(200);
+    expect(mermaid.headers.get("content-type")).toContain("text/javascript");
+    const mermaidBody = await mermaid.text();
+    expect(mermaidBody.length).toBeGreaterThan(100_000);
+    expect(mermaidBody).toContain('globalThis["mermaid"]');
+
     const wrapper = await fetch(`${base}/lib/canvas.js`);
     expect(wrapper.status).toBe(200);
-    expect(await wrapper.text()).toContain("window.PiCanvas");
+    const wrapperBody = await wrapper.text();
+    expect(wrapperBody).toContain("window.PiCanvas");
+    expect(wrapperBody).toContain("async function mermaid");
 
     expect((await fetch(`${base}/lib/nope.js`)).status).toBe(404);
     expect((await fetch(`${base}/lib/../secret`)).status).toBe(404);

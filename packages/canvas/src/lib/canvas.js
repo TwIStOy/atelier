@@ -37,6 +37,12 @@ window.PiCanvas = (() => {
     }
   }
 
+  function assertMermaid() {
+    if (!window.mermaid) {
+      throw new Error('PiCanvas: mermaid not loaded — add <script src="/lib/mermaid.min.js"></script> before /lib/canvas.js');
+    }
+  }
+
   function resolveEl(el) {
     const node = typeof el === "string" ? document.querySelector(el) : el;
     if (!node) throw new Error(`PiCanvas: element not found: ${el}`);
@@ -259,9 +265,72 @@ window.PiCanvas = (() => {
     return chart;
   }
 
+  let mermaidInitialized = false;
+  let mermaidSeq = 0;
+
+  function initMermaid() {
+    if (mermaidInitialized) return;
+    const pal = palette();
+    const cScale = {};
+    pal.series.forEach((color, i) => {
+      cScale[`cScale${i}`] = color;
+    });
+    window.mermaid.initialize({
+      startOnLoad: false,
+      theme: "base",
+      themeVariables: Object.assign(
+        {
+          fontFamily: "inherit",
+          background: "transparent",
+          primaryColor: pal.surface,
+          primaryTextColor: pal.fg,
+          primaryBorderColor: pal.border,
+          secondaryColor: pal.surface,
+          secondaryTextColor: pal.muted,
+          secondaryBorderColor: pal.border,
+          tertiaryColor: pal.surface,
+          tertiaryTextColor: pal.muted,
+          tertiaryBorderColor: pal.border,
+          lineColor: pal.muted,
+          textColor: pal.fg,
+          edgeLabelBackground: pal.surface,
+          clusterBkg: "transparent",
+          clusterBorder: pal.border,
+        },
+        cScale,
+      ),
+    });
+    mermaidInitialized = true;
+  }
+
+  async function mermaid(el, opts) {
+    assertMermaid();
+    const node = resolveEl(el);
+    initMermaid();
+    const text = typeof opts === "string" ? opts : opts.diagram;
+    const id = `pi-canvas-mmd-${mermaidSeq++}`;
+    try {
+      const { svg } = await window.mermaid.render(id, text);
+      node.innerHTML = svg;
+      const svgEl = node.querySelector("svg");
+      if (svgEl) {
+        svgEl.style.maxWidth = "100%";
+        svgEl.style.height = "auto";
+      }
+    } catch (err) {
+      node.innerHTML = "";
+      const msg = document.createElement("div");
+      msg.className = "callout callout-danger";
+      msg.textContent = `Mermaid syntax error: ${String((err && err.message) || err)}`;
+      node.appendChild(msg);
+    }
+    return node;
+  }
+
   return {
     lineChart: (el, opts) => cartesian(el, opts, "line"),
     barChart: (el, opts) => cartesian(el, opts, "bar"),
     pieChart,
+    mermaid,
   };
 })();

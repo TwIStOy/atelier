@@ -72,6 +72,34 @@ PiCanvas.pieChart("#share", {
 - `tone` is `"success" | "danger" | "warning" | "info" | "neutral"`. Omit it to auto-assign from the series palette; set it only when the value carries semantic meaning that should match tonal elements elsewhere on the page.
 - Colors, gridlines, tooltips, and typography come from the page's CSS variables — never pass ECharts options directly or hardcode colors.
 
+## Diagrams (`PiCanvas.mermaid`)
+
+For flowcharts, sequence diagrams, state machines, ER diagrams, gantt charts, and other structural/relational diagrams, use Mermaid. Load Mermaid **only on pages that contain diagrams** (it is a large library):
+
+```html
+<script src="/lib/mermaid.min.js"></script>
+<script src="/lib/canvas.js"></script>
+```
+
+Then render into a container:
+
+```js
+PiCanvas.mermaid("#flow", {
+  diagram: `flowchart TD
+    A[Request] --> B{Auth?}
+    B -- yes --> C[Handler]
+    B -- no --> D[401]
+    C --> E[(DB)]
+    E --> F[Response]`,
+});
+```
+
+- The wrapper maps the page's CSS variables onto Mermaid's theme (node fill, borders, edges, text) — **never hardcode colors** in diagram definitions; let the theme drive them.
+- Use plain-text node labels. Mermaid runs at the default (strict) security level, so HTML/script inside labels is sanitized.
+- `PiCanvas.mermaid` accepts either `{ diagram: "..." }` or a bare diagram string. It is async (returns a `Promise`); call it fire-and-forget from the page script — no need to `await`.
+- On a syntax error the container shows a `.callout-danger` block with the message instead of breaking the page; fix the diagram source and republish.
+- Keep diagrams legible: prefer `flowchart TD`/`LR`, give nodes short labels, and split very wide graphs into subgraphs or multiple diagrams.
+
 ## Layout component classes
 
 Use these instead of hand-rolling containers (they map to the design tokens):

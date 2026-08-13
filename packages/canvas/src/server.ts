@@ -15,7 +15,7 @@ export interface CanvasServerOptions {
 export const SSE_PATH = "/__canvas/events";
 
 const LIB_DIR = fileURLToPath(new URL("./lib", import.meta.url));
-const LIB_FILES = new Set(["echarts.min.js", "canvas.js"]);
+const LIB_FILES = new Set(["echarts.min.js", "mermaid.min.js", "canvas.js"]);
 
 const HEARTBEAT_MS = 25_000;
 
