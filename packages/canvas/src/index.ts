@@ -11,6 +11,7 @@ import {
   registerConfigItems,
 } from "@htwang-contrib/common";
 import { Type } from "@sinclair/typebox";
+import { canvasPublishAdapter } from "./display.ts";
 import { CanvasServer, externalIPv4Addresses } from "./server.ts";
 import { isValidPageName, PageStore } from "./store.ts";
 
@@ -107,6 +108,11 @@ export default function (pi: ExtensionAPI): void {
   function activateCanvas(): void {
     if (activated) return;
     activated = true;
+
+    pi.events.emit("tool-display:register", {
+      toolName: "canvas_publish",
+      adapter: canvasPublishAdapter,
+    });
 
     pi.registerTool({
       name: "canvas_publish",
