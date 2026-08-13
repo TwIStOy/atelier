@@ -1,9 +1,9 @@
-import { type FSWatcher, mkdirSync, readFileSync, watch } from "node:fs";
+import { readFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { networkInterfaces } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { type CanvasPage, type PageStore, pageNameFromFile } from "./store.ts";
+import type { CanvasPage, PageStore } from "./store.ts";
 
 export interface CanvasServerOptions {
   store: PageStore;
@@ -18,7 +18,6 @@ const LIB_DIR = fileURLToPath(new URL("./lib", import.meta.url));
 const LIB_FILES = new Set(["echarts.min.js", "canvas.js"]);
 
 const HEARTBEAT_MS = 25_000;
-const WATCH_DEBOUNCE_MS = 120;
 
 const BASE_STYLE = `<style id="pi-canvas-base">:root{
 --canvas-bg:#14161a;
@@ -139,8 +138,6 @@ export class CanvasServer {
   private server: Server | null = null;
   private readonly clients = new Set<ServerResponse>();
   private heartbeat: NodeJS.Timeout | null = null;
-  private watcher: FSWatcher | null = null;
-  private readonly pendingWatchTimers = new Map<string, NodeJS.Timeout>();
   private actualPort = 0;
 
   constructor(private readonly options: CanvasServerOptions) {}
@@ -163,7 +160,6 @@ export class CanvasServer {
         this.actualPort = await this.listen(this.options.preferredPort + i, host);
         this.heartbeat = setInterval(() => this.broadcastRaw(": hb\n\n"), HEARTBEAT_MS);
         this.heartbeat.unref();
-        this.startWatcher();
         return this.actualPort;
       } catch (err) {
         lastError = err;
@@ -178,14 +174,6 @@ export class CanvasServer {
       clearInterval(this.heartbeat);
       this.heartbeat = null;
     }
-    if (this.watcher) {
-      this.watcher.close();
-      this.watcher = null;
-    }
-    for (const timer of this.pendingWatchTimers.values()) {
-      clearTimeout(timer);
-    }
-    this.pendingWatchTimers.clear();
     for (const client of this.clients) {
       client.end();
     }
@@ -206,34 +194,6 @@ export class CanvasServer {
     for (const client of this.clients) {
       client.write(payload);
     }
-  }
-
-  private startWatcher(): void {
-    const dir = this.options.store.dir;
-    try {
-      mkdirSync(dir, { recursive: true });
-      this.watcher = watch(dir, (_event, filename) => {
-        if (!filename) return;
-        const name = pageNameFromFile(filename.toString());
-        if (!name || this.options.store.recentlyWritten(name)) return;
-        this.scheduleDiskNotify(name);
-      });
-    } catch {
-      this.watcher = null;
-    }
-  }
-
-  private scheduleDiskNotify(name: string): void {
-    const existing = this.pendingWatchTimers.get(name);
-    if (existing) clearTimeout(existing);
-    this.pendingWatchTimers.set(
-      name,
-      setTimeout(() => {
-        this.pendingWatchTimers.delete(name);
-        if (this.options.store.recentlyWritten(name)) return;
-        this.notifyChanged(name);
-      }, WATCH_DEBOUNCE_MS),
-    );
   }
 
   private listen(port: number, host: string): Promise<number> {

@@ -29,11 +29,9 @@ export function pageNameFromFile(filename: string): string | null {
   return isValidPageName(name) ? name : null;
 }
 
-// Disk is the source of truth (no in-memory page cache): multiple pi sessions
-// share the directory, so reads rescan to stay consistent across processes.
+// Disk is the source of truth (no in-memory page cache): reads rescan on every
+// call so the HTTP server always serves the latest on-disk state.
 export class PageStore {
-  private readonly writtenAt = new Map<string, number>();
-
   constructor(readonly dir: string) {}
 
   get(name: string): CanvasPage | undefined {
@@ -65,7 +63,6 @@ export class PageStore {
     const tmp = `${target}.${process.pid}.${Date.now()}.tmp`;
     writeFileSync(tmp, html, "utf8");
     renameSync(tmp, target);
-    this.writtenAt.set(name, Date.now());
     return { name, html, updatedAt: Date.now() };
   }
 
@@ -80,12 +77,6 @@ export class PageStore {
     } catch {
       return false;
     }
-    this.writtenAt.set(name, Date.now());
     return existed;
-  }
-
-  recentlyWritten(name: string, withinMs = 1000): boolean {
-    const at = this.writtenAt.get(name);
-    return at !== undefined && Date.now() - at < withinMs;
   }
 }

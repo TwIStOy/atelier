@@ -89,14 +89,4 @@ describe("PageStore", () => {
     const store = new PageStore(join(dir, "missing"));
     expect(store.list()).toHaveLength(0);
   });
-
-  it("tracks recent writes for watcher suppression", async () => {
-    const store = new PageStore(dir);
-    store.upsert("dash", "<html>x</html>");
-    expect(store.recentlyWritten("dash")).toBe(true);
-    expect(store.recentlyWritten("other")).toBe(false);
-    expect(store.recentlyWritten("dash", 0)).toBe(false);
-    await new Promise((r) => setTimeout(r, 10));
-    expect(store.recentlyWritten("dash", 5)).toBe(false);
-  });
 });

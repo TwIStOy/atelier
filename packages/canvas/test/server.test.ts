@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -124,30 +124,6 @@ describe("CanvasServer", () => {
     await sse.close();
     expect(received).toContain("event: changed");
     expect(received).toContain('"name":"dash"');
-  });
-
-  it("broadcasts pages written by other sessions via fs.watch", async () => {
-    const res = await fetch(`${base}${SSE_PATH}`);
-    const sse = sseReader(res);
-    await sse.readUntil(": connected", 2000);
-
-    writeFileSync(join(dir, "other.html"), "<html>from another session</html>");
-
-    const received = await sse.readUntil("event: changed", 3000);
-    await sse.close();
-    expect(received).toContain('"name":"other"');
-  });
-
-  it("does not broadcast the server's own writes through the watcher", async () => {
-    const res = await fetch(`${base}${SSE_PATH}`);
-    const sse = sseReader(res);
-    await sse.readUntil(": connected", 2000);
-
-    store.upsert("own", "<html>own write</html>");
-
-    const received = await sse.readUntil("event: changed", 500);
-    await sse.close();
-    expect(received).not.toContain("event: changed");
   });
 
   it("restarts after stop", async () => {

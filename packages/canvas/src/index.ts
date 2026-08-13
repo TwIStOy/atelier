@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { ExtensionAPI, MessageRenderer } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext, MessageRenderer } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 import {
   type ExtensionConfigSchema,
@@ -52,7 +52,8 @@ function registerConfig(): void {
       type: "string",
       label: "Pages Directory",
       value: () => loadConfig().pagesDir,
-      description: "Directory where published pages are persisted and shared across sessions.",
+      description:
+        "Base directory for published pages. Each pi session writes to its own subdirectory (keyed by session id) so canvases never collide across sessions.",
       extensionLabel: "Canvas",
       order: 10,
     },
@@ -84,9 +85,10 @@ export default function (pi: ExtensionAPI): void {
   let server: CanvasServer | null = null;
   let activated = false;
 
-  async function ensureRunning(): Promise<{ store: PageStore; server: CanvasServer }> {
+  async function ensureRunning(ctx: ExtensionContext): Promise<{ store: PageStore; server: CanvasServer }> {
     if (!store) {
-      store = new PageStore(loadConfig().pagesDir);
+      const sessionId = ctx.sessionManager.getSessionId();
+      store = new PageStore(join(loadConfig().pagesDir, sessionId));
     }
     if (!server) {
       server = new CanvasServer({ store, preferredPort: loadConfig().port });
@@ -120,7 +122,7 @@ export default function (pi: ExtensionAPI): void {
         }),
         html: Type.String({ description: "Full HTML document for the page." }),
       }),
-      async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
+      async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
         if (!isValidPageName(params.name)) {
           return {
             content: [{ type: "text", text: `Invalid page name "${params.name}". ${NAME_RULES}.` }],
@@ -129,7 +131,7 @@ export default function (pi: ExtensionAPI): void {
         }
         let running: { store: PageStore; server: CanvasServer };
         try {
-          running = await ensureRunning();
+          running = await ensureRunning(ctx);
         } catch (err) {
           return startError(err);
         }
@@ -177,10 +179,10 @@ export default function (pi: ExtensionAPI): void {
       label: "Canvas List",
       description: "List pages published on the canvas server, with URLs.",
       parameters: Type.Object({}),
-      async execute(_toolCallId, _params, _signal, _onUpdate, _ctx) {
+      async execute(_toolCallId, _params, _signal, _onUpdate, ctx) {
         let running: { store: PageStore; server: CanvasServer };
         try {
-          running = await ensureRunning();
+          running = await ensureRunning(ctx);
         } catch (err) {
           return startError(err);
         }
@@ -220,7 +222,7 @@ export default function (pi: ExtensionAPI): void {
     handler: async (args, ctx) => {
       activateCanvas();
       try {
-        const running = await ensureRunning();
+        const running = await ensureRunning(ctx);
         const count = running.store.list().length;
         const urls = pageUrls(running.server.port, "/");
         ctx.ui.notify(
