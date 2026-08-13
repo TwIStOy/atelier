@@ -41,7 +41,8 @@
       "packages/agents-mirror",
       "packages/workflow",
       "packages/heap-probe",
-      "packages/inject-prompt-by-model"
+      "packages/inject-prompt-by-model",
+      "packages/canvas"
     ],
     "skills": [
       "skills/code-philosophy",
