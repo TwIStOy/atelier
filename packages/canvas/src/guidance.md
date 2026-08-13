@@ -97,6 +97,7 @@ PiCanvas.mermaid("#flow", {
 - The wrapper maps the page's CSS variables onto Mermaid's theme (node fill, borders, edges, text) — **never hardcode colors** in diagram definitions; let the theme drive them.
 - Use plain-text node labels. Mermaid runs at the default (strict) security level, so HTML/script inside labels is sanitized.
 - `PiCanvas.mermaid` accepts either `{ diagram: "..." }` or a bare diagram string. It is async (returns a `Promise`); call it fire-and-forget from the page script — no need to `await`.
+- **Sizing**: every diagram renders at a fixed scale, so all diagrams on a page share the same text size — a large graph is never shrunk to fit (that would make its text smaller than a small graph's). A diagram is centered horizontally when it fits its container; a wider one scrolls horizontally instead of scaling. Cap the scroll box with `maxWidth` (pixels): `PiCanvas.mermaid("#f", { diagram: "...", maxWidth: 720 })`. Keep diagrams compact (subgraphs, short labels) so they rarely need to scroll; place small ones in a `.card` so they read as figures.
 - On a syntax error the container shows a `.callout-danger` block with the message instead of breaking the page; fix the diagram source and republish.
 - Keep diagrams legible: prefer `flowchart TD`/`LR`, give nodes short labels, and split very wide graphs into subgraphs or multiple diagrams.
 

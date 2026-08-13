@@ -308,17 +308,30 @@ window.PiCanvas = (() => {
     const node = resolveEl(el);
     initMermaid();
     const text = typeof opts === "string" ? opts : opts.diagram;
+    const maxWidth = opts && typeof opts.maxWidth === "number" ? opts.maxWidth : null;
     const id = `pi-canvas-mmd-${mermaidSeq++}`;
     try {
       const { svg } = await window.mermaid.render(id, text);
       node.innerHTML = svg;
       const svgEl = node.querySelector("svg");
       if (svgEl) {
-        svgEl.style.maxWidth = "100%";
+        // Render at the diagram's natural pixel size so every diagram shares
+        // one font size — no responsive scaling that would shrink larger
+        // diagrams (and their text) to fit the container.
+        const vb = (svgEl.getAttribute("viewBox") || "").split(/[\s,]+/);
+        const natW = Number(vb[2]);
+        svgEl.style.maxWidth = "none";
+        svgEl.style.width = Number.isFinite(natW) ? `${natW}px` : "auto";
         svgEl.style.height = "auto";
+        svgEl.style.display = "block";
+        svgEl.style.margin = "0 auto";
       }
+      node.style.overflowX = "auto";
+      node.style.maxWidth = maxWidth !== null ? `${maxWidth}px` : "";
     } catch (err) {
       node.innerHTML = "";
+      node.style.overflowX = "";
+      node.style.maxWidth = "";
       const msg = document.createElement("div");
       msg.className = "callout callout-danger";
       msg.textContent = `Mermaid syntax error: ${String((err && err.message) || err)}`;
