@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- DeepSeek models (`deepseek-v4-pro`, `deepseek-v4-flash`) now advertise `maxTokens: 65536`. The gateway's `openai-responses` endpoint caps their output at 65536 tokens, so the previous catalog default of 128000 made every request fail with `max_tokens (128000) exceeds model's maximum output tokens (65536)`.
+
 ### Changed
 
 - `glm-5.3` now shares `glm-5.2`'s reasoning-effort family: `compat` with `supportsReasoningEffort: true` and thinkingLevelMap `{ minimal: null, low/medium/high: "high", max: "max" }`. Family constants renamed accordingly (`ZAI_COMPAT_REASONING_EFFORT`, `GLM_REASONING_EFFORT_MAP`, `GLM_REASONING_EFFORT_IDS`).

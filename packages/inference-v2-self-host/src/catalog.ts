@@ -74,6 +74,8 @@ const DEEPSEEK_COMPAT: NonNullable<ProviderModelConfig["compat"]> = {
   thinkingFormat: "deepseek",
 };
 
+const DEEPSEEK_MAX_TOKENS = 65536;
+
 const DEEPSEEK_THINKING_LEVEL_MAP: NonNullable<ProviderModelConfig["thinkingLevelMap"]> = {
   minimal: null,
   low: null,
@@ -159,6 +161,7 @@ function applyFamilyOverrides(config: ProviderModelConfig, api: Api): void {
   if (id.startsWith("deepseek-")) {
     config.compat = DEEPSEEK_COMPAT;
     config.thinkingLevelMap = DEEPSEEK_THINKING_LEVEL_MAP;
+    config.maxTokens = DEEPSEEK_MAX_TOKENS;
     return;
   }
   if (id === "kimi-k3") {
