@@ -52,12 +52,14 @@ const ZAI_COMPAT: NonNullable<ProviderModelConfig["compat"]> = {
   zaiToolStream: true,
 };
 
-const ZAI_COMPAT_52: NonNullable<ProviderModelConfig["compat"]> = {
+const ZAI_COMPAT_REASONING_EFFORT: NonNullable<ProviderModelConfig["compat"]> = {
   ...ZAI_COMPAT,
   supportsReasoningEffort: true,
 };
 
-const GLM_52_THINKING_LEVEL_MAP: NonNullable<ProviderModelConfig["thinkingLevelMap"]> = {
+const GLM_REASONING_EFFORT_IDS = new Set(["glm-5.2", "glm-5.3"]);
+
+const GLM_REASONING_EFFORT_MAP: NonNullable<ProviderModelConfig["thinkingLevelMap"]> = {
   minimal: null,
   low: "high",
   medium: "high",
@@ -145,9 +147,9 @@ function pickApi(entry: GatewayModelObject): Api {
 
 function applyFamilyOverrides(config: ProviderModelConfig, api: Api): void {
   const id = config.id;
-  if (id === "glm-5.2") {
-    config.compat = ZAI_COMPAT_52;
-    config.thinkingLevelMap = GLM_52_THINKING_LEVEL_MAP;
+  if (GLM_REASONING_EFFORT_IDS.has(id)) {
+    config.compat = ZAI_COMPAT_REASONING_EFFORT;
+    config.thinkingLevelMap = GLM_REASONING_EFFORT_MAP;
     return;
   }
   if (id.startsWith("glm-")) {

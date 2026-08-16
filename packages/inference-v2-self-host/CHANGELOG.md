@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- `glm-5.3` now shares `glm-5.2`'s reasoning-effort family: `compat` with `supportsReasoningEffort: true` and thinkingLevelMap `{ minimal: null, low/medium/high: "high", max: "max" }`. Family constants renamed accordingly (`ZAI_COMPAT_REASONING_EFFORT`, `GLM_REASONING_EFFORT_MAP`, `GLM_REASONING_EFFORT_IDS`).
+
 ## [0.5.0] - 2026-08-12
 
 ### Changed
