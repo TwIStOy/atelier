@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- `kimi-k3` now sets `deferredToolsMode: "kimi"` so Pi Dynamic Tool Loading uses Moonshot's native system-message tool injection. Official Kimi docs support this only on `kimi-k3`; it stays off the shared `moonshotCompat` used by k2.5/k2.6.
+
 ## [0.4.0] - 2026-07-31
 
 ### Changed

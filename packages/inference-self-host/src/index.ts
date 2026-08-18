@@ -49,6 +49,7 @@ const moonshotCompat = {
 const kimiK3Compat = {
   ...moonshotCompat,
   requiresReasoningContentOnAssistantMessages: true,
+  deferredToolsMode: "kimi" as const,
 };
 
 const kimiK3ThinkingLevelMap = {
