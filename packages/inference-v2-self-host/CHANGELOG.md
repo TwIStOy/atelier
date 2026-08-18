@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- `/refresh-inference-v2` force-refreshes the gateway catalog and writes `models-store.json`, bypassing the 4h freshness window. `pi update --models` does not load this extension, so it cannot refresh this provider.
+
 ### Fixed
 
 - DeepSeek models (`deepseek-v4-pro`, `deepseek-v4-flash`) now advertise `maxTokens: 65536`. The gateway's `openai-responses` endpoint caps their output at 65536 tokens, so the previous catalog default of 128000 made every request fail with `max_tokens (128000) exceeds model's maximum output tokens (65536)`.

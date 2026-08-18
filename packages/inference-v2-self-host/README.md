@@ -20,6 +20,10 @@ Every request to this provider carries an `x-lite-session-id` header whose value
 
 The header is injected via pi's `before_provider_headers` hook and scoped to `ctx.model.provider === "inference-v2-self-host"`, so it is never sent to other providers. It applies to both `openai-completions` and `anthropic-messages` models served by the gateway.
 
+## Commands
+
+- `/refresh-inference-v2` — force-refresh the gateway catalog now (bypasses the 4h window) and persist it to `~/.pi/agent/models-store.json`. Use this instead of `pi update --models`; that command does not load extensions, so it never calls this provider's `refreshModels`.
+
 ## Model Catalog (dynamic)
 
 Starts with an empty `models: []` baseline and is populated by the new `refreshModels` provider API:
@@ -27,6 +31,7 @@ Starts with an empty `models: []` baseline and is populated by the new `refreshM
 1. pi calls `refreshModels(context)` during startup and on `/model` refresh.
 2. The callback (`src/catalog.ts` -> `refreshCatalog`) issues `GET https://inference-v2.twistoy.cn/api/v1/models` with `Authorization: Bearer <key>` and maps each entry to a `ProviderModelConfig`.
 3. The result is persisted through `context.store` (provider-scoped `ModelsStore`) with a 4h freshness interval, so offline startup still sees the last known catalog.
+4. `/refresh-inference-v2` calls `modelRegistry.refresh({ providers: ["inference-v2-self-host"], allowNetwork: true, force: true })` so the same callback runs immediately.
 
 ### Field mapping (from the gateway's `ModelObject`)
 
