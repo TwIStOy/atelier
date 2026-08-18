@@ -1,7 +1,7 @@
 import type { Api, ModelsStoreEntry, RefreshModelsContext } from "@earendil-works/pi-ai";
 import type { ProviderModelConfig } from "@earendil-works/pi-coding-agent";
 
-const ENV_VAR = "INFERENCE_V2_TWISTOY_API_KEY";
+export const ENV_VAR = "INFERENCE_V2_TWISTOY_API_KEY";
 const GATEWAY_V1_BASE_URL = "https://inference-v2.twistoy.cn/api/v1";
 const GATEWAY_ROOT_BASE_URL = "https://inference-v2.twistoy.cn/api";
 const DEFAULT_CONTEXT_WINDOW = 200000;
