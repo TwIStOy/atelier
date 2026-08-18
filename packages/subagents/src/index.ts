@@ -1,5 +1,9 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { isExtensionDisabled } from "@htwang-contrib/common";
+import {
+  isExtensionDisabled,
+  registerSystemPromptContribution,
+  SYSTEM_PROMPT_CONTRIBUTION_PRIORITIES,
+} from "@htwang-contrib/common";
 import { buildSubagentAgentCatalog, subagentsPersonasSystemPromptXml } from "./agent-catalog.ts";
 import { runSubagentsAgentsCommand } from "./agents-inspect.ts";
 import { shouldInjectSubagentsParentSystemPrompt, subagentsFeatureSystemPrompt } from "./feature-system-prompt.ts";
@@ -27,15 +31,15 @@ export default function (pi: ExtensionAPI) {
     },
   });
 
-  pi.on("before_agent_start", (event, ctx) => {
-    if (!shouldInjectSubagentsParentSystemPrompt(ctx)) {
-      return { systemPrompt: event.systemPrompt };
-    }
-    const catalog = buildSubagentAgentCatalog(ctx.cwd);
-    const block = subagentsPersonasSystemPromptXml(catalog);
-    return {
-      systemPrompt: [event.systemPrompt, subagentsFeatureSystemPrompt(), block].join("\n\n"),
-    };
+  registerSystemPromptContribution(pi, {
+    id: "subagents",
+    priority: SYSTEM_PROMPT_CONTRIBUTION_PRIORITIES.subagents,
+    contribute(_event, ctx) {
+      if (!shouldInjectSubagentsParentSystemPrompt(ctx)) return null;
+      const catalog = buildSubagentAgentCatalog(ctx.cwd);
+      const block = subagentsPersonasSystemPromptXml(catalog);
+      return [subagentsFeatureSystemPrompt(), block].join("\n\n");
+    },
   });
 }
 
