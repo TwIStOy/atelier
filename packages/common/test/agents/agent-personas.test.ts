@@ -12,7 +12,7 @@ describe("shared personas layer", () => {
       expect(catalog.agents.has(id)).toBe(true);
     }
     const explore = catalog.agents.get("explore");
-    expect(explore?.fileOptions.model).toBe("inference-v2-self-host/deepseek-v4-flash");
+    expect(explore?.fileOptions.model).toBe("toori/deepseek-v4-flash");
     expect(explore?.sourcePath).toContain(sharedPersonasDir());
   });
 });

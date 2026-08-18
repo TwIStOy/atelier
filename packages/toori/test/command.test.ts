@@ -54,27 +54,27 @@ describe("handleRefreshCommand", () => {
       force: true,
       signal: undefined,
     });
-    expect(notifications).toEqual([{ message: "Refreshed inference-v2 catalog (2): glm-5.2, kimi-k3", type: "info" }]);
+    expect(notifications).toEqual([{ message: "Refreshed toori catalog (2): glm-5.2, kimi-k3", type: "info" }]);
   });
 
   test("reports abort", async () => {
     process.env[ENV_VAR] = "sk-test";
     const { ctx, notifications } = makeCtx({ aborted: true });
     await handleRefreshCommand("", ctx);
-    expect(notifications).toEqual([{ message: "inference-v2 catalog refresh aborted", type: "warning" }]);
+    expect(notifications).toEqual([{ message: "toori catalog refresh aborted", type: "warning" }]);
   });
 
   test("reports provider error", async () => {
     process.env[ENV_VAR] = "sk-test";
     const { ctx, notifications } = makeCtx({ error: new Error("gateway 503") });
     await handleRefreshCommand("", ctx);
-    expect(notifications).toEqual([{ message: "inference-v2 catalog refresh failed: gateway 503", type: "error" }]);
+    expect(notifications).toEqual([{ message: "toori catalog refresh failed: gateway 503", type: "error" }]);
   });
 
   test("warns when the catalog is empty", async () => {
     process.env[ENV_VAR] = "sk-test";
     const { ctx, notifications } = makeCtx({ models: [] });
     await handleRefreshCommand("", ctx);
-    expect(notifications).toEqual([{ message: "inference-v2 catalog refresh returned no models", type: "warning" }]);
+    expect(notifications).toEqual([{ message: "toori catalog refresh returned no models", type: "warning" }]);
   });
 });

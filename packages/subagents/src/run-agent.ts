@@ -3,8 +3,8 @@ import type { ChildAgentProgress, ChildAgentUsageSnapshot, RunChildAgentResult }
 import { runChildAgent } from "@htwang-contrib/common";
 import extraTools from "@htwang-contrib/extra-tools";
 import inferenceSelfHost from "@htwang-contrib/inference-self-host";
-import inferenceV2SelfHost from "@htwang-contrib/inference-v2-self-host";
 import protectSecrets from "@htwang-contrib/protect-secrets";
+import toori from "@htwang-contrib/toori";
 import webTools from "@htwang-contrib/web-tools";
 import { buildSubagentAgentCatalog, type SubagentAgentCatalog } from "./agent-catalog.ts";
 import { registerGitCloneTool } from "./git-clone/index.ts";
@@ -26,7 +26,7 @@ const CHILD_SESSION_EXTENSION_FACTORIES: ExtensionFactory[] = [
   extraTools,
   webTools,
   inferenceSelfHost,
-  inferenceV2SelfHost,
+  toori,
   gitCloneExtension,
 ];
 

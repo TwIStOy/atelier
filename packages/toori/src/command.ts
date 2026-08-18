@@ -1,8 +1,8 @@
 import type { ModelsRefreshOptions, ModelsRefreshResult } from "@earendil-works/pi-ai";
 import { ENV_VAR } from "./catalog.ts";
 
-export const PROVIDER_ID = "inference-v2-self-host";
-export const COMMAND_NAME = "refresh-inference-v2";
+export const PROVIDER_ID = "toori";
+export const COMMAND_NAME = "refresh-toori";
 export { ENV_VAR };
 
 export type RefreshCommandContext = {
@@ -30,13 +30,13 @@ export async function handleRefreshCommand(_args: string, ctx: RefreshCommandCon
   });
 
   if (result.aborted) {
-    ctx.ui.notify("inference-v2 catalog refresh aborted", "warning");
+    ctx.ui.notify("toori catalog refresh aborted", "warning");
     return;
   }
 
   const error = result.errors.get(PROVIDER_ID);
   if (error) {
-    ctx.ui.notify(`inference-v2 catalog refresh failed: ${error.message}`, "error");
+    ctx.ui.notify(`toori catalog refresh failed: ${error.message}`, "error");
     return;
   }
 
@@ -45,8 +45,8 @@ export async function handleRefreshCommand(_args: string, ctx: RefreshCommandCon
     .filter((model) => model.provider === PROVIDER_ID)
     .map((model) => model.id);
   if (ids.length === 0) {
-    ctx.ui.notify("inference-v2 catalog refresh returned no models", "warning");
+    ctx.ui.notify("toori catalog refresh returned no models", "warning");
     return;
   }
-  ctx.ui.notify(`Refreshed inference-v2 catalog (${ids.length}): ${ids.join(", ")}`, "info");
+  ctx.ui.notify(`Refreshed toori catalog (${ids.length}): ${ids.join(", ")}`, "info");
 }

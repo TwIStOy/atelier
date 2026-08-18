@@ -41,9 +41,7 @@ describe("resolveModelPrompts", () => {
   });
 
   it("matches deepseek-v4 flash and pro, not other deepseek ids", () => {
-    expect(resolveModelPrompts("inference-v2-self-host/deepseek-v4-flash").map((rule) => rule.name)).toEqual([
-      "deepseek-v4",
-    ]);
+    expect(resolveModelPrompts("toori/deepseek-v4-flash").map((rule) => rule.name)).toEqual(["deepseek-v4"]);
     expect(resolveModelPrompts("inference-self-host/deepseek-v4-pro").map((rule) => rule.name)).toEqual([
       "deepseek-v4",
     ]);

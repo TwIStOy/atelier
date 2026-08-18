@@ -1,5 +1,5 @@
 {
-  "name": "@htwang-contrib/inference-v2-self-host",
+  "name": "@htwang-contrib/toori",
   "version": "0.5.0",
   "type": "module",
   "main": "src/index.ts",

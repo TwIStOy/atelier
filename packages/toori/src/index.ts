@@ -3,16 +3,16 @@ import { createLogger, isExtensionDisabled } from "@htwang-contrib/common";
 import { refreshCatalog } from "./catalog.ts";
 import { COMMAND_NAME, ENV_VAR, handleRefreshCommand, PROVIDER_ID } from "./command.ts";
 
-const logger = createLogger("inference-v2-self-host");
+const logger = createLogger("toori");
 
 const SESSION_AFFINITY_HEADER = "x-lite-session-id";
 
 export default async function (pi: ExtensionAPI) {
-  if (isExtensionDisabled("inference-v2-self-host")) return;
+  if (isExtensionDisabled("toori")) return;
   logger.info("extension loaded");
   pi.registerProvider(PROVIDER_ID, {
-    name: "Inference V2 (Self Host)",
-    baseUrl: "https://inference-v2.twistoy.cn/api/v1",
+    name: "Toori",
+    baseUrl: "https://toori.twistoy.cn/api/v1",
     apiKey: `$${ENV_VAR}`,
     api: "openai-completions",
     authHeader: true,
@@ -21,7 +21,7 @@ export default async function (pi: ExtensionAPI) {
   });
 
   pi.registerCommand(COMMAND_NAME, {
-    description: "Force-refresh the inference-v2-self-host model catalog",
+    description: "Force-refresh the toori model catalog",
     handler: handleRefreshCommand,
   });
 

@@ -53,7 +53,6 @@ gondolin-sandbox
 herdr
 htw-producer
 inference-self-host
-inference-v2-self-host
 memory
 message-queue
 moshi-hooks-extra
@@ -65,6 +64,7 @@ subagents
 todo
 tool-call-fixer
 tool-display
+toori
 truncate-outputs
 user-input-history
 user-message

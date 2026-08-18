@@ -11,7 +11,7 @@
       "packages/tool-call-fixer",
       "packages/loop-guard",
       "packages/zai-coding-plan",
-      "packages/inference-v2-self-host",
+      "packages/toori",
       "packages/statusline",
       "packages/user-input-history",
       "packages/user-message",

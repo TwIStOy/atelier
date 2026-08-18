@@ -2,9 +2,13 @@
 
 ## [Unreleased]
 
+### Breaking Changes
+
+- Renamed the extension from `inference-v2-self-host` to `toori`: package `@htwang-contrib/toori` (directory `packages/toori`), provider id `toori` (model references become `toori/<id>`), force-refresh command `/refresh-toori`, and gateway base URL `https://toori.twistoy.cn` (`/api/v1` for OpenAI APIs, `/api` for Anthropic). The `INFERENCE_V2_TWISTOY_API_KEY` env var and the `x-lite-session-id` session-affinity header are unchanged.
+
 ### Added
 
-- `/refresh-inference-v2` force-refreshes the gateway catalog and writes `models-store.json`, bypassing the 4h freshness window. `pi update --models` does not load this extension, so it cannot refresh this provider.
+- `/refresh-toori` force-refreshes the gateway catalog and writes `models-store.json`, bypassing the 4h freshness window. `pi update --models` does not load this extension, so it cannot refresh this provider.
 
 ### Fixed
 

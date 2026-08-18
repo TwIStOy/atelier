@@ -4,8 +4,8 @@ import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, formatSize, truncateHead } from "
 import { runChildAgent } from "@htwang-contrib/common";
 import extraTools from "@htwang-contrib/extra-tools";
 import inferenceSelfHost from "@htwang-contrib/inference-self-host";
-import inferenceV2SelfHost from "@htwang-contrib/inference-v2-self-host";
 import protectSecrets from "@htwang-contrib/protect-secrets";
+import toori from "@htwang-contrib/toori";
 import webTools from "@htwang-contrib/web-tools";
 import { Type } from "typebox";
 import { loadWorkflowConfig } from "./config.ts";
@@ -23,13 +23,7 @@ import {
 import { parseWorkflowScript } from "./script.ts";
 import { type SavedWorkflowScope, saveWorkflowScript } from "./script-store.ts";
 
-const WORKFLOW_CHILD_FACTORIES: ExtensionFactory[] = [
-  protectSecrets,
-  extraTools,
-  webTools,
-  inferenceSelfHost,
-  inferenceV2SelfHost,
-];
+const WORKFLOW_CHILD_FACTORIES: ExtensionFactory[] = [protectSecrets, extraTools, webTools, inferenceSelfHost, toori];
 
 export type ExecuteWorkflowOptions = {
   script?: string;
