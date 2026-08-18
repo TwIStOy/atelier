@@ -1,5 +1,9 @@
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
-import { isExtensionDisabled } from "@htwang-contrib/common";
+import {
+  isExtensionDisabled,
+  registerSystemPromptContribution,
+  SYSTEM_PROMPT_CONTRIBUTION_PRIORITIES,
+} from "@htwang-contrib/common";
 import { buildReorganizeMemoryPrompt } from "./commands/reorganize-memory-template.js";
 import { buildSelfImprovePrompt } from "./commands/self-improve-template.js";
 import { buildMemoryStatusReport } from "./memory-status.js";
@@ -92,12 +96,14 @@ export default function initMemory(pi: ExtensionAPI): void {
     setSessionNamespace(getNamespace(ctx));
   });
 
-  pi.on("before_agent_start", async (event, ctx) => {
-    if (!isMemoryEnabled(ctx)) return;
-    sessionCwd = ctx.cwd;
-    setSessionNamespace(getNamespace(ctx));
-
-    const appendix = await generateSystemPrompt();
-    return { systemPrompt: [event.systemPrompt, appendix].join("\n\n") };
+  registerSystemPromptContribution(pi, {
+    id: "memory",
+    priority: SYSTEM_PROMPT_CONTRIBUTION_PRIORITIES.memory,
+    async contribute(_event, ctx) {
+      if (!isMemoryEnabled(ctx)) return null;
+      sessionCwd = ctx.cwd;
+      setSessionNamespace(getNamespace(ctx));
+      return generateSystemPrompt();
+    },
   });
 }

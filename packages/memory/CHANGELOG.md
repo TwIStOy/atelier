@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- System-prompt appendix now registers through `@htwang-contrib/common`'s contribution registry (`priority` 200, see `docs/common/SYSTEM-PROMPT-PRIORITIES.md`) instead of returning `{ systemPrompt }` from `before_agent_start`.
+
 ## [0.4.0] - 2026-07-31
 
 ### Changed
