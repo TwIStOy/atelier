@@ -151,6 +151,21 @@ export { getAvailableSkillNames } from "./skills.ts";
 export type { SpinnerStyle } from "./spinner.ts";
 export { DEFAULT_SPINNER, resolveSpinner, SPINNER_STYLES } from "./spinner.ts";
 export type {
+  KnownSystemPromptContributionId,
+  SystemPromptContributeFn,
+  SystemPromptContribution,
+  SystemPromptContributionMode,
+} from "./system-prompt-contributions.ts";
+export {
+  applySystemPromptContributions,
+  clearSystemPromptContributions,
+  installSystemPromptAssembler,
+  listSystemPromptContributions,
+  registerSystemPromptContribution,
+  SYSTEM_PROMPT_CONTRIBUTION_PRIORITIES,
+  unregisterSystemPromptContribution,
+} from "./system-prompt-contributions.ts";
+export type {
   TelemetryDeltaType,
   TelemetryFormatOptions,
   TelemetryModelRef,
