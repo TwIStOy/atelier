@@ -1,5 +1,10 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { isExtensionDisabled, isStaleCtxError } from "@htwang-contrib/common";
+import {
+  isExtensionDisabled,
+  isStaleCtxError,
+  registerSystemPromptContribution,
+  SYSTEM_PROMPT_CONTRIBUTION_PRIORITIES,
+} from "@htwang-contrib/common";
 import { type ModelLike, modelTarget, resolveModelPrompts } from "./resolve.ts";
 
 export const EXTENSION_ID = "inject-prompt-by-model";
@@ -40,8 +45,11 @@ export default function (pi: ExtensionAPI) {
     applyModel(event.model, ctx);
   });
 
-  pi.on("before_agent_start", (event) => {
-    if (sessionPrompt === null) return;
-    return { systemPrompt: `${event.systemPrompt}\n\n${sessionPrompt}` };
+  registerSystemPromptContribution(pi, {
+    id: EXTENSION_ID,
+    priority: SYSTEM_PROMPT_CONTRIBUTION_PRIORITIES["inject-prompt-by-model"],
+    contribute() {
+      return sessionPrompt;
+    },
   });
 }

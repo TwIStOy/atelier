@@ -2,13 +2,15 @@
 
 Injects extra system-prompt text based on the currently active model.
 
-On every `before_agent_start`, the extension builds a target string
+On `session_start` / `model_select` the extension builds a target string
 `<provider>/<modelId>` from `ctx.model` (e.g. `zai/glm-4.7`) and tests it
 against a hardcoded, ordered rule list under `src/rules/`. **All** rules
-whose regex matches are appended to the system prompt for that turn, joined
-with a blank line, in the exact registration order of `MODEL_PROMPT_RULES` —
-the order is fixed so the injected prefix stays byte-stable across turns
-(prompt-cache friendly). No rule matches → the system prompt is left untouched.
+whose regex matches are cached for the session, joined with a blank line, in
+the exact registration order of `MODEL_PROMPT_RULES` — the order is fixed so
+the injected prefix stays byte-stable across turns (prompt-cache friendly).
+The cached text is registered with the shared system-prompt contribution
+registry (`priority` 300). No rule matches → the callback returns null and
+the system prompt is left untouched.
 
 ## Adding a rule
 
