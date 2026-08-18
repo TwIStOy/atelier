@@ -19,7 +19,7 @@ The same numbers live in `SYSTEM_PROMPT_CONTRIBUTION_PRIORITIES` in `packages/co
 | --- | ---: | --- | --- |
 | `subagents` | 100 | `packages/subagents` | Parent-session feature prompt + persona catalog XML. Skips child subagent sessions. |
 | `memory` | 200 | `packages/memory` | Memory + journal instruction blocks. Skips when memory tools are disabled for the session. |
-| `inject-prompt-by-model` | 300 | `packages/inject-prompt-by-model` | Cached model-specific rules for the current `provider/id`. Skips when no rule matched. |
+| `inject-prompt-by-model` | 300 | `packages/inject-prompt-by-model` | Cached model-specific rules for the current `provider/id` (`prompt` append and/or `replaceFirstLine`). Skips when no rule matched. |
 
 ## Callback contract
 

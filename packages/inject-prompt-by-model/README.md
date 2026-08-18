@@ -8,9 +8,10 @@ against a hardcoded, ordered rule list under `src/rules/`. **All** rules
 whose regex matches are cached for the session, joined with a blank line, in
 the exact registration order of `MODEL_PROMPT_RULES` — the order is fixed so
 the injected prefix stays byte-stable across turns (prompt-cache friendly).
-The cached text is registered with the shared system-prompt contribution
-registry (`priority` 300). No rule matches → the callback returns null and
-the system prompt is left untouched.
+Matched rules are applied through the shared system-prompt contribution
+registry (`priority` 300, `mode: "replace"`). A rule may `prompt` (append) and/or
+`replaceFirstLine` (swap the first line of the current prompt). No rule
+matches → the callback returns null and the system prompt is left untouched.
 
 ## Adding a rule
 
@@ -35,6 +36,6 @@ import { glmRule } from "./glm.ts";
 export const MODEL_PROMPT_RULES: ModelPromptRule[] = [glmRule];
 ```
 
-Rules are evaluated in array order and every match is injected in that same
-fixed order, so register rules in the exact sequence you want them appended. The extension can be disabled entirely via the standard
-`isExtensionDisabled("inject-prompt-by-model")` kill switch.
+Rules are evaluated in array order. Append `prompt`s join in that order;
+if several rules set `replaceFirstLine`, the last match wins. The extension
+can be disabled entirely via `isExtensionDisabled("inject-prompt-by-model")`.
