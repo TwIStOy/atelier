@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-08-19
+
 ### Changed
 
 - Model-specific appendix now registers through `@htwang-contrib/common`'s contribution registry (`priority` 300, `mode: "replace"`, see `docs/common/SYSTEM-PROMPT-PRIORITIES.md`) instead of returning `{ systemPrompt }` from `before_agent_start`. Session-level rule cache (`session_start` / `model_select`) is unchanged. Rules may now set `replaceFirstLine` as well as `prompt`.

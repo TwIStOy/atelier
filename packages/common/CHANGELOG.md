@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-08-19
+
 ### Added
 
 - System-prompt contribution registry (`src/system-prompt-contributions.ts`): extensions register an `id` + `priority` + callback at factory time; optional `mode` is `"append"` (default, join onto the current prompt) or `"replace"` (callback return value becomes the whole current prompt). `installSystemPromptAssembler` (also invoked by `registerSystemPromptContribution`) attaches one idempotent `before_agent_start` handler that applies non-empty callback results in priority order via `applySystemPromptContributions`. Documented ids must use the ledger priorities in `SYSTEM_PROMPT_CONTRIBUTION_PRIORITIES` (see `docs/common/SYSTEM-PROMPT-PRIORITIES.md`). Empty / null / whitespace results skip that turn. A throwing callback is logged and skipped.

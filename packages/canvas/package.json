@@ -1,6 +1,6 @@
 {
   "name": "@htwang-contrib/canvas",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Pi extension. Agent-published HTML pages served over LAN/Tailscale with SSE live reload.",
   "keywords": [
     "pi-package",

@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-08-19
+
 ### Breaking Changes
 
 - Renamed the extension from `inference-v2-self-host` to `toori`: package `@htwang-contrib/toori` (directory `packages/toori`), provider id `toori` (model references become `toori/<id>`), force-refresh command `/refresh-toori`, and gateway base URL `https://toori.twistoy.cn` (`/api/v1` for OpenAI APIs, `/api` for Anthropic). The `INFERENCE_V2_TWISTOY_API_KEY` env var and the `x-lite-session-id` session-affinity header are unchanged.

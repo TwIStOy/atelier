@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-08-19
+
 ### Added
 
 - Project-local config at `<project>/.pi/extensions/protect-secrets/config.json` with a `protectedPaths` array to protect extra paths beyond the built-in `/run/agenix`. Entries may be absolute, `~/`-prefixed, or relative to the project root (the directory containing `.pi`; the config is discovered by walking up from the session cwd). The file is re-read when it changes (mtime/size-cached), and malformed configs surface a warning on session start.

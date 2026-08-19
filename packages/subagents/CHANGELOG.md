@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-08-19
+
 ### Changed
 
 - Parent-session feature prompt + persona catalog now register through `@htwang-contrib/common`'s contribution registry (`priority` 100, see `docs/common/SYSTEM-PROMPT-PRIORITIES.md`) instead of returning `{ systemPrompt }` from `before_agent_start`.

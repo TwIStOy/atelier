@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-08-19
+
 ### Fixed
 
 - Horizontal bar charts: `xLabel`/`yLabel` now follow the visual axes (previously they were bound to category/value axes, so with `horizontal: true` the category-axis name was rendered at the middle of the vertical axis with a fixed 26px gap and overlapped long category labels). The value-axis name renders at the top-right end; the category-axis name at the top end of the vertical axis with a small gap.
