@@ -8,9 +8,9 @@
     "@htwang-contrib/common": "*"
   },
   "devDependencies": {
-    "@earendil-works/pi-ai": "^0.83.0",
+    "@earendil-works/pi-ai": "^0.84.2",
     "@earendil-works/pi-coding-agent": "latest",
-    "@earendil-works/pi-tui": "^0.83.0",
+    "@earendil-works/pi-tui": "^0.84.2",
     "@types/node": "^26.1.2",
     "typescript": "^7.0.2"
   }
