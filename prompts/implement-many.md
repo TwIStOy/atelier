@@ -79,7 +79,7 @@ The pane agents run unattended, so each seed carries a standing contract: commit
 
 ```
 cat > /tmp/pi-impl-many-unattended.md <<'EOF'
-You run unattended in a background tmux pane: nobody can answer an interactive prompt. Every commit and push must be non-interactive — commit with git -c commit.gpgsign=false commit (same for tag.gpgsign if you tag), and push with GIT_SSH_COMMAND set to ssh -o BatchMode=yes so failures fail fast instead of hanging on pinentry or ssh-agent confirmation.
+You run unattended in a background tmux pane: nobody can answer an interactive prompt. Keep every commit and push non-interactive so a failure fails fast instead of hanging; if a command genuinely needs interaction, stop and report.
 
 Landing your work, in order:
 
@@ -123,7 +123,7 @@ Give the user a table:
 
 | Pane | Target | Branch | Worktree |
 
-Plus the tmux target to switch to the window (`<prefix> <win-index>`), and a note that each agent runs `/implement` independently (load → TDD → review → commit → push → PR), then babysits its PR — watching CI, rebasing on conflicts or base-branch moves — until the user merges it; agents never merge themselves. Commits and pushes are unsigned and non-interactive because the panes run unattended.
+Plus the tmux target to switch to the window (`<prefix> <win-index>`), and a note that each agent runs `/implement` independently (load → TDD → review → commit → push → PR), then babysits its PR — watching CI, rebasing on conflicts or base-branch moves — until the user merges it; agents never merge themselves. Commits and pushes are non-interactive because the panes run unattended.
 
 ## Discipline
 

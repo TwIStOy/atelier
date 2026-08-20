@@ -26,7 +26,7 @@ Use `git status`, `git log origin/<branch>..<branch>`, `gh pr view`, `gh pr chec
 
 ## Unattended rules
 
-You may be running unattended in a background tmux pane: nobody can answer an interactive prompt. Make every commit and push non-interactive — commit with `git -c commit.gpgsign=false commit` (same for `tag.gpgsign` if you tag), and push with `GIT_SSH_COMMAND` set to `ssh -o BatchMode=yes` so failures fail fast instead of hanging on pinentry or ssh-agent confirmation. If a human is actively present and an override genuinely blocks you (e.g. a passphrase key with no agent), ask them to run that one command instead.
+You may be running unattended in a background tmux pane: nobody can answer an interactive prompt. Keep every commit and push non-interactive so a failure fails fast instead of hanging. If a human is actively present and a command genuinely blocks on interaction, ask them to run that one command instead.
 
 ## Flow
 
