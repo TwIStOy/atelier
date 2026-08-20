@@ -1,5 +1,5 @@
 ---
-description: Fan out N implement targets into parallel git worktrees — one pi agent per pane in a new tmux window, each seeded with /implement
+description: Fan out N implement targets into parallel git worktrees — one pi agent per pane in a new tmux window, each seeded with /implement plus an unattended contract to push, open a PR, keep it green, and wait for the user to merge
 argument-hint: "<#issue | spec-path | description> ..."
 ---
 
@@ -73,15 +73,29 @@ tmux select-layout -t "$SESSION:$WIN" tiled   # 2 -> side-by-side; 3+ -> grid. U
 
 Panes come back in index order from `tmux list-panes -t "$SESSION:$WIN" -F '#{pane_index}'`, so `pane[i] ↔ target[i]`. Verify each pane's cwd is its own worktree: `tmux list-panes -t "$SESSION:$WIN" -F '#{pane_index}: #{pane_current_path}'`.
 
-### 4. Seed each pane with /implement
+### 4. Seed each pane with /implement + the unattended contract
 
-One bare invocation per pane — the template expands server-side, so do not paste an expanded brief:
+The pane agents run unattended, so each seed carries a standing contract: commit and push, open a PR, keep it green (CI + rebase), and wait for the user to merge — all non-interactively. The template expands server-side, so do not paste an expanded brief, and never pass the contract as extra `/implement` arguments (a second CLI message arg is dropped; trailing prose gets swallowed into the template's `$@`, i.e. its "Work to implement" section). Instead write the contract to a file once and pass its path via `--append-system-prompt`, which reads file contents:
 
 ```
-tmux send-keys -t "$SESSION:$WIN.<pane>" "pi '/implement <target>'" Enter
+cat > /tmp/pi-impl-many-unattended.md <<'EOF'
+You run unattended in a background tmux pane: nobody can answer an interactive prompt. Every commit and push must be non-interactive — commit with git -c commit.gpgsign=false commit (same for tag.gpgsign if you tag), and push with GIT_SSH_COMMAND set to ssh -o BatchMode=yes so failures fail fast instead of hanging on pinentry or ssh-agent confirmation.
+
+Landing your work, in order:
+
+1. When the implementation is done and its checks pass, commit it (stage only files you changed; never git add -A) and push the branch: git push -u origin HEAD.
+2. Open the PR right after the push: gh pr create with explicit --title and --body flags only (never interactive), base branch = the repo default branch your worktree forked from, body referencing the originating issue when there is one. If the PR cannot be opened at all (permissions, not a GitHub repo), report that after the push and stop.
+3. Wait for CI when the repo has checks: gh pr checks --watch --interval 30, one blocking call is fine. If CI fails on your change, fix it, push, and wait again. Rerun a check once if it looks flaky or infrastructural before treating it as a real failure.
+4. Keep the PR mergeable: if it conflicts, or the base branch moved and branch protection now requires an update, fetch the base and git rebase onto it. Resolve conflicts only in files your branch touched — if a conflict lands in files you did not touch, stop and report. Push the rebase with git push --force-with-lease, permitted only for your own PR branch and only after a rebase. CI reruns after the push; go back to step 3.
+5. Never merge, never enable auto-merge, never close or reopen the PR: the human merges. After every base-branch move, re-check CI and mergeability (steps 3-4), handle what changed, and keep waiting.
+6. Poll gh pr view --json state,mergeable every few minutes with a sleep between polls; never busy-loop. Terminal states: MERGED — report and stop. CLOSED without merge — report and stop.
+EOF
+
+# per pane:
+tmux send-keys -t "$SESSION:$WIN.<pane>" "pi --append-system-prompt /tmp/pi-impl-many-unattended.md '/implement <target>'" Enter
 ```
 
-`<target>` is the **original token from section 0** (e.g. `#77`), not the slug. Quote it so the shell passes it as one arg.
+`<target>` is the **original token from section 0** (e.g. `#77`), not the slug. Quote it so the shell passes it as one arg. Do not delete the contract file afterwards — pi reads it at pane startup, and a missing path is appended as literal text instead of file contents.
 
 ### 5. Accept the "Trust project folder?" dialog on every pane
 
@@ -109,11 +123,11 @@ Give the user a table:
 
 | Pane | Target | Branch | Worktree |
 
-Plus the tmux target to switch to the window (`<prefix> <win-index>`), and a note that each agent runs `/implement` independently (load → TDD → review → commit), stopping on its own if it hits a blocker.
+Plus the tmux target to switch to the window (`<prefix> <win-index>`), and a note that each agent runs `/implement` independently (load → TDD → review → commit → push → PR), then babysits its PR — watching CI, rebasing on conflicts or base-branch moves — until the user merges it; agents never merge themselves. Commits and pushes are unsigned and non-interactive because the panes run unattended.
 
 ## Discipline
 
 - One worktree + one branch + one pane per target. Never share a worktree or branch across targets.
 - You set up and verify only; each pane's agent owns its implementation.
-- Branch off the repo default branch. Do not push or open PRs — agents commit to their own branches and stop.
+- Branch off the repo default branch. Each agent commits, pushes, and opens a PR for its own branch; the user merges — agents never merge and never enable auto-merge.
 - If a target is an issue that declares blockers, note it to the user but still proceed; the `/implement` agent will stop and report if it cannot continue.

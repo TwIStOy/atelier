@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- `/implement-many`: pane agents now land their work unattended. After `/implement` they commit unsigned (`commit.gpgsign=false`), push non-interactively (`GIT_SSH_COMMAND` with `ssh -o BatchMode=yes`), open a PR via `gh pr create`, watch CI (`gh pr checks --watch`), rebase onto the base branch on conflicts or required updates (`push --force-with-lease` on their own branch only), and keep the PR green until the user merges it — agents never merge or enable auto-merge. The contract is injected at seed time via `--append-system-prompt <file>`.
+
 ## [0.2.4] - 2026-07-09
 
 ## [0.2.3] - 2026-07-09
