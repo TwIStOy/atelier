@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- `/land` prompt template: land the current branch from any state — resume detection (uncommitted / pushed / PR open), then commit, push, `gh pr create`, watch CI, rebase on conflicts or base-branch moves, and wait (polling, no busy-loop) until the human merges. Reusable in half-finished sessions; agents never merge or enable auto-merge.
+
 ### Changed
 
 - `/implement-many`: pane agents now land their work unattended. After `/implement` they commit unsigned (`commit.gpgsign=false`), push non-interactively (`GIT_SSH_COMMAND` with `ssh -o BatchMode=yes`), open a PR via `gh pr create`, watch CI (`gh pr checks --watch`), rebase onto the base branch on conflicts or required updates (`push --force-with-lease` on their own branch only), and keep the PR green until the user merges it — agents never merge or enable auto-merge. The contract is injected at seed time via `--append-system-prompt <file>`.
