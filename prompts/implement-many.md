@@ -75,11 +75,13 @@ Panes come back in index order from `tmux list-panes -t "$SESSION:$WIN" -F '#{pa
 
 ### 4. Seed each pane with /implement + the unattended contract
 
-The pane agents run unattended, so each seed carries a standing contract: commit and push, open a PR, keep it green (CI + rebase), and wait for the user to merge — all non-interactively. The template expands server-side, so do not paste an expanded brief, and never pass the contract as extra `/implement` arguments (a second CLI message arg is dropped; trailing prose gets swallowed into the template's `$@`, i.e. its "Work to implement" section). Instead write the contract to a file once and pass its path via `--append-system-prompt`, which reads file contents:
+The pane agents run unattended, so each seed carries a standing contract: decide open questions from the issue instead of asking, commit and push, open a PR, keep it green (CI + rebase), and wait for the user to merge — all non-interactively. The template expands server-side, so do not paste an expanded brief, and never pass the contract as extra `/implement` arguments (a second CLI message arg is dropped; trailing prose gets swallowed into the template's `$@`, i.e. its "Work to implement" section). Instead write the contract to a file once and pass its path via `--append-system-prompt`, which reads file contents:
 
 ```
 cat > /tmp/pi-impl-many-unattended.md <<'EOF'
 You run unattended in a background tmux pane: nobody can answer an interactive prompt. Keep every commit and push non-interactive so a failure fails fast instead of hanging; if a command genuinely needs interaction, stop and report.
+
+Do not ask the user questions (no ask_user_question, no pausing on decisions): the originating issue is already split into a scope you can implement independently. Resolve every open question from the issue text and the repo's existing conventions, and note non-obvious choices in the PR body. Stop and report only when no reasonable interpretation lets you proceed safely.
 
 Landing your work, in order:
 
