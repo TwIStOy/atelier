@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- `runChildAgent` now aborts correctly in two previously-missed windows: an already-aborted `signal` at call time returns an `Operation aborted` error result before creating any child session, and `forwardAbort` invokes the child `session.abort()` immediately when the signal was aborted before listener registration (an `abort` listener on an already-aborted `AbortSignal` never fires). Previously a parent abort landing during child-session construction left the subagent running to completion with no way to stop it.
+
 ## [0.6.0] - 2026-08-19
 
 ### Added

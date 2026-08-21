@@ -181,6 +181,10 @@ function forwardAbort(session: AgentSession, signal: AbortSignal | undefined) {
   const onAbort = () => {
     void session.abort();
   };
+  if (signal.aborted) {
+    onAbort();
+    return () => {};
+  }
   signal.addEventListener("abort", onAbort, { once: true });
   return () => signal.removeEventListener("abort", onAbort);
 }
@@ -247,6 +251,14 @@ export async function runChildAgent(
         text: "",
         isError: true,
         errorMessage: "task is empty",
+        tool_calls: 0,
+      });
+    }
+    if (signal?.aborted) {
+      return finish({
+        text: "",
+        isError: true,
+        errorMessage: "Operation aborted",
         tool_calls: 0,
       });
     }
