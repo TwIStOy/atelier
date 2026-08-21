@@ -22,7 +22,16 @@ Run `/implement <target>` in parallel: one isolated git worktree + git branch pe
 
 ## Process
 
-### 1. Plan the fan-out
+### 1. Precheck: no target issue is blocked
+
+Before planning anything, check every target that is an issue ref (`#N` or `N`) for open blockers. Both sources count:
+
+- **Native dependencies**: `gh api repos/<owner>/<repo>/issues/<N> --jq '{title, summary: .issue_dependencies_summary, body}'` — `issue_dependencies_summary.blocked_by > 0` means open native blockers (missing/null summary = none).
+- **Body mentions**: scan `.body` for a `Blocked by: #<n>` line (fallback convention) and looser "blocked by #N" phrasing; each referenced issue that is still open (`gh issue view <n> --json state -q .state`) is a blocker. Mentions of closed issues or of non-issues are not.
+
+If any target has an open blocker from either source, stop and report the blocked targets with their blockers, then ask the user whether to drop them (fan out only the unblocked rest) or proceed anyway. Never silently fan out a blocked issue.
+
+### 2. Plan the fan-out
 
 For each target derive `(SLUG, BRANCH, WORKTREE)`:
 
@@ -47,7 +56,7 @@ WORKTREE="$HOME/Projects/worktree/$REPO/agent-sessions/$SLUG"
 
 Stop and ask the user if any slug collides with an existing branch/worktree, or two targets would yield the same slug.
 
-### 2. Create the worktrees
+### 3. Create the worktrees
 
 From the repo root, one `git worktree add` per target:
 
@@ -57,7 +66,7 @@ mkdir -p "$HOME/Projects/worktree/$REPO/agent-sessions"
 git worktree add -b "$BRANCH" "$WORKTREE" "$BASE"
 ```
 
-### 3. New tmux window + one pane per worktree
+### 4. New tmux window + one pane per worktree
 
 Create one new window (do not reuse the current one); the first pane is the window itself, each further target is a split:
 
@@ -73,7 +82,7 @@ tmux select-layout -t "$SESSION:$WIN" tiled   # 2 -> side-by-side; 3+ -> grid. U
 
 Panes come back in index order from `tmux list-panes -t "$SESSION:$WIN" -F '#{pane_index}'`, so `pane[i] ↔ target[i]`. Verify each pane's cwd is its own worktree: `tmux list-panes -t "$SESSION:$WIN" -F '#{pane_index}: #{pane_current_path}'`.
 
-### 4. Seed each pane with /implement + the unattended contract
+### 5. Seed each pane with /implement + the unattended contract
 
 The pane agents run unattended, so each seed carries a standing contract: decide open questions from the issue instead of asking, commit and push, open a PR, keep it green (CI + rebase), and wait for the user to merge — all non-interactively. The template expands server-side, so do not paste an expanded brief, and never pass the contract as extra `/implement` arguments (a second CLI message arg is dropped; trailing prose gets swallowed into the template's `$@`, i.e. its "Work to implement" section). Instead write the contract to a file once and pass its path via `--append-system-prompt`, which reads file contents:
 
@@ -99,7 +108,7 @@ tmux send-keys -t "$SESSION:$WIN.<pane>" "pi --append-system-prompt /tmp/pi-impl
 
 `<target>` is the **original token from section 0** (e.g. `#77`), not the slug. Quote it so the shell passes it as one arg. Do not delete the contract file afterwards — pi reads it at pane startup, and a missing path is appended as literal text instead of file contents.
 
-### 5. Accept the "Trust project folder?" dialog on every pane
+### 6. Accept the "Trust project folder?" dialog on every pane
 
 A worktree dir pi has never opened triggers pi's **Trust project folder?** dialog, which blocks the template from expanding (the pane sits blank/stalled). ~5s after seeding, each pane shows it with the cursor already on **Trust**. Accept on every pane:
 
@@ -109,7 +118,7 @@ tmux send-keys -t "$SESSION:$WIN.<pane>" Enter
 
 This persists trust for that worktree dir; the dialog does not recur for trusted dirs.
 
-### 6. Verify every seed expanded
+### 7. Verify every seed expanded
 
 ~15–20s after accepting, capture each pane and confirm the `/implement` body is showing (steps 1–5, "Discipline") and the agent has begun booting (`memory read system://boot`, fetching the issue) — **not** the bare string `/implement #N` and **not** a stalled blank pane:
 
@@ -132,4 +141,4 @@ Plus the tmux target to switch to the window (`<prefix> <win-index>`), and a not
 - One worktree + one branch + one pane per target. Never share a worktree or branch across targets.
 - You set up and verify only; each pane's agent owns its implementation.
 - Branch off the repo default branch. Each agent commits, pushes, and opens a PR for its own branch; the user merges — agents never merge and never enable auto-merge.
-- If a target is an issue that declares blockers, note it to the user but still proceed; the `/implement` agent will stop and report if it cannot continue.
+- Blocked issues are caught by the step-1 precheck and the user decides; do not discover blockers only after a pane is already running. If a blocked target is nonetheless fanned out (user override), its `/implement` agent stops and reports when it cannot continue.
