@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Model-authored text fields (`question`, `header`, `label`, `description`, `preview`) are now sanitized at the tool entry point: `\r\n` is normalized to `\n`, lone `\r` bytes and other C0/C1 control characters are stripped (tab and newline preserved). LLM tool calls occasionally emit stray CR spam; `visibleWidth` counts control chars as 0 columns, so width math stayed correct while the terminal interpreted the bare CR as cursor-to-column-0 and repainted over the line — garbling the whole dialog. Validation now runs on the sanitized copy, so questions differing only in CR junk are correctly rejected as duplicates.
+
 ## [0.5.0] - 2026-08-12
 
 ### Added

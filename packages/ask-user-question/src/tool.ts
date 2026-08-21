@@ -7,6 +7,7 @@ import { editWithExternalEditor } from "./state/external-editor.ts";
 import { QuestionnaireSession } from "./state/questionnaire-session.ts";
 import { buildQuestionnaireResponse, buildToolResult } from "./tool/response-envelope.ts";
 import { runRpcQuestionnaire } from "./tool/rpc-native.ts";
+import { sanitizeQuestionnaire } from "./tool/sanitize-questionnaire.ts";
 import {
   MAX_OPTIONS,
   MAX_QUESTIONS,
@@ -61,7 +62,7 @@ export function registerAskUserQuestionTool(pi: ExtensionAPI): void {
     parameters: QuestionParamsSchema,
     constrainedSampling: { type: "json_schema", strict: "prefer" },
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-      const typed = params as QuestionParams;
+      const typed = sanitizeQuestionnaire(params as QuestionParams);
       if (!ctx.hasUI) {
         return buildToolResult(ERROR_NO_UI, {
           answers: [],
