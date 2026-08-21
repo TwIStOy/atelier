@@ -63,19 +63,37 @@ function runGit(
   signal: AbortSignal | undefined,
 ): Promise<{ code: number; stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new Error("Operation aborted"));
+      return;
+    }
     const child = spawn("git", args, {
       cwd,
+      detached: true,
       stdio: ["ignore", "pipe", "pipe"],
       env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
     });
     const stdoutChunks: Buffer[] = [];
     const stderrChunks: Buffer[] = [];
-    let aborted = false;
+    let settled = false;
+
+    const killProcessGroup = () => {
+      try {
+        if (child.pid !== undefined) process.kill(-child.pid, "SIGKILL");
+      } catch {
+        try {
+          child.kill("SIGKILL");
+        } catch {
+          // process already gone
+        }
+      }
+    };
 
     const onAbort = () => {
-      if (aborted) return;
-      aborted = true;
-      child.kill("SIGKILL");
+      if (settled) return;
+      settled = true;
+      killProcessGroup();
+      reject(new Error("Operation aborted"));
     };
     signal?.addEventListener("abort", onAbort, { once: true });
 
@@ -86,15 +104,15 @@ function runGit(
       stderrChunks.push(Buffer.from(d));
     });
     child.on("error", (err) => {
+      if (settled) return;
+      settled = true;
       signal?.removeEventListener("abort", onAbort);
       reject(err);
     });
     child.on("close", (code) => {
+      if (settled) return;
+      settled = true;
       signal?.removeEventListener("abort", onAbort);
-      if (aborted) {
-        reject(new Error("Operation aborted"));
-        return;
-      }
       resolve({
         code: code ?? 0,
         stdout: Buffer.concat(stdoutChunks).toString("utf8"),
