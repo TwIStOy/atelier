@@ -11,7 +11,7 @@
 | 类型 | 如何触发 | 成员 |
 |---|---|---|
 | **Skill**(model-invoked) | 正常说话——agent 把你的请求和每个 skill 的 `description` 做语义匹配,自动加载。不需要斜杠命令。 | `grilling`、`domain-modeling`、`tdd`、`code-review`、`diagnosing-bugs`、`write-a-skill` |
-| **Prompt**(user-invoked) | 显式打 `/command`。只能手动触发。 | `/setup-agent-repo-context`、`/grill-with-docs`、`/triage`、`/improve-codebase-architecture`、`/to-spec`、`/to-tickets`、`/implement` |
+| **Prompt**(user-invoked) | 显式打 `/command`。只能手动触发。 | `/setup-agent-repo-context`、`/grill-with-docs`、`/triage`、`/improve-codebase-architecture`、`/to-spec`、`/to-tickets`、`/implement`、`/wizard`、`/wait-what` |
 
 触发是**语义匹配**,所以中文英文都行——但英文关键词最稳。拿不准就直接点名:"用 tdd skill 来做"。
 
@@ -19,14 +19,14 @@
 
 ### `grilling` —— 动手前盘问方案
 
-- **触发词**:"stress-test this plan"、"grill me"、"challenge this design"、"interrogate this idea"、"盘问一下这个方案"。
+- **触发词**:"stress-test this plan"、"grill me"、"challenge this design"、"interrogate this idea"、"盘问一下这个方案",或任何含 "grill" 的说法。
 - **何时用**:想法还模糊,想在碰代码前被交叉盘问到清晰。
-- **纪律**:一次只问一个问题,每个都给推荐答案;能自己查代码查到的就不问你;在你确认达成共识前不会动手执行方案。
+- **纪律**:把方案当一棵**决策树**,按**轮(round)**推进——每轮把 frontier 上(前置已敲定、现在就能问的)问题一次性全部问出,每题编号并附推荐答案,等你回答后再算下一轮。**事实自己查**(read/grep/glob 或子 agent),不问你查得到的东西;**决策归你**,逐条等你拍板。frontier 清空前不收工;你确认达成共识前不动手执行方案。
 - **无状态**:不向磁盘写任何东西。
 
 ### `domain-modeling` —— 固定项目的统一语言
 
-- **触发词**:"pin down this term"、"sharpen the domain language"、"record an architectural decision"、"CONTEXT.md"、"ADR"、"统一术语"、"记个架构决策"。
+- **触发词**:"pin down this term"、"sharpen the domain language"、"record an architectural decision",讨论代码库术语时、写/改 `CONTEXT.md` 或 ADR 时。
 - **何时用**:项目词汇 slippery,或你即将做一个值得记录的、难撤销的决策。
 - **产物**:`CONTEXT.md`(一份词汇表——鲜明的正典术语配 `_Avoid_` 同义词,不含实现细节)和 `docs/adr/NNNN-slug.md`(1–3 句的决策记录)。
 - **纪律**:术语一敲定就当场记下(绝不攒批);只有三个条件**全满足**才提 ADR——难撤销、没上下文会让人困惑、是真有取舍的结果。
@@ -88,6 +88,19 @@
 - **何时用**:有一张 `ready-for-agent` 票或一份 spec,要真正动手写代码。
 - **机制**:加载 `tdd`(在约定 seam 上)→ 持续 typecheck/单测 → 结束时 `code-review` → 提交到当前分支。不扩 scope。
 
+### `/wizard` —— 生成人肉步骤向导脚本
+
+- **怎么用**:`/wizard 配置 Stripe 测试密钥` / `/wizard 数据库迁移到新集群`。
+- **何时用**:有一段只有人能做的流程(开第三方控制台、配 CI secret、 provisioning、一次性迁移),每次重讲给 AI 很烦。
+- **产物**:一个 bash 向导脚本——逐阶段清屏、开 URL、告诉你点哪复制哪、隐藏输入 secret、幂等写 `.env` / `gh secret`,带进度和收尾总结。默认一次性,放 scratch;可重复使用的才提交进仓库。
+- **资源**:库与模板在 `prompts/resource/wizard/template.sh`;`STAGES` 标记以上是固定库,不许手改。
+
+### `/wait-what` —— 没看懂,重讲
+
+- **怎么用**:任何时刻打 `/wait-what`。
+- **何时用**:agent 上一条消息没看懂——丢了上下文、跳了步骤、或术语飘了。
+- **机制**:要求 agent 用简化技术英语(ASD-STE100)重新 pitch,并带上你缺的上下文;术语跟 `CONTEXT.md`(多上下文仓库按 `CONTEXT-MAP.md` 索引)。
+
 ### `tdd` —— 值得留的测试驱动开发
 
 - **触发词**:"use TDD for X"、"test-first"、"red-green-refactor"、"integration tests"、"用 TDD 做 X"。
@@ -114,7 +127,8 @@
 - **触发词**:"debug this"、"diagnose X"、"this is broken / throwing / failing / slow"、"调试这个 bug"、"排查一下"。
 - **何时用**:硬 bug 或性能回归——那种盯着代码看没用的。
 - **铁律**:**没有 tight、red-capable 的反馈回路,不准提假设。** Phase 1 才是「这个 skill 的本体」——其余都是机械操作。在你拿不出一条能复现 bug 的、快速、确定、断言用户确切症状的命令前,agent 拒绝理论化。
-- **6 个阶段**:建回路并收紧 → 复现并最小化 → 提假设(3–5 条排序、可证伪)→ 插桩(一次只动一个变量,日志打 `[DEBUG-xxxx]` 标签)→ 修 + 在正确的 seam 上写回归测试 → 清理 + 复盘。
+- **脱敏先行**:展示任何命令、输出或抓包之前先把 secret 打成 `<REDACTED>`;回路用环境变量携带凭据;抓包只引用携带信号的那几行。
+- **6 个阶段**:建回路并收紧 → 复现并最小化 → 提假设(3–5 条排序、可证伪)→ 插桩(一次只动一个变量,日志打 `[DEBUG-xxxx]` 标签)→ 修 + 在正确的 seam 上写回归测试 → 清理。
 - **人肉回路兜底**:当必须人来点击时,用自带的 `skills/diagnosing-bugs/scripts/hitl-loop.template.sh` 把回路结构化。
 
 ## 推荐工作流
@@ -147,7 +161,7 @@
 3. **提假设** —— 3–5 条排序,每条都要可证伪;先给用户过目
 4. **插桩** —— 一次只动一个变量;日志打 `[DEBUG-xxxx]` 标签
 5. **修 + 回归测试** —— 在正确的 seam 上;没 seam → 那本身就是发现
-6. **清理 + 复盘** —— 删掉插桩;在 commit 里写明真因
+6. **清理** —— 删掉插桩;在 commit 里写明真因
 
 ### 单 skill 片段
 
@@ -156,6 +170,8 @@
 - 只测一个功能 → "do X with TDD"
 - 只评审一次改动 → "review since main"
 - 出 bug 了 → "debug this" / "diagnose X"(触发 `diagnosing-bugs`)
+- 看不懂 agent 在说什么 → `/wait-what`
+- 要人肉走一遍配置/迁移 → `/wizard`
 
 ## 实操要点
 
@@ -179,5 +195,7 @@
 - **`improve-codebase-architecture` 内联了 codebase-design 词汇。** 上游依赖 model-invoked 的 `codebase-design` skill;本仓库未移植该 skill(和 `code-philosophy` + `design-an-interface` 有重叠),于是把 module/interface/depth/seam/adapter/leverage/locality 词汇和三条原则直接写进 prompt。接口备选仍指向已有的 `design-an-interface`。
 - **Prompt 附带资源放在 `prompts/resource/<name>/`。** 例如 `triage` 的 `AGENT-BRIEF.md` / `OUT-OF-SCOPE.md`,`improve-codebase-architecture` 的 `HTML-REPORT.md`。入口 prompt 用仓库根相对路径引用。
 - **reference 文件移进 `references/`。** mattpocock 把它们当同级文件放;本仓库 skill 的约定是 `references/` 子目录。链接相应更新。文件名沿用上游(`tests.md`、`mocking.md`、`CONTEXT-FORMAT.md`、`ADR-FORMAT.md`),因为仓库本来就已混用大小写。
-- **`diagnosing-bugs` 的脚本路径。** 两处 `hitl-loop.template.sh` 引用都改成完整仓库路径(`skills/diagnosing-bugs/scripts/...`),因为 pi 从 cwd 解析文件路径,而不是从 skill 目录。Phase 6 可移交到 `/improve-codebase-architecture`。
-- **`writing-great-skills/GLOSSARY.md` 是蒸馏而非作为 skill 移植。** 它的词汇(leading words、两种 invocation 负载、completion criteria、五种 failure mode)放在 `skills/write-a-skill/references/SKILL_VOCABULARY.md`,合并进已有的 `write-a-skill` skill 以避免重叠。
+- **`diagnosing-bugs` 的脚本路径。** 两处 `hitl-loop.template.sh` 引用都改成完整仓库路径(`skills/diagnosing-bugs/scripts/...`),因为 pi 从 cwd 解析文件路径,而不是从 skill 目录。Phase 6 现在只做清理;上游已把 post-mortem 移交 `/improve-codebase-architecture` 的段落整个删除(model-invoked skill 不能调 user-invoked prompt,且实践中很少触发),本仓库同步。
+- **`grilling` 同步到 rounds/frontier 模型(2026-08)。** 上游把「一次一问」重写为按轮推进:每轮把 frontier 上全部可问问题一次性编号问出;新增 facts(decisions 分离(facts 自己查/子 agent,decisions 归用户)和显式 confirm gate。`/grill-with-docs`、`/triage` 中对 grilling 的描述已同步。
+- **`writing-great-skills/GLOSSARY.md` 是蒸馏而非作为 skill 移植。** 它的词汇(leading words、两种 invocation 负载、completion criteria、五种 failure mode)放在 `skills/write-a-skill/references/SKILL_VOCABULARY.md`,合并进已有的 `write-a-skill` skill 以避免重叠。上游后来删除了 `writing-great-skills`,由泛化的 `writing-for-agents` 接替;2026-08 同步时按同样方式把其新增概念(context pointer、negation、environment-as-cache)蒸馏进了该词汇表。
+- **`/wizard`、`/wait-what`(2026-08 新增)。** 上游均为 user-invoked,按约定映射到 `prompts/`。`wizard` 的 `template.sh` 原样放在 `prompts/resource/wizard/template.sh`(仅头注释改为 "Generated by the /wizard prompt")。

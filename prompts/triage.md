@@ -105,7 +105,7 @@ Show counts and a one-line summary per item. Let the maintainer pick.
 
 3. **Verify the claim.** Before any grilling, check that the claim holds up. For a bug, reproduce it from the reporter's steps. For a PR, confirm the diff does what it claims — check it out, run the relevant tests or commands. Report what happened: confirmed (with code path), failed, or insufficient detail (a strong `needs-info` signal). A confirmed verification makes a much stronger agent brief.
 
-4. **Grill (if needed).** If the request needs fleshing out, run the `grilling` and `domain-modeling` skills together — grill it into shape one question at a time, sharpening domain terms and updating `CONTEXT.md`/ADRs inline as decisions land. Load `skills/grilling/SKILL.md` and `skills/domain-modeling/SKILL.md` first.
+4. **Grill (if needed).** If the request needs fleshing out, run the `grilling` and `domain-modeling` skills together — grill it into shape round by round, sharpening domain terms and updating `CONTEXT.md`/ADRs inline as decisions land. Load `skills/grilling/SKILL.md` and `skills/domain-modeling/SKILL.md` first.
 
 5. **Apply the outcome:**
    - `ready-for-agent` — post an agent brief comment (`prompts/resource/triage/AGENT-BRIEF.md`).

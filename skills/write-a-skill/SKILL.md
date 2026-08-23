@@ -117,7 +117,7 @@ Each file in `references/` should:
 
 ## Skill Qualities & Vocabulary
 
-Once structure is right, refine a skill's *behaviour* with the vocabulary of predictability: leading words, completion criteria, the two invocation loads, and named failure modes. See [Skill Vocabulary & Qualities](references/SKILL_VOCABULARY.md).
+Once structure is right, refine a skill's *behaviour* with the vocabulary of predictability: leading words, context pointers, completion criteria, the two invocation loads, and named failure modes. See [Skill Vocabulary & Qualities](references/SKILL_VOCABULARY.md).
 
 ## Review Checklist
 
@@ -130,4 +130,5 @@ After drafting, verify:
 - [ ] Concrete examples included
 - [ ] References one level deep
 - [ ] No no-op lines (each instruction changes behaviour vs the model's default)
+- [ ] Prohibitions phrased as positive target behaviours where possible (no elephant-naming)
 - [ ] A leading word anchors the core behaviour, or restatements collapsed into one
