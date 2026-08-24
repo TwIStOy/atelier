@@ -127,28 +127,30 @@ export async function pushUsageSnapshot(
   const fetchFn = options.fetch ?? fetch;
   const log = options.logger;
   const url = `${credentials.baseUrl}/hosts/${encodeURIComponent(credentials.hostId)}/usage`;
+  const requestHeaders = {
+    Authorization: `Bearer ${credentials.hostSecret}`,
+    "Content-Type": "application/json",
+    "User-Agent": "pi-moshi-hooks-extra",
+  };
+  const requestBody = JSON.stringify({ snapshots: [snapshot] });
   log?.info(
-    `sending usage snapshot host=${snapshot.hostName} account=${snapshot.accountId} windows=${snapshot.windows.length} agent=${snapshot.agent}`,
+    `sending usage request method=POST url=${url} headers=${JSON.stringify({ ...requestHeaders, Authorization: "Bearer [redacted]" })} body=${requestBody}`,
   );
   try {
     const resp = await fetchFn(url, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${credentials.hostSecret}`,
-        "Content-Type": "application/json",
-        "User-Agent": "pi-moshi-hooks-extra",
-      },
-      body: JSON.stringify({ snapshots: [snapshot] }),
+      headers: requestHeaders,
+      body: requestBody,
       signal: options.signal,
     });
-    const body = await resp.text();
-    const summary = `status=${resp.status} body=${truncateBody(body)}`;
+    const responseBody = await resp.text();
+    const summary = `status=${resp.status} body=${truncateBody(responseBody)}`;
     if (resp.ok) {
       log?.info(`usage push responded ${summary}`);
     } else {
       log?.warn(`usage push rejected ${summary}`);
     }
-    return { ok: resp.ok, status: resp.status, body };
+    return { ok: resp.ok, status: resp.status, body: responseBody };
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     log?.error(`usage push failed: ${message}`);

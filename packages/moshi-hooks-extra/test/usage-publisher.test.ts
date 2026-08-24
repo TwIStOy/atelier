@@ -183,10 +183,11 @@ describe("pushUsageSnapshot logging", () => {
     await pushUsageSnapshot(snapshot, CREDS, { fetch: fetchMock, logger });
 
     expect(calls.map((c) => c.level)).toEqual(["info", "info"]);
-    expect(calls[0].msg).toContain("sending usage snapshot");
-    expect(calls[0].msg).toContain(`host=${CREDS.hostName}`);
-    expect(calls[0].msg).toContain(`account=${ZAI_ACCOUNT_ID}`);
-    expect(calls[0].msg).toContain("windows=3");
+    expect(calls[0].msg).toContain("sending usage request method=POST");
+    expect(calls[0].msg).toContain("url=https://api.getmoshi.app/api/v1/hosts/host_abc/usage");
+    expect(calls[0].msg).toContain('"Authorization":"Bearer [redacted]"');
+    expect(calls[0].msg).toContain(`"accountId":"${ZAI_ACCOUNT_ID}"`);
+    expect(calls[0].msg).not.toContain(CREDS.hostSecret);
     expect(calls[1].msg).toContain("status=200");
     expect(calls[1].msg).toContain('body={"success":true,"count":1}');
   });

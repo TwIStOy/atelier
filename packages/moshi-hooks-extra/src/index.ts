@@ -44,11 +44,16 @@ export default function moshiHooksExtra(pi: ExtensionAPI): void {
   if (isExtensionDisabled("moshi-hooks-extra")) return;
   logger.info("extension loaded");
   if (!isMoshiHookAvailable()) {
+    logger.debug("moshi-hook unavailable");
     return;
   }
 
   const transport = resolveTransportMode();
-  if (transport === "none") return;
+  if (transport === "none") {
+    logger.debug("no Moshi transport available");
+    return;
+  }
+  logger.debug(`selected transport=${transport}`);
 
   registerConfigItems("moshi-hooks-extra", [
     {
@@ -87,6 +92,7 @@ export default function moshiHooksExtra(pi: ExtensionAPI): void {
     activity.reset();
     pendingQuestion.clear();
     cachedCredentials = readMoshiSecrets();
+    logger.debug(`session started usageCredentials=${cachedCredentials ? "available" : "missing"}`);
     const models = ctx.modelRegistry.getAvailable();
     cachedModels = models.map((m) => ({
       label: `${m.provider}/${m.id}`,
@@ -201,18 +207,30 @@ export default function moshiHooksExtra(pi: ExtensionAPI): void {
 
   pi.events.on(ZAI_CODING_PLAN_EVENTS.RAW_USAGE_UPDATE, (data: unknown) => {
     const credentials = cachedCredentials ?? readMoshiSecrets();
-    if (!credentials) return;
+    if (!credentials) {
+      logger.debug("usage push skipped source=raw reason=credentials-missing");
+      return;
+    }
     const payload = data as { usage?: CodingPlanRawUsage } | undefined;
     const usage = payload?.usage;
-    if (!usage?.windows.some((window) => window.kind === "tokens")) return;
+    if (!usage?.windows.some((window) => window.kind === "tokens")) {
+      logger.debug("usage push skipped source=raw reason=no-token-windows");
+      return;
+    }
     lastRawUsage = usage;
     const now = Date.now();
-    if (usagePushInFlight || now - lastUsagePushAt < USAGE_PUSH_MIN_INTERVAL_MS) {
+    if (usagePushInFlight) {
+      logger.debug("usage push skipped source=raw reason=request-in-flight");
+      return;
+    }
+    if (now - lastUsagePushAt < USAGE_PUSH_MIN_INTERVAL_MS) {
+      logger.debug("usage push skipped source=raw reason=throttled");
       return;
     }
     usagePushInFlight = true;
     lastUsagePushAt = now;
     const snapshot = buildZaiRawSnapshot(usage, credentials);
+    logger.debug(`usage push started source=raw windows=${snapshot.windows.length}`);
     void pushUsageSnapshot(snapshot, credentials, { logger }).finally(() => {
       usagePushInFlight = false;
     });
@@ -224,17 +242,29 @@ export default function moshiHooksExtra(pi: ExtensionAPI): void {
     // it is the sole source.
     if (lastRawUsage) return;
     const credentials = cachedCredentials ?? readMoshiSecrets();
-    if (!credentials) return;
+    if (!credentials) {
+      logger.debug("usage push skipped source=legacy reason=credentials-missing");
+      return;
+    }
     const payload = data as { usage?: CodingPlanUsage } | undefined;
     const usage = payload?.usage;
-    if (!usage || usage.limits.length === 0) return;
+    if (!usage || usage.limits.length === 0) {
+      logger.debug("usage push skipped source=legacy reason=no-windows");
+      return;
+    }
     const now = Date.now();
-    if (usagePushInFlight || now - lastUsagePushAt < USAGE_PUSH_MIN_INTERVAL_MS) {
+    if (usagePushInFlight) {
+      logger.debug("usage push skipped source=legacy reason=request-in-flight");
+      return;
+    }
+    if (now - lastUsagePushAt < USAGE_PUSH_MIN_INTERVAL_MS) {
+      logger.debug("usage push skipped source=legacy reason=throttled");
       return;
     }
     usagePushInFlight = true;
     lastUsagePushAt = now;
     const snapshot = buildZaiSnapshot(usage, credentials);
+    logger.debug(`usage push started source=legacy windows=${snapshot.windows.length}`);
     void pushUsageSnapshot(snapshot, credentials, { logger }).finally(() => {
       usagePushInFlight = false;
     });
