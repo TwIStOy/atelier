@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- GPT-5.6 models now expose the official OpenAI Responses thinking levels, including `xhigh` and `max`, in Pi's thinking-level selector.
+
 ## [0.6.0] - 2026-08-19
 
 ### Breaking Changes
