@@ -1,8 +1,14 @@
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, truncateSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, test } from "vitest";
-import { createLogger, getExtensionsLogPath, resolveStateDir } from "../src/log.ts";
+import { dirname, join } from "node:path";
+import type {
+  ExtensionAPI,
+  ExtensionContext,
+  ExtensionHandler,
+  SessionStartEvent,
+} from "@earendil-works/pi-coding-agent";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { createLogger, getExtensionsLogPath, registerLogFileSizeWarning, resolveStateDir } from "../src/log.ts";
 
 describe("resolveStateDir", () => {
   test("prefers XDG_STATE_HOME", () => {
@@ -85,5 +91,91 @@ describe("createLogger", () => {
     // some sandboxes). The logger must swallow the failure, never throw.
     const log = createLogger("x", { env: { XDG_STATE_HOME: "/dev/null/sub" } });
     expect(() => log.error("boom")).not.toThrow();
+  });
+});
+
+describe("registerLogFileSizeWarning", () => {
+  let dir: string;
+  let env: NodeJS.ProcessEnv;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "pi-log-warning-"));
+    env = { XDG_STATE_HOME: dir };
+  });
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  function install(): {
+    handlers: Array<ExtensionHandler<SessionStartEvent>>;
+    pi: Pick<ExtensionAPI, "on">;
+  } {
+    const handlers: Array<ExtensionHandler<SessionStartEvent>> = [];
+    const pi = {
+      on: (event: string, handler: ExtensionHandler<SessionStartEvent>) => {
+        if (event === "session_start") handlers.push(handler);
+      },
+    } as unknown as Pick<ExtensionAPI, "on">;
+    registerLogFileSizeWarning(pi, env);
+    return { handlers, pi };
+  }
+
+  function createContext(notify: ExtensionContext["ui"]["notify"]): ExtensionContext {
+    return { ui: { notify } } as unknown as ExtensionContext;
+  }
+
+  function resizeLog(size: number): string {
+    const logPath = getExtensionsLogPath(env);
+    mkdirSync(dirname(logPath), { recursive: true });
+    writeFileSync(logPath, "");
+    truncateSync(logPath, size);
+    return logPath;
+  }
+
+  test("warns once at startup when the log exceeds 500 MiB", async () => {
+    const logPath = resizeLog(500 * 1024 * 1024 + 1);
+    const notify = vi.fn();
+    const { handlers, pi } = install();
+    registerLogFileSizeWarning(pi, env);
+
+    expect(handlers).toHaveLength(1);
+    await handlers[0]?.({ type: "session_start", reason: "startup" }, createContext(notify));
+    await handlers[0]?.({ type: "session_start", reason: "startup" }, createContext(notify));
+
+    expect(notify).toHaveBeenCalledOnce();
+    expect(notify).toHaveBeenCalledWith(`Extension log exceeds 500 MiB. Check ${logPath}.`, "warning");
+  });
+
+  test("does not check on non-startup session events", async () => {
+    resizeLog(500 * 1024 * 1024 + 1);
+    const notify = vi.fn();
+    const { handlers } = install();
+
+    await handlers[0]?.({ type: "session_start", reason: "reload" }, createContext(notify));
+    expect(notify).not.toHaveBeenCalled();
+
+    await handlers[0]?.({ type: "session_start", reason: "startup" }, createContext(notify));
+    expect(notify).toHaveBeenCalledOnce();
+  });
+
+  test("does not warn at exactly 500 MiB", async () => {
+    resizeLog(500 * 1024 * 1024);
+    const notify = vi.fn();
+    const { handlers } = install();
+
+    await handlers[0]?.({ type: "session_start", reason: "startup" }, createContext(notify));
+
+    expect(notify).not.toHaveBeenCalled();
+  });
+
+  test("ignores a missing log file", () => {
+    const notify = vi.fn();
+    const { handlers } = install();
+
+    expect(() => {
+      handlers[0]?.({ type: "session_start", reason: "startup" }, createContext(notify));
+    }).not.toThrow();
+    expect(notify).not.toHaveBeenCalled();
   });
 });

@@ -127,6 +127,7 @@ export type { CreateLoggerOptions, Logger, LogLevel } from "./log.ts";
 export {
   createLogger,
   getExtensionsLogPath,
+  registerLogFileSizeWarning,
   resolveStateDir,
 } from "./log.ts";
 export type { McpClientInfo, McpSession } from "./mcp.ts";

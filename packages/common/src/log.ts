@@ -15,9 +15,11 @@
  * atomic on POSIX filesystems, so concurrent appenders from different
  * extensions do not interleave — no lock is required.
  */
-import { appendFileSync, mkdirSync } from "node:fs";
+
+import { appendFileSync, mkdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 export type LogLevel = "debug" | "info" | "warn" | "error";
 
@@ -42,6 +44,9 @@ const LEVEL_PRIORITY: Record<LogLevel, number> = {
   error: 40,
 };
 
+const LOG_FILE_SIZE_WARNING_GUARD = Symbol.for("htwang-contrib.log-file-size-warning.installed");
+const LOG_FILE_SIZE_WARNING_BYTES = 500 * 1024 * 1024;
+
 /**
  * Resolve the base state directory.
  *
@@ -60,6 +65,24 @@ export function resolveStateDir(env: NodeJS.ProcessEnv = process.env, home = hom
 /** Path to the shared extensions log file. */
 export function getExtensionsLogPath(env: NodeJS.ProcessEnv = process.env): string {
   return join(resolveStateDir(env), "pi", "extensions.log");
+}
+
+export function registerLogFileSizeWarning(pi: Pick<ExtensionAPI, "on">, env: NodeJS.ProcessEnv = process.env): void {
+  const guard = pi as unknown as Record<symbol, boolean>;
+  if (guard[LOG_FILE_SIZE_WARNING_GUARD]) return;
+  guard[LOG_FILE_SIZE_WARNING_GUARD] = true;
+
+  let checked = false;
+  pi.on("session_start", (event, ctx) => {
+    if (checked || event.reason !== "startup") return;
+    checked = true;
+
+    const logPath = getExtensionsLogPath(env);
+    try {
+      if (statSync(logPath).size <= LOG_FILE_SIZE_WARNING_BYTES) return;
+      ctx.ui.notify(`Extension log exceeds 500 MiB. Check ${logPath}.`, "warning");
+    } catch {}
+  });
 }
 
 function appendLine(logPath: string, line: string): void {
