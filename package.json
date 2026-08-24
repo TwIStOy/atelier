@@ -8,6 +8,7 @@
   ],
   "pi": {
     "extensions": [
+      "packages/common/src/log-warning.ts",
       "packages/tool-call-fixer",
       "packages/loop-guard",
       "packages/zai-coding-plan",
