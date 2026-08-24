@@ -43,6 +43,16 @@ type GatewayModelsResponse = {
 
 const API_PREFERENCE: readonly Api[] = ["openai-responses", "openai-completions", "anthropic-messages"];
 
+const GPT_56_THINKING_LEVEL_MAP: NonNullable<ProviderModelConfig["thinkingLevelMap"]> = {
+  off: "none",
+  minimal: null,
+  low: "low",
+  medium: "medium",
+  high: "high",
+  xhigh: "xhigh",
+  max: "max",
+};
+
 const ZAI_COMPAT: NonNullable<ProviderModelConfig["compat"]> = {
   supportsStore: false,
   supportsDeveloperRole: false,
@@ -149,6 +159,10 @@ function pickApi(entry: GatewayModelObject): Api {
 
 function applyFamilyOverrides(config: ProviderModelConfig, api: Api): void {
   const id = config.id;
+  if (id.startsWith("gpt-5.6-")) {
+    config.thinkingLevelMap = GPT_56_THINKING_LEVEL_MAP;
+    return;
+  }
   if (GLM_REASONING_EFFORT_IDS.has(id)) {
     config.compat = ZAI_COMPAT_REASONING_EFFORT;
     config.thinkingLevelMap = GLM_REASONING_EFFORT_MAP;
