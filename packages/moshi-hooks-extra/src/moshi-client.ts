@@ -8,9 +8,9 @@ import {
   modelNameFromCtx,
   nowIso,
   projectNameForCwd,
-  sessionIdFromEventCtx,
 } from "./envelope.ts";
 import { buildMoshiPayload, type MoshiPayload } from "./payload.ts";
+import { sessionIdFromEventCtx } from "./session-id.ts";
 import { type SocketSendStatus, sendEnvelopeToSocket, socketFileExists } from "./socket.ts";
 import { EMPTY_TERMINAL_CONTEXT, getCachedTerminalContext, type TerminalContext } from "./terminal-context.ts";
 

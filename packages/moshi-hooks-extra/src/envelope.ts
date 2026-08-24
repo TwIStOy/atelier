@@ -85,24 +85,6 @@ export function buildSessionUpdateEnvelope(
   };
 }
 
-export function sessionIdFromEventCtx(event: MoshiHookEvent, ctx: MoshiHookCtx): string {
-  const sessionManager = ctx.sessionManager as
-    | (Record<string, unknown> & {
-        getSessionFile?: (...args: unknown[]) => unknown;
-      })
-    | undefined;
-  const getSessionFile = sessionManager?.getSessionFile;
-  let sessionFile = "";
-  if (typeof getSessionFile === "function") {
-    try {
-      sessionFile = String(getSessionFile.call(sessionManager) ?? "");
-    } catch {
-      sessionFile = "";
-    }
-  }
-  return firstString(event.session_id as string, event.sessionId as string, sessionFile, ctx.cwd as string, "pi");
-}
-
 export function modelNameFromCtx(ctx: MoshiHookCtx): string {
   return modelLabel(ctx.model);
 }

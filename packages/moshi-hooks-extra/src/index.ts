@@ -20,6 +20,7 @@ import {
 import { previewContent } from "./envelope.ts";
 import { isMoshiHookAvailable, resolveTransportMode, sendEnvelope, snapshotCtx } from "./moshi-client.ts";
 import { type MoshiCredentials, readMoshiSecrets } from "./moshi-secrets.ts";
+import { sessionIdFromCtx } from "./session-id.ts";
 import {
   lastAssistantMessage,
   loadSummaryConfig,
@@ -309,21 +310,6 @@ export default function moshiHooksExtra(pi: ExtensionAPI): void {
     );
     return;
   });
-}
-
-function sessionIdFromCtx(ctx: { sessionManager?: unknown }): string {
-  const sessionManager = ctx.sessionManager as
-    | (Record<string, unknown> & {
-        getSessionFile?: (...args: unknown[]) => unknown;
-      })
-    | undefined;
-  const getSessionFile = sessionManager?.getSessionFile;
-  if (typeof getSessionFile !== "function") return "";
-  try {
-    return String(getSessionFile.call(sessionManager) ?? "");
-  } catch {
-    return "";
-  }
 }
 
 function previewInput(args: unknown, maxChars = 2000): string {

@@ -1,3 +1,5 @@
+import { sessionIdFromEventCtx } from "./session-id.ts";
+
 export function firstString(...values: unknown[]): string {
   for (const value of values) {
     if (typeof value === "string" && value.length > 0) return value;
@@ -43,9 +45,6 @@ export function modelLabel(model: unknown): string {
   );
 }
 
-export type MoshiHookEvent = Record<string, unknown>;
-export type MoshiHookCtx = Record<string, unknown>;
-
 export interface MoshiPayload {
   hook_event_name: string;
   session_id: string;
@@ -55,35 +54,17 @@ export interface MoshiPayload {
   [extra: string]: unknown;
 }
 
-export function sessionID(event: MoshiHookEvent, ctx: MoshiHookCtx): string {
-  const sessionManager = ctx.sessionManager as
-    | (Record<string, unknown> & {
-        getSessionFile?: (...args: unknown[]) => unknown;
-      })
-    | undefined;
-  const getSessionFile = sessionManager?.getSessionFile;
-  let sessionFile = "";
-  if (typeof getSessionFile === "function") {
-    try {
-      sessionFile = String(getSessionFile.call(sessionManager) ?? "");
-    } catch {
-      sessionFile = "";
-    }
-  }
-  return firstString(event.session_id as string, event.sessionId as string, sessionFile, ctx.cwd as string, "pi");
-}
-
 export function buildMoshiPayload(
   hookEventName: string,
   event: unknown,
   ctx: unknown,
   extra: Record<string, unknown> = {},
 ): MoshiPayload {
-  const eventObj = event && typeof event === "object" ? (event as MoshiHookEvent) : {};
-  const ctxObj = ctx && typeof ctx === "object" ? (ctx as MoshiHookCtx) : {};
+  const eventObj = event && typeof event === "object" ? (event as Record<string, unknown>) : {};
+  const ctxObj = ctx && typeof ctx === "object" ? (ctx as Record<string, unknown>) : {};
   return {
     hook_event_name: hookEventName,
-    session_id: sessionID(eventObj, ctxObj),
+    session_id: sessionIdFromEventCtx(eventObj, ctxObj),
     cwd: firstString(ctxObj.cwd as string, process.cwd()),
     model: modelLabel(ctxObj.model),
     event,

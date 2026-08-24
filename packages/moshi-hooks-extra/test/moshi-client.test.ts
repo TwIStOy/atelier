@@ -2,6 +2,7 @@ import { EventEmitter } from "node:events";
 import { describe, expect, test } from "vitest";
 import {
   buildEnvelope,
+  buildMoshiPayload,
   isMoshiHookAvailable,
   resolveTransportMode,
   sendEnvelope,
@@ -162,6 +163,35 @@ describe("buildEnvelope", () => {
     expect(envelope.projectName).toBe("my-repo");
   });
 
+  test("sessionId prefers sessionManager.getSessionId", () => {
+    const envelope = buildEnvelope({
+      eventName: "x",
+      event: { session_id: "evt-sid" },
+      ctx: {
+        sessionManager: {
+          getSessionId: () => "ctx-id",
+          getSessionFile: () => "ctx-file",
+        },
+      },
+      terminalContext: {
+        terminalKind: "",
+        tmuxSession: "",
+        tmuxWindow: "",
+        tmuxPane: "",
+        tmuxSocket: "",
+        zellijSession: "",
+        zellijPane: "",
+        herdrSession: "",
+        herdrPane: "",
+        herdrWorkspaceId: "",
+        herdrWorkspace: "",
+        herdrTabId: "",
+        herdrTab: "",
+      },
+    });
+    expect(envelope.sessionId).toBe("ctx-id");
+  });
+
   test("sessionId prefers event.session_id", () => {
     const envelope = buildEnvelope({
       eventName: "x",
@@ -184,6 +214,22 @@ describe("buildEnvelope", () => {
       },
     });
     expect(envelope.sessionId).toBe("evt-sid");
+  });
+});
+
+describe("buildMoshiPayload", () => {
+  test("uses sessionManager.getSessionId on the spawn path", () => {
+    const payload = buildMoshiPayload(
+      "AgentEnd",
+      { session_id: "evt-sid" },
+      {
+        sessionManager: {
+          getSessionId: () => "ctx-id",
+          getSessionFile: () => "ctx-file",
+        },
+      },
+    );
+    expect(payload.session_id).toBe("ctx-id");
   });
 });
 

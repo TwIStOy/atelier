@@ -6,6 +6,10 @@
 
 - Added extension diagnostics for Moshi transport selection and Z.AI usage publishing, including the secret-redacted request URL, headers, body, response status, and failure reason.
 
+### Fixed
+
+- Pi session events now prefer `sessionManager.getSessionId()` over the transcript file path so the generated Moshi hook and `moshi-hooks-extra` update the same inbox row.
+
 ## [0.4.0] - 2026-07-31
 
 ### Changed
