@@ -5,6 +5,16 @@ import { subagentParams } from "../src/schemas.ts";
 const batchTask = { task: "batch task", description: "Batch task" };
 
 describe("subagent schema", () => {
+  it("keeps every root union branch object-typed for Grok", () => {
+    const schema = subagentParams as { oneOf?: Array<{ type?: unknown }> };
+
+    expect(schema.type).toBe("object");
+    expect(schema.oneOf).toHaveLength(2);
+    for (const branch of schema.oneOf ?? []) {
+      expect(branch.type).toBe("object");
+    }
+  });
+
   it("accepts single-task mode only", () => {
     expect(Check(subagentParams, { task: "single task", description: "Single task" })).toBe(true);
   });

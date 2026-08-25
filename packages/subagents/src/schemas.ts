@@ -133,14 +133,20 @@ export const subagentParams = Type.Object(
   },
   {
     oneOf: [
-      {
-        required: ["task"],
-        not: { required: ["tasks"] },
-      },
-      {
-        required: ["tasks"],
-        not: { required: ["task"] },
-      },
+      Type.Object(
+        {},
+        {
+          required: ["task"],
+          not: { required: ["tasks"] },
+        },
+      ),
+      Type.Object(
+        {},
+        {
+          required: ["tasks"],
+          not: { required: ["task"] },
+        },
+      ),
     ],
   },
 );
