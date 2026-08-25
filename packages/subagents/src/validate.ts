@@ -1,5 +1,6 @@
 import type { SubagentAgentCatalog } from "./agent-catalog.ts";
-import { resolveSubagentAgentId } from "./agent-catalog.ts";
+import { resolveDispatchAgentId } from "./agent-catalog.ts";
+import type { SubagentSettings } from "./settings.ts";
 
 export function validateTaskShape(
   params: {
@@ -13,6 +14,7 @@ export function validateTaskShape(
     agent_type?: string;
   },
   catalog: SubagentAgentCatalog,
+  settings: SubagentSettings,
 ): { ok: true; mode: "single" } | { ok: true; mode: "batch" } | { ok: false; message: string } {
   const hasTask = Boolean(params.task?.trim());
   const hasTasks = Boolean(params.tasks && params.tasks.length > 0);
@@ -37,19 +39,21 @@ export function validateTaskShape(
           message: `subagent: tasks[${i}].task is empty.`,
         };
       }
-      const aid = resolveSubagentAgentId(row.agent_type ?? params.agent_type, catalog);
-      const fileDesc = catalog.agents.get(aid)?.fileOptions.description?.trim();
+      const dispatch = resolveDispatchAgentId(row.agent_type ?? params.agent_type, catalog, settings);
+      if (!dispatch.ok) return { ok: false, message: dispatch.message };
+      const fileDesc = catalog.agents.get(dispatch.id)?.fileOptions.description?.trim();
       if (!row.description?.trim() && !fileDesc) {
         return {
           ok: false,
-          message: `subagent: tasks[${i}].description is required unless the agent persona frontmatter sets description (agent_type → ${aid}).`,
+          message: `subagent: tasks[${i}].description is required unless the agent persona frontmatter sets description (agent_type → ${dispatch.id}).`,
         };
       }
     }
     return { ok: true, mode: "batch" };
   }
-  const aid = resolveSubagentAgentId(params.agent_type, catalog);
-  const fileDesc = catalog.agents.get(aid)?.fileOptions.description?.trim();
+  const dispatch = resolveDispatchAgentId(params.agent_type, catalog, settings);
+  if (!dispatch.ok) return { ok: false, message: dispatch.message };
+  const fileDesc = catalog.agents.get(dispatch.id)?.fileOptions.description?.trim();
   if (!params.description?.trim() && !fileDesc) {
     return {
       ok: false,

@@ -1,5 +1,6 @@
 import * as fs from "node:fs";
 import {
+  FALLBACK_PERSONA_ID,
   type PersonaTypeDefaults,
   parsePersonaDefaultsByType,
   personaDefaultsFilePath,
@@ -12,10 +13,13 @@ const DEFAULT_TIMEOUT_MS = 0;
 
 export type SubagentAgentTypeDefaults = PersonaTypeDefaults;
 
+export const FALLBACK_AGENT_NONE = "none" as const;
+
 export type SubagentSettings = {
   maxConcurrent: number;
   maxTotal: number;
   timeoutMs: number;
+  fallbackAgent: string;
   defaultsByAgentType: Partial<Record<string, SubagentAgentTypeDefaults>>;
 };
 
@@ -53,6 +57,7 @@ export function readSubagentSettings(overrides?: SubagentSettingsOverrides): Sub
   let maxConcurrent = DEFAULT_MAX_CONCURRENT;
   let maxTotal = DEFAULT_MAX_TOTAL;
   let timeoutMs = DEFAULT_TIMEOUT_MS;
+  let fallbackAgent = FALLBACK_PERSONA_ID;
   let defaultsByAgentType: Partial<Record<string, SubagentAgentTypeDefaults>> = {};
 
   if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
@@ -60,6 +65,7 @@ export function readSubagentSettings(overrides?: SubagentSettingsOverrides): Sub
     maxConcurrent = parsePositiveInt(o.max_concurrent, DEFAULT_MAX_CONCURRENT);
     maxTotal = parsePositiveInt(o.max_total, DEFAULT_MAX_TOTAL);
     timeoutMs = parseNonNegativeInt(o.timeout_ms, DEFAULT_TIMEOUT_MS);
+    fallbackAgent = parseFallbackAgent(o.fallback_agent, fallbackAgent);
     defaultsByAgentType = parsePersonaDefaultsByType(o.defaults_by_agent_type);
   }
 
@@ -73,7 +79,7 @@ export function readSubagentSettings(overrides?: SubagentSettingsOverrides): Sub
     timeoutMs = parseNonNegativeInt(overrides.timeout_ms, timeoutMs);
   }
 
-  return { maxConcurrent, maxTotal, timeoutMs, defaultsByAgentType };
+  return { maxConcurrent, maxTotal, timeoutMs, fallbackAgent, defaultsByAgentType };
 }
 
 export function readSubagentConcurrencyLimits(
@@ -81,6 +87,15 @@ export function readSubagentConcurrencyLimits(
 ): { maxConcurrent: number; maxTotal: number } {
   const s = readSubagentSettings(overrides);
   return { maxConcurrent: s.maxConcurrent, maxTotal: s.maxTotal };
+}
+
+function parseFallbackAgent(v: unknown, fallback: string): string {
+  if (v === false) return FALLBACK_AGENT_NONE;
+  if (typeof v !== "string") return fallback;
+  const t = v.trim().toLowerCase();
+  if (!t) return fallback;
+  if (t === FALLBACK_AGENT_NONE) return FALLBACK_AGENT_NONE;
+  return t;
 }
 
 export function resolveTimeoutMs(taskOverride: number | undefined, fallback: number): number {

@@ -9,10 +9,12 @@ import { runSubagentsAgentsCommand } from "./agents-inspect.ts";
 import { shouldInjectSubagentsParentSystemPrompt, subagentsFeatureSystemPrompt } from "./feature-system-prompt.ts";
 import { registerGitCloneTool } from "./git-clone/index.ts";
 import { registerSubagentStatusTool, registerSubagentTool } from "./tool.ts";
+import { registerSubagentsConfig } from "./usage-report.ts";
 import { runSubagentViewerCommand } from "./viewer/command.ts";
 
 export default function (pi: ExtensionAPI) {
   if (isExtensionDisabled("subagents")) return;
+  registerSubagentsConfig();
   registerSubagentTool(pi);
   registerSubagentStatusTool(pi);
 

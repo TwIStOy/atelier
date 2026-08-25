@@ -1,9 +1,11 @@
+import type { Usage } from "@earendil-works/pi-ai";
 import type { AgentToolUpdateCallback, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { buildSubagentAgentCatalog, resolveSubagentAgentId } from "./agent-catalog.ts";
+import { buildSubagentAgentCatalog, resolveDispatchAgentId, resolveSubagentAgentId } from "./agent-catalog.ts";
 import { subagentDetails } from "./details.ts";
 import { tryParentToolUpdate, withThrottledParentFlush } from "./parent-update.ts";
 import { runSubAgent, type SubagentRunDetails } from "./run-agent.ts";
 import { defaultsForAgentType, type SubagentSettings } from "./settings.ts";
+import { toPiUsage } from "./usage-report.ts";
 
 export async function runSingleSubagent(
   ctx: ExtensionContext,
@@ -27,6 +29,7 @@ export async function runSingleSubagent(
 ): Promise<{
   content: Array<{ type: "text"; text: string }>;
   details: SubagentRunDetails;
+  usage?: Usage;
 }> {
   const {
     task,
@@ -43,7 +46,8 @@ export async function runSingleSubagent(
     globalAgentType,
   } = args;
   const catalog = buildSubagentAgentCatalog(ctx.cwd);
-  const singleAgentType = resolveSubagentAgentId(globalAgentType, catalog);
+  const dispatch = resolveDispatchAgentId(globalAgentType, catalog, subagentSettings);
+  const singleAgentType = dispatch.ok ? dispatch.id : resolveSubagentAgentId(globalAgentType, catalog);
   const file = catalog.agents.get(singleAgentType)?.fileOptions ?? {};
   const defs = defaultsForAgentType(subagentSettings, singleAgentType);
   const effectiveModel = globalModel ?? file.model ?? defs.model;
@@ -99,7 +103,7 @@ export async function runSingleSubagent(
         inherit_context: effectiveInherit,
         isolated: effectiveIsolated,
         max_turns: effectiveMaxTurns,
-        agent_type: globalAgentType,
+        agent_type: singleAgentType,
       },
       merged,
       (p) => {
@@ -121,6 +125,7 @@ export async function runSingleSubagent(
   if (result.isError) {
     const failureText = result.errorMessage ?? "subagent failed";
     const partial = result.text.trim();
+    const usage = toPiUsage(result);
     return {
       content: [
         {
@@ -140,12 +145,17 @@ export async function runSingleSubagent(
         error: result.errorMessage ?? "subagent failed",
         usage_input: result.usage_input,
         usage_output: result.usage_output,
+        usage_cache_read: result.usage_cache_read,
+        usage_cache_write: result.usage_cache_write,
+        usage_cost_usd: result.usage_cost_usd,
         context_percent: result.context_percent,
         context_tokens: result.context_tokens,
         context_window: result.context_window,
       }),
+      ...(usage ? { usage } : {}),
     };
   }
+  const usage = toPiUsage(result);
   return {
     content: [
       {
@@ -164,9 +174,13 @@ export async function runSingleSubagent(
       ok: true,
       usage_input: result.usage_input,
       usage_output: result.usage_output,
+      usage_cache_read: result.usage_cache_read,
+      usage_cache_write: result.usage_cache_write,
+      usage_cost_usd: result.usage_cost_usd,
       context_percent: result.context_percent,
       context_tokens: result.context_tokens,
       context_window: result.context_window,
     }),
+    ...(usage ? { usage } : {}),
   };
 }

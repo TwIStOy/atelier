@@ -1,6 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { FALLBACK_PERSONA_ID } from "@htwang-contrib/common";
 import { mergeAbortWithTimeoutMs } from "./abort-timeout.ts";
-import { buildSubagentAgentCatalog, resolveSubagentAgentId, type SubagentAgentCatalog } from "./agent-catalog.ts";
+import { buildSubagentAgentCatalog, resolveDispatchAgentId, type SubagentAgentCatalog } from "./agent-catalog.ts";
 import { backgroundStartedReply, finalizeBackgroundSuccess, finalizeBackgroundThrown } from "./background-finish.ts";
 import { backgroundJobStatusPayload, createBackgroundJob, subagentStatusToolDetails } from "./background-jobs.ts";
 import { subagentDetails } from "./details.ts";
@@ -8,15 +9,18 @@ import { type ParallelTaskRow, runParallelBatchSubagent } from "./orchestrate-ba
 import { runSingleSubagent } from "./orchestrate-single.ts";
 import { subagentParams, subagentStatusParams } from "./schemas.ts";
 import { readSubagentSettings, type SubagentSettings } from "./settings.ts";
+import { drainBackgroundUsage, mergeUsage } from "./usage-report.ts";
 import { validateTaskShape } from "./validate.ts";
 
 function fillBatchTaskDescriptions(
   tasks: ParallelTaskRow[],
   catalog: SubagentAgentCatalog,
   globalAgentType: string | undefined,
+  settings: SubagentSettings,
 ): ParallelTaskRow[] {
   return tasks.map((t) => {
-    const aid = resolveSubagentAgentId(t.agent_type ?? globalAgentType, catalog);
+    const dispatch = resolveDispatchAgentId(t.agent_type ?? globalAgentType, catalog, settings);
+    const aid = dispatch.ok ? dispatch.id : FALLBACK_PERSONA_ID;
     const description = t.description?.trim() || catalog.agents.get(aid)?.fileOptions.description?.trim() || "";
     return { ...t, description };
   });
@@ -28,9 +32,10 @@ export function registerSubagentStatusTool(pi: ExtensionAPI) {
     label: "Subagent status",
     description: "Read status for a background subagent job.",
     parameters: subagentStatusParams,
-    async execute(_toolCallId, params) {
+    async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       const id = params.id.trim();
       const payload = backgroundJobStatusPayload(id);
+      const usage = drainBackgroundUsage(ctx.sessionManager.getHeader()?.id ?? "unknown");
       return {
         content: [
           {
@@ -39,6 +44,7 @@ export function registerSubagentStatusTool(pi: ExtensionAPI) {
           },
         ],
         details: subagentStatusToolDetails(id, payload),
+        ...(usage ? { usage } : {}),
       };
     },
   });
@@ -59,7 +65,15 @@ export function registerSubagentTool(pi: ExtensionAPI) {
       };
 
       const catalog = buildSubagentAgentCatalog(ctx.cwd);
-      const shape = validateTaskShape(params, catalog);
+      for (const warning of catalog.warnings) {
+        ctx.ui.notify(warning, "warning");
+      }
+      const subagentSettings: SubagentSettings = readSubagentSettings({
+        max_concurrent: params.max_concurrent,
+        max_total: params.max_total,
+        timeout_ms: params.timeout_ms,
+      });
+      const shape = validateTaskShape(params, catalog, subagentSettings);
       if (!shape.ok) {
         throw new Error(shape.message);
       }
@@ -85,11 +99,6 @@ export function registerSubagentTool(pi: ExtensionAPI) {
       const isBackground = params.background === true;
       const baseRunSignal = isBackground ? bgSignal : merged;
 
-      const subagentSettings: SubagentSettings = readSubagentSettings({
-        max_concurrent: params.max_concurrent,
-        max_total: params.max_total,
-        timeout_ms: params.timeout_ms,
-      });
       const runSignal = mergeAbortWithTimeoutMs(baseRunSignal, subagentSettings.timeoutMs);
 
       const globalModel = params.model;
@@ -104,7 +113,12 @@ export function registerSubagentTool(pi: ExtensionAPI) {
           maxConcurrent: subagentSettings.maxConcurrent,
           maxTotal: subagentSettings.maxTotal,
         };
-        const tasks = fillBatchTaskDescriptions(params.tasks as ParallelTaskRow[], catalog, params.agent_type);
+        const tasks = fillBatchTaskDescriptions(
+          params.tasks as ParallelTaskRow[],
+          catalog,
+          params.agent_type,
+          subagentSettings,
+        );
         if (tasks.length > limits.maxTotal) {
           return {
             content: [
@@ -146,7 +160,7 @@ export function registerSubagentTool(pi: ExtensionAPI) {
           return backgroundStartedReply(parentBase, shape, jobId);
         }
 
-        return runParallelBatchSubagent(ctx, {
+        const batchResult = await runParallelBatchSubagent(ctx, {
           tasks,
           parentBase,
           merged: baseRunSignal,
@@ -160,9 +174,12 @@ export function registerSubagentTool(pi: ExtensionAPI) {
           globalAgentType,
           limits,
         });
+        const batchUsage = mergeUsage(batchResult.usage, drainBackgroundUsage(parentSessionId));
+        return { ...batchResult, ...(batchUsage ? { usage: batchUsage } : {}) };
       }
 
-      const singleAgentId = resolveSubagentAgentId(params.agent_type, catalog);
+      const singleDispatch = resolveDispatchAgentId(params.agent_type, catalog, subagentSettings);
+      const singleAgentId = singleDispatch.ok ? singleDispatch.id : FALLBACK_PERSONA_ID;
       const singleDescription =
         params.description?.trim() || catalog.agents.get(singleAgentId)?.fileOptions.description?.trim() || "";
       if (isBackground) {
@@ -188,7 +205,7 @@ export function registerSubagentTool(pi: ExtensionAPI) {
         return backgroundStartedReply(parentBase, shape, jobId);
       }
 
-      return runSingleSubagent(ctx, {
+      const singleResult = await runSingleSubagent(ctx, {
         task: params.task!.trim(),
         description: singleDescription,
         parentBase,
@@ -202,6 +219,8 @@ export function registerSubagentTool(pi: ExtensionAPI) {
         globalMaxTurns,
         globalAgentType,
       });
+      const singleUsage = mergeUsage(singleResult.usage, drainBackgroundUsage(parentSessionId));
+      return { ...singleResult, ...(singleUsage ? { usage: singleUsage } : {}) };
     },
   });
 }

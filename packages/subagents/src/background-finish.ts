@@ -1,9 +1,11 @@
+import type { Usage } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { truncateDisplay } from "@htwang-contrib/common";
 import { updateBackgroundJob } from "./background-jobs.ts";
 import { subagentDetails } from "./details.ts";
 import { SUBAGENT_EVENTS } from "./events.ts";
 import type { SubagentRunDetails } from "./run-agent.ts";
+import { drainBackgroundUsage, poolBackgroundUsage } from "./usage-report.ts";
 
 export function finalizeBackgroundSuccess(
   pi: ExtensionAPI,
@@ -19,6 +21,9 @@ export function finalizeBackgroundSuccess(
   const text = r.content[0]?.type === "text" && typeof r.content[0].text === "string" ? r.content[0].text : "";
   const summary = text.length > 12_000 ? `${text.slice(0, 12_000)}\n…` : text;
   const ok = r.details.ok !== false;
+  if (r.details.parent_session_id) {
+    poolBackgroundUsage(r.details.parent_session_id, r.details);
+  }
   const batchCounts =
     mode === "batch" && r.details.batch
       ? r.details.batch.reduce(
@@ -91,8 +96,10 @@ export function backgroundStartedReply(
 ): {
   content: Array<{ type: "text"; text: string }>;
   details: SubagentRunDetails;
+  usage?: Usage;
 } {
   const msg = `Background subagent started. id=${id}\nPoll with tool subagent_status and { "id": "${id}" }.`;
+  const usage = drainBackgroundUsage(parentBase.parent_session_id);
   return {
     content: [{ type: "text", text: msg }],
     details: subagentDetails({
@@ -102,5 +109,6 @@ export function backgroundStartedReply(
       background: true,
       background_id: id,
     }),
+    ...(usage ? { usage } : {}),
   };
 }
