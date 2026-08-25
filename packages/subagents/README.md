@@ -95,6 +95,7 @@ Optional JSON object (missing file → built-in defaults only):
 | `max_concurrent`         | number | 3       | Parallel batch: max simultaneous `runSubAgent` calls.                                                                                                                       |
 | `max_total`              | number | 10      | Parallel batch: max length of `tasks` array.                                                                                                                                |
 | `timeout_ms`             | number | 0       | Wall-clock cap merged via `AbortSignal.timeout`; `0` = disabled.                                                                                                            |
+| `fallback_agent`         | string \| false | `"general-purpose"` | Where an unknown `agent_type` is routed. Any persona id redirects there; `"none"` (or `false`) fails the call closed with an error listing the available types. |
 | `defaults_by_agent_type` | object | —       | Keys are agent ids (e.g. `general-purpose`, `explore`, or custom ids from your catalog). Each value may include `model` and/or `thinking` when the tool omits those fields. |
 
 Example:
@@ -110,6 +111,12 @@ Example:
   }
 }
 ```
+
+## Extension config (`/config` → Subagents)
+
+| Key          | Type    | Default | Role                                                                                                                                                                                       |
+| ------------ | ------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `reportUsage` | boolean | off     | Attach a pi `Usage` to `subagent` / `subagent_status` tool results so child token + cost spend folds into the parent session's `getSessionStats()` and `/cost` (under "Tools/summaries"). Background completions accumulate in a pool and drain onto the next subagent tool result. |
 
 ## Package layout (this extension)
 
@@ -129,6 +136,7 @@ Example:
 | `child-tools.ts`        | Built-in tool name list + filter excluding delegation tools.                                                                                                     |
 | `abort-timeout.ts`      | Merges optional `AbortSignal.timeout` into run signals.                                                                                                          |
 | `settings.ts`           | Reads `settings.json`; concurrency, timeout, persona defaults.                                                                                                   |
+| `usage-report.ts`       | `reportUsage` config + pi `Usage` mapping + background usage pool.                                                                                              |
 | `agents-inspect.ts`     | `/subagents-agents` command: persona picker + read-only inspect editor.                                                                                          |
 | `viewer/`               | `/view-subagents` command + popup output viewer. See `viewer/README.md`-style notes above; files: `command.ts`, `overlay.ts`, `render.ts`, `index.ts` (+ tests). |
 

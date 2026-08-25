@@ -2,10 +2,18 @@
 
 ## [Unreleased]
 
+### Added
+
+- `fallback_agent` setting in `~/.agent/subagents/settings.json`: where an unknown `agent_type` is routed. Omitted keeps the current `general-purpose` fallback; any persona id redirects there; `"none"` (or `false`) fails the call closed with an error listing the available types, so a typo can no longer silently run the wrong agent (upstream tintinweb/pi-subagents#183).
+- `reportUsage` extension config (`/config` → Subagents, default off): attaches a pi `Usage` to `subagent` / `subagent_status` tool results so pi folds child token + cost spend into the parent session's `getSessionStats()` and `/cost` (under "Tools/summaries"). Background jobs that finish between tool calls accumulate in a per-parent-session pool that drains onto the next `subagent`/`subagent_status` result, so their spend is not lost (upstream tintinweb/pi-subagents#193/#243).
+- Malformed persona files now produce a `ctx.ui.notify` warning naming the file when the `subagent` tool builds its catalog, in addition to the catalog's recorded `warnings`.
+
 ### Fixed
 
 - The `subagent` parameter schema now requires exactly one of `task` and `tasks`, rejects empty task instructions, and declares every `oneOf` branch as an object for Grok-compatible tool schema validation. Invalid mode parameters still throw a tool execution error, so Pi records `isError: true` and exposes the validation failure clearly.
 - `git_clone` abort no longer hangs the subagent run forever. `runGit` previously SIGKILLed only the direct `git` child and waited for the `close` event; a stalled clone leaves `git-remote-http` grandchildren holding the inherited stdio pipes, so `close` never fired, the tool promise never settled, and neither the child session's `abort()` nor the parent's Esc/RPC abort could unblock the run (the parent agent stayed wedged on the pending tool call). `runGit` now spawns `git` in its own process group (`detached: true`), on abort SIGKILLs the whole group, and rejects immediately instead of waiting for pipe closure. Regression test aborts a real clone against a never-responding HTTP server and asserts prompt settlement plus no surviving `git` processes.
+- A `subagent` call whose child never started (session setup failure) now fails the tool call instead of returning a success-looking result with error text; pi discards `isError` on returned results, so only a throw is recorded as a failed tool call (upstream tintinweb/pi-subagents#179). Batch mode converts a per-task setup throw into that item's error result so one bad task cannot fail the whole batch.
+- The viewer overlay closes on Ctrl+C in addition to Esc, matching pi's `tui.select.cancel` convention (upstream tintinweb/pi-subagents#255).
 
 ### Removed
 

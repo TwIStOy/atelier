@@ -5,10 +5,15 @@
 ### Added
 
 - `registerLogFileSizeWarning(pi)` installs a one-time check that runs only during Pi startup. The root extension bundle registers it and warns the user when `$XDG_STATE_HOME/pi/extensions.log` exceeds 500 MiB.
+- `src/agents/session-shutdown.ts`: `shutdownChildSession(session)` closes the extension lifecycle a child session opened with `bindExtensions` — emits `session_shutdown` (reason `quit`) when the runner has handlers for it, raced against a 3s ceiling, then always calls `dispose()`. Pi's own `AgentSession.dispose()` only invalidates the runner, so without the emit anything an extension armed in `session_start` leaked once per spawn (upstream tintinweb/pi-subagents#242).
+- `AgentPersonaCatalog` gains a `warnings: string[]` field. `buildAgentPersonaCatalog` now skips an unreadable/unparseable persona file and records a warning naming the file (and the surviving same-id file when the malformed one would have overridden it) instead of silently swallowing it or treating the whole file as prompt body; warnings are also written to the extensions log (upstream tintinweb/pi-subagents#212).
+- `ChildAgentUsageSnapshot` gains optional `usage_cache_read` / `usage_cache_write` / `usage_cost_usd`, populated from the child session's `getSessionStats()`.
 
 ### Fixed
 
 - `runChildAgent` now aborts correctly in two previously-missed windows: an already-aborted `signal` at call time returns an `Operation aborted` error result before creating any child session, and `forwardAbort` invokes the child `session.abort()` immediately when the signal was aborted before listener registration (an `abort` listener on an already-aborted `AbortSignal` never fires). Previously a parent abort landing during child-session construction left the subagent running to completion with no way to stop it.
+- `runChildAgent` and `runIsolatedSession` now dispose the child `AgentSession` via `shutdownChildSession` in a `finally`, so child sessions no longer accumulate for the lifetime of the parent process.
+- `runChildAgent` setup failures (session directory creation, resource loader, `createAgentSession`, `bindExtensions`) now throw instead of returning an `isError` result: pi marks a tool call failed only when `execute` throws and discards `isError` on a returned result, so a child that never started previously read as an agent that ran and reported a problem (upstream tintinweb/pi-subagents#179). Run-phase failures still settle on the result.
 
 ## [0.6.0] - 2026-08-19
 

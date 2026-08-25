@@ -16,15 +16,17 @@ diffing from a known point each session instead of re-auditing from scratch.
 > and the rest were either verified not-applicable to our architecture or
 > re-confirmed declined.** See
 > [§ Borrowed / not-applicable — 2026-07-27](#borrowed--not-applicable--2026-07-27).
+> **Update (2026-09-12): third audit (v0.14.3 → v0.18.2); six items borrowed.**
+> See [§ Borrowed — 2026-09-12](#borrowed--2026-09-12).
 
 ## Commit pointers
 
 | Role | SHA | Date (UTC+2) | Subject |
 | ---- | --- | ---- | ------- |
 | **Our baseline** (last audited) | `4b8f45a909492d82239553c63e8cdebcfbdf8ac9` | 2026-06-01 | `e2e tests` (parent of the first substantive June commit `e55d391`) |
-| **Upstream HEAD (this audit)** | `3ed8632ee25f0160276dc95b9c9cf2a8d8f7df6b` | 2026-07-26 | `fix(#174): foreground results state output completeness, not partiality` (v0.14.3) |
+| **Upstream HEAD (this audit)** | `ad81024825b315577692b785831262874e66be95` | 2026-08-24 | `v0.18.2` |
 
-> Next session: `git -C <cache> fetch && git log 3ed8632..origin/main` to see only
+> Next session: `git -C <cache> fetch && git log ad81024..origin/main` to see only
 > what landed since this audit. Update the HEAD row above when you re-audit.
 
 ## What changed upstream (2026-06-01 → 2026-06-30, v0.13.0 audit)
@@ -122,6 +124,39 @@ FleetView polish (`4bbab47` markers, `55e0885` key-focus, `d54dba2` row width,
 (`8c89823` — we always persist the session by design), and every item in the
 original [§ Not borrowing — user-declined](#not-borrowing--user-declined-2026-07-05).
 
+## What changed upstream — 2026-07-26 → 2026-08-24 (v0.14.3 → v0.18.2 audit)
+
+56 commits, 10 releases (0.15.0 … 0.18.2). Themes: `@handle` mentions +
+tombstone resume + `name`/`color` frontmatter (0.16.0/0.17.0), opt-in nested
+delegation (`8976c63`, #164), `rememberAgents` persist-by-default (0.17.0 — we
+already always persist), `backgroundByDefault` breaking flip (0.18.0 — we stay
+foreground-by-default), `maxConcurrentForeground` (#260), usage reporting
+(`cd306b2`, #193/#243), and a run of robustness fixes.
+
+### Borrowed — 2026-09-12
+
+| Upstream | Change | Our adaptation |
+| --- | --- | --- |
+| `9afe114` (#242) | Emit `session_shutdown` before disposing child sessions | `common/src/agents/session-shutdown.ts` `shutdownChildSession()` (emit with 3s ceiling via `extensionRunner.hasHandlers`/`emit`, then always `dispose()`); wired into the `finally` of both `runChildAgent` and `runIsolatedSession` — ours previously never disposed child sessions at all. |
+| `c83dd82` (#179) | Spawn-never-started fails the tool call (pi discards `isError` on returned results) | `runChildAgent` setup phase (session dir, loader, `createAgentSession`, `bindExtensions`) now throws; run phase still settles on the result. `orchestrate-batch` converts a per-task setup throw into that item's error result so one bad task cannot fail the batch. `runIsolatedSession` already had these semantics. |
+| `cd306b2` (#193/#243) | `reportUsage`: fold child spend into parent `getSessionStats()` via tool-result `usage` | `subagents/src/usage-report.ts`: `toPiUsage()` maps the (extended) `ChildAgentUsageSnapshot` (now with `usage_cache_read`/`usage_cache_write`/`usage_cost_usd`) to pi's `Usage`; attached on foreground single/batch results. Background completions go to a per-parent-session pool drained onto the next `subagent`/`subagent_status` result. Config via `/config` → Subagents → `reportUsage` (default off), per the repo's ConfigItem convention instead of upstream's `subagents.json` key. |
+| `c73e968` (#255) | Ctrl+C closes the conversation viewer | `viewer/overlay.ts` `handleInput` treats `ctrl+c` like `escape`, matching pi's `tui.select.cancel` defaults. |
+| `140324c` (#212) | Malformed agent files skipped with a warning | `agent-personas.ts`: broken frontmatter now throws at parse (previously silently treated the whole file as prompt body); the catalog collects `warnings: string[]` naming the file (+ the surviving same-id file when overridden), logs them via the extensions log, and the `subagent` tool surfaces them through `ctx.ui.notify`. `strictAgentFiles` not borrowed. |
+| `2966cd5` (#183) | `fallbackSubagent` — fail-closed dispatch for unknown types | `fallback_agent` key in `~/.agent/subagents/settings.json`: omitted = `general-purpose` (today), a persona id = route there, `"none"`/`false` = the tool call fails listing available types. Enforced in `validateTaskShape` via `resolveDispatchAgentId`; orchestrators thread the resolved id so a named fallback actually governs prompt/tools. |
+
+### Verified already-covered or not applicable this round
+
+- `rememberAgents` persist-by-default (0.17.0) — we always persist child sessions.
+- Viewer markdown rendering (`917853c`, #259) — our viewer renders via pi's `AssistantMessageComponent` with `getMarkdownTheme()`.
+- Frontmatter `name:` as dispatch identity (0.17.0) — our `personaIdFromFrontmatter` already implements it.
+- #168 effective-model display — our viewer reads the child session's `model_change` events.
+- #199 renderer catch-all — our renderers key off explicit `details` fields, no equivalent fall-through.
+- #224/#249/#181 RPC-spawn UI tracking, `a9db27b` `rpc:consume`, `084d177` RPC `scopeModels` — no cross-extension RPC surface.
+- #205 `parentSession` header — our `SessionManager.create` already passes it.
+- `maxConcurrentForeground` (`e56085d`, #260) — our batch path already caps via `max_concurrent`; foreground singles block the parent turn, and we have no evidence of local-model prompt-cache thrash. Not borrowed.
+- `@handle` mentions, tombstone resume, `name` param, nested delegation (#164), `backgroundByDefault` flip, `worktreeIsolation`/`isolation: "off"`, FleetView/widget/showModel/color badges — all extend previously declined directions; still declined.
+- `973dc6f` nanoid bump — we have no nanoid dependency.
+
 ## Comparison with our port
 
 Legend: ✅ already have / diverge-by-design · ⚠️ upstream-only capability.
@@ -206,3 +241,4 @@ The decision section above is **not** a re-evaluation queue.
 | --- | --- |
 | 2026-07-05 | First upstream-tracking audit. Baseline `4b8f45a` → HEAD `8405e55` (v0.13.0). Change log recorded. Maintainer reviewed the full diff and **declined every borrowable item**; future audits advance pointers + change log only unless an item is explicitly reopened. |
 | 2026-07-27 | Second audit (reopened). HEAD advanced `8405e55` → `3ed8632` (v0.14.3). Of 36 new commits, **two borrowed**: `2d0eb9b` (#147 `max` thinking level) and `441dd4c`+`f8116ee` (#144 failed-final-turn → error). Nine verified **not-applicable** to our architecture (#152, #128, #145, #127, #159, #157, #142, #166, #143, #174). Remainder re-confirmed declined. |
+| 2026-09-12 | Third audit. HEAD advanced `3ed8632` → `ad81024` (v0.18.2). Of 56 new commits, **six borrowed**: #242 (session_shutdown + dispose), #179 (setup failures throw), #193/#243 (reportUsage, via `/config` not settings.json), #255 (Ctrl+C closes viewer), #212 (malformed persona file warnings), #183 (`fallback_agent` fail-closed dispatch). Everything else verified already-covered, not-applicable, or still declined (see the 2026-09-12 section). |
