@@ -61,13 +61,7 @@ export function registerSubagentTool(pi: ExtensionAPI) {
       const catalog = buildSubagentAgentCatalog(ctx.cwd);
       const shape = validateTaskShape(params, catalog);
       if (!shape.ok) {
-        return {
-          content: [{ type: "text", text: shape.message }],
-          details: subagentDetails({
-            ...parentBase,
-            tool_calls: 0,
-          }),
-        };
+        throw new Error(shape.message);
       }
 
       if (!ctx.model) {
