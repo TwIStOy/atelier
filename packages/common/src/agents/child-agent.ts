@@ -29,6 +29,7 @@ import {
 import { resolveChildToolNames } from "./child-tools.ts";
 import { type PersonaTypeDefaults, personaDefaultsForType, readPersonaDefaultsByType } from "./persona-defaults.ts";
 import { recordChildSessionFinished, recordChildSessionStarted } from "./session-links.ts";
+import { shutdownChildSession } from "./session-shutdown.ts";
 
 export const STRUCTURED_OUTPUT_TOOL_NAME = "structured_output";
 
@@ -37,6 +38,9 @@ const THINKING_LEVELS = new Set<string>(["off", "minimal", "low", "medium", "hig
 export type ChildAgentUsageSnapshot = {
   usage_input: number;
   usage_output: number;
+  usage_cache_read?: number;
+  usage_cache_write?: number;
+  usage_cost_usd?: number;
   context_percent: number | null;
   context_tokens: number | null;
   context_window: number;
@@ -192,6 +196,9 @@ function forwardAbort(session: AgentSession, signal: AbortSignal | undefined) {
 const EMPTY_USAGE: ChildAgentUsageSnapshot = {
   usage_input: 0,
   usage_output: 0,
+  usage_cache_read: 0,
+  usage_cache_write: 0,
+  usage_cost_usd: 0,
   context_percent: null,
   context_tokens: null,
   context_window: 0,
@@ -204,6 +211,9 @@ function snapshotUsage(child: AgentSession): ChildAgentUsageSnapshot {
   return {
     usage_input: st.tokens.input,
     usage_output: st.tokens.output,
+    usage_cache_read: st.tokens.cacheRead,
+    usage_cache_write: st.tokens.cacheWrite,
+    usage_cost_usd: st.cost,
     context_percent: cu?.percent ?? null,
     context_tokens: cu?.tokens ?? null,
     context_window: cw,
@@ -238,12 +248,19 @@ export async function runChildAgent(
       errorMessage: partial.errorMessage,
       usage_input: partial.usage_input ?? u.usage_input,
       usage_output: partial.usage_output ?? u.usage_output,
+      usage_cache_read: partial.usage_cache_read ?? u.usage_cache_read,
+      usage_cache_write: partial.usage_cache_write ?? u.usage_cache_write,
+      usage_cost_usd: partial.usage_cost_usd ?? u.usage_cost_usd,
       context_percent: partial.context_percent ?? u.context_percent,
       context_tokens: partial.context_tokens ?? u.context_tokens,
       context_window: partial.context_window ?? u.context_window,
     };
   };
 
+  // Setup failures throw: pi marks a tool call failed only when execute throws,
+  // and a returned isError flag is discarded — a spawn that never started must
+  // not read as an agent that ran and reported a problem (upstream #179).
+  // Callers that need per-item error results (batch) catch and convert.
   try {
     let effectiveTask = input.task.trim();
     if (!effectiveTask) {
@@ -386,57 +403,60 @@ export async function runChildAgent(
 
     emitProgress();
 
+    // The run phase: failures here settle on the result, never throw.
     try {
-      await created.prompt(effectiveTask);
-    } finally {
-      unsub();
-      cleanupAbort();
-    }
+      try {
+        await created.prompt(effectiveTask);
+      } finally {
+        unsub();
+        cleanupAbort();
+      }
 
-    if (structured) {
-      if (!structured.wasCalled) {
+      if (structured) {
+        if (!structured.wasCalled) {
+          return finish({
+            text: extractAssistantText(created.messages),
+            isError: true,
+            errorMessage: `child agent ended without calling ${STRUCTURED_OUTPUT_TOOL_NAME}`,
+            tool_calls: toolCallCount,
+          });
+        }
+        const failure = finalTurnError(created.messages);
         return finish({
-          text: extractAssistantText(created.messages),
-          isError: true,
-          errorMessage: `child agent ended without calling ${STRUCTURED_OUTPUT_TOOL_NAME}`,
+          text: JSON.stringify(structured.captured, null, 2),
+          value: structured.captured,
+          isError: Boolean(failure),
+          errorMessage: failure,
           tool_calls: toolCallCount,
         });
       }
+
+      const raw = extractAssistantText(created.messages);
+      const trunc = truncateHead(raw, {
+        maxLines: DEFAULT_MAX_LINES,
+        maxBytes: DEFAULT_MAX_BYTES,
+      });
+      let text = trunc.content;
+      if (trunc.truncated) {
+        text += `\n\n[Output truncated: ${trunc.outputLines} of ${trunc.totalLines} lines (${formatSize(trunc.outputBytes)} of ${formatSize(trunc.totalBytes)}).]`;
+      }
+
       const failure = finalTurnError(created.messages);
       return finish({
-        text: JSON.stringify(structured.captured, null, 2),
-        value: structured.captured,
+        text,
         isError: Boolean(failure),
         errorMessage: failure,
         tool_calls: toolCallCount,
       });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return finish({
+        text: "",
+        isError: true,
+        errorMessage: msg,
+        tool_calls: toolCallCount,
+      });
     }
-
-    const raw = extractAssistantText(created.messages);
-    const trunc = truncateHead(raw, {
-      maxLines: DEFAULT_MAX_LINES,
-      maxBytes: DEFAULT_MAX_BYTES,
-    });
-    let text = trunc.content;
-    if (trunc.truncated) {
-      text += `\n\n[Output truncated: ${trunc.outputLines} of ${trunc.totalLines} lines (${formatSize(trunc.outputBytes)} of ${formatSize(trunc.totalBytes)}).]`;
-    }
-
-    const failure = finalTurnError(created.messages);
-    return finish({
-      text,
-      isError: Boolean(failure),
-      errorMessage: failure,
-      tool_calls: toolCallCount,
-    });
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return finish({
-      text: "",
-      isError: true,
-      errorMessage: msg,
-      tool_calls: toolCallCount,
-    });
   } finally {
     const subFile = session?.sessionManager.getSessionFile();
     if (subFile) {
@@ -446,5 +466,6 @@ export async function runChildAgent(
         toolCalls: toolCallCount,
       });
     }
+    await shutdownChildSession(session);
   }
 }

@@ -3,6 +3,9 @@ import { homedir } from "node:os";
 import { basename, dirname, extname, join, resolve as resolvePath } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseFrontmatter } from "@earendil-works/pi-coding-agent";
+import { createLogger } from "../log.ts";
+
+const log = createLogger("agent-personas");
 
 export const FALLBACK_PERSONA_ID = "general-purpose" as const;
 
@@ -28,6 +31,7 @@ export type AgentPersonaEntry = {
 
 export type AgentPersonaCatalog = {
   agents: Map<string, AgentPersonaEntry>;
+  warnings: string[];
 };
 
 export type BuildAgentPersonaCatalogOptions = {
@@ -148,8 +152,8 @@ function parsePersonaMarkdown(
     const p = parseFrontmatter(raw);
     frontmatter = p.frontmatter as Record<string, unknown>;
     body = p.body;
-  } catch {
-    body = raw;
+  } catch (e) {
+    throw new Error(`invalid frontmatter: ${e instanceof Error ? e.message : String(e)}`);
   }
   const id = personaIdFromFrontmatter(frontmatter, defaultId);
   const fileOptions = parseFileOptionsFromFrontmatter(frontmatter);
@@ -164,15 +168,11 @@ function loadMdPersonaFile(path: string): {
   fileOptions: AgentPersonaFileOptions;
 } | null {
   if (extname(path).toLowerCase() !== ".md") return null;
-  try {
-    const raw = readFileSync(path, "utf8");
-    const base = basename(path, ".md");
-    const parsed = parsePersonaMarkdown(raw, base);
-    if (!parsed || parsed.prompt.length === 0) return null;
-    return parsed;
-  } catch {
-    return null;
-  }
+  const raw = readFileSync(path, "utf8");
+  const base = basename(path, ".md");
+  const parsed = parsePersonaMarkdown(raw, base);
+  if (!parsed || parsed.prompt.length === 0) return null;
+  return parsed;
 }
 
 function collectMdFilesInDir(dir: string): string[] {
@@ -269,10 +269,20 @@ export function buildAgentPersonaCatalog(cwd: string, opts?: BuildAgentPersonaCa
   layers.push({ dirs: extDirs });
 
   const agents = new Map<string, AgentPersonaEntry>();
+  const warnings: string[] = [];
   for (const layer of layers) {
     for (const dir of layer.dirs) {
       for (const file of collectMdFilesInDir(dir)) {
-        const row = loadMdPersonaFile(file);
+        let row: ReturnType<typeof loadMdPersonaFile>;
+        try {
+          row = loadMdPersonaFile(file);
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          const warning = `skipping malformed agent file ${file}: ${msg}`;
+          const replacedBy = agents.get(normalizePersonaId(basename(file, ".md")))?.sourcePath;
+          warnings.push(replacedBy ? `${warning}; using ${replacedBy} instead` : warning);
+          continue;
+        }
         if (!row) continue;
         agents.set(row.id, {
           prompt: row.prompt,
@@ -282,6 +292,7 @@ export function buildAgentPersonaCatalog(cwd: string, opts?: BuildAgentPersonaCa
       }
     }
   }
+  for (const warning of warnings) log.warn(warning);
   if (!agents.has(FALLBACK_PERSONA_ID)) {
     agents.set(FALLBACK_PERSONA_ID, {
       prompt: ULTIMATE_DEFAULT_PROMPT,
@@ -289,7 +300,7 @@ export function buildAgentPersonaCatalog(cwd: string, opts?: BuildAgentPersonaCa
       sourcePath: `<built-in ${FALLBACK_PERSONA_ID}>`,
     });
   }
-  return { agents };
+  return { agents, warnings };
 }
 
 export function resolvePersonaId(raw: string | undefined, catalog: AgentPersonaCatalog): string {

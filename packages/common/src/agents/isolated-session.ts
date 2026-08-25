@@ -12,6 +12,7 @@ import {
   SettingsManager,
 } from "@earendil-works/pi-coding-agent";
 import { recordChildSessionFinished, recordChildSessionStarted } from "./session-links.ts";
+import { shutdownChildSession } from "./session-shutdown.ts";
 
 const DEFAULT_SESSION_DIR = path.join(homedir(), ".agent", "isolated-sessions");
 
@@ -153,6 +154,7 @@ export async function runIsolatedSession(
         status: errored ? "error" : "done",
       });
     }
+    await shutdownChildSession(session);
   }
 
   const text = lastAssistantText(session.messages);

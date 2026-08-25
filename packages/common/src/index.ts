@@ -48,6 +48,7 @@ export {
   recordChildSessionFinished,
   recordChildSessionStarted,
 } from "./agents/session-links.ts";
+export { shutdownChildSession } from "./agents/session-shutdown.ts";
 export { mapConcurrent } from "./concurrency.ts";
 export type {
   BooleanConfigItem,
