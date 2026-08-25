@@ -7,6 +7,10 @@
 - The `subagent` parameter schema now requires exactly one of `task` and `tasks`, rejects empty task instructions, and declares every `oneOf` branch as an object for Grok-compatible tool schema validation. Invalid mode parameters still throw a tool execution error, so Pi records `isError: true` and exposes the validation failure clearly.
 - `git_clone` abort no longer hangs the subagent run forever. `runGit` previously SIGKILLed only the direct `git` child and waited for the `close` event; a stalled clone leaves `git-remote-http` grandchildren holding the inherited stdio pipes, so `close` never fired, the tool promise never settled, and neither the child session's `abort()` nor the parent's Esc/RPC abort could unblock the run (the parent agent stayed wedged on the pending tool call). `runGit` now spawns `git` in its own process group (`detached: true`), on abort SIGKILLs the whole group, and rejects immediately instead of waiting for pipe closure. Regression test aborts a real clone against a never-responding HTTP server and asserts prompt settlement plus no surviving `git` processes.
 
+### Removed
+
+- Removed the `inference-self-host` provider from child-session extension factories.
+
 ## [0.6.0] - 2026-08-19
 
 ### Changed

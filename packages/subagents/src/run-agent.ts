@@ -2,7 +2,6 @@ import type { ExtensionAPI, ExtensionContext, ExtensionFactory } from "@earendil
 import type { ChildAgentProgress, ChildAgentUsageSnapshot, RunChildAgentResult } from "@htwang-contrib/common";
 import { runChildAgent } from "@htwang-contrib/common";
 import extraTools from "@htwang-contrib/extra-tools";
-import inferenceSelfHost from "@htwang-contrib/inference-self-host";
 import protectSecrets from "@htwang-contrib/protect-secrets";
 import toori from "@htwang-contrib/toori";
 import webTools from "@htwang-contrib/web-tools";
@@ -25,7 +24,6 @@ const CHILD_SESSION_EXTENSION_FACTORIES: ExtensionFactory[] = [
   protectSecrets,
   extraTools,
   webTools,
-  inferenceSelfHost,
   toori,
   gitCloneExtension,
 ];

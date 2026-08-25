@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Refined the `workflow` tool prompt with explicit opt-in, bounded discovery before dynamic fan-out, accurate `parallel` barrier and `pipeline` sequencing semantics, structured `args` guidance, failure handling, and honest coverage reporting.
+
+### Removed
+
+- Removed the `inference-self-host` provider from workflow child-session extension factories.
+
 ## [0.5.0] - 2026-08-12
 
 ### Added

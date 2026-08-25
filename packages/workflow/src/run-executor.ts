@@ -3,7 +3,6 @@ import type { AgentToolUpdateCallback, ExtensionContext, ExtensionFactory } from
 import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, formatSize, truncateHead } from "@earendil-works/pi-coding-agent";
 import { runChildAgent } from "@htwang-contrib/common";
 import extraTools from "@htwang-contrib/extra-tools";
-import inferenceSelfHost from "@htwang-contrib/inference-self-host";
 import protectSecrets from "@htwang-contrib/protect-secrets";
 import toori from "@htwang-contrib/toori";
 import webTools from "@htwang-contrib/web-tools";
@@ -23,7 +22,7 @@ import {
 import { parseWorkflowScript } from "./script.ts";
 import { type SavedWorkflowScope, saveWorkflowScript } from "./script-store.ts";
 
-const WORKFLOW_CHILD_FACTORIES: ExtensionFactory[] = [protectSecrets, extraTools, webTools, inferenceSelfHost, toori];
+const WORKFLOW_CHILD_FACTORIES: ExtensionFactory[] = [protectSecrets, extraTools, webTools, toori];
 
 export type ExecuteWorkflowOptions = {
   script?: string;
