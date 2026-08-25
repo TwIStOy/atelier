@@ -29,7 +29,6 @@
       "packages/web-tools",
       "packages/message-queue",
       "packages/auto-compact",
-      "packages/voice-input",
       "packages/read-tracker",
       "packages/working-indicator",
       "packages/compact-thinking",
