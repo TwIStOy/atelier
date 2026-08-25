@@ -1,0 +1,3 @@
+# Persist Task State as Branch-Aware Lifecycle Events
+
+Task state will be canonically recorded as append-only lifecycle events carrying Stable Task Identity and Link Anchors, then projected into branch-local Task Versions. A linked outcome applies to every descendant branch containing its anchor, while forked or cloned sessions materialize the selected projection as a self-contained baseline; legacy full snapshots are migration inputs only. This accepts projection and migration complexity in exchange for preserving Pi's branch semantics, preventing delayed outcomes from targeting a reused Task Number, and avoiding external sidecars or cross-session log references.

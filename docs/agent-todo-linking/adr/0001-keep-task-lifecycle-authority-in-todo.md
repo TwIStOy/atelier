@@ -1,0 +1,3 @@
+# Keep Task Lifecycle Authority in Todo
+
+Subagents and workflow need synchronous admission and durable settlement, while Pi's event bus is fire-and-forget and direct Task-store mutation from each orchestrator would duplicate lifecycle, readiness, claim, and persistence rules. Todo will remain the sole Task lifecycle writer by registering a shared coordinator contract that orchestrators use to begin and finish Execution Attempts; cross-extension events remain notification-only. This adds an explicit runtime dependency on coordinator availability, but keeps every Task invariant under one authority without making subagents or workflow depend on Todo internals.
