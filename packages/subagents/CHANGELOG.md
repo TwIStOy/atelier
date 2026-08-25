@@ -4,7 +4,7 @@
 
 ### Fixed
 
-- Invalid `subagent` mode parameters now throw a tool execution error instead of returning a successful result with `tool_calls: 0`, so Pi records `isError: true` and exposes the validation failure clearly.
+- The `subagent` parameter schema now requires exactly one of `task` and `tasks`, rejects empty single-task instructions, and keeps the runtime validation fallback. Invalid mode parameters throw a tool execution error instead of returning a successful result with `tool_calls: 0`, so Pi records `isError: true` and exposes the validation failure clearly.
 - `git_clone` abort no longer hangs the subagent run forever. `runGit` previously SIGKILLed only the direct `git` child and waited for the `close` event; a stalled clone leaves `git-remote-http` grandchildren holding the inherited stdio pipes, so `close` never fired, the tool promise never settled, and neither the child session's `abort()` nor the parent's Esc/RPC abort could unblock the run (the parent agent stayed wedged on the pending tool call). `runGit` now spawns `git` in its own process group (`detached: true`), on abort SIGKILLs the whole group, and rejects immediately instead of waiting for pipe closure. Regression test aborts a real clone against a never-responding HTTP server and asserts prompt settlement plus no surviving `git` processes.
 
 ## [0.6.0] - 2026-08-19
