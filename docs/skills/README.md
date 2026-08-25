@@ -41,7 +41,7 @@
   - `docs/agents/domain.md` — `CONTEXT.md` / ADR 布局
   - 在 `AGENTS.md`(优先)或 `CLAUDE.md` 里写一段 `## Agent skills` 索引
 - **纪律**:先 explore 再问;每节一次问题,推荐答案放前;`ask_user_question` 优先。
-- **资源**:`prompts/resource/setup-agent-repo-context/{issue-tracker-github,issue-tracker-gitlab,issue-tracker-local,triage-labels,domain}.md`。
+- **资源**:`prompts-resource/setup-agent-repo-context/{issue-tracker-github,issue-tracker-gitlab,issue-tracker-local,triage-labels,domain}.md`。
 
 ### `/grill-with-docs` —— 边盘问边建领域模型
 
@@ -54,7 +54,7 @@
 - **怎么用**:`/triage` 或 `/triage #42` / `/triage show me what needs attention`。
 - **何时用**:维护者要把外部 issue 或 PR 分类、核实、必要时盘问,并写成 agent-ready brief。
 - **状态机**:每个 issue 一个 category(`bug`/`enhancement`) + 一个 state(`needs-triage`/`needs-info`/`ready-for-agent`/`ready-for-human`/`wontfix`)。
-- **产物**:GitHub 评论上的 agent brief(见 `prompts/resource/triage/AGENT-BRIEF.md`);被拒的 enhancement 写入 `.out-of-scope/`(见 `prompts/resource/triage/OUT-OF-SCOPE.md`)。
+- **产物**:GitHub 评论上的 agent brief(见 `prompts-resource/triage/AGENT-BRIEF.md`);被拒的 enhancement 写入 `.out-of-scope/`(见 `prompts-resource/triage/OUT-OF-SCOPE.md`)。
 - **Tracker**:默认 `gh`;无 GitHub 时回落到 `.scratch/<slug>/`。
 
 ### `/improve-codebase-architecture` —— 找加深(deepening)机会
@@ -66,7 +66,7 @@
   2. 用 `subagent`/`explore` 扫代码,按 deep-module 词汇(module/interface/depth/seam/adapter/leverage/locality)记摩擦点。
   3. 写一份自包含 HTML 报告到 `$TMPDIR/architecture-review-<ts>.html`(Tailwind + Mermaid CDN),打开给用户挑。
   4. 用户选中后进入 `grilling` + `domain-modeling` 循环;需要备选接口时加载 `design-an-interface`。
-- **资源**:`prompts/resource/improve-codebase-architecture/HTML-REPORT.md`。
+- **资源**:`prompts-resource/improve-codebase-architecture/HTML-REPORT.md`。
 
 ### `/to-spec` —— 把当前对话收成一份 spec
 
@@ -93,7 +93,7 @@
 - **怎么用**:`/wizard 配置 Stripe 测试密钥` / `/wizard 数据库迁移到新集群`。
 - **何时用**:有一段只有人能做的流程(开第三方控制台、配 CI secret、 provisioning、一次性迁移),每次重讲给 AI 很烦。
 - **产物**:一个 bash 向导脚本——逐阶段清屏、开 URL、告诉你点哪复制哪、隐藏输入 secret、幂等写 `.env` / `gh secret`,带进度和收尾总结。默认一次性,放 scratch;可重复使用的才提交进仓库。
-- **资源**:库与模板在 `prompts/resource/wizard/template.sh`;`STAGES` 标记以上是固定库,不许手改。
+- **资源**:库与模板在 `prompts-resource/wizard/template.sh`;`STAGES` 标记以上是固定库,不许手改。
 
 ### `/wait-what` —— 没看懂,重讲
 
@@ -181,7 +181,7 @@
 - **`code-review` 要一个固定点。** 给它 `review since main`、`review since HEAD~5`、`review since <tag>` 等。不给的话它会问你要。
 - **`diagnosing-bugs` 强制顺序。** 在 tight、red-capable 的反馈回路建立前,它拒绝理论化——如果你觉得它「不肯直接猜」很慢,那正是纪律在起作用。遇到必须人肉点击的 bug,它会回落到自带的 `skills/diagnosing-bugs/scripts/hitl-loop.template.sh`。
 - **交叉引用都能解析。** `tdd` 指向 `code-review`;`grill-with-docs` / `triage` / `improve-codebase-architecture` 加载 `grilling` + `domain-modeling`;`implement` 加载 `tdd` + `code-review`;`tdd`、`domain-modeling`、`diagnosing-bugs`、`improve-codebase-architecture` 都读 `CONTEXT.md`。所有目标在本仓库都存在。
-- **Prompt 资源路径从仓库根解析。** 例如 `prompts/resource/triage/AGENT-BRIEF.md`、`prompts/resource/improve-codebase-architecture/HTML-REPORT.md`、`prompts/resource/setup-agent-repo-context/`——pi 从 cwd 解析路径,不是从 prompt 文件所在目录。
+- **Prompt 资源路径从仓库根解析。** 例如 `prompts-resource/triage/AGENT-BRIEF.md`、`prompts-resource/improve-codebase-architecture/HTML-REPORT.md`、`prompts-resource/setup-agent-repo-context/`——pi 从 cwd 解析路径,不是从 prompt 文件所在目录。
 - **`docs/agents/*` 是 per-repo 配置。** `/triage`、`/to-spec`、`/to-tickets`、`/implement` 优先读它们;缺失时回落到内联的 `gh` / `.scratch` 默认。
 
 ## 来源与适配
@@ -193,9 +193,9 @@
 - **`code-review` 的子 agent 机制。** 原文「两个 `Agent` 工具调用」改成一次 `subagent` 调用、`tasks` 数组里放两项(`agent_type: "general-purpose"`),并发执行且上下文隔离。
 - **`setup-matt-pocock-skills` → `/setup-agent-repo-context`。** 改名并去掉所有 Matt 专属字样;产物仍写 `docs/agents/{issue-tracker,triage-labels,domain}.md`。优先编辑 `AGENTS.md`(pi 约定),其次 `CLAUDE.md`。`/triage` / `/to-spec` / `/to-tickets` / `/implement` 优先读这些文件,缺失时回落到内联 `gh` / `.scratch` 默认。
 - **`improve-codebase-architecture` 内联了 codebase-design 词汇。** 上游依赖 model-invoked 的 `codebase-design` skill;本仓库未移植该 skill(和 `code-philosophy` + `design-an-interface` 有重叠),于是把 module/interface/depth/seam/adapter/leverage/locality 词汇和三条原则直接写进 prompt。接口备选仍指向已有的 `design-an-interface`。
-- **Prompt 附带资源放在 `prompts/resource/<name>/`。** 例如 `triage` 的 `AGENT-BRIEF.md` / `OUT-OF-SCOPE.md`,`improve-codebase-architecture` 的 `HTML-REPORT.md`。入口 prompt 用仓库根相对路径引用。
+- **Prompt 附带资源放在 `prompts-resource/<name>/`。** 例如 `triage` 的 `AGENT-BRIEF.md` / `OUT-OF-SCOPE.md`,`improve-codebase-architecture` 的 `HTML-REPORT.md`。入口 prompt 用仓库根相对路径引用。
 - **reference 文件移进 `references/`。** mattpocock 把它们当同级文件放;本仓库 skill 的约定是 `references/` 子目录。链接相应更新。文件名沿用上游(`tests.md`、`mocking.md`、`CONTEXT-FORMAT.md`、`ADR-FORMAT.md`),因为仓库本来就已混用大小写。
 - **`diagnosing-bugs` 的脚本路径。** 两处 `hitl-loop.template.sh` 引用都改成完整仓库路径(`skills/diagnosing-bugs/scripts/...`),因为 pi 从 cwd 解析文件路径,而不是从 skill 目录。Phase 6 现在只做清理;上游已把 post-mortem 移交 `/improve-codebase-architecture` 的段落整个删除(model-invoked skill 不能调 user-invoked prompt,且实践中很少触发),本仓库同步。
 - **`grilling` 同步到 rounds/frontier 模型(2026-08)。** 上游把「一次一问」重写为按轮推进:每轮把 frontier 上全部可问问题一次性编号问出;新增 facts(decisions 分离(facts 自己查/子 agent,decisions 归用户)和显式 confirm gate。`/grill-with-docs`、`/triage` 中对 grilling 的描述已同步。
 - **`writing-great-skills/GLOSSARY.md` 是蒸馏而非作为 skill 移植。** 它的词汇(leading words、两种 invocation 负载、completion criteria、五种 failure mode)放在 `skills/write-a-skill/references/SKILL_VOCABULARY.md`,合并进已有的 `write-a-skill` skill 以避免重叠。上游后来删除了 `writing-great-skills`,由泛化的 `writing-for-agents` 接替;2026-08 同步时按同样方式把其新增概念(context pointer、negation、environment-as-cache)蒸馏进了该词汇表。
-- **`/wizard`、`/wait-what`(2026-08 新增)。** 上游均为 user-invoked,按约定映射到 `prompts/`。`wizard` 的 `template.sh` 原样放在 `prompts/resource/wizard/template.sh`(仅头注释改为 "Generated by the /wizard prompt")。
+- **`/wizard`、`/wait-what`(2026-08 新增)。** 上游均为 user-invoked,按约定映射到 `prompts/`。`wizard` 的 `template.sh` 原样放在 `prompts-resource/wizard/template.sh`(仅头注释改为 "Generated by the /wizard prompt")。

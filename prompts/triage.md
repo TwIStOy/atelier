@@ -25,8 +25,8 @@ Every comment or issue posted to the issue tracker during triage **must** start 
 
 Load these before acting:
 
-- `prompts/resource/triage/AGENT-BRIEF.md` — how to write durable agent briefs
-- `prompts/resource/triage/OUT-OF-SCOPE.md` — how the `.out-of-scope/` knowledge base works
+- `prompts-resource/triage/AGENT-BRIEF.md` — how to write durable agent briefs
+- `prompts-resource/triage/OUT-OF-SCOPE.md` — how the `.out-of-scope/` knowledge base works
 
 ## Issue tracker and labels
 
@@ -108,13 +108,13 @@ Show counts and a one-line summary per item. Let the maintainer pick.
 4. **Grill (if needed).** If the request needs fleshing out, run the `grilling` and `domain-modeling` skills together — grill it into shape round by round, sharpening domain terms and updating `CONTEXT.md`/ADRs inline as decisions land. Load `skills/grilling/SKILL.md` and `skills/domain-modeling/SKILL.md` first.
 
 5. **Apply the outcome:**
-   - `ready-for-agent` — post an agent brief comment (`prompts/resource/triage/AGENT-BRIEF.md`).
+   - `ready-for-agent` — post an agent brief comment (`prompts-resource/triage/AGENT-BRIEF.md`).
    - `ready-for-human` — same structure as an agent brief, but note why it can't be delegated (judgment calls, external access, design decisions, manual testing).
    - `needs-info` — post triage notes (template below).
    - `wontfix` — close, with the comment depending on *why*:
      - **Already implemented** — the change already exists in the codebase. Point to where it lives; do **not** write to `.out-of-scope/` (that KB is for *rejected* requests, not built ones).
      - **Rejected (bug)** — polite explanation, then close.
-     - **Rejected (enhancement)** — write to `.out-of-scope/`, link to it from a comment, then close (`prompts/resource/triage/OUT-OF-SCOPE.md`).
+     - **Rejected (enhancement)** — write to `.out-of-scope/`, link to it from a comment, then close (`prompts-resource/triage/OUT-OF-SCOPE.md`).
    - `needs-triage` — apply the role. Optional comment if there's partial progress.
 
 ## Quick state override

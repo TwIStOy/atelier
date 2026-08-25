@@ -23,11 +23,11 @@ If section 0 contains `reconfigure` (or the user asks to restart), treat existin
 
 Load these before writing; they are starting points for the files under `docs/agents/`:
 
-- `prompts/resource/setup-agent-repo-context/issue-tracker-github.md`
-- `prompts/resource/setup-agent-repo-context/issue-tracker-gitlab.md`
-- `prompts/resource/setup-agent-repo-context/issue-tracker-local.md`
-- `prompts/resource/setup-agent-repo-context/triage-labels.md`
-- `prompts/resource/setup-agent-repo-context/domain.md`
+- `prompts-resource/setup-agent-repo-context/issue-tracker-github.md`
+- `prompts-resource/setup-agent-repo-context/issue-tracker-gitlab.md`
+- `prompts-resource/setup-agent-repo-context/issue-tracker-local.md`
+- `prompts-resource/setup-agent-repo-context/triage-labels.md`
+- `prompts-resource/setup-agent-repo-context/domain.md`
 
 ## Process
 

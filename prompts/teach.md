@@ -21,18 +21,18 @@ This is a stateful request — the user intends to learn the topic over multiple
 
 Load these before acting — they define the workspace file formats:
 
-- `prompts/resource/teach/MISSION-FORMAT.md` — the `MISSION.md` template and rules
-- `prompts/resource/teach/RESOURCES-FORMAT.md` — the `RESOURCES.md` template and rules
-- `prompts/resource/teach/LEARNING-RECORD-FORMAT.md` — the learning record format
+- `prompts-resource/teach/MISSION-FORMAT.md` — the `MISSION.md` template and rules
+- `prompts-resource/teach/RESOURCES-FORMAT.md` — the `RESOURCES.md` template and rules
+- `prompts-resource/teach/LEARNING-RECORD-FORMAT.md` — the learning record format
 
 ## Teaching workspace
 
 The state of the user's learning is captured in this directory in several files:
 
-- `MISSION.md`: captures the _reason_ the user is interested in the topic. Used to ground all teaching. Use the format in `prompts/resource/teach/MISSION-FORMAT.md`.
+- `MISSION.md`: captures the _reason_ the user is interested in the topic. Used to ground all teaching. Use the format in `prompts-resource/teach/MISSION-FORMAT.md`.
 - `./reference/*.html`: reference materials — the compressed learnings from the lessons (cheat sheets, reference algorithms, syntax, yoga poses, glossaries). They are the raw units of learning. They should be beautiful documents which print out well, designed for quick reference.
-- `RESOURCES.md`: a list of resources explored to ground teaching in contextual knowledge, or to acquire knowledge and wisdom. Use the format in `prompts/resource/teach/RESOURCES-FORMAT.md`.
-- `./learning-records/*.md`: learning records capturing what the user has learned. Loosely equivalent to architectural decision records — they capture non-obvious lessons and key insights that may need revising later, or that drive future sessions. Used to calculate the zone of proximal development. Titled `0001-<dash-case-name>.md`, incrementing each time. Use the format in `prompts/resource/teach/LEARNING-RECORD-FORMAT.md`.
+- `RESOURCES.md`: a list of resources explored to ground teaching in contextual knowledge, or to acquire knowledge and wisdom. Use the format in `prompts-resource/teach/RESOURCES-FORMAT.md`.
+- `./learning-records/*.md`: learning records capturing what the user has learned. Loosely equivalent to architectural decision records — they capture non-obvious lessons and key insights that may need revising later, or that drive future sessions. Used to calculate the zone of proximal development. Titled `0001-<dash-case-name>.md`, incrementing each time. Use the format in `prompts-resource/teach/LEARNING-RECORD-FORMAT.md`.
 - `./lessons/*.html`: lessons. A __lesson__ is a single, self-contained HTML output that teaches one tightly-scoped thing tied to the mission. This is the primary unit of teaching in this workspace.
 - `./assets/*`: reusable __components__ shared across lessons. See [Assets](#assets).
 - `NOTES.md`: a scratchpad for user preferences and working notes.
