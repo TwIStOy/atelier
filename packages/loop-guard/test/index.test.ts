@@ -148,6 +148,30 @@ describe("loop-guard wiring", () => {
     assert.match(blocked.reason, /did NOT run/);
   });
 
+  it("never blocks subagent_status polling for a background job", () => {
+    const { pi, onHandlers } = mockPi();
+    extension(pi);
+    const { ctx } = mockCtx();
+    const poll = () => ({
+      type: "tool_call",
+      toolCallId: "poll",
+      toolName: "subagent_status",
+      input: { id: "job-1" },
+    });
+    const pollResult = () => ({
+      type: "tool_result",
+      toolCallId: "poll",
+      toolName: "subagent_status",
+      input: { id: "job-1" },
+      content: [{ type: "text", text: "status: running" }],
+      isError: false,
+    });
+    for (let i = 0; i < 5; i++) {
+      assert.equal(onHandlers.tool_call(poll() as never, ctx as never), undefined);
+      onHandlers.tool_result(pollResult() as never, ctx as never);
+    }
+  });
+
   it("resets detectors on session_start", () => {
     const { pi, onHandlers } = mockPi();
     extension(pi);

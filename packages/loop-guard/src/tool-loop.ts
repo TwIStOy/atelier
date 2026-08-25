@@ -4,6 +4,7 @@ export interface ToolLoopOptions {
   windowSize: number;
   maxRepeats: number;
   pingPongMinCycles: number;
+  allowedTools: ReadonlySet<string>;
 }
 
 export type ToolLoopDetection =
@@ -24,6 +25,7 @@ export class ToolLoopDetector {
   }
 
   checkCall(toolName: string, input: unknown, options: ToolLoopOptions): ToolLoopDetection | null {
+    if (options.allowedTools.has(toolName)) return null;
     const signature = toolSignature(toolName, input);
     const pingPong = this.checkPingPong(signature, toolName, options);
     if (pingPong) return pingPong;
@@ -45,6 +47,7 @@ export class ToolLoopDetector {
   }
 
   recordResult(toolName: string, input: unknown, resultText: string, isError: boolean, options: ToolLoopOptions): void {
+    if (options.allowedTools.has(toolName)) return;
     this.history.push({
       signature: toolSignature(toolName, input),
       result: resultSignature(resultText, isError),

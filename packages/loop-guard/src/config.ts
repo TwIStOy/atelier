@@ -9,6 +9,7 @@ export interface LoopGuardConfig {
   maxRepeats: number;
   pingPongMinCycles: number;
   windowSize: number;
+  allowedTools: string;
   thinkingEnabled: boolean;
   thinkingMinChunkChars: number;
   thinkingAcrossRepeatLimit: number;
@@ -27,6 +28,7 @@ export const DEFAULT_CONFIG: LoopGuardConfig = {
   maxRepeats: 3,
   pingPongMinCycles: 3,
   windowSize: 30,
+  allowedTools: "subagent_status",
   thinkingEnabled: true,
   thinkingMinChunkChars: 200,
   thinkingAcrossRepeatLimit: 1,
@@ -45,7 +47,24 @@ const CONFIG_SCHEMA: ExtensionConfigSchema<LoopGuardConfig> = {
 };
 
 export function loadConfig(): LoopGuardConfig {
-  return readConfig(CONFIG_ID, CONFIG_SCHEMA);
+  const config = readConfig(CONFIG_ID, CONFIG_SCHEMA);
+  return { ...config, allowedTools: normalizeAllowedTools(config.allowedTools) };
+}
+
+function normalizeAllowedTools(value: unknown): string {
+  if (Array.isArray(value)) {
+    return value.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0).join(",");
+  }
+  return typeof value === "string" ? value : "";
+}
+
+export function parseAllowedTools(value: string): Set<string> {
+  return new Set(
+    value
+      .split(",")
+      .map((name) => name.trim())
+      .filter((name) => name.length > 0),
+  );
 }
 
 export function toolLoopOptions(config: LoopGuardConfig): ToolLoopOptions {
@@ -53,6 +72,7 @@ export function toolLoopOptions(config: LoopGuardConfig): ToolLoopOptions {
     windowSize: config.windowSize,
     maxRepeats: config.maxRepeats,
     pingPongMinCycles: config.pingPongMinCycles,
+    allowedTools: parseAllowedTools(config.allowedTools),
   };
 }
 
@@ -108,6 +128,17 @@ export function registerConfig(): void {
       description: "How many recent tool results are kept for loop detection. Older calls are forgotten.",
       extensionLabel: "Loop Guard",
       order: 30,
+    },
+    {
+      key: "allowedTools",
+      type: "string",
+      label: "Allowed Tools",
+      value: () => loadConfig().allowedTools,
+      placeholder: "subagent_status",
+      description:
+        "Comma-separated tool names exempt from loop detection, for tools where repeated identical calls are legitimate (e.g. polling a background job with subagent_status). Exempt calls are never blocked and do not count toward the history window.",
+      extensionLabel: "Loop Guard",
+      order: 35,
     },
     {
       key: "thinkingEnabled",

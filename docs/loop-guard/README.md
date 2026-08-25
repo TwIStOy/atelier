@@ -12,6 +12,8 @@ The classic stuck-agent pattern: `read` the same file, `grep` the same pattern, 
 
 A call only counts toward a loop when **tool + arguments + result are all identical** (results are hashed, including the error flag). This is the "no progress" signal: read-after-edit is safe because the second read returns different content. When the same call has already produced the same result `maxRepeats - 1` times, the next attempt is **blocked** before execution.
 
+Tools where repeated identical calls are legitimate — e.g. `subagent_status` polling a background job that keeps answering "running" — are exempt via `allowedTools` (comma-separated, default `subagent_status`). Exempt calls are never blocked, are not recorded in the history window, and do not participate in ping-pong chains, so heavy polling cannot flush real signal out of the window.
+
 ### Ping-pong tool calls
 
 Alternating cycles `A,B,A,B,...` (e.g. edit → test → edit → revert) where both A and B return identical results every iteration. Checked *before* exact-repeat so a cycle gets the cycle-specific diagnosis rather than a plain "repeated call" on its third A.
@@ -46,9 +48,10 @@ All settings live in `/config` under "Loop Guard" (persisted to `~/.config/pi/ex
 | Key | Default | Meaning |
 | --- | --- | --- |
 | `enabled` | `true` | Master switch for detection and blocking. |
-| `maxRepeats` | `3` | Block the Nth call with identical args + identical results. Raise this if you do intentional polling (e.g. waiting on CI). |
+| `maxRepeats` | `3` | Block the Nth call with identical args + identical results. Raise this if you do intentional polling with a tool that is not in `allowedTools` (e.g. waiting on CI). |
 | `pingPongMinCycles` | `3` | Block when an `A,B` alternation repeats this many times. |
 | `windowSize` | `30` | Recent tool results kept for comparison; older calls are forgotten (this is also the escape hatch that lets a blocked call become callable again later). |
+| `allowedTools` | `subagent_status` | Comma-separated tool names exempt from loop detection, for tools where repeated identical calls are legitimate (polling a background job). Exempt calls are never blocked and are not recorded in the history window. |
 | `thinkingEnabled` | `true` | Enable reasoning-loop detection. |
 | `thinkingMinChunkChars` | `200` | Minimum paragraph length considered; guards against trivial short repeats. |
 | `thinkingAcrossRepeatLimit` | `1` | Distinct repeated paragraphs required to flag an across-turn loop. |

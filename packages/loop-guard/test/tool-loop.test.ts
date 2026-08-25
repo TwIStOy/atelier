@@ -2,7 +2,12 @@ import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import { ToolLoopDetector, type ToolLoopOptions } from "../src/tool-loop.ts";
 
-const OPTIONS: ToolLoopOptions = { windowSize: 30, maxRepeats: 3, pingPongMinCycles: 3 };
+const OPTIONS: ToolLoopOptions = {
+  windowSize: 30,
+  maxRepeats: 3,
+  pingPongMinCycles: 3,
+  allowedTools: new Set(),
+};
 
 function run(
   detector: ToolLoopDetector,
@@ -83,6 +88,38 @@ describe("ToolLoopDetector repeat detection", () => {
     run(detector, "read", { path: "/a" }, "contents");
     detector.reset();
     assert.equal(detector.checkCall("read", { path: "/a" }, OPTIONS), null);
+  });
+});
+
+describe("ToolLoopDetector allowed tools", () => {
+  const POLLING_OPTIONS: ToolLoopOptions = { ...OPTIONS, allowedTools: new Set(["subagent_status"]) };
+
+  it("never blocks repeated identical calls to an allowed tool", () => {
+    const detector = new ToolLoopDetector();
+    for (let i = 0; i < 6; i++) {
+      assert.equal(detector.checkCall("subagent_status", { id: "job-1" }, POLLING_OPTIONS), null);
+      detector.recordResult("subagent_status", { id: "job-1" }, "running", false, POLLING_OPTIONS);
+    }
+  });
+
+  it("does not record allowed tools in the history window", () => {
+    const detector = new ToolLoopDetector();
+    for (let i = 0; i < 6; i++) {
+      run(detector, "subagent_status", { id: "job-1" }, "running", false, POLLING_OPTIONS);
+    }
+    run(detector, "read", { path: "/a" }, "contents", false, POLLING_OPTIONS);
+    run(detector, "read", { path: "/a" }, "contents", false, POLLING_OPTIONS);
+    assert.equal(detector.checkCall("read", { path: "/a" }, POLLING_OPTIONS)?.kind, "repeat");
+  });
+
+  it("still blocks non-allowed tools while an allowed tool is polled", () => {
+    const detector = new ToolLoopDetector();
+    for (let i = 0; i < 3; i++) {
+      run(detector, "subagent_status", { id: "job-1" }, "running", false, POLLING_OPTIONS);
+      run(detector, "read", { path: "/a" }, "contents", false, POLLING_OPTIONS);
+    }
+    assert.equal(detector.checkCall("read", { path: "/a" }, POLLING_OPTIONS)?.kind, "repeat");
+    assert.equal(detector.checkCall("subagent_status", { id: "job-1" }, POLLING_OPTIONS), null);
   });
 });
 
