@@ -104,7 +104,7 @@ export class SubagentViewerOverlay implements Component {
   }
 
   handleInput(data: string): void {
-    if (matchesKey(data, Key.escape)) {
+    if (matchesKey(data, Key.escape) || matchesKey(data, Key.ctrl("c"))) {
       this.finish("done");
       return;
     }

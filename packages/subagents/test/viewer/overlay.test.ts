@@ -5,6 +5,7 @@ import type { SubagentRunSummary } from "../../src/viewer/index.ts";
 import { SubagentViewerOverlay } from "../../src/viewer/overlay.ts";
 
 const ESC = "\u001b";
+const CTRL_C = "\u0003";
 const ARROW_LEFT = "\u001b[D";
 const ARROW_RIGHT = "\u001b[C";
 const ARROW_DOWN = "\u001b[B";
@@ -60,6 +61,21 @@ describe("SubagentViewerOverlay navigation", () => {
       },
     });
     overlay.handleInput(ESC);
+    expect(action).toBe("done");
+    overlay.dispose();
+  });
+
+  it("Ctrl+C triggers done action", () => {
+    let action = "none";
+    const overlay = new SubagentViewerOverlay({
+      ...PARAM_BASE,
+      runs: [makeRun("a", "Run A")],
+      initialIndex: 0,
+      onAction: (a) => {
+        action = a;
+      },
+    });
+    overlay.handleInput(CTRL_C);
     expect(action).toBe("done");
     overlay.dispose();
   });
