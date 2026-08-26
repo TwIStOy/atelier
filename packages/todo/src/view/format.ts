@@ -51,3 +51,9 @@ export function formatCommandTaskLine(t: Task, glyph: string): string {
   const block = t.blockedBy?.length ? `    ⛓ ${t.blockedBy.map((id) => `#${id}`).join(",")}` : "";
   return `  ${glyph} #${t.id} ${t.subject}${form}${block}`;
 }
+
+export function formatTaskListLine(t: Task): string {
+  const block = t.blockedBy?.length ? ` ⛓ ${t.blockedBy.map((id) => `#${id}`).join(",")}` : "";
+  const form = t.status === "in_progress" && t.activeForm ? ` (${t.activeForm})` : "";
+  return `[${t.status}] #${t.id} ${t.subject}${form}${block}`;
+}

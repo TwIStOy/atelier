@@ -1,13 +1,8 @@
 import type { TaskState } from "../state/state.ts";
 import type { Op } from "../state/state-reducer.ts";
 import { deriveBlocks } from "../state/task-graph.ts";
+import { formatTaskListLine } from "../view/format.ts";
 import type { Task, TaskAction, TaskDetails, TaskMutationParams } from "./types.ts";
-
-function formatListLine(t: Task): string {
-  const block = t.blockedBy?.length ? ` ⛓ ${t.blockedBy.map((id) => `#${id}`).join(",")}` : "";
-  const form = t.status === "in_progress" && t.activeForm ? ` (${t.activeForm})` : "";
-  return `[${t.status}] #${t.id} ${t.subject}${form}${block}`;
-}
 
 function formatGetLines(task: Task, state: TaskState): string {
   const blocks = deriveBlocks(state.tasks).get(task.id) ?? [];
@@ -43,7 +38,7 @@ export function formatContent(op: Op, state: TaskState): string {
       let view = state.tasks;
       if (!op.includeDeleted) view = view.filter((t) => t.status !== "deleted");
       if (op.statusFilter) view = view.filter((t) => t.status === op.statusFilter);
-      return view.length === 0 ? "No tasks" : view.map(formatListLine).join("\n");
+      return view.length === 0 ? "No tasks" : view.map(formatTaskListLine).join("\n");
     }
     case "get":
       return formatGetLines(op.task, state);

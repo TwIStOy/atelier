@@ -21,8 +21,8 @@ afterEach(() => {
 });
 
 describe("loadConfig", () => {
-  it("returns {} when no config file exists (empty dir)", () => {
-    expect(loadConfig()).toEqual({});
+  it("returns reminder defaults when no config file exists (empty dir)", () => {
+    expect(loadConfig()).toEqual({ reminderEnabled: true, reminderInterval: 4 });
   });
 
   it("reads the 'todo' section when present", () => {
@@ -45,21 +45,31 @@ describe("loadConfig", () => {
     expect(cfg.guidance?.promptGuidelines).toEqual(["rule1", "rule2"]);
   });
 
-  it("returns {} when the file exists but has no 'todo' section", () => {
+  it("returns reminder defaults when the file exists but has no 'todo' section", () => {
     const configDir = join(tmpDir, "pi");
     mkdirSync(configDir, { recursive: true });
     const configPath = join(configDir, "extensions.json");
     writeFileSync(configPath, JSON.stringify({ other: { foo: "bar" } }));
     const cfg = loadConfig();
-    expect(cfg).toEqual({});
+    expect(cfg).toEqual({ reminderEnabled: true, reminderInterval: 4 });
   });
 
-  it("returns {} when the JSON is malformed", () => {
+  it("returns reminder defaults when the JSON is malformed", () => {
     const configDir = join(tmpDir, "pi");
     mkdirSync(configDir, { recursive: true });
     const configPath = join(configDir, "extensions.json");
     writeFileSync(configPath, "{ not valid json");
     const cfg = loadConfig();
-    expect(cfg).toEqual({});
+    expect(cfg).toEqual({ reminderEnabled: true, reminderInterval: 4 });
+  });
+
+  it("lets the 'todo' section override reminder defaults", () => {
+    const configDir = join(tmpDir, "pi");
+    mkdirSync(configDir, { recursive: true });
+    const configPath = join(configDir, "extensions.json");
+    writeFileSync(configPath, JSON.stringify({ todo: { reminderEnabled: false, reminderInterval: 9 } }));
+    const cfg = loadConfig();
+    expect(cfg.reminderEnabled).toBe(false);
+    expect(cfg.reminderInterval).toBe(9);
   });
 });

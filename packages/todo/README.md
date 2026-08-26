@@ -7,6 +7,7 @@
 - **`todo_*` 工具** —— 6 个独立工具(`todo_create` / `todo_update` / `todo_list` / `todo_get` / `todo_delete` / `todo_clear`)负责创建/更新/查询/删除/清空任务,每个工具只暴露该 action 所需的字段(必填字段直接在 schema 层面约束)
 - **`/todos` 命令** —— 三段分组查看当前任务列表
 - **Overlay widget** —— 编辑器上方实时面板,显示 `completed/total` 计数,完成项自动折叠
+- **System-reminder 注入** —— 连续 N 轮(默认 4)未使用 `todo_*` 工具且列表非空时,向下一次 LLM 请求注入一条瞬态 `<system-reminder>`(提醒文案 + 当前列表快照),不落盘
 - **状态持久化** —— 通过 session branch replay,`/reload` 和 compact 后自动恢复
 
 ## `todo_*` 工具
@@ -43,7 +44,7 @@
 
 ## 配置
 
-在 `extensions.json` 的 `"todo"` 段可覆盖 prompt 文案:
+在 `extensions.json` 的 `"todo"` 段可覆盖 prompt 文案与 reminder 行为:
 
 ```json
 {
@@ -51,12 +52,18 @@
     "guidance": {
       "promptSnippet": "Maintain a focused todo list...",
       "promptGuidelines": ["Keep tasks small", "Mark progress promptly"]
-    }
+    },
+    "reminderEnabled": true,
+    "reminderInterval": 4
   }
 }
 ```
 
-未设置时使用各工具内置的默认 `promptSnippet` / `promptGuidelines`(按 action 分发,无重复)。
+未设置时使用各工具内置的默认 `promptSnippet` / `promptGuidelines`(按 action 分发,无重复)。`reminderEnabled` / `reminderInterval` 也可以通过 `/config` 的 extension-config-ui 修改。
+
+## System-reminder
+
+参考 Claude Code / pi-tasks 的提醒机制:cadence 状态机(`src/reminder/cadence.ts`,纯函数可单测)在 `turn_start` 计数、在 `tool_result` 判定——连续 `reminderInterval` 轮没有调用任何 `todo_*` 工具(含旧版 `todo`)且可见任务列表非空时,标记 reminder 到期;下一次 `context` 钩子把 `buildReminderMessage`(`src/reminder/message.ts`)生成的文本作为瞬态 user message 追加到请求里,不写入 session。任何 `todo_*` 调用都会重置计时;注入后重新起算间隔。列表为空(或仅剩 tombstone)时不提醒。
 
 ## 持久化
 
