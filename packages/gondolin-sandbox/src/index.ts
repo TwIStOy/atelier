@@ -1,6 +1,14 @@
 import type { VM } from "@earendil-works/gondolin";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { createBashTool, createEditTool, createReadTool, createWriteTool } from "@earendil-works/pi-coding-agent";
+import {
+  createBashTool,
+  createEditTool,
+  createFindTool,
+  createGrepTool,
+  createLsTool,
+  createReadTool,
+  createWriteTool,
+} from "@earendil-works/pi-coding-agent";
 import {
   type ExtensionConfigSchema,
   isExtensionDisabled,
@@ -12,6 +20,9 @@ import {
 import {
   createGondolinBashOps,
   createGondolinEditOps,
+  createGondolinFindOps,
+  createGondolinGrepOps,
+  createGondolinLsOps,
   createGondolinReadOps,
   createGondolinWriteOps,
   createSandboxVm,
@@ -33,7 +44,7 @@ interface SandboxConfig {
 const DEFAULT_CONFIG: SandboxConfig = {
   enabled: false,
   allowedHosts: "",
-  image: "alpine-base:latest",
+  image: "alpine-tools:latest",
   memory: "1G",
   cpus: 2,
 };
@@ -61,7 +72,7 @@ function registerConfig(): void {
       label: "Enabled",
       value: () => loadConfig().enabled,
       description:
-        "Run read/write/edit/bash inside a Gondolin micro-VM. The host cwd is mounted at /workspace. Off = pi behaves normally.",
+        "Run read/write/edit/bash/grep/find/ls inside a Gondolin micro-VM. The host cwd is mounted at /workspace. Off = pi behaves normally.",
       extensionLabel: EXTENSION_LABEL,
       order: 0,
     },
@@ -80,7 +91,9 @@ function registerConfig(): void {
       type: "string",
       label: "Image",
       value: () => loadConfig().image,
-      description: "Guest image selector resolved via the built-in image registry.",
+      placeholder: "alpine-tools:latest",
+      description:
+        "Guest image selector resolved via the image registry. Default alpine-tools:latest adds fd and ripgrep on top of alpine-base (build it with the config under this package's image/ directory).",
       extensionLabel: EXTENSION_LABEL,
       order: 20,
     },
@@ -133,6 +146,9 @@ export default function (pi: ExtensionAPI) {
   const localWrite = createWriteTool(localCwd);
   const localEdit = createEditTool(localCwd);
   const localBash = createBashTool(localCwd);
+  const localGrep = createGrepTool(localCwd);
+  const localFind = createFindTool(localCwd);
+  const localLs = createLsTool(localCwd);
 
   let handle: VmHandle | null = null;
   let starting: Promise<VmHandle> | null = null;
@@ -239,6 +255,42 @@ export default function (pi: ExtensionAPI) {
       if (!vm) return localBash.execute(id, params, signal, onUpdate);
       const tool = createBashTool(localCwd, {
         operations: createGondolinBashOps(vm, localCwd),
+      });
+      return tool.execute(id, params, signal, onUpdate);
+    },
+  });
+
+  pi.registerTool({
+    ...localGrep,
+    async execute(id, params, signal, onUpdate, ctx) {
+      const vm = await ensureVm(ctx);
+      if (!vm) return localGrep.execute(id, params, signal, onUpdate);
+      const tool = createGrepTool(localCwd, {
+        operations: createGondolinGrepOps(vm, localCwd),
+      });
+      return tool.execute(id, params, signal, onUpdate);
+    },
+  });
+
+  pi.registerTool({
+    ...localFind,
+    async execute(id, params, signal, onUpdate, ctx) {
+      const vm = await ensureVm(ctx);
+      if (!vm) return localFind.execute(id, params, signal, onUpdate);
+      const tool = createFindTool(localCwd, {
+        operations: createGondolinFindOps(vm, localCwd),
+      });
+      return tool.execute(id, params, signal, onUpdate);
+    },
+  });
+
+  pi.registerTool({
+    ...localLs,
+    async execute(id, params, signal, onUpdate, ctx) {
+      const vm = await ensureVm(ctx);
+      if (!vm) return localLs.execute(id, params, signal, onUpdate);
+      const tool = createLsTool(localCwd, {
+        operations: createGondolinLsOps(vm, localCwd),
       });
       return tool.execute(id, params, signal, onUpdate);
     },
