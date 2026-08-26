@@ -36,6 +36,7 @@ All settings live under the `gondolin-sandbox` section in `~/.config/pi/extensio
 | --- | --- | --- | --- |
 | `enabled` | boolean | `false` | Master switch. When off, pi behaves exactly as without this extension. |
 | `allowedHosts` | string | `""` | Comma-separated HTTP egress allowlist (for example `api.github.com,registry.npmjs.org`). Empty means open egress — same as the upstream Gondolin default. |
+| `extraMounts` | string | `""` | Comma-separated extra host mounts as `hostPath:guestPath[:ro\|:rw]` (for example `/tmp:/tmp,/nix/store:/nix/store:ro`). Host paths outside the workspace and these mounts are rejected by the tools. `~` expands to the host home. Keep guest path equal to host path when bash commands reference it. |
 | `image` | string | `alpine-tools:latest` | Guest image selector resolved through the image registry. The default adds `fd`/`ripgrep` to `alpine-base`; build it once (see below). |
 | `memory` | string | `1G` | VM memory size forwarded to QEMU. |
 | `cpus` | number | `2` | VM CPU count. |
@@ -43,7 +44,9 @@ All settings live under the `gondolin-sandbox` section in `~/.config/pi/extensio
 ## Behavior when enabled
 
 - One long-lived VM is started lazily on the first tool call (and eagerly on `session_start`), then closed on `session_shutdown`.
-- The system prompt's `Current working directory:` line is rewritten to point at `/workspace` so the model addresses the guest path.
+- The system prompt's `Current working directory:` line is rewritten to point at `/workspace` so the model addresses the guest path; extra mounts are appended to the prompt when configured.
+- Paths outside the workspace and any `extraMounts` are rejected with a `path escapes sandbox mounts` error listing the allowed roots. Missing host paths in `extraMounts` are skipped with a warning instead of failing VM startup.
+- Extra mounts become Gondolin VFS mounts: `vm.fs` calls short-circuit to the host provider, and the guest sees them via fuse binds at the configured guest path (`ro` mounts reject writes with `EROFS`).
 - `user_bash` (`!command`) is also routed into the VM.
 - `grep`: the `rg` search process itself still runs on the host (pi's grep tool spawns it outside the operations interface); directory checks and context-line reads go through `vm.fs`. Since `/workspace` is backed by the host directory, search results are identical. `rg` is also installed inside the guest for bash usage.
 - `find`: runs `fd` **inside the guest** (`/usr/bin/fd`) with the same argument construction as pi's host implementation (`--glob --hidden`, `--max-results`, `--full-path` handling, `.gitignore`-aware git detection). Requires the `alpine-tools` image (or any image shipping `fd`).

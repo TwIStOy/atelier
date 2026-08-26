@@ -4,6 +4,8 @@
 
 ### Added
 
+- New `extraMounts` config: comma-separated `hostPath:guestPath[:ro|:rw]` mounts exposed inside the VM in addition to `/workspace`. Fixes the previous hard failure on any host path outside the session cwd (e.g. `/tmp` scratch scripts, `/nix/store` docs, sibling repos). Read-only mounts use Gondolin's `ReadonlyProvider`; `ro`-mode writes fail with `EROFS`. Missing host paths or duplicate guest paths are skipped with a warning. Extra mounts are listed in the rewritten system prompt.
+
 - `grep`, `find`, and `ls` tools are now rewired when the sandbox is enabled. `ls` routes `stat`/`readdir` through `vm.fs`; `grep` routes directory checks and context-line reads through `vm.fs` (the `rg` search process itself still runs on the host over the mounted workspace — pi's grep tool spawns it outside the operations interface, results are identical since `/workspace` is host-backed).
 
 ### Changed

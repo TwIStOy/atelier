@@ -1,4 +1,3 @@
-import type { VM } from "@earendil-works/gondolin";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import {
   createBashTool,
@@ -26,6 +25,7 @@ import {
   createGondolinReadOps,
   createGondolinWriteOps,
   createSandboxVm,
+  parseExtraMounts,
   type VmHandle,
 } from "./vm-ops.ts";
 
@@ -36,6 +36,7 @@ const GUEST_WORKSPACE = "/workspace";
 interface SandboxConfig {
   enabled: boolean;
   allowedHosts: string;
+  extraMounts: string;
   image: string;
   memory: string;
   cpus: number;
@@ -44,6 +45,7 @@ interface SandboxConfig {
 const DEFAULT_CONFIG: SandboxConfig = {
   enabled: false,
   allowedHosts: "",
+  extraMounts: "",
   image: "alpine-tools:latest",
   memory: "1G",
   cpus: 2,
@@ -85,6 +87,17 @@ function registerConfig(): void {
       description: "Comma-separated HTTP egress allowlist. Empty = open egress (the Gondolin default).",
       extensionLabel: EXTENSION_LABEL,
       order: 10,
+    },
+    {
+      key: "extraMounts",
+      type: "string",
+      label: "Extra Mounts",
+      value: () => loadConfig().extraMounts,
+      placeholder: "/tmp:/tmp,/nix/store:/nix/store:ro",
+      description:
+        'Comma-separated extra host mounts as "hostPath:guestPath[:ro|:rw]". Paths outside the workspace and these mounts are rejected. Guest path must match the host path for bash commands referencing it to work.',
+      extensionLabel: EXTENSION_LABEL,
+      order: 15,
     },
     {
       key: "image",
@@ -153,10 +166,10 @@ export default function (pi: ExtensionAPI) {
   let handle: VmHandle | null = null;
   let starting: Promise<VmHandle> | null = null;
 
-  async function ensureVm(ctx?: ExtensionContext): Promise<VM | null> {
+  async function ensureVm(ctx?: ExtensionContext): Promise<VmHandle | null> {
     if (!loadConfig().enabled) return null;
-    if (handle) return handle.vm;
-    if (starting) return (await starting).vm;
+    if (handle) return handle;
+    if (starting) return starting;
 
     starting = (async () => {
       const config = loadConfig();
@@ -164,7 +177,10 @@ export default function (pi: ExtensionAPI) {
 
       const created = await createSandboxVm(
         localCwd,
-        { allowedHosts: parseAllowedHosts(config.allowedHosts) },
+        {
+          allowedHosts: parseAllowedHosts(config.allowedHosts),
+          extraMounts: parseExtraMounts(config.extraMounts),
+        },
         {
           sandbox: { imagePath: config.image },
           memory: config.memory,
@@ -175,11 +191,14 @@ export default function (pi: ExtensionAPI) {
       handle = created;
       setStatus(ctx, `${EXTENSION_LABEL}: running (${localCwd} -> ${GUEST_WORKSPACE})`);
       notify(ctx, `Gondolin VM ready. Host ${localCwd} mounted at ${GUEST_WORKSPACE}`, "info");
+      for (const warning of created.warnings) {
+        notify(ctx, `${EXTENSION_LABEL}: ${warning}`, "warning");
+      }
       return created;
     })();
 
     try {
-      return (await starting).vm;
+      return await starting;
     } catch (err) {
       if (isStaleCtxError(err)) return null;
       starting = null;
@@ -215,10 +234,10 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     ...localRead,
     async execute(id, params, signal, onUpdate, ctx) {
-      const vm = await ensureVm(ctx);
-      if (!vm) return localRead.execute(id, params, signal, onUpdate);
+      const h = await ensureVm(ctx);
+      if (!h) return localRead.execute(id, params, signal, onUpdate);
       const tool = createReadTool(localCwd, {
-        operations: createGondolinReadOps(vm, localCwd),
+        operations: createGondolinReadOps(h.vm, h.mounts),
       });
       return tool.execute(id, params, signal, onUpdate);
     },
@@ -227,10 +246,10 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     ...localWrite,
     async execute(id, params, signal, onUpdate, ctx) {
-      const vm = await ensureVm(ctx);
-      if (!vm) return localWrite.execute(id, params, signal, onUpdate);
+      const h = await ensureVm(ctx);
+      if (!h) return localWrite.execute(id, params, signal, onUpdate);
       const tool = createWriteTool(localCwd, {
-        operations: createGondolinWriteOps(vm, localCwd),
+        operations: createGondolinWriteOps(h.vm, h.mounts),
       });
       return tool.execute(id, params, signal, onUpdate);
     },
@@ -239,10 +258,10 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     ...localEdit,
     async execute(id, params, signal, onUpdate, ctx) {
-      const vm = await ensureVm(ctx);
-      if (!vm) return localEdit.execute(id, params, signal, onUpdate);
+      const h = await ensureVm(ctx);
+      if (!h) return localEdit.execute(id, params, signal, onUpdate);
       const tool = createEditTool(localCwd, {
-        operations: createGondolinEditOps(vm, localCwd),
+        operations: createGondolinEditOps(h.vm, h.mounts),
       });
       return tool.execute(id, params, signal, onUpdate);
     },
@@ -251,10 +270,10 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     ...localBash,
     async execute(id, params, signal, onUpdate, ctx) {
-      const vm = await ensureVm(ctx);
-      if (!vm) return localBash.execute(id, params, signal, onUpdate);
+      const h = await ensureVm(ctx);
+      if (!h) return localBash.execute(id, params, signal, onUpdate);
       const tool = createBashTool(localCwd, {
-        operations: createGondolinBashOps(vm, localCwd),
+        operations: createGondolinBashOps(h.vm, h.mounts),
       });
       return tool.execute(id, params, signal, onUpdate);
     },
@@ -263,10 +282,10 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     ...localGrep,
     async execute(id, params, signal, onUpdate, ctx) {
-      const vm = await ensureVm(ctx);
-      if (!vm) return localGrep.execute(id, params, signal, onUpdate);
+      const h = await ensureVm(ctx);
+      if (!h) return localGrep.execute(id, params, signal, onUpdate);
       const tool = createGrepTool(localCwd, {
-        operations: createGondolinGrepOps(vm, localCwd),
+        operations: createGondolinGrepOps(h.vm, h.mounts),
       });
       return tool.execute(id, params, signal, onUpdate);
     },
@@ -275,10 +294,10 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     ...localFind,
     async execute(id, params, signal, onUpdate, ctx) {
-      const vm = await ensureVm(ctx);
-      if (!vm) return localFind.execute(id, params, signal, onUpdate);
+      const h = await ensureVm(ctx);
+      if (!h) return localFind.execute(id, params, signal, onUpdate);
       const tool = createFindTool(localCwd, {
-        operations: createGondolinFindOps(vm, localCwd),
+        operations: createGondolinFindOps(h.vm, h.mounts),
       });
       return tool.execute(id, params, signal, onUpdate);
     },
@@ -287,10 +306,10 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     ...localLs,
     async execute(id, params, signal, onUpdate, ctx) {
-      const vm = await ensureVm(ctx);
-      if (!vm) return localLs.execute(id, params, signal, onUpdate);
+      const h = await ensureVm(ctx);
+      if (!h) return localLs.execute(id, params, signal, onUpdate);
       const tool = createLsTool(localCwd, {
-        operations: createGondolinLsOps(vm, localCwd),
+        operations: createGondolinLsOps(h.vm, h.mounts),
       });
       return tool.execute(id, params, signal, onUpdate);
     },
@@ -298,16 +317,23 @@ export default function (pi: ExtensionAPI) {
 
   pi.on("user_bash", async (_event, _ctx) => {
     if (!handle) return;
-    return { operations: createGondolinBashOps(handle.vm, localCwd) };
+    return { operations: createGondolinBashOps(handle.vm, handle.mounts) };
   });
 
   pi.on("before_agent_start", async (event, ctx) => {
-    const vm = await ensureVm(ctx);
-    if (!vm) return;
-    const modified = event.systemPrompt.replace(
+    const h = await ensureVm(ctx);
+    if (!h) return;
+    let modified = event.systemPrompt.replace(
       `Current working directory: ${localCwd}`,
       `Current working directory: ${GUEST_WORKSPACE} (Gondolin VM, mounted from host: ${localCwd})`,
     );
+    if (h.mounts.length > 1) {
+      const extras = h.mounts
+        .slice(1)
+        .map((m) => `${m.guestRoot} (${m.readOnly ? "ro" : "rw"}, host ${m.hostRoot})`)
+        .join(", ");
+      modified += `\nGondolin sandbox extra mounts: ${extras}`;
+    }
     return { systemPrompt: modified };
   });
 }
