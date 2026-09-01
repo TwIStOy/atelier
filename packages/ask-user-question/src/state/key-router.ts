@@ -7,6 +7,12 @@ const KEYBIND_UP = "tui.select.up";
 const KEYBIND_DOWN = "tui.select.down";
 const KEYBIND_CONFIRM = "tui.select.confirm";
 const KEYBIND_CANCEL = "tui.select.cancel";
+/** TUI binding for "insert newline" (default `shift+enter`, `ctrl+j`). */
+const KEYBIND_NEW_LINE = "tui.input.newLine";
+const KEYBIND_EDITOR_UP = "tui.editor.cursorUp";
+const KEYBIND_EDITOR_DOWN = "tui.editor.cursorDown";
+/** TUI line-kill binding (default `ctrl+u`), reinterpreted as a whole-draft clear. */
+const KEYBIND_INPUT_CLEAR = "tui.editor.deleteToLineStart";
 
 /** Pi's built-in app-level binding for "open external editor" (default `ctrl+g`). Resolved via the app `KeybindingsManager` injected from the `ctx.ui.custom` factory, which also spreads the TUI bindings — so the same manager covers `tui.select.*`. */
 const KEYBIND_EXTERNAL_EDITOR = "app.editor.external";
@@ -16,6 +22,7 @@ const SPACE_KEY = " ";
 
 export type QuestionnaireAction =
   | { kind: "nav"; nextIndex: number }
+  | { kind: "input_clear" }
   | { kind: "input_edit"; value: string }
   | { kind: "input_replace"; value: string }
   | { kind: "tab_switch"; nextTab: number }
@@ -159,6 +166,9 @@ export function routeKey(data: string, state: QuestionnaireState, runtime: Quest
   }
 
   if (state.inputMode) {
+    // Newline takes precedence over confirmation if a user configuration binds
+    // the same physical key to both semantic actions.
+    if (kb.matches(data, KEYBIND_NEW_LINE)) return { kind: "ignore" };
     if (kb.matches(data, KEYBIND_CONFIRM)) {
       const answer = buildSingleSelectAnswer(state, runtime);
       if (!answer) return { kind: "ignore" };
@@ -168,8 +178,15 @@ export function routeKey(data: string, state: QuestionnaireState, runtime: Quest
         autoAdvanceTab: computeAutoAdvanceTab(state, runtime),
       };
     }
+    // Treat Pi's Ctrl+U line-kill binding as an explicit whole-draft clear,
+    // independent of the current cursor position.
+    if (kb.matches(data, KEYBIND_INPUT_CLEAR)) return { kind: "input_clear" };
     if (kb.matches(data, KEYBIND_EXTERNAL_EDITOR)) return { kind: "input_edit", value: runtime.inputBuffer };
     if (kb.matches(data, KEYBIND_CANCEL)) return { kind: "cancel" };
+    // Vertical cursor movement stays inside the multi-line draft until the cursor
+    // reaches its first/last logical line; only then do UP/DOWN leave for row nav.
+    if (kb.matches(data, KEYBIND_EDITOR_UP) && runtime.canMoveInputUp) return { kind: "ignore" };
+    if (kb.matches(data, KEYBIND_EDITOR_DOWN) && runtime.canMoveInputDown) return { kind: "ignore" };
     if (kb.matches(data, KEYBIND_UP)) {
       return prevNavOnUp(state, runtime);
     }

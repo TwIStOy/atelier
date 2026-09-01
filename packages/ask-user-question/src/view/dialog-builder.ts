@@ -15,6 +15,8 @@ export const HINT_PART_NOTES = "n to add notes";
 export const HINT_PART_EDIT = "Ctrl+G to edit in external editor";
 export const HINT_PART_TAB = "Tab to switch questions";
 export const HINT_PART_CANCEL = "Esc to cancel";
+export const HINT_PART_NEW_LINE = "Shift+Enter for newline";
+export const HINT_PART_CLEAR = "Ctrl+U to clear";
 /**
  * `HINT_SINGLE` / `HINT_MULTI` describe the CORE hint that must always be visible on
  * narrow terminals; trailing segments may clip with `…` (`OneLineClippedText`).

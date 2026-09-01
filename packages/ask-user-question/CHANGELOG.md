@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Added
+
+- Ctrl+U (`tui.editor.deleteToLineStart`) now clears the entire custom-answer draft — all of its lines, regardless of cursor position — without cancelling the questionnaire, replacing the single-line delete-to-line-start behavior. ([#99](https://github.com/TwIStOy/pi-extensions/issues/99))
+- The controls hint advertises `Shift+Enter for newline · Ctrl+U to clear` while the custom-answer row is focused. The parts sit after the cancel hint so narrow terminals clip them before the core hints. ([#99](https://github.com/TwIStOy/pi-extensions/issues/99))
+
+### Changed
+
+- The "Type something." row is now backed by a headless `@earendil-works/pi-tui` `Editor` instead of `Input`, giving the custom answer multi-line editing semantics. Shift+Enter (any key bound to `tui.input.newLine`) inserts a newline into the draft; bracketed-paste content keeps its newlines; UP/DOWN move the cursor within the draft first and only fall back to option navigation once the cursor reaches the draft's first/last logical line. Multiline drafts reuse the `customDraftsByTab` persistence from #98 (they survive navigation and tab switches), submitted custom answers may span multiple lines, and values are read from the editor's expanded text so large pastes submit their real content instead of a `[paste #N …]` marker. ([#99](https://github.com/TwIStOy/pi-extensions/issues/99))
+
 ## [0.6.1] - 2026-09-01
 
 ### Fixed

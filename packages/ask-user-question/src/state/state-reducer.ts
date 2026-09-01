@@ -9,7 +9,7 @@ export interface ApplyContext {
   questions: readonly QuestionData[];
   itemsByTab: ReadonlyArray<readonly WrappingSelectItem[]>;
   /**
-   * Live "Type something." buffer snapshot, read from the headless `inlineInput` at
+   * Live "Type something." buffer snapshot, read from the headless `inlineEditor` at
    * dispatch time. The reducer never mutates it directly — it persists the snapshot into
    * `customDraftsByTab` on focus-leaving transitions and rehydrates via effects.
    */
@@ -90,6 +90,18 @@ function persistMultiSelectAnswer(state: QuestionnaireState, ctx: ApplyContext):
 }
 
 /**
+ * Delete `tab`'s entry from `customDraftsByTab`. No allocation when absent — callers use
+ * it for both explicit clears (`input_clear`) and the empty-buffer branch of
+ * `captureDraft`, keeping the map free of entries the live buffer can't reproduce.
+ */
+function withoutCustomDraft(state: QuestionnaireState, tab: number): ReadonlyMap<number, string> {
+  if (!state.customDraftsByTab.has(tab)) return state.customDraftsByTab;
+  const drafts = new Map(state.customDraftsByTab);
+  drafts.delete(tab);
+  return drafts;
+}
+
+/**
  * Persist the live `ctx.inputBuffer` into `customDraftsByTab` for the current tab when
  * focus is about to leave the input row. No-op unless `inputMode` is set, so callers can
  * invoke it unconditionally on any focus-leaving transition (nav / tab switch). Empty
@@ -99,10 +111,7 @@ function captureDraft(state: QuestionnaireState, ctx: ApplyContext): Questionnai
   if (!state.inputMode) return state;
   const buf = ctx.inputBuffer;
   if (buf.length === 0) {
-    if (!state.customDraftsByTab.has(state.currentTab)) return state;
-    const cleared = new Map(state.customDraftsByTab);
-    cleared.delete(state.currentTab);
-    return { ...state, customDraftsByTab: cleared };
+    return { ...state, customDraftsByTab: withoutCustomDraft(state, state.currentTab) };
   }
   if (state.customDraftsByTab.get(state.currentTab) === buf) return state;
   const updated = new Map(state.customDraftsByTab);
@@ -280,7 +289,13 @@ const notesForwardHandler: Handler<"notes_forward"> = (s, a, _c) => ({
   effects: [{ kind: "forward_notes_keystroke", data: a.data }],
 });
 
-/** Hand the current draft to the host so it can launch Pi's configured external editor. Pure: emits the effect, touches no state (the draft lives in the runtime `inlineInput`). */
+/** Whole-draft clear (Ctrl+U). Drops the tab's persisted draft entry so the map mirrors the now-empty live buffer, and rehydrates via `clear_input_buffer`. The questionnaire stays open (`inputMode` untouched). */
+const inputClearHandler: Handler<"input_clear"> = (state, _action, _ctx) => ({
+  state: { ...state, customDraftsByTab: withoutCustomDraft(state, state.currentTab) },
+  effects: [{ kind: "clear_input_buffer" }],
+});
+
+/** Hand the current draft to the host so it can launch Pi's configured external editor. Pure: emits the effect, touches no state (the draft lives in the runtime `inlineEditor`). */
 const inputEditHandler: Handler<"input_edit"> = (state, action, _ctx) => ({
   state,
   effects: [{ kind: "open_input_editor", value: action.value }],
@@ -308,6 +323,7 @@ const ignoreHandler: Handler<"ignore"> = (s, _a, _c) => ({
  */
 const HANDLERS: { [K in QuestionnaireAction["kind"]]: Handler<K> } = {
   nav: navHandler,
+  input_clear: inputClearHandler,
   input_edit: inputEditHandler,
   input_replace: inputReplaceHandler,
   tab_switch: tabSwitchHandler,

@@ -197,6 +197,47 @@ describe("confirming an answer discards the uncommitted draft", () => {
   });
 });
 
+describe("reduce — input_clear (Ctrl+U whole-draft clear)", () => {
+  it("drops the current tab's draft entry and emits clear_input_buffer", () => {
+    const ctx = makeCtx(QUESTIONS, "");
+    const before = freshState({
+      currentTab: 0,
+      optionIndex: INPUT_ROW,
+      inputMode: true,
+      customDraftsByTab: new Map([
+        [0, "in flight"],
+        [1, "other tab"],
+      ]),
+    });
+
+    const result = reduce(before, { kind: "input_clear" }, ctx);
+
+    expect(result.state.customDraftsByTab.has(0)).toBe(false);
+    expect(result.state.customDraftsByTab.get(1)).toBe("other tab");
+    expect(result.effects).toEqual<readonly Effect[]>([{ kind: "clear_input_buffer" }]);
+  });
+
+  it("emits clear_input_buffer even when no draft entry exists", () => {
+    const ctx = makeCtx(QUESTIONS, "");
+    const before = freshState({ currentTab: 0, optionIndex: INPUT_ROW, inputMode: true });
+
+    const result = reduce(before, { kind: "input_clear" }, ctx);
+
+    expect(result.state.customDraftsByTab.size).toBe(0);
+    expect(result.effects).toEqual<readonly Effect[]>([{ kind: "clear_input_buffer" }]);
+  });
+
+  it("keeps inputMode set so the questionnaire is not cancelled or left", () => {
+    const ctx = makeCtx(QUESTIONS, "");
+    const before = freshState({ currentTab: 0, optionIndex: INPUT_ROW, inputMode: true });
+
+    const result = reduce(before, { kind: "input_clear" }, ctx);
+
+    expect(result.state.inputMode).toBe(true);
+    expect(result.state.optionIndex).toBe(INPUT_ROW);
+  });
+});
+
 describe("reduce — external editor actions", () => {
   it("input_edit emits an open_input_editor effect carrying the draft and leaves state untouched", () => {
     const ctx = makeCtx(QUESTIONS, "my draft");

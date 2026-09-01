@@ -59,6 +59,8 @@ function makeRuntime(over: Partial<QuestionnaireRuntime> = {}): QuestionnaireRun
   return {
     keybindings: { matches: () => false },
     inputBuffer: "",
+    canMoveInputUp: false,
+    canMoveInputDown: false,
     questions: [singleSelectQuestion],
     isMulti: false,
     currentItem: undefined,

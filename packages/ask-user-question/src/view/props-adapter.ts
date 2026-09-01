@@ -1,4 +1,4 @@
-import type { Input } from "@earendil-works/pi-tui";
+import type { Editor } from "@earendil-works/pi-tui";
 import type { BindingContext, PerTabBindingContext } from "../state/selectors/contract.ts";
 import { selectActivePreviewPaneIndex } from "../state/selectors/derivations.ts";
 import { selectActiveView } from "../state/selectors/focus.ts";
@@ -14,17 +14,17 @@ interface Invalidatable {
 }
 
 /**
- * Reads pi-tui Input's private `cursor` field via type escape with full runtime validation.
- * Returns `undefined` on any failure → graceful degradation to end-of-buffer cursor.
- * Follow-up: replace with Input.getCursorOffset() when pi-tui exposes a public API.
+ * Flat code-unit offset of the editor cursor within `getLines().join("\n")` —
+ * matches the string the inline row renders (`getText()`), including large-paste
+ * markers, so the drawn cursor stays exact. Pure arithmetic over public APIs; no
+ * private-field escapes.
  */
-function getInputCursorOffset(input: Input): number | undefined {
-  const raw = (input as unknown as { cursor?: unknown }).cursor;
-  if (typeof raw !== "number") return undefined;
-  if (!Number.isSafeInteger(raw)) return undefined;
-  const value = input.getValue();
-  if (raw < 0 || raw > value.length) return undefined;
-  return raw;
+function getInputCursorOffset(editor: Editor): number {
+  const lines = editor.getLines();
+  const cursor = editor.getCursor();
+  let offset = cursor.col;
+  for (let i = 0; i < cursor.line; i++) offset += (lines[i]?.length ?? 0) + 1;
+  return offset;
 }
 
 export interface QuestionnairePropsAdapterConfig {
@@ -32,7 +32,7 @@ export interface QuestionnairePropsAdapterConfig {
   questions: readonly QuestionData[];
   itemsByTab: ReadonlyArray<readonly WrappingSelectItem[]>;
   tabsByIndex: ReadonlyArray<TabComponents>;
-  inlineInput: Input;
+  inlineEditor: Editor;
   globalBindings: ReadonlyArray<BoundGlobalBinding>;
   perTabBindings: ReadonlyArray<BoundPerTabBinding>;
   /**
@@ -49,7 +49,7 @@ export interface QuestionnairePropsAdapterConfig {
  * (dialog, submitPicker?, tabBar?); `perTabBindings` covers the per-tab kinds
  * (optionList, preview, multiSelect?). The hand-coded fan-out collapses to one
  * global loop + one nested per-tab loop. The inline-Other value is read from
- * the headless `inlineInput` instance per tick into ctx so `selectOptionListProps`
+ * the headless `inlineEditor` per tick into ctx so `selectOptionListProps`
  * sees the live value.
  */
 export class QuestionnairePropsAdapter {
@@ -57,7 +57,7 @@ export class QuestionnairePropsAdapter {
   private readonly questions: readonly QuestionData[];
   private readonly itemsByTab: ReadonlyArray<readonly WrappingSelectItem[]>;
   private readonly tabsByIndex: ReadonlyArray<TabComponents>;
-  private readonly inlineInput: Input;
+  private readonly inlineEditor: Editor;
   private readonly globalBindings: ReadonlyArray<BoundGlobalBinding>;
   private readonly perTabBindings: ReadonlyArray<BoundPerTabBinding>;
   private readonly extraInvalidatables: ReadonlyArray<Invalidatable>;
@@ -67,7 +67,7 @@ export class QuestionnairePropsAdapter {
     this.questions = config.questions;
     this.itemsByTab = config.itemsByTab;
     this.tabsByIndex = config.tabsByIndex;
-    this.inlineInput = config.inlineInput;
+    this.inlineEditor = config.inlineEditor;
     this.globalBindings = config.globalBindings;
     this.perTabBindings = config.perTabBindings;
     this.extraInvalidatables = config.extraInvalidatables ?? [];
@@ -84,8 +84,11 @@ export class QuestionnairePropsAdapter {
       itemsByTab: this.itemsByTab,
       totalQuestions,
       activeView,
-      inputBuffer: this.inlineInput.getValue(),
-      inputCursorOffset: getInputCursorOffset(this.inlineInput),
+      // Marker form (`getText()`), NOT `getExpandedText()`: the cursor offset above is
+      // computed against the editor's stored lines, so rendering the expanded text
+      // would desync the drawn cursor whenever a large-paste marker is present.
+      inputBuffer: this.inlineEditor.getText(),
+      inputCursorOffset: getInputCursorOffset(this.inlineEditor),
       activePreviewPane,
     };
 

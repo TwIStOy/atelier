@@ -38,6 +38,10 @@ export interface QuestionnaireState {
 export interface QuestionnaireRuntime {
   keybindings: { matches(data: string, name: string): boolean };
   inputBuffer: string;
+  /** Whether the draft cursor sits below the first logical line — lets UP move within the multi-line draft before falling back to row navigation. */
+  canMoveInputUp: boolean;
+  /** Whether the draft cursor sits above the last logical line — lets DOWN move within the multi-line draft before falling back to row navigation. */
+  canMoveInputDown: boolean;
   questions: readonly QuestionData[];
   isMulti: boolean;
   currentItem: WrappingSelectItem | undefined;

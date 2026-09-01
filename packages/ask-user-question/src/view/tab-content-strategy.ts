@@ -6,9 +6,11 @@ import type { PreviewPane, PreviewPaneProps } from "./components/preview/preview
 import {
   type DialogState,
   HINT_PART_CANCEL,
+  HINT_PART_CLEAR,
   HINT_PART_EDIT,
   HINT_PART_ENTER,
   HINT_PART_NAV,
+  HINT_PART_NEW_LINE,
   HINT_PART_NOTES,
   HINT_PART_TAB,
   HINT_PART_TOGGLE,
@@ -214,10 +216,12 @@ export class SubmitTabStrategy implements TabContentStrategy {
 
 /**
  * Build the controls hint line. Order:
- *   Enter · ↑/↓ [· Space toggle] [· n notes] [· Tab switch] · Esc
+ *   Enter · ↑/↓ [· Ctrl+G edit] [· Space toggle] [· n notes] [· Tab switch] · Esc
+ *   [· Shift+Enter newline] [· Ctrl+U clear]
  *
  * `HINT_SINGLE` / `HINT_MULTI` are the CORE prefix that must always render; trailing
- * parts may be clipped by `OneLineClippedText` on narrow terminals.
+ * parts may be clipped by `OneLineClippedText` on narrow terminals, so the multiline
+ * editing hints sit after the cancel part to keep the core hints visible.
  */
 export function buildHintText(question: QuestionData | undefined, isMulti: boolean, state: DialogState): string {
   const parts: string[] = [HINT_PART_ENTER, HINT_PART_NAV];
@@ -228,5 +232,8 @@ export function buildHintText(question: QuestionData | undefined, isMulti: boole
   }
   if (isMulti) parts.push(HINT_PART_TAB);
   parts.push(HINT_PART_CANCEL);
+  if (state.inputMode) {
+    parts.push(HINT_PART_NEW_LINE, HINT_PART_CLEAR);
+  }
   return parts.join(" · ");
 }

@@ -1,5 +1,5 @@
 import { getMarkdownTheme, type Theme } from "@earendil-works/pi-coding-agent";
-import { Input } from "@earendil-works/pi-tui";
+import { Editor, type EditorTheme, Input, type TUI } from "@earendil-works/pi-tui";
 import type { QuestionData } from "../tool/types.ts";
 import {
   type BoundGlobalBinding,
@@ -45,9 +45,27 @@ export interface QuestionnaireBuildConfig {
 export interface QuestionnaireBuilt {
   adapter: QuestionnairePropsAdapter;
   notesInput: Input;
-  inlineInput: Input;
+  inlineEditor: Editor;
   render: (width: number) => string[];
   invalidate: () => void;
+}
+
+/**
+ * Theme adapter for the headless `Editor` backing the "Type something." row. The
+ * editor is never rendered itself (WrappingSelect draws the row from its text), so
+ * these functions exist only to satisfy the `EditorTheme` contract.
+ */
+function editorTheme(theme: Theme): EditorTheme {
+  return {
+    borderColor: (text) => theme.fg("borderMuted", text),
+    selectList: {
+      selectedPrefix: (text) => theme.bg("selectedBg", theme.fg("accent", text)),
+      selectedText: (text) => theme.bg("selectedBg", theme.bold(text)),
+      description: (text) => theme.fg("muted", text),
+      scrollInfo: (text) => theme.fg("dim", text),
+      noMatch: (text) => theme.fg("warning", text),
+    },
+  };
 }
 
 interface HeightComputers {
@@ -100,7 +118,12 @@ class QuestionnaireBuilder {
   private readonly selectTheme: WrappingSelectTheme;
   private readonly markdownTheme = getMarkdownTheme();
   private readonly notesInput = new Input();
-  private readonly inlineInput = new Input();
+  /**
+   * Headless multi-line editor for the "Type something." row — owns newline-preserving
+   * paste, in-draft cursor movement, and whole-draft clears. Never rendered: the
+   * WrappingSelect row reads its text + cursor per tick.
+   */
+  private readonly inlineEditor: Editor;
   private readonly getTerminalWidth = () => this.tui.terminal.columns;
   private readonly getTerminalRows = () => this.tui.terminal.rows;
 
@@ -114,6 +137,11 @@ class QuestionnaireBuilder {
     this.getCurrentTab = config.getCurrentTab;
 
     this.selectTheme = this.makeSelectTheme();
+    // The structural host type covers both members the headless editor touches at
+    // runtime (`requestRender()`; `terminal.rows` only inside `render()`, which is
+    // never invoked here) — the cast narrows the declared `TUI` requirement to those.
+    this.inlineEditor = new Editor(config.tui as unknown as TUI, editorTheme(config.theme));
+    this.inlineEditor.disableSubmit = true;
   }
 
   build(): QuestionnaireBuilt {
@@ -293,7 +321,7 @@ class QuestionnaireBuilder {
       questions: this.questions,
       itemsByTab: this.itemsByTab,
       tabsByIndex: tabs,
-      inlineInput: this.inlineInput,
+      inlineEditor: this.inlineEditor,
       globalBindings,
       perTabBindings,
       extraInvalidatables: [this.notesInput],
@@ -304,7 +332,7 @@ class QuestionnaireBuilder {
     return {
       adapter,
       notesInput: this.notesInput,
-      inlineInput: this.inlineInput,
+      inlineEditor: this.inlineEditor,
       render: (w) => dialog.render(w),
       invalidate: () => adapter.invalidate(),
     };

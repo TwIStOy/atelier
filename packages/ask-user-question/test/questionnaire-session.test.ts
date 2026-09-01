@@ -5,8 +5,11 @@ import type { QuestionnaireResult, QuestionParams } from "../src/tool/types.ts";
 import type { WrappingSelectItem } from "../src/view/components/wrapping-select.ts";
 
 const DOWN = "\x1b[B";
+const UP = "\x1b[A";
 const ENTER = "<ENTER>";
 const CTRL_G = "\x07";
+const SHIFT_ENTER = "\x1b\r";
+const CTRL_U = "\x15";
 
 const params: QuestionParams = {
   questions: [
@@ -28,15 +31,23 @@ function itemsFor(value: QuestionParams): WrappingSelectItem[][] {
   ]);
 }
 
-/** Minimal resolver: each named binding maps to one concrete data byte; everything else falls through to ignore. */
+/** Minimal resolver: each named binding maps to one concrete data byte; everything else falls through to ignore. Arrow bytes match both the select and editor bindings, mirroring the app manager's spread TUI defaults. */
 function fakeKeybindings() {
   return {
     matches(data: string, name: string): boolean {
       switch (name) {
         case "tui.select.down":
+        case "tui.editor.cursorDown":
           return data === DOWN;
+        case "tui.select.up":
+        case "tui.editor.cursorUp":
+          return data === UP;
         case "tui.select.confirm":
           return data === ENTER;
+        case "tui.input.newLine":
+          return data === SHIFT_ENTER;
+        case "tui.editor.deleteToLineStart":
+          return data === CTRL_U;
         case "app.editor.external":
           return data === CTRL_G;
         default:
@@ -176,5 +187,112 @@ describe("QuestionnaireSession — external editor wiring", () => {
 
     const result = done.mock.calls[0]![0];
     expect(result.answers[0]).toMatchObject({ kind: "custom", answer: "k" });
+  });
+});
+
+describe("QuestionnaireSession — multiline custom answer editing", () => {
+  const renderRows = (session: QuestionnaireSession): string[] => session.component.render(120);
+  const rowOf = (rows: readonly string[], needle: string): number => rows.findIndex((r) => r.includes(needle));
+  /** The draft renders as two separate rows iff newlines survived: `ab` strictly above `cd`. */
+  const expectTwoLineDraft = (session: QuestionnaireSession): void => {
+    const rows = renderRows(session);
+    const abRow = rowOf(rows, "ab");
+    const cdRow = rowOf(rows, "cd");
+    expect(abRow).toBeGreaterThanOrEqual(0);
+    expect(cdRow).toBeGreaterThan(abRow);
+  };
+  /** Focus the input row and build the two-line draft `ab\ncd` with the cursor on its second line. */
+  function typeTwoLineDraft(session: QuestionnaireSession): void {
+    focusCustomRow(session);
+    session.component.handleInput("a");
+    session.component.handleInput("b");
+    session.component.handleInput(SHIFT_ENTER);
+    session.component.handleInput("c");
+    session.component.handleInput("d");
+  }
+
+  it("submits a draft typed across Shift+Enter lines as one multiline answer", () => {
+    const { session, done } = makeSession();
+    typeTwoLineDraft(session);
+
+    session.component.handleInput(ENTER);
+
+    expect(done).toHaveBeenCalledOnce();
+    const result = done.mock.calls[0]![0];
+    expect(result.cancelled).toBe(false);
+    expect(result.answers[0]).toMatchObject({ kind: "custom", answer: "ab\ncd" });
+  });
+
+  it("preserves newlines from a bracketed paste", () => {
+    const { session, done } = makeSession();
+    focusCustomRow(session);
+
+    session.component.handleInput("\x1b[200~line one\nline two\x1b[201~");
+    session.component.handleInput(ENTER);
+
+    const result = done.mock.calls[0]![0];
+    expect(result.answers[0]).toMatchObject({ kind: "custom", answer: "line one\nline two" });
+  });
+
+  it("moves UP within the draft before falling back to row navigation", () => {
+    const { session, done } = makeSession();
+    typeTwoLineDraft(session);
+    expectTwoLineDraft(session);
+
+    // Cursor is on the draft's second line: UP stays inside the draft (row unchanged).
+    session.component.handleInput(UP);
+    expectTwoLineDraft(session);
+
+    // Cursor reached the first line: UP now leaves for row navigation.
+    session.component.handleInput(UP);
+    const browsed = renderRows(session);
+    expect(rowOf(browsed, "cd")).toBe(-1);
+    expect(browsed.some((r) => r.includes("Type something."))).toBe(true);
+
+    // Returning rehydrates the captured multiline draft; submitting proves the round-trip.
+    session.component.handleInput(DOWN);
+    expectTwoLineDraft(session);
+    session.component.handleInput(ENTER);
+
+    const result = done.mock.calls[0]![0];
+    expect(result.answers[0]).toMatchObject({ kind: "custom", answer: "ab\ncd" });
+  });
+
+  it("moves DOWN within the draft when the cursor is above its last line", () => {
+    const { session } = makeSession();
+    typeTwoLineDraft(session);
+
+    // Return the cursor to the first line, then DOWN must re-enter the draft
+    // (row unchanged) instead of leaving for row navigation.
+    session.component.handleInput(UP);
+    session.component.handleInput(DOWN);
+    expectTwoLineDraft(session);
+  });
+
+  it("clears the whole multiline draft with Ctrl+U and stays open for retyping", () => {
+    const { session, done } = makeSession();
+    typeTwoLineDraft(session);
+
+    session.component.handleInput(CTRL_U);
+    session.component.handleInput("f");
+    session.component.handleInput("r");
+    session.component.handleInput("e");
+    session.component.handleInput("s");
+    session.component.handleInput("h");
+    session.component.handleInput(ENTER);
+
+    expect(done).toHaveBeenCalledOnce();
+    const result = done.mock.calls[0]![0];
+    expect(result.cancelled).toBe(false);
+    expect(result.answers[0]).toMatchObject({ kind: "custom", answer: "fresh" });
+  });
+
+  it("shows the multiline hint parts on the hint bar while in inputMode", () => {
+    const { session } = makeSession();
+    focusCustomRow(session);
+
+    const hintBar = session.component.render(200).join("\n");
+    expect(hintBar).toContain("Shift+Enter for newline");
+    expect(hintBar).toContain("Ctrl+U to clear");
   });
 });

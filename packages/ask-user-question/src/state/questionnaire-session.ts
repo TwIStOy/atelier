@@ -1,5 +1,5 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import type { Input } from "@earendil-works/pi-tui";
+import type { Editor, Input } from "@earendil-works/pi-tui";
 import type { QuestionData, QuestionnaireResult, QuestionParams } from "../tool/types.ts";
 import type { WrappingSelectItem } from "../view/components/wrapping-select.ts";
 import type { QuestionnairePropsAdapter } from "../view/props-adapter.ts";
@@ -7,10 +7,6 @@ import { buildQuestionnaire } from "./build-questionnaire.ts";
 import { type QuestionnaireAction, routeKey } from "./key-router.ts";
 import type { QuestionnaireRuntime, QuestionnaireState } from "./state.ts";
 import { type ApplyContext, type Effect, reduce } from "./state-reducer.ts";
-
-// Module-level constant; reused for cursor-end mutations after setValue rehydration.
-// Ctrl-E → tui.editor.cursorLineEnd (public path; pi-tui keybindings.js:25-28).
-const CURSOR_END = "\x05";
 
 export interface QuestionnaireSessionConfig {
   tui: { terminal: { columns: number; rows: number }; requestRender(): void };
@@ -59,7 +55,7 @@ export class QuestionnaireSession {
   private readonly itemsByTab: WrappingSelectItem[][];
 
   private readonly notesInput: Input;
-  private readonly inlineInput: Input;
+  private readonly inlineEditor: Editor;
   private readonly viewAdapter: QuestionnairePropsAdapter;
 
   private readonly keybindings: QuestionnaireSessionConfig["keybindings"];
@@ -92,7 +88,7 @@ export class QuestionnaireSession {
     });
 
     this.notesInput = built.notesInput;
-    this.inlineInput = built.inlineInput;
+    this.inlineEditor = built.inlineEditor;
     this.viewAdapter = built.adapter;
 
     this.component = {
@@ -130,11 +126,11 @@ export class QuestionnaireSession {
   private runEffect(effect: Effect): void {
     switch (effect.kind) {
       case "set_input_buffer":
-        this.inlineInput.setValue(effect.value);
-        this.inlineInput.handleInput(CURSOR_END);
+        // `setText` places the cursor at the end of the (last line of the) text.
+        this.inlineEditor.setText(effect.value);
         return;
       case "clear_input_buffer":
-        this.inlineInput.setValue("");
+        this.inlineEditor.setText("");
         return;
       case "open_input_editor":
         if (this.inputEditorOpen) return;
@@ -167,28 +163,27 @@ export class QuestionnaireSession {
   }
 
   /**
-   * Per-keystroke `ignore` fast path: delegates to the headless `inlineInput`
-   * Input so bracketed-paste accumulator (`input.js:33-63`) and Kitty CSI-u
-   * decode (`input.js:155-163`) take effect. Cursor is NOT force-reset here —
-   * doing so would corrupt split-chunk pastes (a `\x05` byte mid-paste lands
-   * verbatim in `pasteBuffer` and survives `handlePaste`'s narrow strip).
-   * Cursor advances naturally via `insertCharacter` on typing/paste; cursor-
-   * movement keys (Left/Right/Home/End/word-jumps) are now functional, with
-   * the always-end visual cursor marker drawn independently by
-   * `WrappingSelect.renderInlineInputRow`. `viewAdapter.apply` is called
-   * directly without a reducer round-trip — preserves the D3 fast-path
-   * latency profile from Phase 11.
+   * Per-keystroke `ignore` fast path: delegates to the headless `inlineEditor`
+   * so its own bracketed-paste accumulator, Kitty CSI-u decode, newline
+   * insertion, undo, and cursor movement take effect. No cursor force-reset — the
+   * editor owns the cursor; `WrappingSelect.renderInlineInputRow` mirrors it per
+   * tick via the props adapter. `viewAdapter.apply` runs directly, skipping the
+   * reducer so per-keystroke edits never pay a state-dispatch round-trip.
    */
   private handleIgnoreInline(data: string): void {
     if (!this.state.inputMode) return;
-    this.inlineInput.handleInput(data);
+    this.inlineEditor.handleInput(data);
     this.viewAdapter.apply(this.state);
   }
 
   private runtime(): QuestionnaireRuntime {
+    const cursor = this.inlineEditor.getCursor();
+    const lastLine = this.inlineEditor.getLines().length - 1;
     return {
       keybindings: this.keybindings,
-      inputBuffer: this.inlineInput.getValue(),
+      inputBuffer: this.inlineEditor.getExpandedText(),
+      canMoveInputUp: cursor.line > 0,
+      canMoveInputDown: cursor.line < lastLine,
       questions: this.questions,
       isMulti: this.isMulti,
       currentItem: this.currentItem(),
@@ -200,7 +195,9 @@ export class QuestionnaireSession {
     return {
       questions: this.questions,
       itemsByTab: this.itemsByTab,
-      inputBuffer: this.inlineInput.getValue(),
+      // Expanded form: persisted drafts and answers carry real paste content, never
+      // the `[paste #N …]` marker the editor stores in its lines.
+      inputBuffer: this.inlineEditor.getExpandedText(),
     };
   }
 
