@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Default `allowedTools` now also exempts `wiki_ingest`: when many Source Packets are pending, the model legitimately fans out repeated `wiki_ingest` calls to start multiple ingest tasks, which previously fell inside loop detection.
+
 ## [0.6.1] - 2026-09-01
 
 ### Added

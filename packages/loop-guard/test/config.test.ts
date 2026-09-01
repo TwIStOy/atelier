@@ -14,9 +14,9 @@ describe("loop-guard config", () => {
     mockConfig = { ...DEFAULT_CONFIG };
   });
 
-  it("defaults to allowing subagent_status", () => {
-    assert.equal(loadConfig().allowedTools, "subagent_status");
-    assert.deepEqual(parseAllowedTools(DEFAULT_CONFIG.allowedTools), new Set(["subagent_status"]));
+  it("defaults to allowing subagent_status and wiki_ingest", () => {
+    assert.equal(loadConfig().allowedTools, "subagent_status,wiki_ingest");
+    assert.deepEqual(parseAllowedTools(DEFAULT_CONFIG.allowedTools), new Set(["subagent_status", "wiki_ingest"]));
   });
 
   it("parses comma-separated names with whitespace", () => {
