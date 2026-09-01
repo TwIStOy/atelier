@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-09-01
+
 ### Removed
 
 - Removed `inference-self-host` from the `pi.extensions` list.

@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-09-01
+
 ### Added
 
 - `allowedTools` config (comma-separated, default `subagent_status`): tool names exempt from loop detection. Exempt calls are never blocked and are not recorded in the history window, so legitimate polling (e.g. `subagent_status` on a background subagent that keeps returning "running") is not cut off at `maxRepeats`, and heavy polling cannot flush real signal out of the `windowSize` history.

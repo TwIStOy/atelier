@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-09-01
+
 ### Added
 
 - `/land` prompt template: land the current branch from any state — resume detection (uncommitted / pushed / PR open), then commit, push, `gh pr create`, watch CI, rebase on conflicts or base-branch moves, and wait (polling, no busy-loop) until the human merges. Reusable in half-finished sessions; agents never merge or enable auto-merge.

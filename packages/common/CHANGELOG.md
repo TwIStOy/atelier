@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-09-01
+
 ### Added
 
 - `registerLogFileSizeWarning(pi)` installs a one-time check that runs only during Pi startup. The root extension bundle registers it and warns the user when `$XDG_STATE_HOME/pi/extensions.log` exceeds 500 MiB.

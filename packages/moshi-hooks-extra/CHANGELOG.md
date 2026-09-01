@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-09-01
+
 ### Added
 
 - Added extension diagnostics for Moshi transport selection and Z.AI usage publishing, including the secret-redacted request URL, headers, body, response status, and failure reason.

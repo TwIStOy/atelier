@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-09-01
+
 ### Added
 
 - System-reminder injection: when no `todo_*` tool has been used for `reminderInterval` turns (default 4) and the visible task list is non-empty, a transient `<system-reminder>` user message (nudge text + current list snapshot) is appended to the next LLM request via the `context` hook. The message is never persisted to the session. Configurable via the `/config` UI or the `"todo"` section of `extensions.json`: `reminderEnabled` (default `true`) and `reminderInterval` (default `4`).

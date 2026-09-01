@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-09-01
+
 ### Changed
 
 - Refined the `workflow` tool prompt with explicit opt-in, bounded discovery before dynamic fan-out, accurate `parallel` barrier and `pipeline` sequencing semantics, structured `args` guidance, failure handling, and honest coverage reporting.

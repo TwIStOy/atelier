@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-09-01
+
 ### Added
 
 - `fallback_agent` setting in `~/.agent/subagents/settings.json`: where an unknown `agent_type` is routed. Omitted keeps the current `general-purpose` fallback; any persona id redirects there; `"none"` (or `false`) fails the call closed with an error listing the available types, so a typo can no longer silently run the wrong agent (upstream tintinweb/pi-subagents#183).
