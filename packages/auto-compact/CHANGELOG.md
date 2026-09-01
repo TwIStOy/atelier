@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Idle compaction: after `idleCompactMinutes` (default 0 = off) of inactivity, the next `turn_start` (and session `resume`/`fork`) compacts before the request re-reads the whole context at full price. Guarded by a hardcoded 50%-of-window floor; the resume path compacts without sending a follow-up. `/auto-compact` status now shows the idle threshold and current idle gap. Decision record: `docs/auto-compact/adr/0001-idle-compaction-uses-semantic-summary.md`.
+
 ## [0.4.0] - 2026-07-31
 
 ### Changed

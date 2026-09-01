@@ -7,6 +7,7 @@ import {
   readConfig,
   registerConfigItems,
 } from "@htwang-contrib/common";
+import { computeIdleGapMs, normalizeIdleCompactMinutes, shouldIdleCompact } from "./idle.ts";
 
 type CompactionStrategy = "keep-recent" | "keep-bookends" | "summarize-all";
 
@@ -24,6 +25,7 @@ interface AutoCompactConfig {
   autoCompactTokenLimit: number;
   keepRecentPercent: number;
   strategy: CompactionStrategy;
+  idleCompactMinutes: number;
 }
 
 const CONFIG_SCHEMA: ExtensionConfigSchema<AutoCompactConfig> = {
@@ -32,6 +34,7 @@ const CONFIG_SCHEMA: ExtensionConfigSchema<AutoCompactConfig> = {
     autoCompactTokenLimit: 0,
     keepRecentPercent: 15,
     strategy: "keep-recent",
+    idleCompactMinutes: 0,
   },
 };
 
@@ -42,6 +45,7 @@ function loadConfig(): AutoCompactConfig {
     autoCompactTokenLimit: Number(raw.autoCompactTokenLimit),
     keepRecentPercent: Number(raw.keepRecentPercent),
     strategy: raw.strategy as CompactionStrategy,
+    idleCompactMinutes: normalizeIdleCompactMinutes(raw.idleCompactMinutes),
   };
 }
 
@@ -152,13 +156,14 @@ function applyTruncationStrategy(
   }
 }
 
-type AutoCompactPhase = "pre-turn" | "mid-turn" | "emergency" | "session-resume";
+type AutoCompactPhase = "pre-turn" | "mid-turn" | "emergency" | "session-resume" | "idle";
 
 const AUTO_COMPACT_FOLLOW_UP: Record<AutoCompactPhase, string> = {
   "pre-turn": "Auto-compact ran before this turn. Continue with the current task.",
   "mid-turn": "Auto-compact ran mid-turn. Continue executing the remaining work.",
   emergency: "Emergency auto-compact ran. Resume where we left off.",
   "session-resume": "Auto-compact ran on session resume. Continue with the active task.",
+  idle: "Idle auto-compact ran after a long idle period. Continue with the current task.",
 };
 
 function registerAutoCompactConfigItems(): void {
@@ -202,6 +207,16 @@ function registerAutoCompactConfigItems(): void {
       extensionLabel: "Auto-Compact",
       order: 2,
       options: STRATEGY_OPTIONS,
+    },
+    {
+      key: "idleCompactMinutes",
+      type: "number",
+      label: "Idle Compact Threshold",
+      value: () => loadConfig().idleCompactMinutes,
+      description: "Minutes of inactivity after which compaction runs before the next turn (0 disables)",
+      extensionLabel: "Auto-Compact",
+      order: 3,
+      min: 0,
     },
   ]);
 }
@@ -257,12 +272,19 @@ export default function autoCompact(pi: ExtensionAPI): void {
     return lastEstimatedTokens;
   };
 
-  const triggerAutoCompact = (ctx: ExtensionContext, phase: AutoCompactPhase, customInstructions?: string): void => {
+  const triggerAutoCompact = (
+    ctx: ExtensionContext,
+    phase: AutoCompactPhase,
+    customInstructions?: string,
+    options?: { followUp?: boolean },
+  ): void => {
+    const followUp = options?.followUp ?? true;
     pendingCompaction = true;
     ctx.compact({
       customInstructions,
       onComplete: () => {
         pendingCompaction = false;
+        if (!followUp) return;
         setImmediate(() => {
           if (ctx.isIdle()) {
             pi.sendUserMessage(AUTO_COMPACT_FOLLOW_UP[phase]);
@@ -275,12 +297,46 @@ export default function autoCompact(pi: ExtensionAPI): void {
     });
   };
 
-  pi.on("turn_start", async (_event, ctx) => {
+  const currentIdleGapMs = (ctx: ExtensionContext, now: number): number | null => {
+    return computeIdleGapMs(ctx.sessionManager.getBranch(), now);
+  };
+
+  const maybeIdleCompact = (
+    ctx: ExtensionContext,
+    tokens: number,
+    now: number,
+    options?: { followUp?: boolean },
+  ): boolean => {
+    if (pendingCompaction) return false;
+    const config = loadConfig();
+    const gapMs = currentIdleGapMs(ctx, now);
+    if (
+      !shouldIdleCompact({
+        gapMs,
+        tokens,
+        contextWindow: cachedContextWindow,
+        thresholdMinutes: config.idleCompactMinutes,
+      })
+    ) {
+      return false;
+    }
+    triggerAutoCompact(
+      ctx,
+      "idle",
+      "The session was idle long enough for the prompt cache to expire. Focus on preserving task context and open decisions.",
+      options,
+    );
+    return true;
+  };
+
+  pi.on("turn_start", async (event, ctx) => {
     truncationAppliedThisTurn = false;
     const tokens = getTokenUsage(ctx);
     if (tokens >= cachedAutoCompactLimit) {
       triggerAutoCompact(ctx, "pre-turn", "Focus on preserving task context and recent work.");
+      return;
     }
+    maybeIdleCompact(ctx, tokens, event.timestamp);
   });
 
   pi.on("context", async (event, ctx) => {
@@ -336,6 +392,8 @@ export default function autoCompact(pi: ExtensionAPI): void {
         updateCachedLimits(config, cw);
         if (usage.tokens >= cachedAutoCompactLimit) {
           triggerAutoCompact(ctx, "session-resume");
+        } else {
+          maybeIdleCompact(ctx, usage.tokens, Date.now(), { followUp: false });
         }
       }
     }
@@ -358,12 +416,16 @@ export default function autoCompact(pi: ExtensionAPI): void {
       const tokens = usage?.tokens ?? lastEstimatedTokens;
       const percent = usage?.percent ?? (cachedAutoCompactLimit > 0 ? (tokens / cachedAutoCompactLimit) * 100 : 0);
       const strategyLabel = STRATEGY_OPTIONS.find((o) => o.value === config.strategy)?.label ?? config.strategy;
+      const idleGapMs = currentIdleGapMs(ctx, Date.now());
+      const idleGapLabel = idleGapMs !== null ? `${(idleGapMs / 60000).toFixed(1)} min` : "unknown";
       ctx.ui.notify(
         `Auto-Compact Status:\n` +
           `  Current tokens: ~${Math.round(tokens / 1000)}K\n` +
           `  Limit: ${Math.round(cachedAutoCompactLimit / 1000)}K (${config.autoCompactPercent}% of ${Math.round(cachedContextWindow / 1000)}K)\n` +
           `  Usage: ${percent.toFixed(1)}%\n` +
           `  Strategy: ${strategyLabel}\n` +
+          `  Idle threshold: ${config.idleCompactMinutes > 0 ? `${config.idleCompactMinutes} min` : "disabled"}\n` +
+          `  Idle gap: ${idleGapLabel}\n` +
           `  Pending compaction: ${pendingCompaction}\n` +
           `  Truncation this turn: ${truncationAppliedThisTurn}`,
         "info",
