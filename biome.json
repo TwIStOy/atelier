@@ -27,6 +27,8 @@
     "includes": [
       "packages/*/src/**/*.ts",
       "packages/*/test/**/*.ts",
+      "extensions/*/src/**/*.ts",
+      "extensions/*/test/**/*.ts",
       "!**/node_modules/**/*",
       "!**/test-sessions.ts",
       "!**/models.generated.ts",
