@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { afterEach, describe, expect, it } from "vitest";
-import { isOpenAIGptModel, syncToolset } from "../src/index.ts";
+import { isOpenAIGptModel, registerApplyPatchExtension, syncToolset } from "../src/index.ts";
 import { APPLY_PATCH_LARK_GRAMMAR } from "../src/patch.ts";
 import type { ApplyPatchToolDetails } from "../src/preview.ts";
 import { APPLY_PATCH_DESCRIPTION, createApplyPatchTool } from "../src/tool.ts";
@@ -197,6 +197,85 @@ describe("createApplyPatchTool", () => {
         cwd: directory,
       } as ExtensionContext),
     ).rejects.toThrow("empty patch");
+  });
+});
+
+describe("registerApplyPatchExtension", () => {
+  type ToolsetModel = { provider: string; id: string; api?: string };
+
+  function createHarness(initialActiveTools: string[]) {
+    let active = [...initialActiveTools];
+    const registeredTools: string[] = [];
+    const handlers = new Map<string, Array<(event: unknown, ctx: unknown) => Promise<void> | void>>();
+    const pi = {
+      registerTool(tool: { name: string }) {
+        registeredTools.push(tool.name);
+      },
+      on(event: string, handler: (event: unknown, ctx: unknown) => Promise<void> | void) {
+        handlers.set(event, [...(handlers.get(event) ?? []), handler]);
+      },
+      getActiveTools: () => [...active],
+      setActiveTools: (names: string[]) => {
+        active = [...names];
+      },
+    };
+
+    const trigger = async (event: string, model: ToolsetModel | undefined) => {
+      for (const handler of handlers.get(event) ?? []) {
+        await handler(model !== undefined ? { model } : {}, { model });
+      }
+    };
+
+    return { registeredTools, activeTools: () => [...active], trigger, pi };
+  }
+
+  const GPT: ToolsetModel = { provider: "openai", id: "gpt-5" };
+  const CLAUDE: ToolsetModel = { provider: "anthropic", id: "claude-sonnet-4" };
+
+  it("does not register the tool for non-GPT sessions", async () => {
+    const h = createHarness(["read", "edit", "write"]);
+    registerApplyPatchExtension(h.pi as never);
+
+    await h.trigger("session_start", CLAUDE);
+    await h.trigger("before_agent_start", CLAUDE);
+
+    expect(h.registeredTools).toEqual([]);
+    expect(h.activeTools()).toEqual(["read", "edit", "write"]);
+  });
+
+  it("registers the tool once when a GPT model becomes active", async () => {
+    const h = createHarness(["read", "edit", "write"]);
+    registerApplyPatchExtension(h.pi as never);
+
+    await h.trigger("session_start", GPT);
+    await h.trigger("before_agent_start", GPT);
+    await h.trigger("model_select", GPT);
+
+    expect(h.registeredTools).toEqual(["apply_patch"]);
+    expect(h.activeTools()).toEqual(["read", "apply_patch"]);
+  });
+
+  it("registers on model switch from non-GPT to GPT", async () => {
+    const h = createHarness(["read", "edit", "write"]);
+    registerApplyPatchExtension(h.pi as never);
+
+    await h.trigger("session_start", CLAUDE);
+    expect(h.registeredTools).toEqual([]);
+
+    await h.trigger("model_select", GPT);
+    expect(h.registeredTools).toEqual(["apply_patch"]);
+    expect(h.activeTools()).toEqual(["read", "apply_patch"]);
+  });
+
+  it("keeps the registration but restores edit tools when switching away from GPT", async () => {
+    const h = createHarness(["read", "edit", "write"]);
+    registerApplyPatchExtension(h.pi as never);
+
+    await h.trigger("session_start", GPT);
+    await h.trigger("model_select", CLAUDE);
+
+    expect(h.registeredTools).toEqual(["apply_patch"]);
+    expect(h.activeTools()).toEqual(["read", "edit", "write"]);
   });
 });
 

@@ -7,7 +7,7 @@ const GPT_APPLY_PATCH_PROVIDERS = new Set(["openai", "openai-codex", "azure-open
 const GPT_APPLY_PATCH_APIS = new Set(["openai-responses", "openai-codex-responses"]);
 const STANDARD_EDIT_TOOL_NAMES = ["edit", "write"] as const;
 
-type ToolsetApi = Pick<ExtensionAPI, "on" | "getActiveTools" | "setActiveTools">;
+type ApplyPatchExtensionApi = Pick<ExtensionAPI, "on" | "registerTool" | "getActiveTools" | "setActiveTools">;
 
 export function isOpenAIGptModel(
   model: (Pick<Model<string>, "provider" | "id"> & Partial<Pick<Model<string>, "api">>) | undefined,
@@ -41,22 +41,33 @@ export function syncToolset(
   pi.setActiveTools([...withoutExtensionManagedEditTools(currentToolNames), ...STANDARD_EDIT_TOOL_NAMES]);
 }
 
-export function registerApplyPatchExtension(pi: ToolsetApi): void {
+export function registerApplyPatchExtension(pi: ApplyPatchExtensionApi): void {
+  let registered = false;
+
+  const reconcile = (model: Model<string> | undefined): void => {
+    // pi has no unregisterTool; registration happens lazily, at most once per
+    // extension instance, and only after a GPT-family model has been active.
+    if (isOpenAIGptModel(model) && !registered) {
+      pi.registerTool(createApplyPatchTool());
+      registered = true;
+    }
+    syncToolset(pi, model);
+  };
+
   pi.on("session_start", async (_event, ctx) => {
-    syncToolset(pi, ctx.model);
+    reconcile(ctx.model);
   });
 
   pi.on("model_select", async (event) => {
-    syncToolset(pi, event.model);
+    reconcile(event.model);
   });
 
   pi.on("before_agent_start", async (_event, ctx) => {
-    syncToolset(pi, ctx.model);
+    reconcile(ctx.model);
   });
 }
 
 export default function (pi: ExtensionAPI) {
   if (isExtensionDisabled("apply-patch")) return;
-  pi.registerTool(createApplyPatchTool());
   registerApplyPatchExtension(pi);
 }

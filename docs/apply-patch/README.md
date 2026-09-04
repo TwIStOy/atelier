@@ -8,9 +8,10 @@ Registers one LLM-callable tool, `apply_patch`, that applies Codex patch envelop
 
 | Case | Result |
 |------|--------|
-| OpenAI GPT provider active | replaces `write` and `edit` with `apply_patch` |
-| Custom `openai-responses` GPT provider active | replaces `write` and `edit` with `apply_patch` |
-| Non-GPT model active | restores the original `write` and `edit` toolset |
+| GPT model active | `apply_patch` is registered (lazily, once) and replaces `write` and `edit` in the active toolset |
+| Custom `openai-responses` GPT provider active | same as above |
+| Non-GPT model active | standard `write`/`edit` toolset restored; `apply_patch` stays inactive |
+| GPT model never used in the session | `apply_patch` is never registered at all |
 | Raw freeform patch input | accepted and applied |
 | JSON `{ "input": "..." }` patch input | accepted and applied |
 | Absolute or parent-escaping path | accepted and resolved by Node path semantics |
@@ -36,7 +37,7 @@ Providers with `compat.supportsOpenAIGrammarTools` receive an OpenAI custom gram
 - `src/apply.ts` — file application: atomic writes, per-file mutation queues (shared with pi's own file tools via `withFileMutationQueue`), `applyPatch` (fail-fast) and `applyPatchDetailed` (accumulates failures + recovery instructions).
 - `src/preview.ts` — per-file previews with unified diffs, computed before application; `ApplyPatchToolDetails` is the display contract consumed by tool-display.
 - `src/tool.ts` — the `ToolDefinition` (grammar, prompt snippet/guidelines, progress updates via `onUpdate`).
-- `src/index.ts` — extension entry; toolset reconciliation on `session_start` / `model_select` / `before_agent_start`.
+- `src/index.ts` — extension entry. The tool is only registered once a GPT-family model has been active (pi has no `unregisterTool`, so registration is lazy and at most once per extension instance); toolset reconciliation (swap `edit`/`write` ↔ `apply_patch`) runs on `session_start` / `model_select` / `before_agent_start`.
 
 ## Display
 
