@@ -81,6 +81,7 @@ export {
   updateConfig,
   writeConfig,
 } from "./config/index.ts";
+export { generateUnifiedDiff } from "./diff.ts";
 export {
   chainEditorFactory,
   getEditorFactoryParent,
