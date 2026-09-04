@@ -138,6 +138,13 @@ function makeHeader(
     else if (isPartial) statusIcon = spinnerGlyph(theme, spinAt);
     else if (isError) statusIcon = theme.fg("error", "◆");
     else statusIcon = theme.fg("success", "◆");
+  } else if (toolName === "apply_patch") {
+    const d = details && typeof details === "object" ? (details as Record<string, unknown>) : undefined;
+    const r = typeof d?.result === "object" && d.result !== null ? (d.result as { failures?: unknown[] }) : undefined;
+    if (r && Array.isArray(r.failures) && r.failures.length > 0) statusIcon = theme.fg("error", "◆");
+    else if (isPartial) statusIcon = spinnerGlyph(theme, spinAt);
+    else if (isError) statusIcon = theme.fg("error", "◆");
+    else statusIcon = theme.fg("success", "◆");
   } else {
     statusIcon = isPartial ? spinnerGlyph(theme, spinAt) : isError ? theme.fg("error", "◆") : theme.fg("success", "◆");
   }

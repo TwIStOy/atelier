@@ -5,6 +5,7 @@
   "main": "src/index.ts",
   "types": "src/index.ts",
   "dependencies": {
+    "@htwang-contrib/apply-patch": "*",
     "@htwang-contrib/common": "*",
     "@htwang-contrib/workflow": "*",
     "diff": "^9.0.0"
