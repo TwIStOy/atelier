@@ -43,7 +43,8 @@
       "packages/workflow",
       "packages/heap-probe",
       "packages/inject-prompt-by-model",
-      "packages/canvas"
+      "packages/canvas",
+      "packages/apply-patch"
     ],
     "skills": [
       "skills/code-philosophy",
