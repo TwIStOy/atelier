@@ -6,6 +6,11 @@
 
 - `apply_patch` tool display adapter: the Codex-style patch tool (registered by `@htwang-contrib/apply-patch` for OpenAI GPT models) now renders in the repo's Edit/Write style. The header shows `ApplyPatch <path>` (accent, `+N more` for multi-file patches); the collapsed line is `└ patch [i/n] +N -M unified|side-by-side · F files [change bar]` with a `✗ N failed` marker on failed hunks (header icon also turns red); the expanded view renders per-file unified diffs through the same `delta` pipeline as Edit, with `├`/`└` per-file headers for multi-file patches and a `✗` failure list. Falls back to parsing the raw patch text for counts while the call is still streaming. The delta rendering helpers (`renderWithDelta`, `renderChangeBar`, `resolveIsSplit`) moved from `edit.ts` to `adapters/shared.ts`, and `generateUnifiedDiff` now comes from `@htwang-contrib/common`.
 
+### Changed
+
+- Collapsed tool summaries now sit flush left, aligned under the status icon. The generic collapsed summary (`└ N lines — <key> to expand`, used by tools without a display adapter such as `todo_update`) no longer prefixes a four-space indent, matching the existing read/edit/grep adapter convention.
+- `ask_user_question` no longer renders a collapsed `└ N questions` line; its collapsed view is the header only. The `askUserQuestionCollapsed` adapter-gating clause in `renderToolCall` was removed together with it.
+
 ## [0.5.0] - 2026-08-12
 
 ### Changed
