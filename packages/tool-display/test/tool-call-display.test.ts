@@ -144,6 +144,48 @@ describe("todo adapter collapsed-content width safety", () => {
   });
 });
 
+describe("collapsed summary line indentation", () => {
+  it("renders the generic collapsed summary flush left, like adapter summaries", () => {
+    const lines = renderToolCall(
+      {
+        toolName: "todo_update",
+        args: { id: 5, status: "completed" },
+        output: "Updated #5",
+        expanded: false,
+        isPartial: false,
+        isError: false,
+        registry: globalToolDisplayRegistry,
+      },
+      PLAIN_THEME,
+    ).render(80);
+    expect(lines.length).toBe(2);
+    expect(lines[1].startsWith("└ ")).toBe(true);
+  });
+
+  it("renders no collapsed content line for ask_user_question", () => {
+    const lines = renderCollapsed(
+      "ask_user_question",
+      {
+        questions: [
+          {
+            header: "Auth",
+            question: "Which provider?",
+            multiSelect: false,
+            options: [
+              { label: "OAuth", description: "device flow" },
+              { label: "Token", description: "static token" },
+            ],
+          },
+        ],
+      },
+      'User has answered your questions: "Which provider?"="OAuth". You can now continue.',
+      false,
+    );
+    expect(lines.length).toBe(1);
+    expect(lines[0]).toContain("AskUserQuestion");
+  });
+});
+
 describe("bash adapter command display width", () => {
   const LONG_CMD =
     "nix build .#default --print-build-logs --fallback --extra-experimental-features 'nix-command flakes ca-derivations' --cores 8 --max-jobs 4";

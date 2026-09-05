@@ -1,6 +1,6 @@
 import { truncateDisplay } from "@htwang-contrib/common";
 import type { ToolDisplayAdapter } from "../types.ts";
-import { formatExpandedToolOutputLines, INDENT } from "./shared.ts";
+import { formatExpandedToolOutputLines } from "./shared.ts";
 
 interface AuqQuestionArg {
   header?: string;
@@ -56,13 +56,8 @@ export const askUserQuestionAdapter: ToolDisplayAdapter<AskUserQuestionArgs> = {
     return title;
   },
 
-  formatCollapsedContent(args, _output, theme, _width, _details, _isPartial, _spinAt) {
-    const { count } = summarize(args);
-    const lines: string[] = [];
-    if (count > 0) {
-      lines.push(INDENT + theme.fg("muted", `└ ${count} question${count !== 1 ? "s" : ""}`));
-    }
-    return lines;
+  formatCollapsedContent() {
+    return [];
   },
 
   formatExpandedContent(_args, output, theme, width, _details) {

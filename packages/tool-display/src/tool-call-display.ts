@@ -67,8 +67,7 @@ export function formatGenericToolHeader(
 export function defaultGenericCollapsedRenderer(output: string, theme: Theme, width: number): string[] {
   if (!output.trim()) return [];
   const n = trimTrailingEmpty(output.split("\n")).length;
-  const line =
-    INDENT + theme.fg("muted", `└ ${n} line${n !== 1 ? "s" : ""} — ${keyText("app.tools.expand")} to expand`);
+  const line = theme.fg("muted", `└ ${n} line${n !== 1 ? "s" : ""} — ${keyText("app.tools.expand")} to expand`);
   return [truncateToWidth(line, width, "…")];
 }
 
@@ -252,13 +251,10 @@ export function renderToolCall(
 
       const lsCollapsedPartial = opts.toolName === "ls" && !opts.expanded && opts.isPartial;
 
-      const askUserQuestionCollapsed = opts.toolName === "ask_user_question" && !opts.expanded && adapter;
-
       const useAdapter =
         adapter &&
         (opts.expanded ||
           hasTextOutput ||
-          askUserQuestionCollapsed ||
           detailsOnlyCollapsed ||
           grepCollapsedPartial ||
           globCollapsedPartial ||
