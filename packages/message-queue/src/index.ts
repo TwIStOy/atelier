@@ -2,7 +2,7 @@ import type { ImageContent, TextContent } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import type { TUI } from "@earendil-works/pi-tui";
 import { getKeybindings, Key, matchesKey } from "@earendil-works/pi-tui";
-import { isExtensionDisabled, MODAL_ACTIVE_EVENT } from "@htwang-contrib/common";
+import { isExtensionDisabled, MODAL_ACTIVE_EVENT, registerTuiCommands } from "@htwang-contrib/common";
 import type { QueuedMessage } from "./queue.ts";
 import { MessageQueue } from "./queue.ts";
 import { createQueuePanel, type QueueAction } from "./queue-panel.ts";
@@ -160,38 +160,40 @@ export default function messageQueueExtension(pi: ExtensionAPI): void {
     });
   });
 
-  pi.registerCommand("queue", {
-    description: "Manage queued messages in an interactive panel",
-    handler: async (_rawArgs, ctx) => {
-      if (!ctx.hasUI) {
-        ctx.ui.notify("/queue requires an interactive terminal.", "warning");
-        return;
-      }
-      if (queue.isEmpty) {
-        ctx.ui.notify("No messages in queue.", "info");
-        return;
-      }
+  registerTuiCommands(pi, (api) => {
+    api.registerCommand("queue", {
+      description: "Manage queued messages in an interactive panel",
+      handler: async (_rawArgs, ctx) => {
+        if (!ctx.hasUI) {
+          ctx.ui.notify("/queue requires an interactive terminal.", "warning");
+          return;
+        }
+        if (queue.isEmpty) {
+          ctx.ui.notify("No messages in queue.", "info");
+          return;
+        }
 
-      panelOpen = true;
-      disableEmptyEnter();
+        panelOpen = true;
+        disableEmptyEnter();
 
-      const action = await ctx.ui.custom<QueueAction>((tui: TUI, theme: Theme, kb, done) =>
-        createQueuePanel(
-          () => queue.items,
-          (idx) => deleteAt(idx),
-          theme,
-          tui,
-          kb,
-          done,
-        ),
-      );
+        const action = await ctx.ui.custom<QueueAction>((tui: TUI, theme: Theme, kb, done) =>
+          createQueuePanel(
+            () => queue.items,
+            (idx) => deleteAt(idx),
+            theme,
+            tui,
+            kb,
+            done,
+          ),
+        );
 
-      panelOpen = false;
-      refreshWidget();
+        panelOpen = false;
+        refreshWidget();
 
-      if (action?.kind === "send") {
-        sendFromPanel(action.index);
-      }
-    },
+        if (action?.kind === "send") {
+          sendFromPanel(action.index);
+        }
+      },
+    });
   });
 }
