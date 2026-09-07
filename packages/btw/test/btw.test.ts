@@ -46,6 +46,10 @@ function mockPi(): MockPi {
   } as unknown as MockPi;
 }
 
+async function startInMode(pi: MockPi, mode: string): Promise<void> {
+  await pi.onHandlers.session_start?.({ type: "session_start", reason: "startup" }, { mode });
+}
+
 function makeTurn(question: string, answer: string): BtwTurn {
   return {
     userMessage: {
@@ -61,12 +65,22 @@ function makeTurn(question: string, answer: string): BtwTurn {
 }
 
 describe("registerBtw", () => {
-  test("registers the /btw command", () => {
+  test("registers the /btw command after session_start in tui mode", async () => {
     clearGlobalState(BTW_STATE_KEY);
     const pi = mockPi();
     registerBtw(pi as unknown as import("@earendil-works/pi-coding-agent").ExtensionAPI);
+    expect(pi.commands.btw).toBeUndefined();
+    await startInMode(pi, "tui");
     expect(pi.commands.btw).toBeDefined();
     expect(pi.commands.btw.handler).toBeInstanceOf(Function);
+  });
+
+  test("does not register the /btw command in rpc mode", async () => {
+    clearGlobalState(BTW_STATE_KEY);
+    const pi = mockPi();
+    registerBtw(pi as unknown as import("@earendil-works/pi-coding-agent").ExtensionAPI);
+    await startInMode(pi, "rpc");
+    expect(pi.commands.btw).toBeUndefined();
   });
 
   test("registers message_end hook", () => {
@@ -86,28 +100,30 @@ describe("registerBtw", () => {
 });
 
 describe("command handler guards", () => {
-  test("notifies when hasUI is false", async () => {
+  async function startedPi(): Promise<MockPi> {
     clearGlobalState(BTW_STATE_KEY);
     const pi = mockPi();
     registerBtw(pi as unknown as import("@earendil-works/pi-coding-agent").ExtensionAPI);
+    await startInMode(pi, "tui");
+    return pi;
+  }
+
+  test("notifies when hasUI is false", async () => {
+    const pi = await startedPi();
     const ctx = mockCtx({ hasUI: false });
     await pi.commands.btw.handler("what?", ctx);
     expect(ctx.ui.notify).toHaveBeenCalledWith(expect.stringContaining("interactive terminal"), "warning");
   });
 
   test("notifies when args are empty", async () => {
-    clearGlobalState(BTW_STATE_KEY);
-    const pi = mockPi();
-    registerBtw(pi as unknown as import("@earendil-works/pi-coding-agent").ExtensionAPI);
+    const pi = await startedPi();
     const ctx = mockCtx();
     await pi.commands.btw.handler("  ", ctx);
     expect(ctx.ui.notify).toHaveBeenCalledWith(expect.stringContaining("requires a question"), "warning");
   });
 
   test("notifies when no model is set", async () => {
-    clearGlobalState(BTW_STATE_KEY);
-    const pi = mockPi();
-    registerBtw(pi as unknown as import("@earendil-works/pi-coding-agent").ExtensionAPI);
+    const pi = await startedPi();
     const ctx = mockCtx({ model: undefined });
     await pi.commands.btw.handler("what?", ctx);
     expect(ctx.ui.notify).toHaveBeenCalledWith(expect.stringContaining("active model"), "warning");

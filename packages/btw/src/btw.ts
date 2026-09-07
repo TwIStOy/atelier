@@ -15,6 +15,7 @@ import {
   createSessionCache,
   executeSideCall,
   getGlobalState,
+  registerTuiCommands,
   userMessageText,
 } from "@htwang-contrib/common";
 import type { BtwTurn } from "./btw-ui.ts";
@@ -176,11 +177,13 @@ export function registerBtw(pi: ExtensionAPI): void {
   registerMessageEndSnapshot(pi, cache);
   registerInvalidationHooks(pi, cache);
 
-  pi.registerCommand("btw", {
-    description:
-      "Ask a one-off side question to the current model. Answer appears in an overlay and does not enter the conversation.",
-    async handler(args, ctx) {
-      await handleBtwCommand(args, ctx);
-    },
+  registerTuiCommands(pi, (api) => {
+    api.registerCommand("btw", {
+      description:
+        "Ask a one-off side question to the current model. Answer appears in an overlay and does not enter the conversation.",
+      async handler(args, ctx) {
+        await handleBtwCommand(args, ctx);
+      },
+    });
   });
 }
