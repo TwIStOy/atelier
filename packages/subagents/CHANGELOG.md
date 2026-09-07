@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- `/view-subagents` is now registered only when pi runs in TUI mode (via `registerTuiCommands` from `@htwang-contrib/common`); its viewer is a `ctx.ui.custom` overlay, which resolves `undefined` in RPC mode. `/subagents-agents` stays available in RPC because `ctx.ui.select`/`ctx.ui.editor` dialogs are wired through the RPC protocol.
+
 ## [0.6.1] - 2026-09-01
 
 ### Added
