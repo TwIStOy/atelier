@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- `/commit` and `/commit-model` are now registered only when pi runs in TUI mode (via `registerTuiCommands` from `@htwang-contrib/common`). Both drive `ctx.ui.custom` overlays, which resolve `undefined` in RPC mode and left `/commit` hanging forever on the overlay controller promise.
+
 ## [0.5.0] - 2026-08-12
 
 ### Fixed
