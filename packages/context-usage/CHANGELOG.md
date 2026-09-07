@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- `/context` is now registered only when pi runs in TUI mode (via `registerTuiCommands` from `@htwang-contrib/common`). The below-editor widget is registered as a component factory (ignored by the RPC widget bridge) and its Esc-clear relies on `onTerminalInput` (interactive-only), so the command was a silent no-op in RPC mode.
+
 ## [0.4.0] - 2026-07-31
 
 ### Changed
