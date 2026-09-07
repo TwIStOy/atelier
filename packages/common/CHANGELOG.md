@@ -5,6 +5,7 @@
 ### Added
 
 - `generateUnifiedDiff(filePath, oldText, newText)` in `src/diff.ts`: git-style unified diff generation with 3-line context, shared by the apply-patch tool's preview details and tool-display's Edit/apply_patch adapters. Standalone `\n` tokens from `newlineIsToken` diffing are folded into the preceding token so trailing newlines no longer produce a phantom empty context line or inflated hunk counts.
+- `registerTuiCommands(pi, register)` in `src/tui-commands.ts`: registers TUI-only slash commands from a `session_start` handler gated on `ctx.mode === "tui"`. Extension factories run before the runner's mode is bound (mode is still the `"print"` default there), so mode-gated command registration must be deferred; `session_start` fires after `bindExtensions`, before the TUI builds its autocomplete provider, and re-fires on reload/session switches (registration is idempotent).
 
 ## [0.6.1] - 2026-09-01
 

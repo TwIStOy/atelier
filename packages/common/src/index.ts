@@ -188,6 +188,7 @@ export {
   terminalWidth,
 } from "./terminal.ts";
 export { resolveNow } from "./time.ts";
+export { registerTuiCommands } from "./tui-commands.ts";
 export type {
   CodingPlanLimitKind,
   CodingPlanLimitPeriod,
