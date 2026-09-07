@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- `/config` is now registered only when pi runs in TUI mode (via `registerTuiCommands` from `@htwang-contrib/common`). The settings browser is a `ctx.ui.custom` component, which resolves `undefined` in RPC mode, so the command was a silent no-op there.
+
 ## [0.4.0] - 2026-07-31
 
 ### Changed
