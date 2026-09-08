@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Added
+
+- Compact thinking blocks are now click-expandable per block. Each rendered thinking run is wrapped in a `MouseRegion`; a left click toggles that single run between the compact preview (or summary) and the full raw thinking text, leaving other runs untouched. The collapsed truncation hint now reads `... (N more lines, click or ctrl+t to expand)` and the expanded view ends with `... (click to collapse)`; expanding a summarized run shows the original thinking, not the summary. Per-run expansion state resets when the global thinking visibility is toggled (ctrl+t), matching the stock component's override reset.
+
+### Changed
+
+- Dev dependencies bumped to `@earendil-works/pi-tui`, `@earendil-works/pi-coding-agent`, and `@earendil-works/pi-ai` `^0.85.0` (`MouseRegion` and mouse dispatch landed in pi-tui 0.84.2+; the stock `Markdown.paddingX` became private in 0.85.1, so the expanded-thinking indent now sets it through the internals cast). npm hoisted `pi-coding-agent` 0.85.1 to the root `node_modules` for all workspaces as a side effect.
+
 ## [0.5.0] - 2026-08-12
 
 ### Added
