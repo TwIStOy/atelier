@@ -83,7 +83,13 @@ type ToolExecutionPatchThis = {
   getTextOutput?: () => string | undefined;
   getCallRenderer?: () => unknown;
   getResultRenderer?: () => unknown;
+  setExpanded(expanded: boolean): void;
   invalidate(): void;
+};
+
+type PatchedMouseEvent = {
+  type: string;
+  button?: string;
 };
 
 const FALLBACK_THEME: Theme = {
@@ -171,6 +177,22 @@ function patchToolExecutionRender(getTheme: () => Theme, registry: typeof global
     }
     if (previous instanceof ToolExecutionComponent) return lines;
     return ["", ...lines];
+  };
+
+  const originalHandleMouse = proto.handleMouse as
+    | ((this: ToolExecutionPatchThis, event: PatchedMouseEvent) => unknown)
+    | undefined;
+  proto.handleMouse = function (this: ToolExecutionPatchThis, event: PatchedMouseEvent) {
+    const childResult = originalHandleMouse?.call(this, event);
+    if (childResult) return childResult;
+    if (!proto.__tdRegistry.get(this.toolName)) return undefined;
+    // Adapter-rendered blocks bypass the stock MouseRegion wrappers: the patched render
+    // never updates selfRenderHeight (edit is renderShell "self"), and default-shell child
+    // heights no longer match our rendered lines. Finish unhandled left clicks ourselves,
+    // mirroring the stock createResultRegion semantics.
+    if (!this.result || event.type !== "click" || event.button !== "left") return undefined;
+    this.setExpanded(!this.expanded);
+    return { handled: true };
   };
   proto.__tdPatched = true;
 }

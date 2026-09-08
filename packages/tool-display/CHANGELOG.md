@@ -11,6 +11,10 @@
 - Collapsed tool summaries now sit flush left, aligned under the status icon. The generic collapsed summary (`└ N lines — <key> to expand`, used by tools without a display adapter such as `todo_update`) no longer prefixes a four-space indent, matching the existing read/edit/grep adapter convention.
 - `ask_user_question` no longer renders a collapsed `└ N questions` line; its collapsed view is the header only. The `askUserQuestionCollapsed` adapter-gating clause in `renderToolCall` was removed together with it.
 
+### Fixed
+
+- Adapter-rendered tool blocks are click-expandable again in fullscreen mode. pi's per-block mouse expansion wraps renderer output in `MouseRegion`s inside `ToolExecutionComponent`, but the patched `render` bypasses that tree: `edit` (the only `renderShell: "self"` tool) gates `handleMouse` on `selfRenderHeight`, which only the stock `render` updates, so clicks never toggled; default-shell tools only toggled when the stale child heights happened to cover the clicked line. The patch now also overrides `handleMouse`: unhandled left clicks on a finished adapter-rendered block toggle `setExpanded`, matching the stock `createResultRegion` semantics (nested regions and OSC 8 links still win).
+
 ## [0.5.0] - 2026-08-12
 
 ### Changed
