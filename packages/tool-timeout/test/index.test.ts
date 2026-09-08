@@ -66,7 +66,7 @@ describe("tool-timeout wiring", () => {
   });
 
   it("leaves input untouched when the cap is disabled", () => {
-    mockConfig = { maxTimeoutSeconds: 0 };
+    mockConfig = { ...DEFAULT_CONFIG, maxTimeoutSeconds: 0 };
     const { pi, onHandlers } = mockPi();
     extension(pi);
     const event = bashCall({ command: "sleep 1000" });
@@ -79,5 +79,74 @@ describe("tool-timeout wiring", () => {
     const { pi, onHandlers } = mockPi();
     extension(pi);
     assert.equal(Object.keys(onHandlers).length, 0);
+  });
+});
+
+describe("tool-timeout exempt rules wiring", () => {
+  beforeEach(() => {
+    mockConfig = { ...DEFAULT_CONFIG, exemptRules: [{ tool: "bash", pattern: "ocr review" }] };
+    disabled = false;
+  });
+
+  it("leaves matched calls with no timeout at all", () => {
+    const { pi, onHandlers } = mockPi();
+    extension(pi);
+    const event = bashCall({ command: "ocr review --all" });
+    onHandlers.tool_call(event as never);
+    assert.equal("timeout" in event.input, false);
+  });
+
+  it("removes a model-requested timeout from matched calls", () => {
+    const { pi, onHandlers } = mockPi();
+    extension(pi);
+    const event = bashCall({ command: "ocr review", timeout: 60 });
+    onHandlers.tool_call(event as never);
+    assert.equal("timeout" in event.input, false);
+  });
+
+  it("strips matched timeouts even when the cap is disabled", () => {
+    mockConfig = {
+      maxTimeoutSeconds: 0,
+      exemptRules: [{ tool: "bash", pattern: "ocr review" }],
+    };
+    const { pi, onHandlers } = mockPi();
+    extension(pi);
+    const event = bashCall({ command: "ocr review", timeout: 60 });
+    onHandlers.tool_call(event as never);
+    assert.equal("timeout" in event.input, false);
+  });
+
+  it("still caps unmatched bash calls when rules are configured", () => {
+    const { pi, onHandlers } = mockPi();
+    extension(pi);
+    const event = bashCall({ command: "sleep 1000" });
+    onHandlers.tool_call(event as never);
+    assert.equal(event.input.timeout, 3600);
+  });
+
+  it("applies rules to non-bash tools", () => {
+    mockConfig = { ...DEFAULT_CONFIG, exemptRules: [{ tool: "mytool", pattern: "watch" }] };
+    const { pi, onHandlers } = mockPi();
+    extension(pi);
+    const event = {
+      type: "tool_call",
+      toolCallId: "call-3",
+      toolName: "mytool",
+      input: { action: "watch stuff", timeout: 30 },
+    };
+    onHandlers.tool_call(event as never);
+    assert.equal("timeout" in event.input, false);
+  });
+
+  it("ignores malformed rule entries instead of blocking the cap", () => {
+    mockConfig = {
+      ...DEFAULT_CONFIG,
+      exemptRules: [{ tool: "bash", pattern: "" }, "ocr review"] as unknown as ToolTimeoutConfig["exemptRules"],
+    };
+    const { pi, onHandlers } = mockPi();
+    extension(pi);
+    const event = bashCall({ command: "ocr review" });
+    onHandlers.tool_call(event as never);
+    assert.equal(event.input.timeout, 3600);
   });
 });
