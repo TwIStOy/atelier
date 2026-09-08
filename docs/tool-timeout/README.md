@@ -17,13 +17,34 @@ A `tool_call` event handler (the hook that runs before execution, whose `event.i
 
 The rewritten value flows into whatever `bash` tool is actually registered — pi's built-in local bash or a re-registered one (e.g. gondolin-sandbox) — because the mutation happens on the call input, not on a wrapped tool. Pi's bash implementation kills the process group when the timeout expires, so the cap is real cancellation.
 
+### Exempt rules
+
+Some commands must never be interrupted — killing them mid-run wastes hours of work (e.g. a long `ocr review` pass that would have to restart from scratch). `exemptRules` is an array of `{ "tool", "pattern" }` objects; when the tool name matches and **any string argument** contains the pattern (for bash: the `command`), the call runs with **no timeout at all**:
+
+- the cap is not applied, and
+- a model-requested `timeout` argument is removed.
+
+The pattern is a plain case-sensitive substring (commas, `=`, quotes etc. are all literal). Entries whose `tool`/`pattern` is missing or empty are ignored. Rules are absolute: they strip the timeout even when `maxTimeoutSeconds` is `0`.
+
+This key is **not** registered in `/config` (the config UI cannot edit arrays); edit `extensions.json` directly.
+
 ## Config
 
-Registered via `registerConfigItems`, editable through `/config` (see `extension-config-ui`), persisted to `~/.config/pi/extensions.json` under `tool-timeout`:
+`maxTimeoutSeconds` is registered via `registerConfigItems`, editable through `/config` (see `extension-config-ui`). Both keys persist to `~/.config/pi/extensions.json` under `tool-timeout`:
 
-| Key                 | Type   | Default | Meaning                                                                    |
-| ------------------- | ------ | ------- | -------------------------------------------------------------------------- |
-| `maxTimeoutSeconds` | number | `3600`  | Cap in seconds. `0` disables the cap entirely (pi stock: no default bound). |
+```json
+{
+  "tool-timeout": {
+    "maxTimeoutSeconds": 3600,
+    "exemptRules": [{ "tool": "bash", "pattern": "ocr review" }]
+  }
+}
+```
+
+| Key                 | Type    | Default | Meaning                                                                    |
+| ------------------- | ------- | ------- | -------------------------------------------------------------------------- |
+| `maxTimeoutSeconds` | number  | `3600`  | Cap in seconds. `0` disables the cap entirely (pi stock: no default bound). |
+| `exemptRules`       | array   | `[]`    | `{ tool, pattern }` rules; matched calls run with no timeout (see above). JSON-only, not in `/config`. |
 
 Master kill-switch: disable the extension via `extension-disable` (`tool-timeout`).
 
