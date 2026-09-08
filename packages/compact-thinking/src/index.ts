@@ -5,7 +5,7 @@ import {
   type ExtensionContext,
   type Theme,
 } from "@earendil-works/pi-coding-agent";
-import { Markdown, Spacer, Text, type TUI } from "@earendil-works/pi-tui";
+import { Markdown, MouseRegion, Spacer, Text, type TUI } from "@earendil-works/pi-tui";
 import { createLogger, isExtensionDisabled, isStaleCtxError, resolveModel } from "@htwang-contrib/common";
 import { loadConfig, registerCompactThinkingConfigItems, setCachedModelOptions } from "./config.ts";
 import { DURATION_ENTRY_TYPE, restoreDurationEntries } from "./durations.ts";
@@ -36,6 +36,7 @@ export default function compactThinking(pi: ExtensionAPI) {
 
   const prototype = AssistantMessageComponent.prototype as PatchedPrototype;
   const originalUpdateContent = prototype.updateContent;
+  const originalSetHideThinkingBlock = prototype.setHideThinkingBlock;
 
   const completedDurations = new Map<number, Map<number, number>>();
   const completedSummaries = new Map<number, Map<number, string>>();
@@ -43,6 +44,7 @@ export default function compactThinking(pi: ExtensionAPI) {
   const renderedComponents = new Set<AssistantMessageComponent>();
   const streamingComponents = new Set<AssistantMessageComponent>();
   const summarizingComponents = new Set<AssistantMessageComponent>();
+  let expandedRuns = new WeakMap<AssistantMessageComponent, Set<number>>();
   let activeThinking: ActiveThinking | undefined;
   let activeTheme: Theme | undefined;
   let activeTui: TUI | undefined;
@@ -133,8 +135,9 @@ export default function compactThinking(pi: ExtensionAPI) {
     if (!self.hideThinkingBlock) {
       originalUpdateContent.call(this, message);
       for (const child of self.contentContainer.children) {
-        if (child instanceof Markdown && (child as unknown as { defaultTextStyle?: unknown }).defaultTextStyle) {
-          child.paddingX = self.outputPad + THINKING_INDENT;
+        const markdown = child as unknown as { defaultTextStyle?: unknown; paddingX?: number };
+        if (child instanceof Markdown && markdown.defaultTextStyle) {
+          markdown.paddingX = self.outputPad + THINKING_INDENT;
         }
       }
       return;
@@ -155,6 +158,8 @@ export default function compactThinking(pi: ExtensionAPI) {
           (content.type === "text" && content.text.trim()) || (content.type === "thinking" && content.thinking.trim()),
       );
     if (hasVisibleContent) self.contentContainer.addChild(new Spacer(1));
+
+    let thinkingRunIndex = 0;
 
     for (let i = 0; i < message.content.length; i++) {
       const content = message.content[i];
@@ -189,6 +194,7 @@ export default function compactThinking(pi: ExtensionAPI) {
       if (hasVisibleContentBefore) {
         self.contentContainer.addChild(new Spacer(1));
       }
+      const runIndex = thinkingRunIndex++;
 
       const elapsedMs = activeThinking ? Math.max(1, Date.now() - activeThinking.startedAt) : undefined;
       const completedMs = getCompletedDuration(message.timestamp, runStartIndex, runEndIndex);
@@ -211,25 +217,46 @@ export default function compactThinking(pi: ExtensionAPI) {
       const summary = active
         ? undefined
         : getRunSummary(completedSummaries, message.timestamp, runStartIndex, runEndIndex);
+      const expanded = expandedRuns.get(component)?.has(runIndex) ?? false;
       const block =
-        summary !== undefined
+        expanded && previewSource.trim()
           ? new StrictThinkingPreview(
               heading,
-              `${SUMMARY_DISPLAY_PREFIX}${summary}`,
+              previewSource.trim(),
               self.outputPad + THINKING_INDENT,
               thinkingStyle,
-              Math.max(config.previewLines, 1),
+              config.previewLines,
+              true,
             )
-          : config.previewLines > 0 && previewSource.trim()
+          : summary !== undefined
             ? new StrictThinkingPreview(
                 heading,
-                previewSource.trim(),
+                `${SUMMARY_DISPLAY_PREFIX}${summary}`,
                 self.outputPad + THINKING_INDENT,
                 thinkingStyle,
-                config.previewLines,
+                Math.max(config.previewLines, 1),
               )
-            : new Text(heading, self.outputPad + THINKING_INDENT, 0);
-      self.contentContainer.addChild(new Gutter(block, self.outputPad + THINKING_BAR_COLUMN, thinkingBar()));
+            : config.previewLines > 0 && previewSource.trim()
+              ? new StrictThinkingPreview(
+                  heading,
+                  previewSource.trim(),
+                  self.outputPad + THINKING_INDENT,
+                  thinkingStyle,
+                  config.previewLines,
+                )
+              : new Text(heading, self.outputPad + THINKING_INDENT, 0);
+      const gutter = new Gutter(block, self.outputPad + THINKING_BAR_COLUMN, thinkingBar());
+      self.contentContainer.addChild(
+        new MouseRegion(gutter, (event) => {
+          if (event.type !== "click" || event.button !== "left") return undefined;
+          const runs = expandedRuns.get(component) ?? new Set<number>();
+          if (runs.has(runIndex)) runs.delete(runIndex);
+          else runs.add(runIndex);
+          expandedRuns.set(component, runs);
+          if (self.lastMessage) self.updateContent(self.lastMessage);
+          return { handled: true };
+        }),
+      );
 
       const hasVisibleContentAfter = message.content
         .slice(i + 1)
@@ -278,6 +305,11 @@ export default function compactThinking(pi: ExtensionAPI) {
         );
       }
     }
+  }
+
+  function patchedSetHideThinkingBlock(this: AssistantMessageComponent, hide: boolean) {
+    expandedRuns = new WeakMap();
+    originalSetHideThinkingBlock.call(this, hide);
   }
 
   function startThinking(message: AssistantMessage, contentIndex: number) {
@@ -468,6 +500,7 @@ export default function compactThinking(pi: ExtensionAPI) {
     if (ctx.mode !== "tui") return;
     tuiSession = true;
     prototype.updateContent = patchedUpdateContent;
+    prototype.setHideThinkingBlock = patchedSetHideThinkingBlock;
     patchInstalled = true;
     restoreDurationEntries(ctx.sessionManager.getBranch(), completedDurations);
     restoreSummaryEntries(ctx.sessionManager.getBranch(), completedSummaries);
@@ -517,6 +550,7 @@ export default function compactThinking(pi: ExtensionAPI) {
 
     if (patchInstalled) {
       prototype.updateContent = originalUpdateContent;
+      prototype.setHideThinkingBlock = originalSetHideThinkingBlock;
       patchInstalled = false;
     }
   });

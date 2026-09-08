@@ -21,6 +21,7 @@ const PLAIN_THEME: Theme = {
   fg: (_c: string, text: string) => text,
   bg: (_c: string, text: string) => text,
   bold: (text: string) => text,
+  italic: (text: string) => text,
 } as Theme;
 
 const fakeAdapter: ToolDisplayAdapter = {
@@ -29,10 +30,21 @@ const fakeAdapter: ToolDisplayAdapter = {
   formatExpandedContent: () => ["expanded"],
 };
 
+type PatchedMouseEvent = {
+  type: string;
+  button: string;
+  x: number;
+  y: number;
+  screenX: number;
+  screenY: number;
+  width: number;
+  height: number;
+};
+
 type PatchedComponent = {
   expanded: boolean;
   result?: unknown;
-  handleMouse(event: { type: string; button?: string }): unknown;
+  handleMouse(event: PatchedMouseEvent): unknown;
   updateResult(result: unknown, isPartial?: boolean): void;
 };
 
@@ -80,15 +92,29 @@ function withResult(component: PatchedComponent): PatchedComponent {
   return component;
 }
 
+function mouseEvent(overrides: Partial<PatchedMouseEvent>): PatchedMouseEvent {
+  return {
+    type: "click",
+    button: "left",
+    x: 2,
+    y: 1,
+    screenX: 2,
+    screenY: 5,
+    width: 80,
+    height: 3,
+    ...overrides,
+  };
+}
+
 describe("patched handleMouse", () => {
   it("toggles expanded on left click for adapter-rendered blocks", () => {
     activateExtension();
     globalToolDisplayRegistry.register("mousetool", fakeAdapter);
     const component = withResult(makeComponent("mousetool"));
 
-    expect(component.handleMouse({ type: "click", button: "left" })).toEqual({ handled: true });
+    expect(component.handleMouse(mouseEvent({}))).toEqual({ handled: true });
     expect(component.expanded).toBe(true);
-    expect(component.handleMouse({ type: "click", button: "left" })).toEqual({ handled: true });
+    expect(component.handleMouse(mouseEvent({}))).toEqual({ handled: true });
     expect(component.expanded).toBe(false);
   });
 
@@ -97,7 +123,7 @@ describe("patched handleMouse", () => {
     globalToolDisplayRegistry.register("mousetool", fakeAdapter);
     const component = makeComponent("mousetool");
 
-    expect(component.handleMouse({ type: "click", button: "left" })).toBeUndefined();
+    expect(component.handleMouse(mouseEvent({}))).toBeUndefined();
     expect(component.expanded).toBe(false);
   });
 
@@ -106,9 +132,9 @@ describe("patched handleMouse", () => {
     globalToolDisplayRegistry.register("mousetool", fakeAdapter);
     const component = withResult(makeComponent("mousetool"));
 
-    expect(component.handleMouse({ type: "wheel" })).toBeUndefined();
-    expect(component.handleMouse({ type: "press", button: "left" })).toBeUndefined();
-    expect(component.handleMouse({ type: "click", button: "right" })).toBeUndefined();
+    expect(component.handleMouse(mouseEvent({ type: "wheel", button: "none" }))).toBeUndefined();
+    expect(component.handleMouse(mouseEvent({ type: "press" }))).toBeUndefined();
+    expect(component.handleMouse(mouseEvent({ button: "right" }))).toBeUndefined();
     expect(component.expanded).toBe(false);
   });
 
@@ -116,7 +142,7 @@ describe("patched handleMouse", () => {
     activateExtension();
     const component = withResult(makeComponent("plain_tool"));
 
-    expect(component.handleMouse({ type: "click", button: "left" })).toBeUndefined();
+    expect(component.handleMouse(mouseEvent({}))).toBeUndefined();
     expect(component.expanded).toBe(false);
   });
 });
