@@ -163,6 +163,10 @@ function applyFamilyOverrides(config: ProviderModelConfig, api: Api): void {
     config.thinkingLevelMap = GPT_56_THINKING_LEVEL_MAP;
     return;
   }
+  if (id.startsWith("gpt-6-")) {
+    config.thinkingLevelMap = GPT_56_THINKING_LEVEL_MAP;
+    return;
+  }
   if (GLM_REASONING_EFFORT_IDS.has(id)) {
     config.compat = ZAI_COMPAT_REASONING_EFFORT;
     config.thinkingLevelMap = GLM_REASONING_EFFORT_MAP;
