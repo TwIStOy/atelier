@@ -66,7 +66,9 @@
       "themes/ayu-light.json",
       "themes/ayu-mirage.json",
       "themes/catppuccin-mocha.json",
-      "themes/catppuccin-latte.json"
+      "themes/catppuccin-latte.json",
+      "themes/github-dark-default.json",
+      "themes/github-light-default.json"
     ],
     "prompts": [
       "prompts"
