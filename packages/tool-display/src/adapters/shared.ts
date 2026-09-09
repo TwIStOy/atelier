@@ -1,10 +1,8 @@
 import { execSync } from "node:child_process";
 import { getLanguageFromPath, highlightCode, type Theme } from "@earendil-works/pi-coding-agent";
-import { truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
+import { truncateToWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 import { extractAnsiRgb, trimTrailingEmpty } from "@htwang-contrib/common";
 import { loadConfig } from "../config.ts";
-
-export const INDENT = "    ";
 
 const BAR_WIDTH = 6;
 
@@ -78,7 +76,7 @@ export function resolveIsSplit(innerWidth: number): boolean {
 }
 
 export function renderWithDelta(unifiedDiff: string, width: number, theme: Theme): string[] {
-  const innerWidth = Math.max(1, width - INDENT.length);
+  const innerWidth = Math.max(1, width);
   const isSplit = resolveIsSplit(innerWidth);
   const styles = probeDeltaStyles(theme);
 
@@ -97,12 +95,12 @@ export function renderWithDelta(unifiedDiff: string, width: number, theme: Theme
     return result
       .split("\n")
       .filter((line) => line.length > 0 && !diffHeaderRe.test(line))
-      .map((line) => INDENT + truncateToWidth(replaceTabs(line), width, ""));
+      .map((line) => truncateToWidth(replaceTabs(line), width, ""));
   } catch {
     return unifiedDiff
       .split("\n")
       .filter((line) => line.length > 0)
-      .map((line) => INDENT + line);
+      .map((line) => truncateToWidth(line, width, "…"));
   }
 }
 
@@ -116,8 +114,8 @@ export function renderChangeBar(added: number, removed: number, theme: Theme): s
 
 export function formatExpandedToolOutputLines(output: string, theme: Theme, width: number): string[] {
   if (!output) return [];
-  const inner = Math.max(1, width - visibleWidth(INDENT));
-  return output.split("\n").map((line) => INDENT + truncateToWidth(theme.fg("toolOutput", line), inner, "…"));
+  const inner = Math.max(1, width);
+  return output.split("\n").map((line) => truncateToWidth(theme.fg("toolOutput", line), inner, "…"));
 }
 
 export function replaceTabs(text: string): string {
@@ -159,7 +157,7 @@ export function renderContentWithLineNumbers(
 
   const endLine = startLine + rawLines.length - 1;
   const gw = gutterVisibleWidth(endLine);
-  const contentWidth = Math.max(1, width - INDENT.length - gw);
+  const contentWidth = Math.max(1, width - gw);
 
   const lines: string[] = [];
 
@@ -168,11 +166,11 @@ export function renderContentWithLineNumbers(
     const gutter = formatLineNumber(lineNum, endLine, theme);
     const codeLine = lang ? replaceTabs(rawLines[i]) : rawLines[i];
     const wrapped = wrapTextWithAnsi(codeLine, contentWidth);
-    lines.push(INDENT + gutter + wrapped[0]);
+    lines.push(gutter + wrapped[0]);
     if (wrapped.length > 1) {
       const contPrefix = formatContinuationPrefix(endLine, theme);
       for (let j = 1; j < wrapped.length; j++) {
-        lines.push(INDENT + contPrefix + wrapped[j]);
+        lines.push(contPrefix + wrapped[j]);
       }
     }
   }

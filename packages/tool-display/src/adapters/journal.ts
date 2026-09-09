@@ -1,6 +1,5 @@
 import { truncateToWidth } from "@earendil-works/pi-tui";
 import type { ToolDisplayAdapter } from "../types.ts";
-import { INDENT } from "./shared.ts";
 
 interface JournalWriteArgs {
   title?: string;
@@ -15,7 +14,7 @@ export const journalWriteAdapter: ToolDisplayAdapter<JournalWriteArgs> = {
   },
 
   formatCollapsedContent(_args, _output, theme) {
-    return [`${INDENT}${theme.fg("success", "written")}`];
+    return [theme.fg("success", "└ written")];
   },
 
   formatExpandedContent(_args, _output, _theme) {
@@ -42,10 +41,10 @@ export const journalReadAdapter: ToolDisplayAdapter<JournalReadArgs> = {
   formatCollapsedContent(_args, _output, theme, width, details) {
     const d = details as JournalReadDetails | undefined;
     const count = d?.content_lines ?? 0;
-    if (count === 0) return [`${INDENT}${theme.fg("muted", "empty")}`];
+    if (count === 0) return [theme.fg("muted", "└ empty")];
     const preview = d?.content_preview?.split("\n")[0] ?? "";
     const truncated = preview.length > 100 ? `${preview.slice(0, 99)}…` : preview;
-    const line = `${INDENT}${theme.fg("success", `${count} line${count === 1 ? "" : "s"}`)} ${theme.fg("dim", truncated)}`;
+    const line = `└ ${theme.fg("success", `${count} line${count === 1 ? "" : "s"}`)} ${theme.fg("dim", truncated)}`;
     return [truncateToWidth(line, width, "…")];
   },
 
@@ -57,12 +56,9 @@ export const journalReadAdapter: ToolDisplayAdapter<JournalReadArgs> = {
     const limit = 20;
     const lines = allLines
       .slice(0, limit)
-      .map(
-        (line) =>
-          INDENT + theme.fg("muted", "│ ") + truncateToWidth(theme.fg("dim", line), width - INDENT.length - 4, "…"),
-      );
+      .map((line) => truncateToWidth(theme.fg("dim", line), Math.max(1, width), "…"));
     if (allLines.length > limit) {
-      lines.push(INDENT + theme.fg("muted", `│ … ${allLines.length - limit} more line(s)`));
+      lines.push(theme.fg("muted", `└ … ${allLines.length - limit} more line(s)`));
     }
     return lines;
   },
@@ -91,10 +87,10 @@ export const journalSearchAdapter: ToolDisplayAdapter<JournalSearchArgs> = {
     const d = details as JournalSearchDetails | undefined;
     const total = d?.total ?? 0;
     if (total === 0) {
-      return [`${INDENT}${theme.fg("muted", "no results")}`];
+      return [theme.fg("muted", "└ no results")];
     }
     const first = d?.items?.[0];
-    const parts: string[] = [INDENT, theme.fg("success", `${total} result${total === 1 ? "" : "s"}`)];
+    const parts: string[] = ["└ ", theme.fg("success", `${total} result${total === 1 ? "" : "s"}`)];
     if (first) {
       parts.push(" ");
       parts.push(theme.fg("dim", first.id));
@@ -115,15 +111,13 @@ export const journalSearchAdapter: ToolDisplayAdapter<JournalSearchArgs> = {
     const lines: string[] = [];
     for (let i = 0; i < Math.min(limit, items.length); i++) {
       const item = items[i]!;
-      const isLast = i === Math.min(limit, items.length) - 1 && total <= limit;
-      const connector = isLast ? "  └ " : "  │ ";
       const idLine =
         theme.fg("dim", item.id) +
         (item.title ? ` ${theme.fg("dim", item.title.length > 100 ? `${item.title.slice(0, 99)}…` : item.title)}` : "");
-      lines.push(INDENT + theme.fg("muted", connector.replace(/^\s{2}/, "")) + idLine);
+      lines.push(theme.fg("accent", idLine));
     }
     if (total > limit) {
-      lines.push(INDENT + theme.fg("muted", `  └ … ${total - limit} more result${total - limit === 1 ? "" : "s"}`));
+      lines.push(theme.fg("muted", `└ … ${total - limit} more result${total - limit === 1 ? "" : "s"}`));
     }
     return lines;
   },

@@ -6,8 +6,6 @@ interface CanvasPublishArgs {
   html?: string;
 }
 
-const INDENT = "    ";
-
 function firstHttpUrl(text: string): string | undefined {
   for (const line of text.split("\n")) {
     const trimmed = line.trim();
@@ -41,8 +39,7 @@ export const canvasPublishAdapter = {
 
   formatExpandedContent(args: CanvasPublishArgs, _output: string, theme: Theme, width: number): string[] {
     const html = args?.html ?? "";
-    if (!html) return [theme.fg("muted", `${INDENT}empty`)];
-    const inner = Math.max(1, width - INDENT.length);
-    return html.split("\n").map((line) => INDENT + truncateToWidth(theme.fg("toolOutput", line), inner, "…"));
+    if (!html) return [theme.fg("muted", "└ empty")];
+    return html.split("\n").map((line) => truncateToWidth(theme.fg("toolOutput", line), Math.max(1, width), "…"));
   },
 };

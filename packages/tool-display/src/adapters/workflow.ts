@@ -5,7 +5,7 @@ import { parseWorkflowScript } from "@htwang-contrib/workflow/script";
 import { spinnerGlyph } from "../format.ts";
 import { defaultCollapsedRenderer } from "../tool-call-display.ts";
 import type { ToolDisplayAdapter } from "../types.ts";
-import { formatExpandedToolOutputLines, INDENT, renderContentWithLineNumbers } from "./shared.ts";
+import { formatExpandedToolOutputLines, renderContentWithLineNumbers } from "./shared.ts";
 
 interface WorkflowArgs {
   script?: string;
@@ -63,13 +63,7 @@ function agentGlyph(theme: Theme, status: string | undefined, isPartial: boolean
   }
 }
 
-function formatAgentRow(
-  theme: Theme,
-  agent: WorkflowAgentRow,
-  branch: string,
-  isPartial: boolean,
-  spinAt: number,
-): string {
+function formatAgentRow(theme: Theme, agent: WorkflowAgentRow, isPartial: boolean, spinAt: number): string {
   const parts: string[] = [];
   parts.push(theme.fg("toolOutput", `#${agent.id ?? "?"} ${truncateDisplay(agent.label ?? "agent", LABEL_MAX)}`));
   if (typeof agent.toolCalls === "number" && agent.toolCalls > 0) {
@@ -83,13 +77,13 @@ function formatAgentRow(
     agent.status === "error" && agent.detail?.trim()
       ? theme.fg("error", ` — ${truncateDisplay(agent.detail.trim(), 120)}`)
       : "";
-  return theme.fg("muted", `${branch} `) + row + detail;
+  return row + detail;
 }
 
 function agentRows(details: WorkflowDetails | undefined, theme: Theme, isPartial: boolean, spinAt: number): string[] {
   const agents = details?.workflow?.agents;
   if (!Array.isArray(agents) || agents.length === 0) return [];
-  return agents.map((agent, i) => formatAgentRow(theme, agent, i === agents.length - 1 ? "└" : "├", isPartial, spinAt));
+  return agents.map((agent) => formatAgentRow(theme, agent, isPartial, spinAt));
 }
 
 function settledCounts(details: WorkflowDetails | undefined): { settled: number; total: number } | undefined {
@@ -117,15 +111,12 @@ export const workflowAdapter: ToolDisplayAdapter<WorkflowArgs> = {
 
   formatCollapsedContent(_args, output, theme, width, details, isPartial, spinAt = Date.now()) {
     if (isPartial) {
-      const rows = agentRows(asDetails(details), theme, true, spinAt);
-      return rows.map((row) => INDENT + row);
+      return agentRows(asDetails(details), theme, true, spinAt);
     }
     if ((output ?? "").trim()) {
       return defaultCollapsedRenderer(output ?? "", theme, width);
     }
-    const rows = agentRows(asDetails(details), theme, false, spinAt);
-    if (rows.length > 0) return rows.map((row) => INDENT + row);
-    return [];
+    return agentRows(asDetails(details), theme, false, spinAt);
   },
 
   formatExpandedContent(args, output, theme, width, _details) {
@@ -134,7 +125,7 @@ export const workflowAdapter: ToolDisplayAdapter<WorkflowArgs> = {
     const out = (output ?? "").trim();
     if (out) {
       lines.push("");
-      lines.push(INDENT + theme.fg("muted", "── output ──"));
+      lines.push(theme.fg("muted", "── output ──"));
       lines.push(...formatExpandedToolOutputLines(output ?? "", theme, width));
     }
     return lines;

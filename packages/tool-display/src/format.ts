@@ -1,5 +1,5 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
+import { wrapTextWithAnsi } from "@earendil-works/pi-tui";
 
 export { wrapTextWithAnsi };
 
@@ -21,12 +21,6 @@ export function formatDuration(elapsedMs: number): string {
   const minutes = Math.floor(totalSec / 60);
   const seconds = totalSec % 60;
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
-}
-
-export function prefixLine(line: string, prefix: string, width: number): string {
-  const prefixWidth = visibleWidth(prefix);
-  const innerWidth = Math.max(1, width - prefixWidth);
-  return prefix + truncateToWidth(line, innerWidth, "");
 }
 
 const SPINNER_INTERVAL_MS = 80;

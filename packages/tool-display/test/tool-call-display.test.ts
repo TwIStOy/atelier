@@ -145,8 +145,8 @@ describe("todo adapters render a header only", () => {
   });
 });
 
-describe("collapsed summary line indentation", () => {
-  it("renders the generic collapsed summary flush left, like adapter summaries", () => {
+describe("collapsed summary line placement", () => {
+  it("renders the generic collapsed summary as a rail continuation row", () => {
     const lines = renderToolCall(
       {
         toolName: "some_generic_tool",
@@ -160,7 +160,7 @@ describe("collapsed summary line indentation", () => {
       PLAIN_THEME,
     ).render(80);
     expect(lines.length).toBe(2);
-    expect(lines[1].startsWith("└ ")).toBe(true);
+    expect(lines[1]?.startsWith("  ┃    └ 1 line — ")).toBe(true);
   });
 
   it("renders no collapsed content line for ask_user_question", () => {
@@ -210,7 +210,7 @@ describe("bash adapter command display width", () => {
     }
     const joined = lines.join(" ");
     expect(joined).not.toContain("…");
-    expect(joined.replaceAll("│", "").replace(/\s+/g, " ")).toContain(LONG_CMD);
+    expect(joined.replaceAll("┃", "").replace(/\s+/g, "")).toContain(LONG_CMD.replace(/\s+/g, ""));
   });
 
   it("produces multiple header lines when the command is wider than the terminal", () => {
@@ -231,7 +231,7 @@ describe("bash adapter command display width", () => {
     expect(lines[0]).toContain("Bash");
   });
 
-  it("prefixes continuation lines of a multi-line command with a tree bar", () => {
+  it("keeps multi-line command rows on the rail with bodies aligned to the body column", () => {
     globalToolDisplayRegistry.register("bash", bashAdapter);
     const lines = renderToolCall(
       {
@@ -245,10 +245,10 @@ describe("bash adapter command display width", () => {
       },
       PLAIN_THEME,
     ).render(80);
-    expect(lines[0]).toContain("Bash set -e");
-    expect(lines[1]).toBe("│   for slug in a b; do");
-    expect(lines[2]).toBe('│     echo "$slug"');
-    expect(lines[3]).toBe("│   done · 1 line");
+    expect(lines[0]).toBe("  ┃  ◆ Bash set -e");
+    expect(lines[1]).toBe("  ┃    for slug in a b; do");
+    expect(lines[2]).toBe('  ┃      echo "$slug"');
+    expect(lines[3]).toBe("  ┃    done · 1 line");
   });
 
   it("fits on one line with no ellipsis on a wide terminal", () => {
@@ -368,8 +368,9 @@ describe("bash collapsed output line count", () => {
       },
       PLAIN_THEME,
     ).render(15);
-    expect(lines.length).toBe(1);
-    expect(lines[0]).toBe("◆ Bash echo aaa");
+    const joined = lines.join("\n");
+    expect(joined).toContain("Bash");
+    expect(joined).not.toContain("· ");
     for (const line of lines) {
       expect(visibleWidth(line)).toBeLessThanOrEqual(15);
     }
@@ -394,7 +395,7 @@ describe("bash collapsed output line count", () => {
 });
 
 describe("multi-line headers of other tools", () => {
-  it("prefixes wrapped generic-tool args with a tree bar", () => {
+  it("continues wrapped generic-tool args on the rail aligned to the body column", () => {
     const lines = renderToolCall(
       {
         toolName: "some_unknown_tool",
@@ -409,12 +410,12 @@ describe("multi-line headers of other tools", () => {
     ).render(40);
     expect(lines.length).toBeGreaterThan(1);
     for (const line of lines.slice(1)) {
-      expect(line.startsWith("│   ")).toBe(true);
+      expect(line.startsWith("  ┃    ")).toBe(true);
       expect(visibleWidth(line)).toBeLessThanOrEqual(40);
     }
   });
 
-  it("prefixes a wrapped todo_create subject with a tree bar", () => {
+  it("continues a wrapped todo_create subject on the rail aligned to the body column", () => {
     globalToolDisplayRegistry.register("todo_create", todoCreateAdapter);
     const lines = renderToolCall(
       {
@@ -431,7 +432,7 @@ describe("multi-line headers of other tools", () => {
     expect(lines.length).toBeGreaterThan(1);
     expect(lines[0]).toContain("TodoCreate");
     for (const line of lines.slice(1)) {
-      expect(line.startsWith("│   ")).toBe(true);
+      expect(line.startsWith("  ┃    ")).toBe(true);
       expect(visibleWidth(line)).toBeLessThanOrEqual(40);
     }
   });

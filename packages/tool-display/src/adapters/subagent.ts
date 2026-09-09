@@ -274,19 +274,14 @@ function formatCollapsedSubagentSummary(
   if (d?.mode === "batch" && Array.isArray(d.batch) && d.batch.length > 0) {
     if (d.batch.length === 1) return null;
     const sorted = [...d.batch].sort((a, b) => a.index - b.index);
-    const n = sorted.length;
     const lines: string[] = [];
-    for (let i = 0; i < n; i++) {
-      const item = sorted[i];
-      const last = i === n - 1;
-      const branch = last ? "└" : "├";
+    for (const item of sorted) {
       const tc = typeof item.tool_calls === "number" ? item.tool_calls : 0;
       const typ = typeForBatchRow(item, d.agent_type, args);
       const rowDesc = descriptionForBatchRow(item, args);
       const waiting = false;
       const spinning = isPartial && item.ok === undefined;
       const uExtra = formatUsageSuffix(theme, item.usage_input, item.usage_output, item.context_percent);
-      const branchPrefix = theme.fg("muted", `${branch} `);
       const row = callsLineStyled(
         theme,
         typ,
@@ -298,9 +293,9 @@ function formatCollapsedSubagentSummary(
         spinning,
         spinAt,
         uExtra,
-        Math.max(1, width - visibleWidth(branchPrefix)),
+        Math.max(1, width),
       );
-      lines.push(fitRowWidth(branchPrefix + row, width));
+      lines.push(fitRowWidth(row, width));
     }
     return lines;
   }
@@ -318,8 +313,6 @@ function formatCollapsedSubagentSummary(
     const ppct = d?.per_task_context_percent;
     const lines: string[] = [];
     for (let i = 0; i < n; i++) {
-      const last = i === n - 1;
-      const branch = last ? "└" : "├";
       const typ = tasks[i]?.agent_type ?? args.agent_type;
       const rowDesc = tasks[i]?.description?.trim() ?? "";
       const started = taskStartedAt(d, n, i, havePerTask, per, legacyOk);
@@ -345,7 +338,6 @@ function formatCollapsedSubagentSummary(
         Array.isArray(pout) ? pout[i] : undefined,
         Array.isArray(ppct) ? ppct[i] : undefined,
       );
-      const branchPrefix = theme.fg("muted", `${branch} `);
       const row = callsLineStyled(
         theme,
         typ,
@@ -357,9 +349,9 @@ function formatCollapsedSubagentSummary(
         spinning,
         spinAt,
         uExtra,
-        Math.max(1, width - visibleWidth(branchPrefix)),
+        Math.max(1, width),
       );
-      lines.push(fitRowWidth(branchPrefix + row, width));
+      lines.push(fitRowWidth(row, width));
     }
     return lines;
   }

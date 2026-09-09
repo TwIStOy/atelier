@@ -1,7 +1,7 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { truncateToWidth } from "@earendil-works/pi-tui";
 import { truncateDisplay } from "@htwang-contrib/common";
 import type { ToolDisplayAdapter } from "../types.ts";
+import { formatExpandedToolOutputLines } from "./shared.ts";
 
 interface GoalArgs {
   objective?: string;
@@ -33,8 +33,7 @@ export const createGoalAdapter: ToolDisplayAdapter<GoalArgs> = {
   },
 
   formatExpandedContent(_args, output, theme, width) {
-    if (!output) return [];
-    return output.split("\n").map((line) => INDENT + truncateToWidth(theme.fg("toolOutput", line), width - 4, "…"));
+    return formatExpandedToolOutputLines(output, theme, width);
   },
 };
 
@@ -56,8 +55,7 @@ export const updateGoalAdapter: ToolDisplayAdapter<GoalArgs> = {
   },
 
   formatExpandedContent(_args, output, theme, width) {
-    if (!output) return [];
-    return output.split("\n").map((line) => INDENT + truncateToWidth(theme.fg("toolOutput", line), width - 4, "…"));
+    return formatExpandedToolOutputLines(output, theme, width);
   },
 };
 
@@ -75,17 +73,14 @@ export const getGoalAdapter: ToolDisplayAdapter<GoalArgs> = {
     const status = typeof d?.status === "string" ? d.status : "unknown";
     const objective = typeof d?.objective === "string" ? d.objective : "";
     const statusGlyph = status === "active" ? "●" : status === "complete" ? "✓" : "○";
-    const preview = truncateDisplay(objective, width - 10);
+    const preview = truncateDisplay(objective, Math.max(1, width - 10));
     return [theme.fg("muted", `└ ${statusGlyph} ${status} — ${preview}`)];
   },
 
   formatExpandedContent(_args, output, theme, width) {
-    if (!output) return [];
-    return output.split("\n").map((line) => INDENT + truncateToWidth(theme.fg("toolOutput", line), width - 4, "…"));
+    return formatExpandedToolOutputLines(output, theme, width);
   },
 };
-
-const INDENT = "    ";
 
 function firstLine(text: string): string {
   return text.split("\n")[0] ?? "";

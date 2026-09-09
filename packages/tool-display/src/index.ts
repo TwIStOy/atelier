@@ -41,7 +41,6 @@ export { workflowAdapter } from "./adapters/workflow.ts";
 export { writeAdapter } from "./adapters/write.ts";
 export {
   formatDuration,
-  prefixLine,
   SpinnerTimer,
   spinnerGlyph,
   wrapTextWithAnsi,

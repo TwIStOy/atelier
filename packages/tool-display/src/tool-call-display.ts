@@ -1,14 +1,19 @@
 import { keyText, type Theme, truncateToVisualLines } from "@earendil-works/pi-coding-agent";
 import { Container, truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
-import { trimTrailingEmpty, truncateDisplay } from "@htwang-contrib/common";
+import {
+  type RailSpec,
+  type RailStatus,
+  renderRailLines,
+  toolRailBodyWidth,
+  trimTrailingEmpty,
+  truncateDisplay,
+} from "@htwang-contrib/common";
 import { formatExpandedToolOutputLines } from "./adapters/shared.ts";
 import { loadConfig } from "./config.ts";
 import { formatDuration, spinnerGlyph } from "./format.ts";
 import type { ContentRenderer, ToolDisplayAdapter } from "./types.ts";
 
 export type { ContentRenderer, ToolDisplayAdapter };
-
-const INDENT = "    ";
 
 export class ToolDisplayRegistry {
   private adapters = new Map<string, ToolDisplayAdapter>();
@@ -58,9 +63,9 @@ export function formatGenericToolHeader(
 
   if (visibleWidth(header) <= width) return header;
 
-  const wrapped = wrapTextWithAnsi(styledArg, Math.max(1, width - INDENT.length));
+  const wrapped = wrapTextWithAnsi(styledArg, Math.max(1, width));
   const firstLine = truncateToWidth(prefix + wrapped[0], width, "…");
-  const contLines = wrapped.slice(1).map((line) => truncateToWidth(line, width - INDENT.length, "…"));
+  const contLines = wrapped.slice(1).map((line) => truncateToWidth(line, width, "…"));
   return [firstLine, ...contLines].join("\n");
 }
 
@@ -96,77 +101,48 @@ function subagentRunFinished(details: unknown): "ok" | "err" | undefined {
   return undefined;
 }
 
-function makeHeader(
+function toolBullet(
   toolName: string,
-  args: Record<string, unknown>,
-  adapter: ToolDisplayAdapter | undefined,
   isPartial: boolean,
   isError: boolean,
+  details: unknown,
   theme: Theme,
-  width: number,
   spinAt: number,
-  expanded: boolean,
   hoverAffordance: boolean,
-  details?: unknown,
-  elapsedMs?: number,
-  output?: string,
-): string[] {
-  let statusIcon: string;
+): { bullet: string; status?: RailStatus } {
+  let spinning = false;
+  let failed = false;
+
   if (toolName === "subagent") {
     const fin = subagentRunFinished(details);
-    if (fin === "ok") statusIcon = theme.fg("success", "◆");
-    else if (fin === "err") statusIcon = theme.fg("error", "◆");
-    else if (isPartial) statusIcon = spinnerGlyph(theme, spinAt);
-    else if (isError) statusIcon = theme.fg("error", "◆");
-    else statusIcon = theme.fg("success", "◆");
+    if (fin === "ok") failed = false;
+    else if (fin === "err") failed = true;
+    else if (isPartial) spinning = true;
+    else failed = isError;
   } else if (toolName === "subagent_status") {
     const d = details && typeof details === "object" ? (details as Record<string, unknown>) : undefined;
     const st = typeof d?.status === "string" ? d.status : "";
-    if (st === "running") statusIcon = spinnerGlyph(theme, spinAt);
-    else if (st === "unknown" || st === "error") {
-      statusIcon = theme.fg("error", "◆");
-    } else if (st === "done" && d?.ok === false) {
-      statusIcon = theme.fg("error", "◆");
-    } else if (isError) {
-      statusIcon = theme.fg("error", "◆");
-    } else {
-      statusIcon = theme.fg("success", "◆");
-    }
+    if (st === "running") spinning = true;
+    else if (st === "unknown" || st === "error" || (st === "done" && d?.ok === false) || isError) failed = true;
   } else if (toolName === "workflow") {
     const d = details && typeof details === "object" ? (details as Record<string, unknown>) : undefined;
-    if (d?.ok === true) statusIcon = theme.fg("success", "◆");
-    else if (d?.ok === false) statusIcon = theme.fg("error", "◆");
-    else if (isPartial) statusIcon = spinnerGlyph(theme, spinAt);
-    else if (isError) statusIcon = theme.fg("error", "◆");
-    else statusIcon = theme.fg("success", "◆");
+    if (d?.ok === true) failed = false;
+    else if (d?.ok === false) failed = true;
+    else if (isPartial) spinning = true;
+    else failed = isError;
   } else if (toolName === "apply_patch") {
     const d = details && typeof details === "object" ? (details as Record<string, unknown>) : undefined;
     const r = typeof d?.result === "object" && d.result !== null ? (d.result as { failures?: unknown[] }) : undefined;
-    if (r && Array.isArray(r.failures) && r.failures.length > 0) statusIcon = theme.fg("error", "◆");
-    else if (isPartial) statusIcon = spinnerGlyph(theme, spinAt);
-    else if (isError) statusIcon = theme.fg("error", "◆");
-    else statusIcon = theme.fg("success", "◆");
+    if (r && Array.isArray(r.failures) && r.failures.length > 0) failed = true;
+    else if (isPartial) spinning = true;
+    else failed = isError;
   } else {
-    statusIcon = isPartial ? spinnerGlyph(theme, spinAt) : isError ? theme.fg("error", "◆") : theme.fg("success", "◆");
+    if (isPartial) spinning = true;
+    else failed = isError;
   }
 
-  if (hoverAffordance) statusIcon = statusIcon.replaceAll("◆", "›");
-
-  const timerLabel = elapsedMs !== undefined ? formatDuration(elapsedMs) : undefined;
-  const timerPart = timerLabel ? `${theme.fg("dim", timerLabel)} ` : "";
-  const timerWidth = timerLabel ? visibleWidth(timerLabel) + 1 : 0;
-  const innerWidth = Math.max(1, width - timerWidth);
-
-  const headerText = adapter
-    ? adapter.formatCallHeader(args, theme, details, isPartial, expanded, innerWidth, output)
-    : formatGenericToolHeader(toolName, args, theme, innerWidth);
-
-  const headerLines = headerText.split("\n");
-  const contPrefix = `${theme.fg("muted", "│")}   `;
-  return headerLines.map((line, i) => {
-    const prefix = i === 0 ? `${statusIcon} ${timerPart}` : contPrefix;
-    return truncateToWidth(prefix + line, width, "…");
-  });
+  if (spinning) return { bullet: spinnerGlyph(theme, spinAt) };
+  return { bullet: hoverAffordance ? "›" : "◆", status: failed ? "error" : "success" };
 }
 
 export function defaultCollapsedRenderer(content: string, theme: Theme, width: number): string[] {
@@ -177,25 +153,22 @@ export function defaultCollapsedRenderer(content: string, theme: Theme, width: n
     .map((line) => theme.fg("toolOutput", line))
     .join("\n");
 
-  const innerWidth = Math.max(1, width - INDENT.length);
+  const innerWidth = Math.max(1, width);
   const result = truncateToVisualLines(styledOutput, previewLines, innerWidth, 0);
 
   const lines: string[] = [];
   if (result.skippedCount > 0) {
-    const hint = theme.fg(
-      "muted",
-      `${INDENT}... (${result.skippedCount} more lines, ${keyText("app.tools.expand")} to expand)`,
-    );
+    const hint = theme.fg("muted", `... (${result.skippedCount} more lines, ${keyText("app.tools.expand")} to expand)`);
     lines.push(truncateToWidth(hint, width, "…"));
   }
-  lines.push(...result.visualLines.map((line) => INDENT + line));
+  lines.push(...result.visualLines);
   return lines;
 }
 
 export function defaultExpandedRenderer(content: string, theme: Theme, width: number): string[] {
   if (!content) return [];
   const lines = formatExpandedToolOutputLines(content, theme, width);
-  const hint = theme.fg("muted", `${INDENT}${keyText("app.tools.expand")} to collapse`);
+  const hint = theme.fg("muted", `${keyText("app.tools.expand")} to collapse`);
   lines.push(truncateToWidth(hint, width, "…"));
   return lines;
 }
@@ -230,22 +203,37 @@ export function renderToolCall(
     render(width: number): string[] {
       const spinAt = Date.now();
       const elapsedMs = opts.startedAtMs !== undefined ? (opts.endedAtMs ?? spinAt) - opts.startedAtMs : undefined;
-      const header = makeHeader(
+      const bodyWidth = toolRailBodyWidth(width);
+      const bullet = toolBullet(
         opts.toolName,
-        opts.args,
-        adapter,
         opts.isPartial,
         opts.isError,
-        theme,
-        width,
-        spinAt,
-        opts.expanded,
-        opts.hoverAffordance === true,
         opts.details,
-        elapsedMs,
-        opts.output,
+        theme,
+        spinAt,
+        opts.hoverAffordance === true,
       );
-      const lines = [...header];
+
+      const timerLabel = elapsedMs !== undefined ? formatDuration(elapsedMs) : undefined;
+      const timerPart = timerLabel ? `${theme.fg("dim", timerLabel)} ` : "";
+      const timerWidth = timerLabel ? visibleWidth(timerLabel) + 1 : 0;
+      const innerWidth = Math.max(1, bodyWidth - timerWidth);
+
+      const headerText = adapter
+        ? adapter.formatCallHeader(
+            opts.args,
+            theme,
+            opts.details,
+            opts.isPartial,
+            opts.expanded,
+            innerWidth,
+            opts.output,
+          )
+        : formatGenericToolHeader(opts.toolName, opts.args, theme, innerWidth);
+
+      const headerLines = headerText.split("\n");
+      if (timerPart) headerLines[0] = timerPart + headerLines[0];
+      const lines = [...headerLines];
 
       const out = opts.output ?? "";
       const hasTextOutput = Boolean(out);
@@ -273,25 +261,25 @@ export function renderToolCall(
 
       if (erroredReason) {
         const reason = out.replace(/\n+/g, " ").trim();
-        const innerWidth = Math.max(1, width - 2);
         if (opts.expanded) {
-          const icon = theme.fg("error", " ");
+          const icon = theme.fg("error", "\ue654 ");
           const cont = " ".repeat(visibleWidth(icon));
-          const wrapped = wrapTextWithAnsi(reason, innerWidth);
+          const wrapWidth = Math.max(1, bodyWidth - visibleWidth(icon));
+          const wrapped = wrapTextWithAnsi(reason, wrapWidth);
           wrapped.forEach((wl, i) => {
             const prefix = i === 0 ? icon : cont;
-            lines.push(prefix + theme.fg("muted", truncateToWidth(wl, innerWidth, "\u2026")));
+            lines.push(prefix + theme.fg("muted", truncateToWidth(wl, wrapWidth, "…")));
           });
           if (adapter) {
-            lines.push(...adapter.formatExpandedContent(opts.args, out, theme, width, opts.details));
+            lines.push(...adapter.formatExpandedContent(opts.args, out, theme, bodyWidth, opts.details));
           }
         } else {
-          lines.push(theme.fg("muted", truncateToWidth(`└ ${reason}`, width, "\u2026")));
+          lines.push(theme.fg("muted", truncateToWidth(`└ ${reason}`, bodyWidth, "…")));
         }
       } else if (useAdapter) {
         const contentLines = opts.expanded
-          ? adapter.formatExpandedContent(opts.args, out, theme, width, opts.details)
-          : adapter.formatCollapsedContent(opts.args, out, theme, width, opts.details, opts.isPartial, spinAt);
+          ? adapter.formatExpandedContent(opts.args, out, theme, bodyWidth, opts.details)
+          : adapter.formatCollapsedContent(opts.args, out, theme, bodyWidth, opts.details, opts.isPartial, spinAt);
         lines.push(...contentLines);
       } else if (opts.output) {
         const collapsedRenderer =
@@ -299,14 +287,19 @@ export function renderToolCall(
         const expandedRenderer =
           opts.renderExpanded ?? (adapter ? defaultExpandedRenderer : defaultGenericExpandedRenderer);
         const contentLines = opts.expanded
-          ? expandedRenderer(opts.output, theme, width)
-          : collapsedRenderer(opts.output, theme, width);
+          ? expandedRenderer(opts.output, theme, bodyWidth)
+          : collapsedRenderer(opts.output, theme, bodyWidth);
         lines.push(...contentLines);
       } else if (!opts.isPartial && !opts.isError) {
-        lines.push(INDENT + theme.fg("muted", "done"));
+        lines.push(theme.fg("muted", "done"));
       }
 
-      return lines;
+      const spec: RailSpec = {
+        mark: lines.length > 1 ? "run" : "none",
+        bullet: bullet.bullet,
+        status: bullet.status,
+      };
+      return renderRailLines(lines, spec, theme, width);
     },
     invalidate() {},
   };

@@ -137,17 +137,17 @@ describe("hover affordance", () => {
     globalToolDisplayRegistry.register("hovertool", fakeAdapter);
     const component = withResult(makeComponent("hovertool"));
 
-    expect(firstHeaderLine(component).startsWith("◆")).toBe(true);
+    expect(firstHeaderLine(component)[5]).toBe("◆");
 
     component.handleMouse(mouseEvent({}));
-    expect(firstHeaderLine(component).startsWith("›")).toBe(true);
+    expect(firstHeaderLine(component)[5]).toBe("›");
 
     component.handleMouse(mouseEvent({ type: "click", button: "left" }));
     expect(component.expanded).toBe(true);
-    expect(firstHeaderLine(component).startsWith("◆")).toBe(true);
+    expect(firstHeaderLine(component)[5]).toBe("◆");
 
     component.setExpanded(false);
-    expect(firstHeaderLine(component).startsWith("›")).toBe(true);
+    expect(firstHeaderLine(component)[5]).toBe("›");
 
     moveOffHoveredTool();
   });
@@ -194,6 +194,6 @@ describe("hover affordance", () => {
       render: true,
     });
     expect(component.__tdHovered).toBe(false);
-    expect(firstHeaderLine(component).startsWith("◆")).toBe(true);
+    expect(firstHeaderLine(component)[5]).toBe("◆");
   });
 });

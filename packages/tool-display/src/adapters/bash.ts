@@ -2,7 +2,7 @@ import type { Theme } from "@earendil-works/pi-coding-agent";
 import { visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 import { shortenPath, trimTrailingEmpty } from "@htwang-contrib/common";
 import type { ToolDisplayAdapter } from "../types.ts";
-import { formatExpandedToolOutputLines, INDENT } from "./shared.ts";
+import { formatExpandedToolOutputLines } from "./shared.ts";
 
 interface BashArgs {
   command?: string;
@@ -11,8 +11,6 @@ interface BashArgs {
 }
 
 const TITLE = "Bash";
-const STATUS_PREFIX_WIDTH = 2;
-const CONTINUATION_INDENT_WIDTH = 4;
 
 function firstLinePrefixWidth(): number {
   return visibleWidth(TITLE) + 1;
@@ -23,14 +21,11 @@ function lastLineSuffixWidth(cwd: string): number {
 }
 
 function singleLineBudget(cwd: string, width: number): number {
-  return Math.max(1, width - STATUS_PREFIX_WIDTH - firstLinePrefixWidth() - lastLineSuffixWidth(cwd));
+  return Math.max(1, width - firstLinePrefixWidth() - lastLineSuffixWidth(cwd));
 }
 
 function continuationWrapWidth(cwd: string, width: number): number {
-  const first = width - STATUS_PREFIX_WIDTH - firstLinePrefixWidth();
-  const middle = width - CONTINUATION_INDENT_WIDTH;
-  const last = width - CONTINUATION_INDENT_WIDTH - lastLineSuffixWidth(cwd);
-  return Math.max(1, Math.min(first, middle, last));
+  return Math.max(1, Math.min(width - firstLinePrefixWidth(), width - lastLineSuffixWidth(cwd)));
 }
 
 function outputLineSuffix(output: string | undefined, theme: Theme): string {
@@ -62,20 +57,20 @@ export const bashAdapter: ToolDisplayAdapter<BashArgs> = {
 
     if (desc) {
       header = `${titlePart}${theme.fg("accent", desc)}${cwdPart}`;
-      if (width !== undefined) lastLineBudget = width - STATUS_PREFIX_WIDTH;
+      if (width !== undefined) lastLineBudget = width;
     } else if (width === undefined || visibleWidth(cmd) <= singleLineBudget(cwd, width)) {
       header = `${titlePart}${theme.fg("muted", cmd)}${cwdPart}`;
-      if (width !== undefined) lastLineBudget = width - STATUS_PREFIX_WIDTH;
+      if (width !== undefined) lastLineBudget = width;
     } else {
       const wrapWidth = continuationWrapWidth(cwd, width);
       const lines = wrapTextWithAnsi(cmd, wrapWidth).map((line) => theme.fg("muted", line));
 
       if (lines.length === 1) {
         header = `${titlePart}${lines[0]}${cwdPart}`;
-        lastLineBudget = width - STATUS_PREFIX_WIDTH;
+        lastLineBudget = width;
       } else {
         header = [`${titlePart}${lines[0]}`, ...lines.slice(1, -1), `${lines[lines.length - 1]}${cwdPart}`].join("\n");
-        lastLineBudget = width - CONTINUATION_INDENT_WIDTH;
+        lastLineBudget = width;
       }
     }
 
@@ -101,9 +96,9 @@ export const bashAdapter: ToolDisplayAdapter<BashArgs> = {
     const desc = args?.description ?? "";
     const outputLines = formatExpandedToolOutputLines(output ?? "", theme, width);
     if (!desc || !cmd) return outputLines;
-    const inner = Math.max(1, width - visibleWidth(INDENT) - 2);
-    const cmdLines = wrapTextWithAnsi(cmd, inner).map(
-      (line, i) => `${INDENT}${theme.fg("muted", `${i === 0 ? "$ " : "  "}${line}`)}`,
+    const inner = Math.max(1, width - 2);
+    const cmdLines = wrapTextWithAnsi(cmd, inner).map((line, i) =>
+      theme.fg("muted", `${i === 0 ? "$ " : "  "}${line}`),
     );
     return [...cmdLines, ...outputLines];
   },
