@@ -64,6 +64,7 @@ import type { ExtensionAPI, Theme } from "@earendil-works/pi-coding-agent";
 import { ToolExecutionComponent } from "@earendil-works/pi-coding-agent";
 import { Container, Editor } from "@earendil-works/pi-tui";
 import { isExtensionDisabled } from "@htwang-contrib/common";
+import { isAggregateToolName, renderAggregateLine } from "./aggregate.ts";
 import { registerToolDisplayConfigItems } from "./config.ts";
 import { globalToolDisplayRegistry } from "./registry.ts";
 import { renderToolCall } from "./tool-call-display.ts";
@@ -99,6 +100,7 @@ type ToolExecutionPatchThis = {
 type PatchedMouseEvent = {
   type: string;
   button?: string;
+  width?: number;
 };
 
 let hoveredTool: ToolExecutionPatchThis | undefined;
@@ -149,29 +151,99 @@ const FALLBACK_THEME: Theme = {
 } as Theme;
 
 function findPreviousVisibleSibling(root: unknown, target: object, width: number): unknown {
-  if (!root || typeof root !== "object") return undefined;
-  const children = (root as { children?: unknown }).children;
-  if (!Array.isArray(children)) return undefined;
-  const index = children.indexOf(target);
-  if (index >= 0) {
-    for (let i = index - 1; i >= 0; i--) {
-      const candidate = children[i] as { render?: (w: number) => string[] };
-      if (typeof candidate?.render !== "function") continue;
-      if (candidate.render(width).length > 0) return candidate;
-    }
-    return null;
+  const context = findSiblingContext(root, target);
+  if (!context) return undefined;
+  const { siblings, index } = context;
+  for (let i = index - 1; i >= 0; i--) {
+    const candidate = siblings[i] as { render?: (w: number) => string[] };
+    if (typeof candidate?.render !== "function") continue;
+    if (candidate.render(width).length > 0) return candidate;
   }
-  for (const child of children) {
-    const found = findPreviousVisibleSibling(child, target, width);
-    if (found !== undefined) return found;
-  }
-  return undefined;
+  return null;
 }
 
 function findPreviousVisibleOf(component: ToolExecutionPatchThis, width: number): unknown {
   const ui = (component as { ui?: unknown }).ui;
   if (!ui) return undefined;
   return findPreviousVisibleSibling(ui, component, width);
+}
+
+interface SiblingContext {
+  siblings: unknown[];
+  index: number;
+}
+
+function findSiblingContext(root: unknown, target: object): SiblingContext | undefined {
+  if (!root || typeof root !== "object") return undefined;
+  const children = (root as { children?: unknown }).children;
+  if (!Array.isArray(children)) return undefined;
+  const index = children.indexOf(target);
+  if (index >= 0) return { siblings: children, index };
+  for (const child of children) {
+    const found = findSiblingContext(child, target);
+    if (found) return found;
+  }
+  return undefined;
+}
+
+function siblingRendersLines(sibling: unknown, width: number): boolean {
+  if (typeof width !== "number" || width <= 0) return true;
+  if (!sibling || typeof sibling !== "object") return false;
+  const render = (sibling as { render?: (w: number) => string[] }).render;
+  if (typeof render !== "function") return false;
+  return render.call(sibling, width).length > 0;
+}
+
+function asToolExecution(component: unknown): ToolExecutionPatchThis | undefined {
+  return component instanceof ToolExecutionComponent ? (component as unknown as ToolExecutionPatchThis) : undefined;
+}
+
+function isAggregateCandidate(component: unknown): component is ToolExecutionPatchThis {
+  const tool = asToolExecution(component);
+  return tool !== undefined && isAggregateToolName(tool.toolName) && !tool.expanded && !tool.hideComponent;
+}
+
+type AggregateGroupRole = { role: "member" } | { role: "leader"; members: ToolExecutionPatchThis[] };
+
+function resolveAggregateRole(component: ToolExecutionPatchThis, width: number): AggregateGroupRole | undefined {
+  if (!isAggregateCandidate(component)) return undefined;
+  const context = findSiblingContext((component as { ui?: unknown }).ui, component);
+  if (!context) return undefined;
+  const { siblings, index } = context;
+
+  let followsAggregateSibling = false;
+  for (let i = index - 1; i >= 0; i--) {
+    const tool = asToolExecution(siblings[i]);
+    if (tool) {
+      if (tool.hideComponent) continue;
+      if (isAggregateCandidate(tool)) followsAggregateSibling = true;
+      break;
+    }
+    if (siblingRendersLines(siblings[i], width)) break;
+  }
+  if (followsAggregateSibling) return { role: "member" };
+
+  const members: ToolExecutionPatchThis[] = [component];
+  for (let i = index + 1; i < siblings.length; i++) {
+    const tool = asToolExecution(siblings[i]);
+    if (tool) {
+      if (tool.hideComponent) continue;
+      if (!isAggregateCandidate(tool)) break;
+      members.push(tool);
+    } else if (siblingRendersLines(siblings[i], width)) {
+      break;
+    }
+  }
+  if (members.length < 2) return undefined;
+  return { role: "leader", members };
+}
+
+function aggregateMemberStates(members: ToolExecutionPatchThis[]) {
+  return members.map((member) => ({
+    toolName: member.toolName,
+    isPartial: member.isPartial,
+    isError: member.result?.isError === true,
+  }));
 }
 
 function applyGroupSpacing(lines: string[], previous: unknown, ensureLeadingBlank: boolean): string[] {
@@ -204,6 +276,14 @@ function patchToolExecutionRender(getTheme: () => Theme, registry: typeof global
   const originalRender = proto.render;
   proto.render = function (this: ToolExecutionPatchThis, width: number): string[] {
     if (this.hideComponent) return [];
+
+    const aggregateRole = resolveAggregateRole(this, width);
+    if (aggregateRole?.role === "member") return [];
+    if (aggregateRole?.role === "leader") {
+      const theme = proto.__tdGetTheme?.() ?? FALLBACK_THEME;
+      const lines = renderAggregateLine(aggregateMemberStates(aggregateRole.members), theme, width);
+      return applyGroupSpacing(lines, findPreviousVisibleOf(this, width), true);
+    }
 
     const reg = proto.__tdRegistry;
     const adapter = reg.get(this.toolName);
@@ -249,6 +329,9 @@ function patchToolExecutionRender(getTheme: () => Theme, registry: typeof global
     | ((this: ToolExecutionPatchThis, event: PatchedMouseEvent) => unknown)
     | undefined;
   proto.handleMouse = function (this: ToolExecutionPatchThis, event: PatchedMouseEvent) {
+    if (event.type === "click" && resolveAggregateRole(this, event.width ?? 0) !== undefined) {
+      return undefined;
+    }
     const childResult = originalHandleMouse?.call(this, event);
     if (childResult) return childResult;
     if (event.type === "move") {
