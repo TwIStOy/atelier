@@ -85,7 +85,7 @@ function makeComponent(
 }
 
 function withResult(component: ToolExecutionComponent): ToolExecutionComponent {
-  component.updateResult({ content: [{ type: "text", text: "done" }], details: {} }, false);
+  component.updateResult({ content: [{ type: "text", text: "done" }], details: {}, isError: false }, false);
   return component;
 }
 
