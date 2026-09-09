@@ -106,17 +106,40 @@ const FALLBACK_THEME: Theme = {
   bold: (text: string) => text,
 } as Theme;
 
-function findPreviousSibling(root: unknown, target: object): unknown {
+function findPreviousVisibleSibling(root: unknown, target: object, width: number): unknown {
   if (!root || typeof root !== "object") return undefined;
   const children = (root as { children?: unknown }).children;
   if (!Array.isArray(children)) return undefined;
   const index = children.indexOf(target);
-  if (index >= 0) return index > 0 ? children[index - 1] : null;
+  if (index >= 0) {
+    for (let i = index - 1; i >= 0; i--) {
+      const candidate = children[i] as { render?: (w: number) => string[] };
+      if (typeof candidate?.render !== "function") continue;
+      if (candidate.render(width).length > 0) return candidate;
+    }
+    return null;
+  }
   for (const child of children) {
-    const found = findPreviousSibling(child, target);
+    const found = findPreviousVisibleSibling(child, target, width);
     if (found !== undefined) return found;
   }
   return undefined;
+}
+
+function findPreviousVisibleOf(component: ToolExecutionPatchThis, width: number): unknown {
+  const ui = (component as { ui?: unknown }).ui;
+  if (!ui) return undefined;
+  return findPreviousVisibleSibling(ui, component, width);
+}
+
+function applyGroupSpacing(lines: string[], previous: unknown, ensureLeadingBlank: boolean): string[] {
+  if (previous instanceof ToolExecutionComponent) {
+    return lines.length > 0 && lines[0].trim() === "" ? lines.slice(1) : lines;
+  }
+  if (ensureLeadingBlank && (lines.length === 0 || lines[0].trim() !== "")) {
+    return ["", ...lines];
+  }
+  return lines;
 }
 
 function patchToolExecutionRender(getTheme: () => Theme, registry: typeof globalToolDisplayRegistry) {
@@ -127,7 +150,6 @@ function patchToolExecutionRender(getTheme: () => Theme, registry: typeof global
   if (proto.__tdPatched) return;
 
   const timings = new WeakMap<object, { startedAtMs?: number; endedAtMs?: number }>();
-  const previousSiblings = new WeakMap<object, unknown>();
 
   const originalSetExpanded = proto.setExpanded as (this: ToolExecutionPatchThis, expanded: boolean) => void;
   proto.setExpanded = function (this: ToolExecutionPatchThis, expanded: boolean) {
@@ -144,7 +166,8 @@ function patchToolExecutionRender(getTheme: () => Theme, registry: typeof global
     const callR = this.getCallRenderer?.();
     const resultR = this.result ? this.getResultRenderer?.() : undefined;
     if (!adapter && (callR != null || resultR != null)) {
-      return originalRender.call(this, width);
+      const lines = originalRender.call(this, width) as string[];
+      return applyGroupSpacing(lines, findPreviousVisibleOf(this, width), false);
     }
 
     const getTextOutput = this.getTextOutput?.bind(this);
@@ -174,17 +197,7 @@ function patchToolExecutionRender(getTheme: () => Theme, registry: typeof global
     const rendered = renderToolCall(opts, theme);
     const lines = rendered.render(width);
 
-    let previous = previousSiblings.get(this);
-    if (previous === undefined) {
-      const ui = (this as { ui?: unknown }).ui;
-      const found = ui ? findPreviousSibling(ui, this) : undefined;
-      if (found !== undefined) {
-        previousSiblings.set(this, found);
-        previous = found;
-      }
-    }
-    if (previous instanceof ToolExecutionComponent) return lines;
-    return ["", ...lines];
+    return applyGroupSpacing(lines, findPreviousVisibleOf(this, width), true);
   };
 
   const originalHandleMouse = proto.handleMouse as
