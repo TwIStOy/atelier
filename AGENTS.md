@@ -25,6 +25,12 @@
 - Do not preserve backward compatibility unless the user asks for it.
 - Never hardcode key checks (e.g. `matchesKey(keyData, "ctrl+x")`). Add defaults to `DEFAULT_EDITOR_KEYBINDINGS` or `DEFAULT_APP_KEYBINDINGS` so they stay configurable.
 
+## Tool Usage
+
+- **Always read file contents with the `read` tool. Never use `cat`, `head`, `tail`, `sed -n`, `awk`, `less`, or `while read` loops to load file contents into context.** This is a hard rule; the `read` tool provides line numbers (needed for precise `edit` calls), image support, and safe truncation.
+- Read specific ranges with `read`'s `offset` (1-indexed) and `limit` parameters instead of `sed -n 'X,Yp'`/`head`/`tail` pipelines. For files exceeding the 2000-line/50KB per-call limit, continue with an incremented `offset` until done.
+- `bash` is for actions (build, test, git, `rg` searches, process inspection), not for reading files. If a command's only purpose is to print file contents, use `read` instead.
+
 ## Tool Naming
 
 - Use `snake_case` for tool names (the identifier used in code and API calls).
