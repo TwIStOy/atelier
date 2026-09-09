@@ -63,6 +63,7 @@ export type { ContentRenderer, ToolDisplayAdapter } from "./types.ts";
 
 import type { ExtensionAPI, Theme } from "@earendil-works/pi-coding-agent";
 import { ToolExecutionComponent } from "@earendil-works/pi-coding-agent";
+import { Container, Editor } from "@earendil-works/pi-tui";
 import { isExtensionDisabled } from "@htwang-contrib/common";
 import { registerToolDisplayConfigItems } from "./config.ts";
 import { globalToolDisplayRegistry } from "./registry.ts";
@@ -71,6 +72,7 @@ import type { ToolDisplayAdapter } from "./types.ts";
 
 type ToolExecutionPatchThis = {
   hideComponent?: boolean;
+  __tdHovered?: boolean;
   toolName: string;
   args: Record<string, unknown>;
   expanded: boolean;
@@ -99,6 +101,47 @@ type PatchedMouseEvent = {
   type: string;
   button?: string;
 };
+
+let hoveredTool: ToolExecutionPatchThis | undefined;
+
+function clearHoveredTool(): boolean {
+  if (!hoveredTool) return false;
+  hoveredTool.__tdHovered = false;
+  hoveredTool = undefined;
+  return true;
+}
+
+function installHoverLeavePatches() {
+  const containerProto = Container.prototype as unknown as {
+    __tdHoverLeavePatched?: boolean;
+    handleMouse?: (this: unknown, event: PatchedMouseEvent) => unknown;
+  };
+  if (containerProto.__tdHoverLeavePatched) return;
+  containerProto.__tdHoverLeavePatched = true;
+  const originalContainerHandleMouse = containerProto.handleMouse;
+  containerProto.handleMouse = function (this: unknown, event: PatchedMouseEvent) {
+    const result = originalContainerHandleMouse?.call(this, event);
+    if (!result && (event.type === "move" || event.type === "wheel") && clearHoveredTool()) {
+      return { handled: true, render: true };
+    }
+    return result;
+  };
+
+  const editorProto = Editor.prototype as unknown as {
+    __tdHoverLeavePatched?: boolean;
+    handleMouse?: (this: unknown, event: PatchedMouseEvent) => unknown;
+  };
+  if (editorProto.__tdHoverLeavePatched) return;
+  editorProto.__tdHoverLeavePatched = true;
+  const originalEditorHandleMouse = editorProto.handleMouse;
+  editorProto.handleMouse = function (this: unknown, event: PatchedMouseEvent) {
+    const result = originalEditorHandleMouse?.call(this, event);
+    if (!result && (event.type === "move" || event.type === "wheel") && clearHoveredTool()) {
+      return { handled: true, render: true };
+    }
+    return result;
+  };
+}
 
 const FALLBACK_THEME: Theme = {
   fg: (_color: string, text: string) => text,
@@ -147,6 +190,8 @@ function patchToolExecutionRender(getTheme: () => Theme, registry: typeof global
   proto.__tdGetTheme = getTheme;
   proto.__tdRegistry = registry;
 
+  installHoverLeavePatches();
+
   if (proto.__tdPatched) return;
 
   const timings = new WeakMap<object, { startedAtMs?: number; endedAtMs?: number }>();
@@ -191,6 +236,7 @@ function patchToolExecutionRender(getTheme: () => Theme, registry: typeof global
       registry: reg,
       startedAtMs: timing.startedAtMs,
       endedAtMs: timing.endedAtMs,
+      hoverAffordance: this.__tdHovered === true && !this.expanded,
     };
 
     const theme = proto.__tdGetTheme?.() ?? FALLBACK_THEME;
@@ -206,6 +252,14 @@ function patchToolExecutionRender(getTheme: () => Theme, registry: typeof global
   proto.handleMouse = function (this: ToolExecutionPatchThis, event: PatchedMouseEvent) {
     const childResult = originalHandleMouse?.call(this, event);
     if (childResult) return childResult;
+    if (event.type === "move") {
+      if (!this.result || this.expanded) return undefined;
+      if (hoveredTool === this && this.__tdHovered) return { handled: true };
+      clearHoveredTool();
+      hoveredTool = this;
+      this.__tdHovered = true;
+      return { handled: true, render: true };
+    }
     if (!proto.__tdRegistry.get(this.toolName)) return undefined;
     // Adapter-rendered blocks bypass the stock MouseRegion wrappers: the patched render
     // never updates selfRenderHeight (edit is renderShell "self"), and default-shell child

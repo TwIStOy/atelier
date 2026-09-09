@@ -106,6 +106,7 @@ function makeHeader(
   width: number,
   spinAt: number,
   expanded: boolean,
+  hoverAffordance: boolean,
   details?: unknown,
   elapsedMs?: number,
 ): string[] {
@@ -147,6 +148,8 @@ function makeHeader(
   } else {
     statusIcon = isPartial ? spinnerGlyph(theme, spinAt) : isError ? theme.fg("error", "◆") : theme.fg("success", "◆");
   }
+
+  if (hoverAffordance) statusIcon = statusIcon.replaceAll("◆", "›");
 
   const timerLabel = elapsedMs !== undefined ? formatDuration(elapsedMs) : undefined;
   const timerPart = timerLabel ? `${theme.fg("dim", timerLabel)} ` : "";
@@ -213,6 +216,7 @@ export interface ToolCallDisplayOpts {
   renderExpanded?: ContentRenderer;
   startedAtMs?: number;
   endedAtMs?: number;
+  hoverAffordance?: boolean;
 }
 
 export function renderToolCall(
@@ -235,6 +239,7 @@ export function renderToolCall(
         width,
         spinAt,
         opts.expanded,
+        opts.hoverAffordance === true,
         opts.details,
         elapsedMs,
       );
