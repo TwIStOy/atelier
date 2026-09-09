@@ -24,17 +24,19 @@ Two layers contribute tools:
 
 1. **Builtin (core)** — `read`, `bash`, `edit`, `write`, `grep`, `find`, `ls`
    (the `ToolName` union in `dist/core/tools/index.d.ts`).
-2. **`packages/extra-tools`** — registers `glob`, `grep`, `ls` that **shadow the
-   builtins** on name conflict (the later-registered tool wins). This is why the
-   live system prompt exposes `glob` (not `find`) and rewritten `grep`/`ls`
-   descriptions.
+2. **`packages/extra-tools`** — registers `glob`, `grep`, `ls`, and (by default)
+   `bash` that **shadow the builtins** on name conflict (the later-registered tool
+   wins). This is why the live system prompt exposes `glob` (not `find`) and
+   rewritten `grep`/`ls` descriptions. The `bash` override can be disabled via the
+   `extendedBash` config item (`/config` → Extra Tools, default on; takes effect
+   after `/reload`) — when off, the builtin `bash` stays in effect.
 
 Net effective set:
 
 | tool name | source | exposed here? |
 |-----------|--------|---------------|
 | `read`    | builtin | yes |
-| `bash`    | builtin | yes |
+| `bash`    | `extra-tools` | **yes (replaces builtin `bash` — adds required `description`; disable via `extendedBash: false`)** |
 | `edit`    | builtin | yes |
 | `write`   | builtin | yes |
 | `glob`    | `extra-tools` | **yes (replaces builtin `find`)** |
@@ -70,7 +72,11 @@ Strategy gotcha: the implementation also tolerates **`file_path`** as an alias f
 it currently renders but the schema field is `path`, so normalizing `file_path` →
 `path` is a safe, high-value repair.
 
-### `bash`
+### `bash` (builtin — shadowed by default)
+
+> In this setup the **effective** `bash` is the `extra-tools` extended version below
+> (unless `extendedBash` is disabled). Documented for completeness and for comparing
+> param sets.
 
 Source: `dist/core/tools/bash.js` (`bashSchema`). Name/label: `bash`.
 
@@ -181,6 +187,24 @@ Tool description (to LLM):
 
 ## Effective overrides (`packages/extra-tools`)
 
+### `bash` (replaces builtin `bash` — adds required `description`)
+
+Source: `packages/extra-tools/src/bash/index.ts` (`bashParams`). Name: `bash`, label: `bash`.
+Wraps `createBashToolDefinition`: execution, truncation, temp-file persistence, and
+native renderers are the builtin's; only the schema and tool description change.
+
+Params:
+| field | type | required | description |
+|-------|------|----------|-------------|
+| `command` | string | yes | Shell command to execute |
+| `description` | string | **yes** | Brief human-readable summary of what this command does, shown in the session UI |
+| `timeout` | number | optional | Timeout in seconds (optional, no default timeout) |
+
+Strategy gotcha (high-value repair): models trained on stock pi emit bash calls
+with **only** `command` (and maybe `timeout`). Against this schema those calls fail
+validation — synthesize a short `description` from the command (e.g. first words of
+the command line) as the repair.
+
 ### `glob` (replaces builtin `find`)
 
 Source: `packages/extra-tools/src/glob/index.ts` (`globParams`). Name: `glob`, label: `Glob`.
@@ -284,7 +308,7 @@ grep -nE "const DEFAULT_LIMIT" bash.js read.js grep.js find.js ls.js
 
 # effective overrides
 cd ../../../../../../../packages/extra-tools/src
-for d in glob grep ls; do grep -nE "Type\.(Object|String|Number|Boolean|Optional)|name:|label:" "$d/index.ts"; cat "$d/$d.txt"; done
+for d in bash glob grep ls; do grep -nE "Type\.(Object|String|Number|Boolean|Optional)|name:|label:" "$d/index.ts"; cat "$d/$d.txt" 2>/dev/null; done
 ```
 
 Then diff against this file and update the "Verified against" version line.

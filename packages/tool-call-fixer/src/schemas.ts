@@ -23,6 +23,7 @@ export const TOOL_SCHEMAS: Readonly<Record<string, ToolSchema>> = {
   },
   bash: {
     command: { type: "string", required: true },
+    description: { type: "string", required: true },
     timeout: { type: "number" },
   },
   grep: {

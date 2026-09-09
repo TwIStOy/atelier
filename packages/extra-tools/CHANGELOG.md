@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Optional extended `bash` tool that replaces the built-in bash (same override mechanism as `ls`/`grep`/`glob`). The extended schema adds a **required** `description` parameter — a brief human-readable summary of the command — which the tool-display bash adapter renders as the call header (`Bash <description>`, command hidden until expanded). Execution delegates to pi's `createBashToolDefinition`, so process management, output truncation, temp-file persistence, `PI_*` env, and native renderers are unchanged. Controlled by the new `extendedBash` boolean config item (default on, `/config` → Extra Tools; takes effect after `/reload`).
+
 ## [0.4.0] - 2026-07-31
 
 ### Changed

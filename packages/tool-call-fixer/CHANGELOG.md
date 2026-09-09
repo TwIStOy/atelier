@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- The `bash` entry in the repair schema table (`TOOL_SCHEMAS`) now includes the required `description` field, matching the extended bash schema registered by `@htwang-contrib/extra-tools` (`extendedBash`, default on). Behaviorally neutral today — `shape-repair` only rewrites fields that are present but malformed and skips missing keys — but keeps the table truthful to the effective schema so future strategies see the real contract.
+
 ## [0.4.0] - 2026-07-31
 
 ### Changed
