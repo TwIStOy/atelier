@@ -9,7 +9,7 @@
   },
   "devDependencies": {
     "@earendil-works/pi-coding-agent": "latest",
-    "@types/node": "^26.1.2",
+    "@types/node": "^26.4.1",
     "cli-table3": "^0.6.5",
     "typescript": "^7.0.2",
     "vitest": "^4.1.10"
