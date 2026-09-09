@@ -6,7 +6,7 @@ const batchTask = { task: "batch task", description: "Batch task" };
 
 describe("subagent schema", () => {
   it("keeps every root union branch object-typed for Grok", () => {
-    const schema = subagentParams as { oneOf?: Array<{ type?: unknown }> };
+    const schema = subagentParams as { type?: unknown; oneOf?: Array<{ type?: unknown }> };
 
     expect(schema.type).toBe("object");
     expect(schema.oneOf).toHaveLength(2);

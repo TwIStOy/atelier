@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Type fixes required by the repo-wide `@earendil-works/pi-*` dev-dependency unification to `^0.85.1` ([#150](https://github.com/TwIStOy/pi-extensions/issues/150)): `ReportableUsage` now accepts partial usage snapshots (matching `toPiUsage`'s existing `?? 0` defaults) so `SubagentRunDetails` can be pooled for background usage reporting, `fallbackAgent` is annotated `: string` because `FALLBACK_PERSONA_ID`'s literal type no longer widens, and the schema test's cast includes `type?: unknown` for the current typebox shape.
+
 ### Changed
 
 - `/view-subagents` is now registered only when pi runs in TUI mode (via `registerTuiCommands` from `@htwang-contrib/common`); its viewer is a `ctx.ui.custom` overlay, which resolves `undefined` in RPC mode. `/subagents-agents` stays available in RPC because `ctx.ui.select`/`ctx.ui.editor` dialogs are wired through the RPC protocol.
