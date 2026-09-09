@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Added
+
+- `borderColor` config option (`/config` -> Statusline -> "Editor Border Color"): `Fixed dim` (default), `Fixed border color` (theme border role), or `Follow thinking level` for pi's built-in thinking-level colors.
+
+### Changed
+
+- The editor border no longer follows the thinking level by default. Pi reapplies thinking-level colors on every level change, which overrode the constant border color `MyEditor` set at construction; the configured color is now re-asserted on every render. Bash mode keeps its dedicated border color.
+
 ## [0.4.0] - 2026-07-31
 
 ### Added
