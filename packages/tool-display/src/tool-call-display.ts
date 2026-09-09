@@ -109,6 +109,7 @@ function makeHeader(
   hoverAffordance: boolean,
   details?: unknown,
   elapsedMs?: number,
+  output?: string,
 ): string[] {
   let statusIcon: string;
   if (toolName === "subagent") {
@@ -157,7 +158,7 @@ function makeHeader(
   const innerWidth = Math.max(1, width - timerWidth);
 
   const headerText = adapter
-    ? adapter.formatCallHeader(args, theme, details, isPartial, expanded, innerWidth)
+    ? adapter.formatCallHeader(args, theme, details, isPartial, expanded, innerWidth, output)
     : formatGenericToolHeader(toolName, args, theme, innerWidth);
 
   const headerLines = headerText.split("\n");
@@ -242,6 +243,7 @@ export function renderToolCall(
         opts.hoverAffordance === true,
         opts.details,
         elapsedMs,
+        opts.output,
       );
       const lines = [...header];
 

@@ -248,7 +248,7 @@ describe("bash adapter command display width", () => {
     expect(lines[0]).toContain("Bash set -e");
     expect(lines[1]).toBe("│   for slug in a b; do");
     expect(lines[2]).toBe('│     echo "$slug"');
-    expect(lines[3]).toBe("│   done");
+    expect(lines[3]).toBe("│   done · 1 line");
   });
 
   it("fits on one line with no ellipsis on a wide terminal", () => {
@@ -342,6 +342,54 @@ describe("bash adapter command display width", () => {
       60,
     );
     expect(header).toBe("Bash build in /r");
+  });
+});
+
+describe("bash collapsed output line count", () => {
+  it("renders header only when collapsed, with the line count in the header", () => {
+    globalToolDisplayRegistry.register("bash", bashAdapter);
+    const lines = renderCollapsed("bash", { command: "npm run build" }, "a\nb\nc\n", false);
+    expect(lines.length).toBe(1);
+    expect(lines[0]).toContain("Bash npm run build · 3 lines");
+    expect(lines.join("\n")).not.toContain("└");
+  });
+
+  it("omits the line count when the header has no room for it", () => {
+    globalToolDisplayRegistry.register("bash", bashAdapter);
+    const lines = renderToolCall(
+      {
+        toolName: "bash",
+        args: { command: "echo aaa" },
+        output: "done",
+        expanded: false,
+        isPartial: false,
+        isError: false,
+        registry: globalToolDisplayRegistry,
+      },
+      PLAIN_THEME,
+    ).render(15);
+    expect(lines.length).toBe(1);
+    expect(lines[0]).toBe("◆ Bash echo aaa");
+    for (const line of lines) {
+      expect(visibleWidth(line)).toBeLessThanOrEqual(15);
+    }
+  });
+
+  it("omits the line count when there is no output", () => {
+    globalToolDisplayRegistry.register("bash", bashAdapter);
+    const lines = renderToolCall(
+      {
+        toolName: "bash",
+        args: { command: "echo aaa" },
+        output: "",
+        expanded: false,
+        isPartial: true,
+        isError: false,
+        registry: globalToolDisplayRegistry,
+      },
+      PLAIN_THEME,
+    ).render(80);
+    expect(lines.join("\n")).not.toContain("· ");
   });
 });
 

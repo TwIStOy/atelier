@@ -1,7 +1,8 @@
+import type { Theme } from "@earendil-works/pi-coding-agent";
 import { visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
-import { shortenPath } from "@htwang-contrib/common";
+import { shortenPath, trimTrailingEmpty } from "@htwang-contrib/common";
 import type { ToolDisplayAdapter } from "../types.ts";
-import { formatExpandedToolOutputLines, formatLineCount, INDENT } from "./shared.ts";
+import { formatExpandedToolOutputLines, INDENT } from "./shared.ts";
 
 interface BashArgs {
   command?: string;
@@ -32,8 +33,23 @@ function continuationWrapWidth(cwd: string, width: number): number {
   return Math.max(1, Math.min(first, middle, last));
 }
 
+function outputLineSuffix(output: string | undefined, theme: Theme): string {
+  if (!output) return "";
+  const count = trimTrailingEmpty(output.split("\n")).length;
+  if (count === 0) return "";
+  return theme.fg("dim", `· ${count} line${count !== 1 ? "s" : ""}`);
+}
+
 export const bashAdapter: ToolDisplayAdapter<BashArgs> = {
-  formatCallHeader(args, theme, _details?: unknown, _isPartial?: boolean, _expanded?: boolean, width?: number) {
+  formatCallHeader(
+    args,
+    theme,
+    _details?: unknown,
+    _isPartial?: boolean,
+    _expanded?: boolean,
+    width?: number,
+    output?: string,
+  ) {
     const cmd = args?.command ?? "";
     const desc = args?.description ?? "";
     const cwd = args?.workdir ?? "";
@@ -41,30 +57,43 @@ export const bashAdapter: ToolDisplayAdapter<BashArgs> = {
     const titlePart = `${theme.fg("toolTitle", theme.bold(TITLE))} `;
     const cwdPart = cwd ? ` ${theme.fg("dim", `in ${shortenPath(cwd)}`)}` : "";
 
+    let header: string;
+    let lastLineBudget: number | undefined;
+
     if (desc) {
-      return `${titlePart}${theme.fg("accent", desc)}${cwdPart}`;
+      header = `${titlePart}${theme.fg("accent", desc)}${cwdPart}`;
+      if (width !== undefined) lastLineBudget = width - STATUS_PREFIX_WIDTH;
+    } else if (width === undefined || visibleWidth(cmd) <= singleLineBudget(cwd, width)) {
+      header = `${titlePart}${theme.fg("muted", cmd)}${cwdPart}`;
+      if (width !== undefined) lastLineBudget = width - STATUS_PREFIX_WIDTH;
+    } else {
+      const wrapWidth = continuationWrapWidth(cwd, width);
+      const lines = wrapTextWithAnsi(cmd, wrapWidth).map((line) => theme.fg("muted", line));
+
+      if (lines.length === 1) {
+        header = `${titlePart}${lines[0]}${cwdPart}`;
+        lastLineBudget = width - STATUS_PREFIX_WIDTH;
+      } else {
+        header = [`${titlePart}${lines[0]}`, ...lines.slice(1, -1), `${lines[lines.length - 1]}${cwdPart}`].join("\n");
+        lastLineBudget = width - CONTINUATION_INDENT_WIDTH;
+      }
     }
 
-    if (width === undefined || visibleWidth(cmd) <= singleLineBudget(cwd, width)) {
-      return `${titlePart}${theme.fg("muted", cmd)}${cwdPart}`;
+    const suffix = outputLineSuffix(output, theme);
+    if (suffix && lastLineBudget !== undefined) {
+      const headerLines = header.split("\n");
+      const last = headerLines[headerLines.length - 1] ?? "";
+      if (visibleWidth(last) + 1 + visibleWidth(suffix) <= lastLineBudget) {
+        headerLines[headerLines.length - 1] = `${last} ${suffix}`;
+        header = headerLines.join("\n");
+      }
     }
 
-    const wrapWidth = continuationWrapWidth(cwd, width);
-    const lines = wrapTextWithAnsi(cmd, wrapWidth).map((line) => theme.fg("muted", line));
-
-    if (lines.length === 1) {
-      return `${titlePart}${lines[0]}${cwdPart}`;
-    }
-
-    const firstLine = `${titlePart}${lines[0]}`;
-    const middle = lines.slice(1, -1);
-    const lastLine = `${lines[lines.length - 1]}${cwdPart}`;
-    return [firstLine, ...middle, lastLine].join("\n");
+    return header;
   },
 
-  formatCollapsedContent(_args, output, theme, _width, _details?: unknown, _isPartial?: boolean, _spinAt?: number) {
-    if (!output) return [];
-    return formatLineCount(output, theme);
+  formatCollapsedContent() {
+    return [];
   },
 
   formatExpandedContent(args, output, theme, width, _details?: unknown) {
