@@ -85,10 +85,10 @@ tmux select-layout -t "$SESSION:$WIN" tiled   # 2 -> side-by-side; 3+ -> grid. U
 
 Panes come back in index order from `tmux list-panes -t "$SESSION:$WIN" -F '#{pane_index}'`, so `pane[i] ↔ target[i]`. Verify each pane's cwd is its own worktree: `tmux list-panes -t "$SESSION:$WIN" -F '#{pane_index}: #{pane_current_path}'`.
 
-**herdr** — with the `herdr` skill loaded, drive the `herdr` CLI. Create one tab — its root pane is target 0 — then split one further pane per remaining target into that tab, each with its worktree as cwd and no focus steal:
+**herdr** — with the `herdr` skill loaded, drive the `herdr` CLI. Create one tab — its root pane is target 0 — in the workspace this session is running in, then split one further pane per remaining target into that tab, each with its worktree as cwd and no focus steal. Always pass `--workspace "$HERDR_WORKSPACE_ID"`: omitting it creates the tab in the server's primary workspace, not the caller's, so the new tab lands in the wrong place:
 
 ```
-herdr tab create     # add a label if the installed CLI supports one (check `herdr tab`); parse .result.tab and .result.root_pane
+herdr tab create --workspace "$HERDR_WORKSPACE_ID"   # add --label if the installed CLI supports one (check `herdr tab`); parse .result.tab and .result.root_pane
 herdr pane split --pane "<root pane id>" --direction right --cwd "$WORKTREE_1" --no-focus   # parse .result.pane.pane_id
 herdr pane split --pane "<root pane id>" --direction right --cwd "$WORKTREE_2" --no-focus
 ```
