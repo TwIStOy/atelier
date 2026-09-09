@@ -22,7 +22,14 @@ import {
 import { readAdapter } from "./adapters/read.ts";
 import { subagentAdapter } from "./adapters/subagent.ts";
 import { subagentStatusAdapter } from "./adapters/subagent-status.ts";
-import { todoAdapter } from "./adapters/todo.ts";
+import {
+  todoClearAdapter,
+  todoCreateAdapter,
+  todoDeleteAdapter,
+  todoGetAdapter,
+  todoListAdapter,
+  todoUpdateAdapter,
+} from "./adapters/todo.ts";
 import { webFetchAdapter } from "./adapters/web-fetch.ts";
 import { webSearchAdapter } from "./adapters/web-search.ts";
 import { workflowAdapter } from "./adapters/workflow.ts";
@@ -41,7 +48,12 @@ globalToolDisplayRegistry.register("apply_patch", applyPatchAdapter);
 globalToolDisplayRegistry.register("bash", bashAdapter);
 globalToolDisplayRegistry.register("subagent", subagentAdapter);
 globalToolDisplayRegistry.register("subagent_status", subagentStatusAdapter);
-globalToolDisplayRegistry.register("todo", todoAdapter);
+globalToolDisplayRegistry.register("todo_create", todoCreateAdapter);
+globalToolDisplayRegistry.register("todo_update", todoUpdateAdapter);
+globalToolDisplayRegistry.register("todo_list", todoListAdapter);
+globalToolDisplayRegistry.register("todo_get", todoGetAdapter);
+globalToolDisplayRegistry.register("todo_delete", todoDeleteAdapter);
+globalToolDisplayRegistry.register("todo_clear", todoClearAdapter);
 globalToolDisplayRegistry.register("create_goal", createGoalAdapter);
 globalToolDisplayRegistry.register("update_goal", updateGoalAdapter);
 globalToolDisplayRegistry.register("get_goal", getGoalAdapter);

@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { bashAdapter } from "../src/adapters/bash.ts";
 import { editAdapter } from "../src/adapters/edit.ts";
 import { subagentAdapter } from "../src/adapters/subagent.ts";
-import { todoAdapter } from "../src/adapters/todo.ts";
+import { todoCreateAdapter, todoUpdateAdapter } from "../src/adapters/todo.ts";
 import { writeAdapter } from "../src/adapters/write.ts";
 import { globalToolDisplayRegistry } from "../src/registry.ts";
 import { renderToolCall } from "../src/tool-call-display.ts";
@@ -119,28 +119,29 @@ describe("renderToolCall collapsed error reason", () => {
   });
 });
 
-describe("todo adapter collapsed-content width safety", () => {
-  it("truncates long create output to fit a narrow terminal", () => {
-    globalToolDisplayRegistry.register("todo", todoAdapter);
-    const result = renderToolCall(
-      {
-        toolName: "todo",
-        args: {
-          action: "create",
-          subject: "Fix todo adapter collapsed-content overflow crash in narrow terminals",
-        },
-        output: "Created #1: Fix todo adapter collapsed-content overflow crash in narrow terminals (pending)",
-        expanded: false,
-        isPartial: false,
-        isError: false,
-        registry: globalToolDisplayRegistry,
-      },
-      PLAIN_THEME,
+describe("todo adapters render a header only", () => {
+  it("renders a header and no collapsed content for todo_create", () => {
+    globalToolDisplayRegistry.register("todo_create", todoCreateAdapter);
+    const lines = renderCollapsed(
+      "todo_create",
+      { subject: "Fix narrow-terminal overflow" },
+      "Created #1: Fix narrow-terminal overflow (pending)",
+      false,
     );
-    const lines = result.render(45);
-    for (const line of lines) {
-      expect(visibleWidth(line)).toBeLessThanOrEqual(45);
-    }
+    expect(lines.length).toBe(1);
+    expect(lines[0]).toContain("TodoCreate");
+    expect(lines[0]).toContain("Fix narrow-terminal overflow");
+    expect(lines.join("\n")).not.toContain("Created #1");
+  });
+
+  it("renders a header and no collapsed content for todo_update", () => {
+    globalToolDisplayRegistry.register("todo_update", todoUpdateAdapter);
+    const lines = renderCollapsed("todo_update", { id: 5, status: "completed" }, "Updated #5", false);
+    expect(lines.length).toBe(1);
+    expect(lines[0]).toContain("TodoUpdate");
+    expect(lines[0]).toContain("[completed]");
+    expect(lines[0]).toContain("#5");
+    expect(lines.join("\n")).not.toContain("Updated #5");
   });
 });
 
@@ -148,7 +149,7 @@ describe("collapsed summary line indentation", () => {
   it("renders the generic collapsed summary flush left, like adapter summaries", () => {
     const lines = renderToolCall(
       {
-        toolName: "todo_update",
+        toolName: "some_generic_tool",
         args: { id: 5, status: "completed" },
         output: "Updated #5",
         expanded: false,
@@ -270,7 +271,7 @@ describe("bash adapter command display width", () => {
     expect(joined).toContain(LONG_CMD);
   });
 
-  it("keeps the description and cwd suffix visible when the command wraps", () => {
+  it("shows only the description in the collapsed header when a description is set", () => {
     globalToolDisplayRegistry.register("bash", bashAdapter);
     const width = 80;
     const lines = renderToolCall(
@@ -285,17 +286,53 @@ describe("bash adapter command display width", () => {
       },
       PLAIN_THEME,
     ).render(width);
-    const joined = lines.join(" ");
+    const joined = lines.join("\n");
+    expect(joined).toContain("Bash build the package");
     expect(joined).toContain("in /r");
-    expect(joined).toContain("build the package");
-    expect(joined).not.toContain("…");
-    expect(joined.replaceAll("│", "").replace(/\s+/g, " ")).toContain(LONG_CMD);
-    for (const line of lines) {
-      expect(visibleWidth(line)).toBeLessThanOrEqual(width);
-    }
+    expect(joined).not.toContain(LONG_CMD);
   });
 
-  it("wraps the command within the available width and never overflows the line", () => {
+  it("reveals the command as a $ line above the output when expanded", () => {
+    globalToolDisplayRegistry.register("bash", bashAdapter);
+    const lines = renderToolCall(
+      {
+        toolName: "bash",
+        args: { command: "ls -la /tmp", description: "list tmp files" },
+        output: "total 0\ndrwxr-xr-x 2 root root 40 Jan 1 00:00 .",
+        expanded: true,
+        isPartial: false,
+        isError: false,
+        registry: globalToolDisplayRegistry,
+      },
+      PLAIN_THEME,
+    ).render(80);
+    const cmdIdx = lines.findIndex((l) => l.includes("$ ls -la /tmp"));
+    const outIdx = lines.findIndex((l) => l.includes("total 0"));
+    expect(cmdIdx).toBeGreaterThan(-1);
+    expect(outIdx).toBeGreaterThan(cmdIdx);
+  });
+
+  it("keeps a multi-line command readable in the expanded $ block", () => {
+    globalToolDisplayRegistry.register("bash", bashAdapter);
+    const lines = renderToolCall(
+      {
+        toolName: "bash",
+        args: { command: 'set -e\nfor slug in a b; do\n  echo "$slug"\ndone', description: "run loop" },
+        output: "ok",
+        expanded: true,
+        isPartial: false,
+        isError: false,
+        registry: globalToolDisplayRegistry,
+      },
+      PLAIN_THEME,
+    ).render(80);
+    const joined = lines.join("\n");
+    expect(joined).toContain("$ set -e");
+    expect(joined).toContain("for slug in a b; do");
+    expect(lines[0]).toContain("Bash run loop");
+  });
+
+  it("renders a single-line description header regardless of command length", () => {
     const header = bashAdapter.formatCallHeader(
       { command: LONG_CMD, description: "build", workdir: "/r" },
       PLAIN_THEME,
@@ -304,11 +341,7 @@ describe("bash adapter command display width", () => {
       false,
       60,
     );
-    expect(header).toContain("in /r");
-    expect(header).not.toContain("…");
-    for (const line of header.split("\n")) {
-      expect(visibleWidth(`◆ ${line}`)).toBeLessThanOrEqual(60);
-    }
+    expect(header).toBe("Bash build in /r");
   });
 });
 
@@ -333,12 +366,12 @@ describe("multi-line headers of other tools", () => {
     }
   });
 
-  it("prefixes a wrapped todo subject with a tree bar", () => {
-    globalToolDisplayRegistry.register("todo", todoAdapter);
+  it("prefixes a wrapped todo_create subject with a tree bar", () => {
+    globalToolDisplayRegistry.register("todo_create", todoCreateAdapter);
     const lines = renderToolCall(
       {
-        toolName: "todo",
-        args: { action: "create", subject: "Fix todo adapter collapsed-content overflow crash in narrow terminals" },
+        toolName: "todo_create",
+        args: { subject: "Fix todo adapter collapsed-content overflow crash in narrow terminals" },
         output: "",
         expanded: false,
         isPartial: true,
@@ -348,7 +381,7 @@ describe("multi-line headers of other tools", () => {
       PLAIN_THEME,
     ).render(40);
     expect(lines.length).toBeGreaterThan(1);
-    expect(lines[0]).toContain("Todo create");
+    expect(lines[0]).toContain("TodoCreate");
     for (const line of lines.slice(1)) {
       expect(line.startsWith("│   ")).toBe(true);
       expect(visibleWidth(line)).toBeLessThanOrEqual(40);

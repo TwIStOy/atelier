@@ -28,7 +28,15 @@ export {
   memoryUpdateAdapter,
 } from "./adapters/memory.ts";
 export { readAdapter } from "./adapters/read.ts";
-export { todoAdapter } from "./adapters/todo.ts";
+export {
+  createTodoAdapter,
+  todoClearAdapter,
+  todoCreateAdapter,
+  todoDeleteAdapter,
+  todoGetAdapter,
+  todoListAdapter,
+  todoUpdateAdapter,
+} from "./adapters/todo.ts";
 export { workflowAdapter } from "./adapters/workflow.ts";
 export { writeAdapter } from "./adapters/write.ts";
 export {

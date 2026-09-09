@@ -1,21 +1,17 @@
 import type { ThemeColor } from "@earendil-works/pi-coding-agent";
-import { truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
+import { visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 import type { ToolDisplayAdapter } from "../types.ts";
 import { formatExpandedToolOutputLines } from "./shared.ts";
 
 interface TodoArgs {
-  action?: string;
-  subject?: string;
   id?: number;
+  subject?: string;
   status?: string;
+  includeDeleted?: boolean;
 }
 
 interface DetailsShape {
   tasks?: Array<{ id?: number; subject?: string }>;
-}
-
-function firstLine(text: string): string {
-  return (text.split("\n")[0] ?? "").trim();
 }
 
 function stateColor(status: string): ThemeColor {
@@ -49,66 +45,56 @@ function attachSubject(core: string, styledSubject: string, width: number | unde
   return [core, ...wrapped].join("\n");
 }
 
-export const todoAdapter: ToolDisplayAdapter<TodoArgs> = {
-  formatCallHeader(args, theme, details, _isPartial, _expanded, width) {
-    const label = theme.fg("toolTitle", theme.bold("Todo"));
-    const action = args.action ?? "";
-    if (!action) return label;
-    const actionLabel = theme.fg("accent", action);
-    let core = `${label} ${actionLabel}`;
-    let subject: string | null = null;
+export function createTodoAdapter(toolName: string): ToolDisplayAdapter<TodoArgs> {
+  const displayName = toolName
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join("");
 
-    switch (action) {
-      case "create":
-        subject = args.subject?.trim() || null;
-        break;
-      case "update":
-        if (args.status) core += ` ${theme.fg(stateColor(args.status), `[${args.status}]`)}`;
-        if (args.id !== undefined) core += ` ${theme.fg("dim", `#${args.id}`)}`;
-        if (args.id !== undefined) subject = findSubjectById(details, args.id);
-        break;
-      case "get":
-      case "delete":
-        if (args.id !== undefined) core += ` ${theme.fg("dim", `#${args.id}`)}`;
-        if (args.id !== undefined) subject = findSubjectById(details, args.id);
-        break;
-      case "list":
-        if (args.status) core += ` ${theme.fg("muted", args.status)}`;
-        break;
-      case "clear":
-        break;
-    }
+  return {
+    formatCallHeader(args, theme, details, _isPartial, _expanded, width) {
+      const label = theme.fg("toolTitle", theme.bold(displayName));
+      let core = label;
+      let subject: string | null = null;
 
-    if (!subject) return core;
-    return attachSubject(core, theme.fg("dim", subject), width);
-  },
-
-  formatCollapsedContent(args, output, theme, width, details) {
-    if (!output) return [];
-
-    const d = details as { error?: string } | undefined;
-    const action = args.action ?? "";
-    const line = firstLine(output);
-
-    if (d?.error || line.startsWith("Error:")) {
-      return [truncateToWidth(theme.fg("muted", `└ ${line}`), width, "…")];
-    }
-
-    switch (action) {
-      case "list": {
-        if (line === "No tasks" || !line) {
-          return [truncateToWidth(theme.fg("muted", "└ 0 tasks"), width, "…")];
-        }
-        const count = output.split("\n").filter((l) => l.trim()).length;
-        return [truncateToWidth(theme.fg("muted", `└ ${count} task${count === 1 ? "" : "s"}`), width, "…")];
+      switch (toolName) {
+        case "todo_create":
+          subject = args.subject?.trim() || null;
+          break;
+        case "todo_update":
+          if (args.status) core += ` ${theme.fg(stateColor(args.status), `[${args.status}]`)}`;
+          if (args.id !== undefined) core += ` ${theme.fg("dim", `#${args.id}`)}`;
+          if (args.id !== undefined) subject = findSubjectById(details, args.id);
+          break;
+        case "todo_get":
+        case "todo_delete":
+          if (args.id !== undefined) core += ` ${theme.fg("dim", `#${args.id}`)}`;
+          if (args.id !== undefined) subject = findSubjectById(details, args.id);
+          break;
+        case "todo_list":
+          if (args.status) core += ` ${theme.fg("muted", args.status)}`;
+          if (args.includeDeleted) core += ` ${theme.fg("muted", "+deleted")}`;
+          break;
       }
-      default:
-        return [truncateToWidth(theme.fg("muted", `└ ${line}`), width, "…")];
-    }
-  },
 
-  formatExpandedContent(_args, output, theme, width) {
-    if (!output) return [];
-    return formatExpandedToolOutputLines(output, theme, width);
-  },
-};
+      if (!subject) return core;
+      return attachSubject(core, theme.fg("dim", subject), width);
+    },
+
+    formatCollapsedContent() {
+      return [];
+    },
+
+    formatExpandedContent(_args, output, theme, width) {
+      if (!output) return [];
+      return formatExpandedToolOutputLines(output, theme, width);
+    },
+  };
+}
+
+export const todoCreateAdapter = createTodoAdapter("todo_create");
+export const todoUpdateAdapter = createTodoAdapter("todo_update");
+export const todoListAdapter = createTodoAdapter("todo_list");
+export const todoGetAdapter = createTodoAdapter("todo_get");
+export const todoDeleteAdapter = createTodoAdapter("todo_delete");
+export const todoClearAdapter = createTodoAdapter("todo_clear");

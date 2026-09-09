@@ -8,8 +8,10 @@
 
 ### Changed
 
+- Todo tool calls now render as a header-only widget with no collapsed output line: the collapsed body (`└ Updated #5`-style echoes of the tool result) carried no information beyond the header. The old single `todo` adapter was replaced by per-tool adapters for the split todo tools (`todo_create` / `todo_update` / `todo_list` / `todo_get` / `todo_delete` / `todo_clear`), each rendering its own header (e.g. `TodoUpdate [completed] #5 <subject>`) via a shared `createTodoAdapter(toolName)` factory; the legacy `todoAdapter` export was removed.
 - Collapsed tool summaries now sit flush left, aligned under the status icon. The generic collapsed summary (`└ N lines — <key> to expand`, used by tools without a display adapter such as `todo_update`) no longer prefixes a four-space indent, matching the existing read/edit/grep adapter convention.
 - `ask_user_question` no longer renders a collapsed `└ N questions` line; its collapsed view is the header only. The `askUserQuestionCollapsed` adapter-gating clause in `renderToolCall` was removed together with it.
+- `bash` calls with a `description` now lead with it: the header is a single-line `Bash <description> in <cwd>` (description in accent) and the command is hidden from the collapsed view, surfacing as a muted `$ <command>` block at the top of the expanded view, above the output. Calls without a description keep the previous width-wrapping `Bash <command> in <cwd>` header.
 
 ### Fixed
 
