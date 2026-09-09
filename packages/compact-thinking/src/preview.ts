@@ -1,6 +1,4 @@
-import { type Component, getKeybindings, Text } from "@earendil-works/pi-tui";
-
-export const SUMMARY_DISPLAY_PREFIX = "✦ Summary: ";
+import { type Component, Text, truncateToWidth } from "@earendil-works/pi-tui";
 
 export function formatThoughtDuration(durationMs: number): string {
   if (durationMs < 1_000) {
@@ -14,58 +12,39 @@ export function formatThoughtDuration(durationMs: number): string {
   return seconds === 0 ? `${minutes}m` : `${minutes}m ${seconds}s`;
 }
 
-function getThinkingToggleHint(): string | undefined {
-  const keys = getKeybindings().getKeys("app.thinking.toggle");
-  return keys.length > 0 ? keys.join("/") : undefined;
+export class SingleLineText implements Component {
+  private text: string;
+
+  constructor(text: string) {
+    this.text = text;
+  }
+
+  render(width: number): string[] {
+    return [truncateToWidth(this.text, Math.max(0, width), "…")];
+  }
+
+  invalidate(): void {}
 }
 
 export class StrictThinkingPreview implements Component {
   private heading: string;
   private text: string;
-  private padding: number;
   private style: (text: string) => string;
-  private previewLines: number;
-  private expanded: boolean;
   private cachedWidth = -1;
   private cachedLines: string[] | undefined;
 
-  constructor(
-    heading: string,
-    text: string,
-    padding: number,
-    style: (text: string) => string,
-    previewLines: number,
-    expanded = false,
-  ) {
+  constructor(heading: string, text: string, style: (text: string) => string) {
     this.heading = heading;
     this.text = text;
-    this.padding = padding;
     this.style = style;
-    this.previewLines = previewLines;
-    this.expanded = expanded;
   }
 
   render(width: number): string[] {
     if (this.cachedLines !== undefined && width === this.cachedWidth) return this.cachedLines;
 
-    const lines = new Text(this.style(this.text), this.padding, 0).render(width);
-
-    let hint: string | undefined;
-    if (this.expanded) {
-      hint = " ... (click to collapse)";
-    } else {
-      const hiddenLines = lines.length - this.previewLines;
-      if (hiddenLines > 0) {
-        const noun = hiddenLines === 1 ? "line" : "lines";
-        const toggleKeys = getThinkingToggleHint();
-        hint = ` ... (${hiddenLines} more ${noun}, click${toggleKeys ? ` or ${toggleKeys}` : ""} to expand)`;
-      }
-    }
-
-    const heading = new Text(this.heading + (hint ? this.style(hint) : ""), this.padding, 0).render(width);
-    const separator = " ".repeat(this.padding);
-    const bodyLines = this.expanded ? lines : lines.slice(-this.previewLines);
-    const result = [...heading, separator, ...bodyLines];
+    const lines = new Text(this.style(this.text), 0, 0).render(width);
+    const heading = new Text(this.heading + this.style(" ... (click to collapse)"), 0, 0).render(width);
+    const result = [...heading, "", ...lines];
     this.cachedWidth = width;
     this.cachedLines = result;
     return result;
