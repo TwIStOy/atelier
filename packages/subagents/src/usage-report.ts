@@ -31,9 +31,11 @@ export function registerSubagentsConfig(): void {
   ]);
 }
 
-export type ReportableUsage = Pick<
-  SubagentUsageSnapshot,
-  "usage_input" | "usage_output" | "usage_cache_read" | "usage_cache_write" | "usage_cost_usd"
+export type ReportableUsage = Partial<
+  Pick<
+    SubagentUsageSnapshot,
+    "usage_input" | "usage_output" | "usage_cache_read" | "usage_cache_write" | "usage_cost_usd"
+  >
 >;
 
 export function toPiUsage(u: ReportableUsage): Usage | undefined {

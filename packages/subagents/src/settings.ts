@@ -57,7 +57,7 @@ export function readSubagentSettings(overrides?: SubagentSettingsOverrides): Sub
   let maxConcurrent = DEFAULT_MAX_CONCURRENT;
   let maxTotal = DEFAULT_MAX_TOTAL;
   let timeoutMs = DEFAULT_TIMEOUT_MS;
-  let fallbackAgent = FALLBACK_PERSONA_ID;
+  let fallbackAgent: string = FALLBACK_PERSONA_ID;
   let defaultsByAgentType: Partial<Record<string, SubagentAgentTypeDefaults>> = {};
 
   if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
