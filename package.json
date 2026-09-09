@@ -45,7 +45,8 @@
       "packages/heap-probe",
       "packages/inject-prompt-by-model",
       "packages/canvas",
-      "packages/apply-patch"
+      "packages/apply-patch",
+      "packages/recap"
     ],
     "skills": [
       "skills/code-philosophy",
