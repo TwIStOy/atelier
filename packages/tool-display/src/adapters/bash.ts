@@ -1,7 +1,7 @@
 import { visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 import { shortenPath } from "@htwang-contrib/common";
 import type { ToolDisplayAdapter } from "../types.ts";
-import { formatExpandedToolOutputLines, formatLineCount } from "./shared.ts";
+import { formatExpandedToolOutputLines, formatLineCount, INDENT } from "./shared.ts";
 
 interface BashArgs {
   command?: string;
@@ -13,22 +13,22 @@ const TITLE = "Bash";
 const STATUS_PREFIX_WIDTH = 2;
 const CONTINUATION_INDENT_WIDTH = 4;
 
-function firstLinePrefixWidth(desc: string): number {
-  return visibleWidth(TITLE) + 1 + (desc ? visibleWidth(desc) + 2 : 0);
+function firstLinePrefixWidth(): number {
+  return visibleWidth(TITLE) + 1;
 }
 
-function lastLineSuffixWidth(desc: string, cwd: string): number {
-  return (desc ? 1 : 0) + (cwd ? visibleWidth(` in ${shortenPath(cwd)}`) : 0);
+function lastLineSuffixWidth(cwd: string): number {
+  return cwd ? visibleWidth(` in ${shortenPath(cwd)}`) : 0;
 }
 
-function singleLineBudget(desc: string, cwd: string, width: number): number {
-  return Math.max(1, width - STATUS_PREFIX_WIDTH - firstLinePrefixWidth(desc) - lastLineSuffixWidth(desc, cwd));
+function singleLineBudget(cwd: string, width: number): number {
+  return Math.max(1, width - STATUS_PREFIX_WIDTH - firstLinePrefixWidth() - lastLineSuffixWidth(cwd));
 }
 
-function continuationWrapWidth(desc: string, cwd: string, width: number): number {
-  const first = width - STATUS_PREFIX_WIDTH - firstLinePrefixWidth(desc);
+function continuationWrapWidth(cwd: string, width: number): number {
+  const first = width - STATUS_PREFIX_WIDTH - firstLinePrefixWidth();
   const middle = width - CONTINUATION_INDENT_WIDTH;
-  const last = width - CONTINUATION_INDENT_WIDTH - lastLineSuffixWidth(desc, cwd);
+  const last = width - CONTINUATION_INDENT_WIDTH - lastLineSuffixWidth(cwd);
   return Math.max(1, Math.min(first, middle, last));
 }
 
@@ -39,26 +39,26 @@ export const bashAdapter: ToolDisplayAdapter<BashArgs> = {
     const cwd = args?.workdir ?? "";
 
     const titlePart = `${theme.fg("toolTitle", theme.bold(TITLE))} `;
-    const descPart = desc ? `${theme.fg("dim", desc)} ` : "";
-    const openParen = desc ? theme.fg("muted", "(") : "";
-    const closeParen = desc ? theme.fg("muted", ")") : "";
     const cwdPart = cwd ? ` ${theme.fg("dim", `in ${shortenPath(cwd)}`)}` : "";
 
-    if (width === undefined || visibleWidth(cmd) <= singleLineBudget(desc, cwd, width)) {
-      const styledCmd = theme.fg("muted", cmd);
-      return `${titlePart}${descPart}${openParen}${styledCmd}${closeParen}${cwdPart}`;
+    if (desc) {
+      return `${titlePart}${theme.fg("accent", desc)}${cwdPart}`;
     }
 
-    const wrapWidth = continuationWrapWidth(desc, cwd, width);
+    if (width === undefined || visibleWidth(cmd) <= singleLineBudget(cwd, width)) {
+      return `${titlePart}${theme.fg("muted", cmd)}${cwdPart}`;
+    }
+
+    const wrapWidth = continuationWrapWidth(cwd, width);
     const lines = wrapTextWithAnsi(cmd, wrapWidth).map((line) => theme.fg("muted", line));
 
     if (lines.length === 1) {
-      return `${titlePart}${descPart}${openParen}${lines[0]}${closeParen}${cwdPart}`;
+      return `${titlePart}${lines[0]}${cwdPart}`;
     }
 
-    const firstLine = `${titlePart}${descPart}${openParen}${lines[0]}`;
+    const firstLine = `${titlePart}${lines[0]}`;
     const middle = lines.slice(1, -1);
-    const lastLine = `${lines[lines.length - 1]}${closeParen}${cwdPart}`;
+    const lastLine = `${lines[lines.length - 1]}${cwdPart}`;
     return [firstLine, ...middle, lastLine].join("\n");
   },
 
@@ -67,7 +67,15 @@ export const bashAdapter: ToolDisplayAdapter<BashArgs> = {
     return formatLineCount(output, theme);
   },
 
-  formatExpandedContent(_args, output, theme, width, _details?: unknown) {
-    return formatExpandedToolOutputLines(output ?? "", theme, width);
+  formatExpandedContent(args, output, theme, width, _details?: unknown) {
+    const cmd = args?.command ?? "";
+    const desc = args?.description ?? "";
+    const outputLines = formatExpandedToolOutputLines(output ?? "", theme, width);
+    if (!desc || !cmd) return outputLines;
+    const inner = Math.max(1, width - visibleWidth(INDENT) - 2);
+    const cmdLines = wrapTextWithAnsi(cmd, inner).map(
+      (line, i) => `${INDENT}${theme.fg("muted", `${i === 0 ? "$ " : "  "}${line}`)}`,
+    );
+    return [...cmdLines, ...outputLines];
   },
 };
