@@ -4,10 +4,16 @@
 
 ### Added
 
+- The thinking gutter bar now plays a per-row brightness wave while a thinking run is active, modeled on grok-build's accent rail: each row's color is a `sin²(tick·speed + row/32·2π)` lerp between `borderMuted` (trough, so the bar never disappears) and a peak role resolved through `text` → `muted` → `thinkingText` (so themes that leave `text` empty — terminal default fg, e.g. catppuccin-mocha — still animate), with a ~1.4s period regardless of the configured animation interval. The spatial wavelength is fixed at 32 rows like grok-build, so adjacent rows differ by at most `amplitude·sin(π/16)` ≈ 19.5% of the color range; the amplitude itself scales with the widget's row count (`min(1, rows/13)`) so short blocks stay subtle and tall blocks reach the full peak. Finished runs keep the static `borderMuted` bar, and themes without color accessors fall back to the static bar.
 - Compact thinking blocks are now click-expandable per block. Each rendered thinking run is wrapped in a `MouseRegion`; a left click toggles that single run between the compact preview (or summary) and the full raw thinking text, leaving other runs untouched. The collapsed truncation hint now reads `... (N more lines, click or ctrl+t to expand)` and the expanded view ends with `... (click to collapse)`; expanding a summarized run shows the original thinking, not the summary. Per-run expansion state resets when the global thinking visibility is toggled (ctrl+t), matching the stock component's override reset.
+
+### Fixed
+
+- The animation tick no longer rebuilds streaming thinking components every frame. Each `updateContent` constructs a fresh `StrictThinkingPreview` with a cold wrap cache, so rebuilding at 45ms re-wrapped the entire (growing) thinking text twice as often as before and starved delta rendering — thinking text visibly arrived in bursts. The gutter wave now reads the animation frame lazily at render time (`createWaveBar` takes a `() => number`), so a plain `requestRender()` animates it; full `updateContent` rebuilds (needed for the heading highlight and duration) only run every other tick, restoring the previous 90ms cadence.
 
 ### Changed
 
+- The default `animationIntervalMs` is now 45 (was 90), closer to grok-build's 33ms/0.15rad-per-tick cadence — the 90ms tick made the wave visibly steppy. The heading highlight animation shares the tick and is correspondingly smoother.
 - Dev dependencies bumped to `@earendil-works/pi-tui`, `@earendil-works/pi-coding-agent`, and `@earendil-works/pi-ai` `^0.85.0` (`MouseRegion` and mouse dispatch landed in pi-tui 0.84.2+; the stock `Markdown.paddingX` became private in 0.85.1, so the expanded-thinking indent now sets it through the internals cast). npm hoisted `pi-coding-agent` 0.85.1 to the root `node_modules` for all workspaces as a side effect.
 
 ## [0.5.0] - 2026-08-12

@@ -5,7 +5,7 @@ export const CONFIG_ID = "compact-thinking";
 
 export const DEFAULT_CONFIG: CompactThinkingConfig = {
   previewLines: 3,
-  animationIntervalMs: 90,
+  animationIntervalMs: 45,
   summaryEnabled: false,
   summaryModel: "",
   summaryMinChars: 2000,

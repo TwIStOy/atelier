@@ -20,6 +20,7 @@ import {
 } from "./summaries.ts";
 import { summarizeThinking } from "./summary.ts";
 import type { ActiveThinking, AssistantInternals, PatchedPrototype } from "./types.ts";
+import { createWaveBar } from "./wave.ts";
 
 const logger = createLogger("compact-thinking");
 
@@ -74,8 +75,13 @@ export default function compactThinking(pi: ExtensionAPI) {
     return activeTheme ? activeTheme.italic(activeTheme.fg("thinkingText", text)) : text;
   }
 
-  function thinkingBar() {
-    return activeTheme ? activeTheme.fg("borderMuted", THINKING_BAR) : THINKING_BAR;
+  function thinkingBar(active: boolean) {
+    if (!activeTheme) return THINKING_BAR;
+    if (active) {
+      const wave = createWaveBar(activeTheme, () => animationFrame, config.animationIntervalMs);
+      if (wave) return wave;
+    }
+    return activeTheme.fg("borderMuted", THINKING_BAR);
   }
 
   function animatedText(text: string, baseStyle: (value: string) => string, animate: boolean) {
@@ -245,7 +251,7 @@ export default function compactThinking(pi: ExtensionAPI) {
                   config.previewLines,
                 )
               : new Text(heading, self.outputPad + THINKING_INDENT, 0);
-      const gutter = new Gutter(block, self.outputPad + THINKING_BAR_COLUMN, thinkingBar());
+      const gutter = new Gutter(block, self.outputPad + THINKING_BAR_COLUMN, thinkingBar(active));
       self.contentContainer.addChild(
         new MouseRegion(gutter, (event) => {
           if (event.type !== "click" || event.button !== "left") return undefined;
@@ -335,14 +341,19 @@ export default function compactThinking(pi: ExtensionAPI) {
 
   function tickAnimation() {
     animationFrame++;
-    for (const component of streamingComponents) {
-      const self = component as unknown as AssistantInternals;
-      if (self.lastMessage) self.updateContent(self.lastMessage);
-    }
-    for (const component of summarizingComponents) {
-      if (streamingComponents.has(component)) continue;
-      const self = component as unknown as AssistantInternals;
-      if (self.lastMessage) self.updateContent(self.lastMessage);
+    // The gutter wave reads animationFrame at render time, so a plain re-render
+    // animates it; full updateContent rebuilds (cold preview wrap caches) only
+    // run every other tick to animate the heading/duration.
+    if (animationFrame % 2 === 0) {
+      for (const component of streamingComponents) {
+        const self = component as unknown as AssistantInternals;
+        if (self.lastMessage) self.updateContent(self.lastMessage);
+      }
+      for (const component of summarizingComponents) {
+        if (streamingComponents.has(component)) continue;
+        const self = component as unknown as AssistantInternals;
+        if (self.lastMessage) self.updateContent(self.lastMessage);
+      }
     }
     activeTui?.requestRender();
   }
