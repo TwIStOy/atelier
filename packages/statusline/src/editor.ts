@@ -8,6 +8,7 @@ import {
 import type { EditorTheme, TUI } from "@earendil-works/pi-tui";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import type { EditorHintPayload } from "@htwang-contrib/common";
+import { loadConfig } from "./config.ts";
 
 const MIN_BODY_LINES = 1;
 
@@ -72,7 +73,7 @@ export class MyEditor extends CustomEditor {
     private readonly pi: ExtensionAPI,
   ) {
     super(tui, theme, keybindings, { paddingX: 1 });
-    this.borderColor = (s: string) => this.fg("border", s);
+    this.applyBorderColor();
   }
 
   applyHint(payload: EditorHintPayload): void {
@@ -102,7 +103,20 @@ export class MyEditor extends CustomEditor {
     return this.ctx.ui.theme.fg(color, text);
   }
 
+  /**
+   * Pi reapplies the thinking-level border color whenever the level changes,
+   * overriding any color set once, so re-assert the configured fixed color on
+   * every render. Bash mode (leading "!") keeps its dedicated border color.
+   */
+  private applyBorderColor(): void {
+    const mode = loadConfig().borderColor;
+    if (mode === "thinkingLevel") return;
+    if (this.getText().trimStart().startsWith("!")) return;
+    this.borderColor = (s: string) => this.fg(mode, s);
+  }
+
   render(width: number): string[] {
+    this.applyBorderColor();
     if (width < 12) return super.render(width);
 
     const innerWidth = Math.max(1, width - 2);
