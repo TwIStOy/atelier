@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- The `canvas_publish` display adapter follows the tool-display rail layout migration ([#144](https://github.com/TwIStOy/pi-extensions/issues/144)): expanded content lines no longer carry the four-space indent (they are rail body rows now), width budgets are computed against the adapter body width, and the empty-html marker renders as `└ empty`.
+
 ## [0.6.0] - 2026-08-19
 
 ### Fixed

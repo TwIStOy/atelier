@@ -1,6 +1,6 @@
 import { truncateDisplay } from "@htwang-contrib/common";
 import type { ToolDisplayAdapter } from "../types.ts";
-import { formatExpandedToolOutputLines, formatLineCount, INDENT } from "./shared.ts";
+import { formatExpandedToolOutputLines, formatLineCount } from "./shared.ts";
 
 interface SubagentStatusArgs {
   id?: string;
@@ -121,7 +121,7 @@ export const subagentStatusAdapter: ToolDisplayAdapter<SubagentStatusArgs> = {
         parts.push(theme.fg("error", truncateDisplay(d.error, 120)));
       }
       if (parts.length > 0) {
-        return [INDENT + parts[0]];
+        return [parts[0]];
       }
     }
     if (!output) return [];

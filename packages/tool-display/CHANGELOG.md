@@ -9,6 +9,9 @@
 
 ### Changed
 
+- All tool call lines (header, collapsed content, expanded content) now render through the shared rail column renderer from `@htwang-contrib/common` (`renderRailLines`, landed for #143): rail glyph at column 2, status bullet at column 5, body at column 7. Single-line calls keep an empty rail; multi-line blocks draw a `┃` rail on every continuation row with the bullet only on the first. The rail and bullet take the status color (green success, red error, plain while spinning); the hover affordance swaps the `◆` bullet for `›` as before ([#144](https://github.com/TwIStOy/pi-extensions/issues/144)).
+- The `│   ` header continuation prefix and the four-space `INDENT` content indent are retired; continuation and content lines are now rail body rows aligned under the first body column. `Subagent`/`workflow` task rows dropped their `├`/`└` tree branches and render as plain rail continuation rows; the same applies to memory/journal expanded content, which no longer draws its own `│ ` bars ([#144](https://github.com/TwIStOy/pi-extensions/issues/144)).
+- `ToolDisplayAdapter` width parameters (`formatCallHeader` / `formatCollapsedContent` / `formatExpandedContent`) and the `ContentRenderer` callbacks now receive the rail body width (`toolRailBodyWidth(width)`: terminal width minus 7) instead of the full terminal width; adapters self-truncate against that budget and `renderRailLines` still applies a final ANSI-aware truncation, so terminals at or below the prefix width no longer produce "exceeds terminal width" lines. The elapsed-time timer now consumes the first body line's budget instead of the old icon prefix ([#144](https://github.com/TwIStOy/pi-extensions/issues/144)).
 - `bash` tool calls now render as a header-only widget when collapsed: the `└ N lines` footer line is gone. Instead, when the header has room, a dim `· N lines` output-line count is appended to the end of the header (after the command or `in <cwd>` suffix; dropped entirely when the header already fills the width). `ToolDisplayAdapter.formatCallHeader` gained an optional trailing `output` parameter that `renderToolCall` now passes through, so adapters can surface output-derived info in the header.
 - Todo tool calls now render as a header-only widget with no collapsed output line: the collapsed body (`└ Updated #5`-style echoes of the tool result) carried no information beyond the header. The old single `todo` adapter was replaced by per-tool adapters for the split todo tools (`todo_create` / `todo_update` / `todo_list` / `todo_get` / `todo_delete` / `todo_clear`), each rendering its own header (e.g. `TodoUpdate [completed] #5 <subject>`) via a shared `createTodoAdapter(toolName)` factory; the legacy `todoAdapter` export was removed.
 - Collapsed tool summaries now sit flush left, aligned under the status icon. The generic collapsed summary (`└ N lines — <key> to expand`, used by tools without a display adapter such as `todo_update`) no longer prefixes a four-space indent, matching the existing read/edit/grep adapter convention.
@@ -19,6 +22,10 @@
 ### Fixed
 
 - Adapter-rendered tool blocks are click-expandable again in fullscreen mode. pi's per-block mouse expansion wraps renderer output in `MouseRegion`s inside `ToolExecutionComponent`, but the patched `render` bypasses that tree: `edit` (the only `renderShell: "self"` tool) gates `handleMouse` on `selfRenderHeight`, which only the stock `render` updates, so clicks never toggled; default-shell tools only toggled when the stale child heights happened to cover the clicked line. The patch now also overrides `handleMouse`: unhandled left clicks on a finished adapter-rendered block toggle `setExpanded`, matching the stock `createResultRegion` semantics (nested regions and OSC 8 links still win).
+
+### Removed
+
+- `prefixLine` (dead helper from the retired line-prefix system) is no longer exported from `./format.ts` ([#144](https://github.com/TwIStOy/pi-extensions/issues/144)).
 
 ## [0.5.0] - 2026-08-12
 

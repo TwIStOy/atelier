@@ -2,7 +2,7 @@ import { countPatchChanges, extractPatchedPaths, parsePatch } from "@htwang-cont
 import type { ApplyPatchToolDetails } from "@htwang-contrib/apply-patch/preview";
 import { shortenPath } from "@htwang-contrib/common";
 import type { ToolDisplayAdapter } from "../types.ts";
-import { formatExpandedToolOutputLines, INDENT, renderChangeBar, renderWithDelta, resolveIsSplit } from "./shared.ts";
+import { formatExpandedToolOutputLines, renderChangeBar, renderWithDelta, resolveIsSplit } from "./shared.ts";
 
 interface ApplyPatchArgs {
   input?: string;
@@ -76,7 +76,7 @@ export const applyPatchAdapter: ToolDisplayAdapter<ApplyPatchArgs> = {
     if (added > 0) parts.push(theme.fg("success", `+${added}`));
     if (removed > 0) parts.push(theme.fg("error", `-${removed}`));
     if (counts !== null) {
-      parts.push(theme.fg("muted", resolveIsSplit(width - INDENT.length * 2) ? "side-by-side" : "unified"));
+      parts.push(theme.fg("muted", resolveIsSplit(width) ? "side-by-side" : "unified"));
     }
     if (fileCount > 1) {
       parts.push(theme.fg("muted", `· ${fileCount} files`));
@@ -108,7 +108,7 @@ export const applyPatchAdapter: ToolDisplayAdapter<ApplyPatchArgs> = {
           lines.push(...renderWithDelta(file.diff, width, theme));
         } else {
           const target = file.movePath ? ` → ${shortenPath(file.movePath)}` : "";
-          lines.push(INDENT + theme.fg("muted", `└ ${file.operation} ${shortenPath(file.filePath)}${target}`));
+          lines.push(theme.fg("muted", `└ ${file.operation} ${shortenPath(file.filePath)}${target}`));
         }
       }
     } else {
@@ -116,7 +116,7 @@ export const applyPatchAdapter: ToolDisplayAdapter<ApplyPatchArgs> = {
         const file = preview.files[i];
         if (!file) continue;
         const branch = i === preview.files.length - 1 ? "└" : "├";
-        const header = `${INDENT}${theme.fg("muted", branch)} ${theme.fg("accent", formatPatchPath(file.filePath, file.movePath))}`;
+        const header = `${theme.fg("muted", branch)} ${theme.fg("accent", formatPatchPath(file.filePath, file.movePath))}`;
         const stats: string[] = [];
         if (file.added > 0) stats.push(theme.fg("success", `+${file.added}`));
         if (file.removed > 0) stats.push(theme.fg("error", `-${file.removed}`));
@@ -129,7 +129,7 @@ export const applyPatchAdapter: ToolDisplayAdapter<ApplyPatchArgs> = {
 
     for (const failure of d?.result?.failures ?? []) {
       const message = failure.message.split("\n")[0] ?? failure.message;
-      lines.push(INDENT + theme.fg("error", `✗ ${failure.filePath} (${failure.operation}): ${message}`));
+      lines.push(theme.fg("error", `✗ ${failure.filePath} (${failure.operation}): ${message}`));
     }
 
     return lines;

@@ -57,11 +57,11 @@ describe("workflowAdapter.formatCollapsedContent", () => {
       0,
     );
     expect(lines).toHaveLength(3);
-    expect(lines[0]).toContain("├");
-    expect(lines[2]).toContain("└");
     expect(lines[0]).toContain("✓ #1 one");
     expect(lines[0]).toContain("3 tools");
     expect(lines[2]).toContain("◌ #3 three");
+    expect(lines.join("")).not.toContain("├");
+    expect(lines.join("")).not.toContain("└");
   });
 
   it("shows error details on failed agents when no output exists", () => {

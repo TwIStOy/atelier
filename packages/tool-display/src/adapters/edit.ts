@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { generateUnifiedDiff, shortenPath } from "@htwang-contrib/common";
 import { diffLines } from "diff";
 import type { ToolDisplayAdapter } from "../types.ts";
-import { INDENT, renderChangeBar, renderWithDelta, resolveIsSplit } from "./shared.ts";
+import { renderChangeBar, renderWithDelta, resolveIsSplit } from "./shared.ts";
 
 interface EditArgs {
   path?: string;
@@ -86,7 +86,7 @@ export const editAdapter: ToolDisplayAdapter<EditArgs> = {
     parts.push(theme.fg("muted", "diff"));
     if (added > 0) parts.push(theme.fg("success", `+${added}`));
     if (removed > 0) parts.push(theme.fg("error", `-${removed}`));
-    parts.push(theme.fg("muted", resolveIsSplit(width - INDENT.length * 2) ? "side-by-side" : "unified"));
+    parts.push(theme.fg("muted", resolveIsSplit(width) ? "side-by-side" : "unified"));
     if (added > 0 || removed > 0) {
       parts.push(renderChangeBar(added, removed, theme));
     }

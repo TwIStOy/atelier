@@ -36,12 +36,10 @@ function findSubjectById(details: unknown, id: number): string | null {
 
 function attachSubject(core: string, styledSubject: string, width: number | undefined): string {
   if (!width) return `${core} ${styledSubject}`;
-  const line0Budget = width - 2;
-  if (visibleWidth(core) + 1 + visibleWidth(styledSubject) <= line0Budget) {
+  if (visibleWidth(core) + 1 + visibleWidth(styledSubject) <= width) {
     return `${core} ${styledSubject}`;
   }
-  const contBudget = Math.max(1, width - 4);
-  const wrapped = wrapTextWithAnsi(styledSubject, contBudget);
+  const wrapped = wrapTextWithAnsi(styledSubject, Math.max(1, width));
   return [core, ...wrapped].join("\n");
 }
 

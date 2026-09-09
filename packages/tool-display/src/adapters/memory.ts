@@ -1,7 +1,7 @@
 import { truncateToWidth } from "@earendil-works/pi-tui";
 import { diffLines } from "diff";
 import type { ToolDisplayAdapter } from "../types.ts";
-import { INDENT } from "./shared.ts";
+import { formatExpandedToolOutputLines } from "./shared.ts";
 
 interface MemoryCreateArgs {
   parent_uri?: string;
@@ -48,12 +48,9 @@ export const memoryCreateAdapter: ToolDisplayAdapter<MemoryCreateArgs> = {
     const limit = 20;
     const lines = allLines
       .slice(0, limit)
-      .map(
-        (line) =>
-          INDENT + theme.fg("muted", "│ ") + truncateToWidth(theme.fg("dim", line), width - INDENT.length - 4, "…"),
-      );
+      .map((line) => truncateToWidth(theme.fg("dim", line), Math.max(1, width), "…"));
     if (allLines.length > limit) {
-      lines.push(INDENT + theme.fg("muted", `│ … ${allLines.length - limit} more line(s)`));
+      lines.push(theme.fg("muted", `… ${allLines.length - limit} more line(s)`));
     }
     return lines;
   },
@@ -95,12 +92,9 @@ export const memoryReadAdapter: ToolDisplayAdapter<MemoryReadArgs> = {
     const limit = 20;
     const lines = allLines
       .slice(0, limit)
-      .map(
-        (line) =>
-          INDENT + theme.fg("muted", "│ ") + truncateToWidth(theme.fg("dim", line), width - INDENT.length - 4, "…"),
-      );
+      .map((line) => truncateToWidth(theme.fg("dim", line), Math.max(1, width), "…"));
     if (allLines.length > limit) {
-      lines.push(INDENT + theme.fg("muted", `│ … ${allLines.length - limit} more line(s)`));
+      lines.push(theme.fg("muted", `… ${allLines.length - limit} more line(s)`));
     }
     return lines;
   },
@@ -168,7 +162,7 @@ export const memoryUpdateAdapter: ToolDisplayAdapter<MemoryUpdateArgs> = {
           : change.removed
             ? theme.fg("error", line)
             : theme.fg("dim", line);
-        lines.push(INDENT + prefix + truncateToWidth(content, width - INDENT.length - 4, "…"));
+        lines.push(prefix + truncateToWidth(content, Math.max(1, width - 2), "…"));
       }
     }
     return lines;
@@ -239,18 +233,14 @@ export const memorySearchAdapter: ToolDisplayAdapter<MemorySearchArgs> = {
     const lines: string[] = [];
     for (let i = 0; i < Math.min(limit, items.length); i++) {
       const item = items[i]!;
-      const isLast = i === Math.min(limit, items.length) - 1 && total <= limit;
-      const connector = isLast ? "  └ " : "  │ ";
-      lines.push(INDENT + theme.fg("muted", connector.replace(/^\s{2}/, "")) + theme.fg("accent", item.uri));
+      lines.push(theme.fg("accent", item.uri));
       if (item.snippet) {
         const snip = item.snippet.length > 100 ? `${item.snippet.slice(0, 99)}…` : item.snippet;
-        lines.push(`${INDENT}${theme.fg("muted", "    │ ")}${theme.fg("dim", snip)}`);
+        lines.push(theme.fg("dim", snip));
       }
     }
     if (total > limit) {
-      lines.push(
-        `${INDENT}${theme.fg("muted", `  └ … ${total - limit} more result${total - limit === 1 ? "" : "s"}`)}`,
-      );
+      lines.push(theme.fg("muted", `└ … ${total - limit} more result${total - limit === 1 ? "" : "s"}`));
     }
     return lines;
   },
@@ -273,10 +263,7 @@ export const memoryListAdapter: ToolDisplayAdapter<MemoryListArgs> = {
   },
 
   formatExpandedContent(_args, output, theme, width) {
-    if (!output) return [];
-    return output
-      .split("\n")
-      .map((line) => INDENT + truncateToWidth(theme.fg("toolOutput", line), width - INDENT.length, "…"));
+    return formatExpandedToolOutputLines(output, theme, width);
   },
 };
 
@@ -398,9 +385,9 @@ export const memoryHistoryAdapter: ToolDisplayAdapter<MemoryHistoryArgs> = {
     const versions = d?.versions ?? [];
     const total = d?.total ?? 0;
     const limit = 15;
-    const lines = versions.slice(0, limit).map((v) => `${INDENT}${theme.fg("muted", "│ ")}${theme.fg("dim", v)}`);
+    const lines = versions.slice(0, limit).map((v) => theme.fg("dim", v));
     if (total > limit) {
-      lines.push(`${INDENT}${theme.fg("muted", `│ … ${total - limit} more version${total - limit === 1 ? "" : "s"}`)}`);
+      lines.push(theme.fg("muted", `└ … ${total - limit} more version${total - limit === 1 ? "" : "s"}`));
     }
     return lines;
   },
@@ -431,6 +418,6 @@ export const memoryDomainsAdapter: ToolDisplayAdapter<Record<string, unknown>> =
   formatExpandedContent(_args, _output, theme, _width, details) {
     const d = details as MemoryDomainsDetails | undefined;
     const items = d?.domains ?? [];
-    return items.map((item) => `${INDENT}${theme.fg("muted", "│ ")}${theme.fg("dim", item)}`);
+    return items.map((item) => theme.fg("dim", item));
   },
 };

@@ -45,6 +45,6 @@ describe("canvasPublishAdapter", () => {
 
   it("expanded content shows an empty marker when html is absent", () => {
     const lines = canvasPublishAdapter.formatExpandedContent({}, "", theme, 80);
-    expect(lines).toEqual(["    empty"]);
+    expect(lines).toEqual(["└ empty"]);
   });
 });
