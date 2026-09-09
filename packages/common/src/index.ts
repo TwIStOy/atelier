@@ -188,6 +188,20 @@ export {
   terminalWidth,
 } from "./terminal.ts";
 export { resolveNow } from "./time.ts";
+export type {
+  RailBar,
+  RailMark,
+  RailSpec,
+  RailStatus,
+} from "./tool-rail.ts";
+export {
+  RAIL_BULLET_AGGREGATE,
+  RAIL_BULLET_SINGLE,
+  renderRailLines,
+  TOOL_RAIL_LAYOUT,
+  ToolRailComponent,
+  toolRailBodyWidth,
+} from "./tool-rail.ts";
 export { registerTuiCommands } from "./tui-commands.ts";
 export type {
   CodingPlanLimitKind,
