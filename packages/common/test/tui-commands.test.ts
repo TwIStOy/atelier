@@ -25,7 +25,7 @@ describe("registerTuiCommands", () => {
   test("registers commands when session starts in tui mode", async () => {
     const { pi, handlers, commands } = createApi();
     registerTuiCommands(pi, (api) => {
-      api.registerCommand("demo", { description: "demo" });
+      api.registerCommand("demo", { description: "demo", handler: async () => {} });
     });
 
     expect(handlers).toHaveLength(1);
@@ -39,7 +39,7 @@ describe("registerTuiCommands", () => {
   test("does not register in rpc mode", async () => {
     const { pi, handlers, commands } = createApi();
     registerTuiCommands(pi, (api) => {
-      api.registerCommand("demo", { description: "demo" });
+      api.registerCommand("demo", { description: "demo", handler: async () => {} });
     });
 
     await handlers[0]?.handler({ type: "session_start", reason: "startup" }, { mode: "rpc" });
@@ -49,7 +49,7 @@ describe("registerTuiCommands", () => {
   test("does not register in print or json mode", async () => {
     const { pi, handlers, commands } = createApi();
     registerTuiCommands(pi, (api) => {
-      api.registerCommand("demo", { description: "demo" });
+      api.registerCommand("demo", { description: "demo", handler: async () => {} });
     });
 
     await handlers[0]?.handler({ type: "session_start", reason: "startup" }, { mode: "print" });
@@ -60,7 +60,7 @@ describe("registerTuiCommands", () => {
   test("re-registering on repeated session_start is idempotent", async () => {
     const { pi, handlers, commands } = createApi();
     registerTuiCommands(pi, (api) => {
-      api.registerCommand("demo", { description: "demo" });
+      api.registerCommand("demo", { description: "demo", handler: async () => {} });
     });
 
     await handlers[0]?.handler({ type: "session_start", reason: "startup" }, { mode: "tui" });

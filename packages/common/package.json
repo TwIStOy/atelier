@@ -10,6 +10,7 @@
     "./time": "./src/time.ts"
   },
   "dependencies": {
+    "@earendil-works/pi-agent-core": "^0.85.1",
     "cli-table3": "^0.6.5",
     "diff": "^9.0.0",
     "typebox": "1.3.10"
