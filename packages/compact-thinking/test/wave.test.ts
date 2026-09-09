@@ -1,7 +1,5 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { Text } from "@earendil-works/pi-tui";
 import { describe, expect, it } from "vitest";
-import { Gutter } from "../src/gutter.ts";
 import { createWaveBar, parseAnsiRgb, waveBrightness } from "../src/wave.ts";
 
 function makeTheme(overrides?: Partial<Theme>): Theme {
@@ -141,32 +139,5 @@ describe("createWaveBar", () => {
     } as Partial<Theme>);
     const rendered = createWaveBar(theme, () => 0, 90)?.(0, 8) ?? "";
     expect(rendered).toMatch(/^\x1b\[38;5;\d+m/);
-  });
-});
-
-describe("Gutter with function bar", () => {
-  it("splices a per-row bar into rendered lines", () => {
-    const inner = new Text("aaa\nbbb\nccc", 2, 0);
-    const gutter = new Gutter(inner, 1, (row) => `[${row}]`);
-    const lines = gutter.render(20);
-    expect(lines).toHaveLength(3);
-    expect(lines[0]).toContain("[0]");
-    expect(lines[1]).toContain("[1]");
-    expect(lines[2]).toContain("[2]");
-  });
-
-  it("passes the total row count to the function bar", () => {
-    const inner = new Text("aaa\nbbb", 2, 0);
-    const gutter = new Gutter(inner, 1, (row, rows) => `${row}/${rows}`);
-    const lines = gutter.render(20);
-    expect(lines[0]).toContain("0/2");
-    expect(lines[1]).toContain("1/2");
-  });
-
-  it("still supports a static string bar", () => {
-    const inner = new Text("aaa\nbbb", 2, 0);
-    const gutter = new Gutter(inner, 1, "|");
-    const lines = gutter.render(20);
-    expect(lines.every((line) => line.includes("|"))).toBe(true);
   });
 });

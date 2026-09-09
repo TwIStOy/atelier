@@ -6,11 +6,20 @@ import {
   type Theme,
 } from "@earendil-works/pi-coding-agent";
 import { Markdown, MouseRegion, Spacer, Text, type TUI } from "@earendil-works/pi-tui";
-import { createLogger, isExtensionDisabled, isStaleCtxError, resolveModel } from "@htwang-contrib/common";
+import {
+  createLogger,
+  isExtensionDisabled,
+  isStaleCtxError,
+  RAIL_BULLET_SINGLE,
+  type RailBar,
+  type RailSpec,
+  resolveModel,
+  TOOL_RAIL_LAYOUT,
+  ToolRailComponent,
+} from "@htwang-contrib/common";
 import { loadConfig, registerCompactThinkingConfigItems, setCachedModelOptions } from "./config.ts";
 import { DURATION_ENTRY_TYPE, restoreDurationEntries } from "./durations.ts";
-import { Gutter } from "./gutter.ts";
-import { formatThoughtDuration, StrictThinkingPreview, SUMMARY_DISPLAY_PREFIX } from "./preview.ts";
+import { formatThoughtDuration, SingleLineText, StrictThinkingPreview } from "./preview.ts";
 import {
   extractThinkingRun,
   getRunSummary,
@@ -26,9 +35,14 @@ const logger = createLogger("compact-thinking");
 
 const WIDGET_ID = "compact-thinking-render-loop";
 
-const THINKING_INDENT = 3;
-const THINKING_BAR_COLUMN = 1;
 const THINKING_BAR = "▌";
+// The wave's brightness scales with the rendered row count (min(1, rows/13));
+// collapsed runs are single lines now, so floor the row count at the height of
+// the former collapsed block (heading + blank line + default preview) to keep
+// the wave as visible as before.
+const WAVE_MIN_ROWS = 5;
+
+const PASSTHROUGH_THEME: Theme = { fg: (_color: string, text: string) => text } as Theme;
 
 export default function compactThinking(pi: ExtensionAPI) {
   if (isExtensionDisabled("compact-thinking")) return;
@@ -75,12 +89,10 @@ export default function compactThinking(pi: ExtensionAPI) {
     return activeTheme ? activeTheme.italic(activeTheme.fg("thinkingText", text)) : text;
   }
 
-  function thinkingBar(active: boolean) {
-    if (!activeTheme) return THINKING_BAR;
-    if (active) {
-      const wave = createWaveBar(activeTheme, () => animationFrame, config.animationIntervalMs);
-      if (wave) return wave;
-    }
+  function activeRailBar(): RailBar | undefined {
+    if (!activeTheme) return undefined;
+    const wave = createWaveBar(activeTheme, () => animationFrame, config.animationIntervalMs);
+    if (wave) return (row, rows) => wave(row, Math.max(rows, WAVE_MIN_ROWS));
     return activeTheme.fg("borderMuted", THINKING_BAR);
   }
 
@@ -143,7 +155,7 @@ export default function compactThinking(pi: ExtensionAPI) {
       for (const child of self.contentContainer.children) {
         const markdown = child as unknown as { defaultTextStyle?: unknown; paddingX?: number };
         if (child instanceof Markdown && markdown.defaultTextStyle) {
-          markdown.paddingX = self.outputPad + THINKING_INDENT;
+          markdown.paddingX = TOOL_RAIL_LAYOUT.prefixWidth;
         }
       }
       return;
@@ -207,6 +219,13 @@ export default function compactThinking(pi: ExtensionAPI) {
       const durationMs = active ? elapsedMs : completedMs;
       const durationText = durationMs === undefined ? undefined : formatThoughtDuration(durationMs);
 
+      const previewSource = thinkingBlocks.join("\n\n");
+      const summary = active
+        ? undefined
+        : getRunSummary(completedSummaries, message.timestamp, runStartIndex, runEndIndex);
+      const expanded = expandedRuns.get(component)?.has(runIndex) ?? false;
+      const useExpanded = expanded && previewSource.trim() !== "";
+
       let heading: string;
       if (active) {
         const label = self.hiddenThinkingLabel || "Thinking...";
@@ -217,43 +236,23 @@ export default function compactThinking(pi: ExtensionAPI) {
         );
         if (isRunSummarizing(message.timestamp, runStartIndex, runEndIndex)) {
           heading += thinkingStyle(" [ ") + animatedText("Summarizing...", thinkingStyle, true) + thinkingStyle(" ]");
+        } else if (summary !== undefined && !useExpanded) {
+          heading += thinkingStyle(` — ${summary}`);
         }
       }
-      const previewSource = thinkingBlocks.join("\n\n");
-      const summary = active
-        ? undefined
-        : getRunSummary(completedSummaries, message.timestamp, runStartIndex, runEndIndex);
-      const expanded = expandedRuns.get(component)?.has(runIndex) ?? false;
-      const block =
-        expanded && previewSource.trim()
-          ? new StrictThinkingPreview(
-              heading,
-              previewSource.trim(),
-              self.outputPad + THINKING_INDENT,
-              thinkingStyle,
-              config.previewLines,
-              true,
-            )
-          : summary !== undefined
-            ? new StrictThinkingPreview(
-                heading,
-                `${SUMMARY_DISPLAY_PREFIX}${summary}`,
-                self.outputPad + THINKING_INDENT,
-                thinkingStyle,
-                Math.max(config.previewLines, 1),
-              )
-            : config.previewLines > 0 && previewSource.trim()
-              ? new StrictThinkingPreview(
-                  heading,
-                  previewSource.trim(),
-                  self.outputPad + THINKING_INDENT,
-                  thinkingStyle,
-                  config.previewLines,
-                )
-              : new Text(heading, self.outputPad + THINKING_INDENT, 0);
-      const gutter = new Gutter(block, self.outputPad + THINKING_BAR_COLUMN, thinkingBar(active));
+
+      const spec: RailSpec = {
+        mark: useExpanded ? "run" : "none",
+        bullet: RAIL_BULLET_SINGLE,
+        status: active ? undefined : "dim",
+      };
+      if (active) spec.bar = activeRailBar();
+      const block = useExpanded
+        ? new StrictThinkingPreview(heading, previewSource.trim(), thinkingStyle)
+        : new SingleLineText(heading);
+      const rail = new ToolRailComponent(block, spec, activeTheme ?? PASSTHROUGH_THEME);
       self.contentContainer.addChild(
-        new MouseRegion(gutter, (event) => {
+        new MouseRegion(rail, (event) => {
           if (event.type !== "click" || event.button !== "left") return undefined;
           const runs = expandedRuns.get(component) ?? new Set<number>();
           if (runs.has(runIndex)) runs.delete(runIndex);
@@ -341,16 +340,19 @@ export default function compactThinking(pi: ExtensionAPI) {
 
   function tickAnimation() {
     animationFrame++;
-    // The gutter wave reads animationFrame at render time, so a plain re-render
-    // animates it; full updateContent rebuilds (cold preview wrap caches) only
-    // run every other tick to animate the heading/duration.
+    // The rail wave reads animationFrame at render time, so a plain re-render
+    // animates it; full updateContent rebuilds (needed for the heading highlight
+    // and duration) only run every other tick, and never for components with an
+    // expanded run — rebuilding would re-wrap the expanded preview's full text.
     if (animationFrame % 2 === 0) {
       for (const component of streamingComponents) {
+        if (expandedRuns.get(component)?.size) continue;
         const self = component as unknown as AssistantInternals;
         if (self.lastMessage) self.updateContent(self.lastMessage);
       }
       for (const component of summarizingComponents) {
         if (streamingComponents.has(component)) continue;
+        if (expandedRuns.get(component)?.size) continue;
         const self = component as unknown as AssistantInternals;
         if (self.lastMessage) self.updateContent(self.lastMessage);
       }
