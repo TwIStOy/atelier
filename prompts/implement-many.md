@@ -1,5 +1,5 @@
 ---
-description: Fan out N implement targets into parallel git worktrees — one pi agent per pane in a new tmux window, each seeded with /implement plus an unattended contract to push, open a PR, keep it green, and wait for the user to merge
+description: Fan out N implement targets into parallel git worktrees — one pi agent per pane in a new herdr tab or tmux window, each seeded with /implement plus an unattended contract to push, open a PR, keep it green, and wait for the user to merge
 argument-hint: "<#issue | spec-path | description> ..."
 ---
 
@@ -13,11 +13,12 @@ Each whitespace-separated token above is one implement target (an issue ref like
 
 ## Goal
 
-Run `/implement <target>` in parallel: one isolated git worktree + git branch per target, one pi agent per tmux pane, all panes in a single **new** tmux window. You only set up worktrees, panes, and seeds, then verify they started — you do **not** implement anything yourself. Each pane's agent owns its own work.
+Run `/implement <target>` in parallel: one isolated git worktree + git branch per target, one pi agent per pane, all panes in a single **new** herdr tab or tmux window. You only set up worktrees, panes, and seeds, then verify they started — you do **not** implement anything yourself. Each pane's agent owns its own work.
 
 ## Preconditions
 
-- You are inside tmux (`$TMUX` is set). If not, stop and tell the user this needs a tmux session.
+- You know which pane environment you are in: herdr (`$HERDR_ENV` is set) or tmux (`$TMUX` is set); if both are set, treat it as herdr. If neither, stop and tell the user this needs a herdr or tmux session. Every pane step below (4–7) has a tmux path and a herdr path — follow the one for your environment consistently.
+- In herdr, load the `herdr` skill before touching panes: it owns the `herdr` CLI reference — command syntax, ID handling, safety rules — that the herdr paths below rely on.
 - The current directory is the repo root whose default branch the worktrees fan out from.
 
 ## Process
@@ -66,9 +67,11 @@ mkdir -p "$HOME/Projects/worktree/$REPO/agent-sessions"
 git worktree add -b "$BRANCH" "$WORKTREE" "$BASE"
 ```
 
-### 4. New tmux window + one pane per worktree
+### 4. New tab/window + one pane per worktree
 
-Create one new window (do not reuse the current one); the first pane is the window itself, each further target is a split:
+Create one new tab (herdr) or window (tmux) — never reuse the current one — with exactly one pane per target.
+
+**tmux** — the first pane is the window itself, each further target is a split:
 
 ```
 SESSION=$(tmux display-message -p '#S')
@@ -82,13 +85,23 @@ tmux select-layout -t "$SESSION:$WIN" tiled   # 2 -> side-by-side; 3+ -> grid. U
 
 Panes come back in index order from `tmux list-panes -t "$SESSION:$WIN" -F '#{pane_index}'`, so `pane[i] ↔ target[i]`. Verify each pane's cwd is its own worktree: `tmux list-panes -t "$SESSION:$WIN" -F '#{pane_index}: #{pane_current_path}'`.
 
+**herdr** — with the `herdr` skill loaded, drive the `herdr` CLI. Create one tab — its root pane is target 0 — then split one further pane per remaining target into that tab, each with its worktree as cwd and no focus steal:
+
+```
+herdr tab create     # add a label if the installed CLI supports one (check `herdr tab`); parse .result.tab and .result.root_pane
+herdr pane split --pane "<root pane id>" --direction right --cwd "$WORKTREE_1" --no-focus   # parse .result.pane.pane_id
+herdr pane split --pane "<root pane id>" --direction right --cwd "$WORKTREE_2" --no-focus
+```
+
+There is no tiled-layout equivalent; split wide panes right and narrow/tall panes down, per the skill. Parse every pane ID from the JSON responses, never predict them: `pane[i] ↔ target[i]`, with the tab's root pane as `pane[0]`.
+
 ### 5. Seed each pane with /implement + the unattended contract
 
 The pane agents run unattended, so each seed carries a standing contract: decide open questions from the issue instead of asking, commit and push, open a PR, keep it green (CI + rebase), and wait for the user to merge — all non-interactively. The template expands server-side, so do not paste an expanded brief, and never pass the contract as extra `/implement` arguments (a second CLI message arg is dropped; trailing prose gets swallowed into the template's `$@`, i.e. its "Work to implement" section). Instead write the contract to a file once and pass its path via `--append-system-prompt`, which reads file contents:
 
 ```
 cat > /tmp/pi-impl-many-unattended.md <<'EOF'
-You run unattended in a background tmux pane: nobody can answer an interactive prompt. Keep every commit and push non-interactive so a failure fails fast instead of hanging; if a command genuinely needs interaction, stop and report.
+You run unattended in a background tmux/herdr pane: nobody can answer an interactive prompt. Keep every commit and push non-interactive so a failure fails fast instead of hanging; if a command genuinely needs interaction, stop and report.
 
 Do not ask the user questions (no ask_user_question, no pausing on decisions): the originating issue is already split into a scope you can implement independently. Resolve every open question from the issue text and the repo's existing conventions, and note non-obvious choices in the PR body. Stop and report only when no reasonable interpretation lets you proceed safely.
 
@@ -102,8 +115,14 @@ Landing your work, in order:
 6. Poll gh pr view --json state,mergeable every few minutes with a sleep between polls; never busy-loop. Terminal states: MERGED — report and stop. CLOSED without merge — report and stop.
 EOF
 
-# per pane:
+# per pane (tmux):
 tmux send-keys -t "$SESSION:$WIN.<pane>" "pi --append-system-prompt /tmp/pi-impl-many-unattended.md '/implement <target>'" Enter
+```
+
+In herdr, seed each pane with the same command line via `herdr pane run`, prefixing a `cd` into that pane's worktree so the seed does not depend on the pane's initial cwd:
+
+```
+herdr pane run "<pane id>" "cd \"$WORKTREE\" && pi --append-system-prompt /tmp/pi-impl-many-unattended.md '/implement <target>'"
 ```
 
 `<target>` is the **original token from section 0** (e.g. `#77`), not the slug. Quote it so the shell passes it as one arg. Do not delete the contract file afterwards — pi reads it at pane startup, and a missing path is appended as literal text instead of file contents.
@@ -113,7 +132,8 @@ tmux send-keys -t "$SESSION:$WIN.<pane>" "pi --append-system-prompt /tmp/pi-impl
 A worktree dir pi has never opened triggers pi's **Trust project folder?** dialog, which blocks the template from expanding (the pane sits blank/stalled). ~5s after seeding, each pane shows it with the cursor already on **Trust**. Accept on every pane:
 
 ```
-tmux send-keys -t "$SESSION:$WIN.<pane>" Enter
+tmux:  tmux send-keys -t "$SESSION:$WIN.<pane>" Enter
+herdr: herdr pane run "<pane id>" ""   # run = text + Enter atomically; empty text = a bare Enter
 ```
 
 This persists trust for that worktree dir; the dialog does not recur for trusted dirs.
@@ -123,7 +143,8 @@ This persists trust for that worktree dir; the dialog does not recur for trusted
 ~15–20s after accepting, capture each pane and confirm the `/implement` body is showing (steps 1–5, "Discipline") and the agent has begun booting (`memory read system://boot`, fetching the issue) — **not** the bare string `/implement #N` and **not** a stalled blank pane:
 
 ```
-tmux capture-pane -t "$SESSION:$WIN.<pane>" -p | tail -25
+tmux:  tmux capture-pane -t "$SESSION:$WIN.<pane>" -p | tail -25
+herdr: herdr pane read "<pane id>" --source recent-unwrapped --lines 25
 ```
 
 If a pane is still blank or still on the trust dialog, accept again and re-verify.
@@ -134,7 +155,7 @@ Give the user a table:
 
 | Pane | Target | Branch | Worktree |
 
-Plus the tmux target to switch to the window (`<prefix> <win-index>`), and a note that each agent runs `/implement` independently (load → TDD → review → commit → push → PR), then babysits its PR — watching CI, rebasing on conflicts or base-branch moves — until the user merges it; agents never merge themselves. Commits and pushes are non-interactive because the panes run unattended.
+Plus how to switch to the new tab/window (tmux: `<prefix> <win-index>`; herdr: the tab's label), and a note that each agent runs `/implement` independently (load → TDD → review → commit → push → PR), then babysits its PR — watching CI, rebasing on conflicts or base-branch moves — until the user merges it; agents never merge themselves. Commits and pushes are non-interactive because the panes run unattended.
 
 ## Discipline
 
