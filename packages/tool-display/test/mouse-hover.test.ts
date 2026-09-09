@@ -116,7 +116,9 @@ function firstHeaderLine(component: PatchedComponent): string {
 function moveOffHoveredTool(): void {
   const container = new Container();
   container.addChild(new Text("plain text", 1, 1));
-  container.handleMouse(mouseEvent({ y: 0, height: 1 }));
+  (container as unknown as { handleMouse(event: PatchedMouseEvent): unknown }).handleMouse(
+    mouseEvent({ y: 0, height: 1 }),
+  );
 }
 
 describe("hover affordance", () => {
@@ -189,7 +191,11 @@ describe("hover affordance", () => {
 
     const container = new Container();
     container.addChild(new Text("plain text", 1, 1));
-    expect(container.handleMouse(mouseEvent({ y: 0, height: 1 }))).toEqual({
+    expect(
+      (container as unknown as { handleMouse(event: PatchedMouseEvent): unknown }).handleMouse(
+        mouseEvent({ y: 0, height: 1 }),
+      ),
+    ).toEqual({
       handled: true,
       render: true,
     });
