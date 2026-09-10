@@ -6,7 +6,7 @@
   "types": "src/index.ts",
   "dependencies": {
     "@htwang-contrib/common": "*",
-    "unbash": "^4.0.4"
+    "unbash": "^4.0.11"
   },
   "devDependencies": {
     "@earendil-works/pi-coding-agent": "^0.85.1",
