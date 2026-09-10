@@ -37,7 +37,7 @@
   },
   "dependencies": {
     "@htwang-contrib/common": "*",
-    "onnxruntime-web": "^1.27.0"
+    "onnxruntime-web": "^1.29.0"
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*"
