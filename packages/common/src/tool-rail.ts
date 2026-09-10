@@ -100,3 +100,62 @@ export function readRailTailSpacing(component: unknown): number | undefined {
   const value = (component as Record<string, unknown>)[RAIL_TAIL_SPACING_KEY];
   return typeof value === "number" ? value : undefined;
 }
+
+// Cross-extension contract: an assistant message component that qualifies as a
+// ThoughtMember (finished, collapsed, no visible body text) marks itself so
+// grouping consumers (tool-display's verb-group) can fold across it. The
+// marker only advertises eligibility; the consumer claims the member by
+// stamping it, and only then does the owner render it at zero lines.
+const THOUGHT_MEMBER_KEY = "__thoughtMember";
+
+export function setThoughtMember(component: object, active: boolean): void {
+  if (active) {
+    (component as Record<string, unknown>)[THOUGHT_MEMBER_KEY] = true;
+  } else {
+    delete (component as Record<string, unknown>)[THOUGHT_MEMBER_KEY];
+  }
+}
+
+export function isThoughtMember(component: unknown): boolean {
+  if (component == null || typeof component !== "object") return false;
+  return (component as Record<string, unknown>)[THOUGHT_MEMBER_KEY] === true;
+}
+
+// Written by the grouping consumer (tool-display) when it folds an eligible
+// ThoughtMember into a verb-group span. The owner (compact-thinking) reads the
+// stamp at render time: claimed members render zero lines; unclaimed ones keep
+// their heading row and re-sync the stamp from their own eligibility.
+const THOUGHT_MEMBER_CLAIMED_KEY = "__thoughtMemberClaimed";
+
+export function setThoughtMemberClaimed(component: object, claimed: boolean): void {
+  if (claimed) {
+    (component as Record<string, unknown>)[THOUGHT_MEMBER_CLAIMED_KEY] = true;
+  } else {
+    delete (component as Record<string, unknown>)[THOUGHT_MEMBER_CLAIMED_KEY];
+  }
+}
+
+export function isThoughtMemberClaimed(component: unknown): boolean {
+  if (component == null || typeof component !== "object") return false;
+  return (component as Record<string, unknown>)[THOUGHT_MEMBER_CLAIMED_KEY] === true;
+}
+
+// Cross-extension contract: an assistant message component showing streaming
+// or user-expanded thinking (with no text body) marks itself as Transparent
+// for grouping consumers: it neither joins a verb-group nor breaks one, and it
+// keeps its own rows. Set by the owner (compact-thinking) on every content
+// rebuild.
+const THOUGHT_TRANSPARENT_KEY = "__thoughtTransparent";
+
+export function setThoughtTransparent(component: object, active: boolean): void {
+  if (active) {
+    (component as Record<string, unknown>)[THOUGHT_TRANSPARENT_KEY] = true;
+  } else {
+    delete (component as Record<string, unknown>)[THOUGHT_TRANSPARENT_KEY];
+  }
+}
+
+export function isThoughtTransparent(component: unknown): boolean {
+  if (component == null || typeof component !== "object") return false;
+  return (component as Record<string, unknown>)[THOUGHT_TRANSPARENT_KEY] === true;
+}

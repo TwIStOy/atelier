@@ -49,6 +49,14 @@ export {
   recordChildSessionStarted,
 } from "./agents/session-links.ts";
 export { shutdownChildSession } from "./agents/session-shutdown.ts";
+export type { AggregateRule } from "./aggregate-rules.ts";
+export {
+  AGGREGATE_RULE_READY_EVENT,
+  AGGREGATE_RULE_REGISTER_EVENT,
+  aggregateRuleFor,
+  registerAggregateRule,
+  resetAggregateRulesForTest,
+} from "./aggregate-rules.ts";
 export type { ComponentSiblingContext } from "./component-tree.ts";
 export { componentRendersLines, findComponentContext } from "./component-tree.ts";
 export { mapConcurrent } from "./concurrency.ts";
@@ -198,12 +206,18 @@ export type {
 } from "./tool-rail.ts";
 export {
   clearRailTailSpacing,
+  isThoughtMember,
+  isThoughtMemberClaimed,
+  isThoughtTransparent,
   RAIL_BULLET_AGGREGATE,
   RAIL_BULLET_SINGLE,
   RAIL_MARK_GLYPH,
   readRailTailSpacing,
   renderRailLines,
   setRailTailSpacing,
+  setThoughtMember,
+  setThoughtMemberClaimed,
+  setThoughtTransparent,
   TOOL_RAIL_LAYOUT,
   ToolRailComponent,
   toolRailBodyWidth,

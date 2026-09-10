@@ -123,16 +123,13 @@ describe("read-only tool aggregation", () => {
     expect(asPatched(grep1).render(80)).toEqual([]);
   });
 
-  it("keeps a single read-only call on the normal ◆ line", () => {
+  it("renders a single read-only call as a one-member aggregate line", () => {
     activateExtension();
     const root: FakeRoot = { children: [] };
     const read1 = withResult(makeComponent("read", root));
     root.children.push(read1);
 
-    const lines = asPatched(read1).render(80);
-    expect(lines.join("\n")).toContain("◆");
-    expect(lines.join("\n")).toContain("Read");
-    expect(lines.join("\n")).not.toContain("◈");
+    expect(asPatched(read1).render(80)).toEqual(["", "  ❙  ◈ Read 1 file"]);
   });
 
   it("breaks the group on an assistant text block between two reads", () => {
@@ -142,14 +139,8 @@ describe("read-only tool aggregation", () => {
     const read2 = withResult(makeComponent("read", root));
     root.children.push(read1, textBlock(["assistant text"]), read2);
 
-    const first = asPatched(read1).render(80).join("\n");
-    const second = asPatched(read2).render(80).join("\n");
-    expect(first).toContain("◆");
-    expect(first).toContain("Read");
-    expect(second).toContain("◆");
-    expect(second).toContain("Read");
-    expect(first).not.toContain("◈");
-    expect(second).not.toContain("◈");
+    expect(asPatched(read1).render(80)).toEqual(["", "  ❙  ◈ Read 1 file"]);
+    expect(asPatched(read2).render(80)).toEqual(["", "  ❙  ◈ Read 1 file"]);
   });
 
   it("breaks the group on a user message component", () => {
@@ -159,8 +150,8 @@ describe("read-only tool aggregation", () => {
     const grep2 = withResult(makeComponent("grep", root));
     root.children.push(grep1, textBlock(["  user message"]), grep2);
 
-    expect(asPatched(grep1).render(80).join("\n")).not.toContain("◈");
-    expect(asPatched(grep2).render(80).join("\n")).not.toContain("◈");
+    expect(asPatched(grep1).render(80)).toEqual(["", "  ❙  ◈ Searched 1 pattern"]);
+    expect(asPatched(grep2).render(80)).toEqual(["", "  ❙  ◈ Searched 1 pattern"]);
   });
 
   it("breaks the group when another tool sits between two reads", () => {
@@ -171,8 +162,9 @@ describe("read-only tool aggregation", () => {
     const read2 = withResult(makeComponent("read", root));
     root.children.push(read1, bash1, read2);
 
-    expect(asPatched(read1).render(80).join("\n")).not.toContain("◈");
-    expect(asPatched(read2).render(80).join("\n")).not.toContain("◈");
+    expect(asPatched(read1).render(80)).toEqual(["", "  ❙  ◈ Read 1 file"]);
+    expect(asPatched(bash1).render(80).join("\n")).toContain("◆");
+    expect(asPatched(read2).render(80)).toEqual(["  ❙  ◈ Read 1 file"]);
   });
 
   it("does not overflow when a previous sibling probes this tool from render", () => {
@@ -201,7 +193,7 @@ describe("read-only tool aggregation", () => {
     expect(asPatched(read1).render(80)).toEqual(["", "  ❙  ◈ Read 2 files"]);
   });
 
-  it("breaks the group around an expanded member", () => {
+  it("keeps the group when a member expands; the expanded tool takes its own rows", () => {
     activateExtension();
     const root: FakeRoot = { children: [] };
     const read1 = withResult(makeComponent("read", root));
@@ -210,10 +202,9 @@ describe("read-only tool aggregation", () => {
     root.children.push(read1, read2, read3);
     read2.setExpanded(true);
 
-    expect(asPatched(read1).render(80).join("\n")).toContain("◆");
+    expect(asPatched(read1).render(80)).toEqual(["", "  ❙  ◈ Read 2 files"]);
     expect(asPatched(read2).render(80).join("\n")).toContain("Read");
-    expect(asPatched(read3).render(80).join("\n")).toContain("◆");
-    expect(asPatched(read3).render(80).join("\n")).not.toContain("◈");
+    expect(asPatched(read3).render(80)).toEqual([]);
   });
 
   it("renders the whole group red with the standard run rail when any member failed", () => {
