@@ -1,5 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import type { Theme } from "@earendil-works/pi-coding-agent";
+import { visibleWidth } from "@earendil-works/pi-tui";
 import { generateUnifiedDiff, shortenPath } from "@htwang-contrib/common";
 import { diffLines } from "diff";
 import type { ToolDisplayAdapter } from "../types.ts";
@@ -69,28 +71,38 @@ function buildFullFileDiff(
   }
 }
 
+function buildDiffStatsSuffix(args: EditArgs, theme: Theme, width: number | undefined): string {
+  const edits = getEdits(args);
+  if (edits.length === 0) return "";
+
+  const { added, removed } = countChanges(edits);
+  const parts: string[] = [];
+  if (added > 0) parts.push(theme.fg("success", `+${added}`));
+  if (removed > 0) parts.push(theme.fg("error", `-${removed}`));
+  if (width !== undefined) {
+    parts.push(theme.fg("muted", resolveIsSplit(width) ? "side-by-side" : "unified"));
+  }
+  if (added > 0 || removed > 0) {
+    parts.push(renderChangeBar(added, removed, theme));
+  }
+  return parts.length > 0 ? parts.join(" ") : "";
+}
+
 export const editAdapter: ToolDisplayAdapter<EditArgs> = {
-  formatCallHeader(args, theme, _details?: unknown, _isPartial?: boolean, _expanded?: boolean) {
+  formatCallHeader(args, theme, _details?: unknown, _isPartial?: boolean, _expanded?: boolean, width?: number) {
     const rawPath = args?.file_path ?? args?.path ?? "";
     const path = shortenPath(rawPath);
     const pathDisplay = path ? theme.fg("accent", path) : theme.fg("toolOutput", "...");
-    return `${theme.fg("toolTitle", theme.bold("Edit"))} ${pathDisplay}`;
+    const base = `${theme.fg("toolTitle", theme.bold("Edit"))} ${pathDisplay}`;
+
+    const suffix = buildDiffStatsSuffix(args ?? {}, theme, width);
+    if (!suffix) return base;
+    if (width !== undefined && visibleWidth(base) + 1 + visibleWidth(suffix) > width) return base;
+    return `${base} ${suffix}`;
   },
 
-  formatCollapsedContent(args, _output, theme, width, _details?: unknown, _isPartial?: boolean, _spinAt?: number) {
-    const edits = getEdits(args);
-    if (edits.length === 0) return [theme.fg("muted", "└ no changes")];
-
-    const { added, removed } = countChanges(edits);
-    const parts: string[] = ["└"];
-    parts.push(theme.fg("muted", "diff"));
-    if (added > 0) parts.push(theme.fg("success", `+${added}`));
-    if (removed > 0) parts.push(theme.fg("error", `-${removed}`));
-    parts.push(theme.fg("muted", resolveIsSplit(width) ? "side-by-side" : "unified"));
-    if (added > 0 || removed > 0) {
-      parts.push(renderChangeBar(added, removed, theme));
-    }
-    return [theme.fg("muted", parts.join(" "))];
+  formatCollapsedContent() {
+    return [];
   },
 
   formatExpandedContent(args, _output, _theme, width, _details?: unknown) {
