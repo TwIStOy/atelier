@@ -30,17 +30,17 @@ function renderActive(content: Array<{ type: string; thinking?: string; text?: s
 describe("active thinking run preview", () => {
   it("renders the heading and the last three thinking lines", () => {
     const lines = renderActive([{ type: "thinking", thinking: "l1\nl2\nl3\nl4\nl5" }]);
-    expect(lines).toEqual(["  ▌  ◆ Thinking... · 1ms", "  ▌    l3", "  ▌    l4", "  ▌    l5"]);
+    expect(lines).toEqual(["  ┃  ◆ Thinking... · 1ms", "  ┃    l3", "  ┃    l4", "  ┃    l5"]);
   });
 
   it("renders every line when the thinking text is shorter than the preview budget", () => {
     const lines = renderActive([{ type: "thinking", thinking: "l1\nl2" }]);
-    expect(lines).toEqual(["  ▌  ◆ Thinking... · 1ms", "  ▌    l1", "  ▌    l2"]);
+    expect(lines).toEqual(["  ┃  ◆ Thinking... · 1ms", "  ┃    l1", "  ┃    l2"]);
   });
 
   it("keeps the single-line heading when no thinking text has streamed yet", () => {
     const lines = renderActive([{ type: "thinking", thinking: "  \n " }]);
-    expect(lines).toEqual(["  ▌  ◆ Thinking... · 1ms"]);
+    expect(lines).toEqual(["  ┃  ◆ Thinking... · 1ms"]);
   });
 
   it("renders completed runs single-line while the active run keeps its preview", () => {
@@ -69,10 +69,10 @@ describe("active thinking run preview", () => {
         "",
         " middle",
         "",
-        "  ▌  ◆ Thinking... · 1ms",
-        "  ▌    live2",
-        "  ▌    live3",
-        "  ▌    live4",
+        "  ┃  ◆ Thinking... · 1ms",
+        "  ┃    live2",
+        "  ┃    live3",
+        "  ┃    live4",
       ]);
     } finally {
       session.shutdown();

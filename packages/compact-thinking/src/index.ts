@@ -41,7 +41,7 @@ const logger = createLogger("compact-thinking");
 
 const WIDGET_ID = "compact-thinking-render-loop";
 
-const THINKING_BAR = "▌";
+const THINKING_BAR = "┃";
 
 const PASSTHROUGH_THEME: Theme = { fg: (_color: string, text: string) => text } as Theme;
 

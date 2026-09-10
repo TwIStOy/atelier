@@ -87,7 +87,7 @@ describe("createWaveBar", () => {
     const rows = new Set<string>();
     for (let row = 0; row < 8; row++) {
       const rendered = bar?.(row, 8) ?? "";
-      expect(rendered).toContain("▌");
+      expect(rendered).toContain("┃");
       expect(rendered).toMatch(/^\x1b\[38;2;\d+;\d+;\d+m/);
       expect(rendered).toMatch(/\x1b\[39m$/);
       rows.add(rendered);
@@ -96,7 +96,7 @@ describe("createWaveBar", () => {
   });
 
   it("renders the exact borderMuted trough at zero brightness", () => {
-    expect(createWaveBar(makeTheme(), () => 0, 90)?.(0, 8)).toBe("\x1b[38;2;80;80;80m▌\x1b[39m");
+    expect(createWaveBar(makeTheme(), () => 0, 90)?.(0, 8)).toBe("\x1b[38;2;80;80;80m┃\x1b[39m");
   });
 
   it("brightens the peak more for taller widgets", () => {
@@ -120,7 +120,7 @@ describe("createWaveBar", () => {
     } as Partial<Theme>);
     const bar = createWaveBar(theme, () => 0, 90);
     expect(bar).toBeTypeOf("function");
-    expect(bar?.(8, 20)).toBe("\x1b[38;2;127;132;156m▌\x1b[39m");
+    expect(bar?.(8, 20)).toBe("\x1b[38;2;127;132;156m┃\x1b[39m");
   });
 
   it("reads the frame lazily so renders animate without rebuilding", () => {

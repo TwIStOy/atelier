@@ -11,7 +11,7 @@ const WAVE_PERIOD_MS = 1400;
 const WAVE_ROWS = 32;
 // Rows at which the wave reaches full amplitude; shorter blocks stay subtle.
 const FULL_AMPLITUDE_ROWS = 13;
-const BAR = "▌";
+const BAR = "┃";
 
 const CUBE_VALUES = [0, 95, 135, 175, 215, 255];
 const BASIC_PALETTE: Rgb[] = [
