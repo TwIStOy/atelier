@@ -117,6 +117,26 @@ describe("renderRailLines status coloring", () => {
     expect(lines[0]).toBe("     \x1b[90m◆\x1b[39m Thought for 5.0s");
     expect(stripTerminalSequences(lines[0])).toBe("     ◆ Thought for 5.0s");
   });
+
+  test("railStatus overrides the rail color while the bullet keeps the status color", () => {
+    const lines = renderRailLines(
+      ["Read 2 files"],
+      { mark: "aggregate", bullet: RAIL_BULLET_AGGREGATE, status: "success", railStatus: "dim" },
+      ANSI_THEME,
+      80,
+    );
+    expect(lines[0]).toBe("  \x1b[90m❙\x1b[39m  \x1b[32m◈\x1b[39m Read 2 files");
+  });
+
+  test("railStatus alone leaves the bullet unstyled", () => {
+    const lines = renderRailLines(
+      ["Searching…"],
+      { mark: "aggregate", bullet: "⠋", railStatus: "dim" },
+      ANSI_THEME,
+      80,
+    );
+    expect(lines[0]).toBe("  \x1b[90m❙\x1b[39m  ⠋ Searching…");
+  });
 });
 
 describe("renderRailLines custom bar", () => {

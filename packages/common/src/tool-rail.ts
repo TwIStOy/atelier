@@ -23,6 +23,7 @@ export interface RailSpec {
   mark: RailMark;
   bullet: string;
   status?: RailStatus;
+  railStatus?: RailStatus;
   bar?: RailBar;
 }
 
@@ -45,7 +46,8 @@ function railText(spec: RailSpec, theme: Theme, row: number, rows: number): stri
   if (spec.bar !== undefined) return typeof spec.bar === "function" ? spec.bar(row, rows) : spec.bar;
   const glyph = RAIL_MARK_GLYPH[spec.mark];
   if (glyph === "") return "";
-  return spec.status ? theme.fg(spec.status, glyph) : glyph;
+  const status = spec.railStatus ?? spec.status;
+  return status ? theme.fg(status, glyph) : glyph;
 }
 
 export function renderRailLines(bodyLines: string[], spec: RailSpec, theme: Theme, width: number): string[] {
