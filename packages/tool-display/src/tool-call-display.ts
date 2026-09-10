@@ -101,7 +101,7 @@ function subagentRunFinished(details: unknown): "ok" | "err" | undefined {
   return undefined;
 }
 
-function toolBullet(
+export function toolBullet(
   toolName: string,
   isPartial: boolean,
   isError: boolean,

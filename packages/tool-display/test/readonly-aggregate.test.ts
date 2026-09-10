@@ -51,7 +51,7 @@ type FakeRoot = { children: unknown[] };
 
 let callSeq = 0;
 
-function makeComponent(toolName: string, root: FakeRoot): ToolExecutionComponent {
+function makeComponent(toolName: string, root: FakeRoot, args: Record<string, unknown> = {}): ToolExecutionComponent {
   const toolDefinition: ToolDefinition = {
     name: toolName,
     label: toolName,
@@ -62,7 +62,7 @@ function makeComponent(toolName: string, root: FakeRoot): ToolExecutionComponent
   return new ToolExecutionComponent(
     toolName,
     `call-${toolName}-${callSeq++}`,
-    {},
+    args,
     {},
     toolDefinition,
     root as unknown as ConstructorParameters<typeof ToolExecutionComponent>[5],
@@ -81,9 +81,11 @@ function textBlock(lines: string[]): { render: (width: number) => string[] } {
 
 type PatchedComponent = {
   expanded: boolean;
+  isPartial: boolean;
   __tdHovered?: boolean;
+  result?: unknown;
   render(width: number): string[];
-  handleMouse(event: { type: string; button: string; width: number }): unknown;
+  handleMouse(event: { type: string; button: string; width: number; y?: number }): unknown;
 };
 
 function asPatched(component: ToolExecutionComponent): PatchedComponent {
@@ -326,7 +328,92 @@ describe("read-only tool aggregation", () => {
     expect(stripTerminalSequences(lines[1]).endsWith("…")).toBe(true);
   });
 
-  it("does not expand the aggregate line on left click", () => {
+  it("expands the group into a grok-style subrow list on a leader-line click", () => {
+    activateExtension();
+    const root: FakeRoot = { children: [] };
+    const read1 = withResult(makeComponent("read", root, { file_path: "packages/a.ts" }));
+    const read2 = withResult(makeComponent("read", root, { file_path: "packages/b.ts" }));
+    root.children.push(read1, read2);
+
+    const leader = asPatched(read1);
+    leader.render(80);
+    expect(leader.handleMouse({ type: "click", button: "left", width: 80, y: 1 })).toEqual({ handled: true });
+    expect(leader.expanded).toBe(false);
+    expect(leader.render(80)).toEqual(["", "  ┃  ◈ Read 2 files", "  ┃     ◆ Read packages/a.ts"]);
+    expect(asPatched(read2).render(80)).toEqual(["  ┃     ◆ Read packages/b.ts"]);
+  });
+
+  it("expands a single member to its full output and back via subrow clicks", () => {
+    activateExtension();
+    const root: FakeRoot = { children: [] };
+    const read1 = withResult(makeComponent("read", root, { file_path: "packages/a.ts" }));
+    const read2 = withResult(makeComponent("read", root, { file_path: "packages/b.ts" }));
+    root.children.push(read1, read2);
+
+    const leader = asPatched(read1);
+    leader.render(80);
+    leader.handleMouse({ type: "click", button: "left", width: 80, y: 1 });
+
+    const member = asPatched(read2);
+    member.render(80);
+    expect(member.handleMouse({ type: "click", button: "left", width: 80, y: 0 })).toEqual({ handled: true });
+    expect(member.expanded).toBe(true);
+
+    const memberLines = member.render(80);
+    expect(memberLines.length).toBeGreaterThan(1);
+    expect(memberLines.join("\n")).toContain("Read packages/b.ts");
+    expect(memberLines.join("\n")).toContain("done");
+    expect(leader.render(80)).toEqual(["", "  ┃  ◈ Read 2 files", "  ┃     ◆ Read packages/a.ts"]);
+
+    expect(member.handleMouse({ type: "click", button: "left", width: 80, y: 2 })).toEqual({ handled: true });
+    expect(member.expanded).toBe(false);
+    expect(member.render(80)).toEqual(["  ┃     ◆ Read packages/b.ts"]);
+  });
+
+  it("expands the leader's own call through its subrow below the summary", () => {
+    activateExtension();
+    const root: FakeRoot = { children: [] };
+    const read1 = withResult(makeComponent("read", root, { file_path: "packages/a.ts" }));
+    const read2 = withResult(makeComponent("read", root, { file_path: "packages/b.ts" }));
+    root.children.push(read1, read2);
+
+    const leader = asPatched(read1);
+    leader.render(80);
+    leader.handleMouse({ type: "click", button: "left", width: 80, y: 1 });
+    expect(leader.handleMouse({ type: "click", button: "left", width: 80, y: 2 })).toEqual({ handled: true });
+    expect(leader.expanded).toBe(true);
+
+    const lines = leader.render(80);
+    expect(lines[0]).toBe("");
+    expect(lines[1]).toBe("  ┃  ◈ Read 2 files");
+    expect(lines.length).toBeGreaterThan(2);
+    expect(lines.join("\n")).toContain("Read packages/a.ts");
+    expect(lines.join("\n")).toContain("done");
+    expect(asPatched(read2).render(80)).toEqual(["  ┃     ◆ Read packages/b.ts"]);
+  });
+
+  it("collapses the whole group back to the aggregate line on a second leader click", () => {
+    activateExtension();
+    const root: FakeRoot = { children: [] };
+    const read1 = withResult(makeComponent("read", root, { file_path: "packages/a.ts" }));
+    const read2 = withResult(makeComponent("read", root, { file_path: "packages/b.ts" }));
+    root.children.push(read1, read2);
+
+    const leader = asPatched(read1);
+    leader.render(80);
+    leader.handleMouse({ type: "click", button: "left", width: 80, y: 1 });
+    asPatched(read2).render(80);
+    asPatched(read2).handleMouse({ type: "click", button: "left", width: 80, y: 0 });
+    expect(asPatched(read2).expanded).toBe(true);
+
+    expect(leader.handleMouse({ type: "click", button: "left", width: 80, y: 1 })).toEqual({ handled: true });
+    expect(leader.render(80)).toEqual(["", "  ❙  ◈ Read 2 files"]);
+    expect(asPatched(read2).render(80)).toEqual([]);
+    expect(asPatched(read2).expanded).toBe(false);
+    expect(leader.expanded).toBe(false);
+  });
+
+  it("ignores clicks on the separator line above the aggregate row", () => {
     activateExtension();
     const root: FakeRoot = { children: [] };
     const read1 = withResult(makeComponent("read", root));
@@ -335,8 +422,110 @@ describe("read-only tool aggregation", () => {
 
     const leader = asPatched(read1);
     leader.render(80);
-    expect(leader.handleMouse({ type: "click", button: "left", width: 80 })).toBeUndefined();
-    expect(leader.expanded).toBe(false);
+    expect(leader.handleMouse({ type: "click", button: "left", width: 80, y: 0 })).toBeUndefined();
+    expect(leader.render(80)).toEqual(["", "  ❙  ◈ Read 2 files"]);
+  });
+
+  it("toggles the group from the aggregate line that directly follows another tool", () => {
+    activateExtension();
+    const root: FakeRoot = { children: [] };
+    const bash1 = withResult(makeComponent("bash", root));
+    const read1 = withResult(makeComponent("read", root, { file_path: "packages/a.ts" }));
+    const read2 = withResult(makeComponent("read", root, { file_path: "packages/b.ts" }));
+    root.children.push(bash1, read1, read2);
+
+    const leader = asPatched(read1);
+    leader.render(80);
+    expect(leader.handleMouse({ type: "click", button: "left", width: 80, y: 0 })).toEqual({ handled: true });
+    expect(leader.render(80)).toEqual(["  ┃  ◈ Read 2 files", "  ┃     ◆ Read packages/a.ts"]);
+  });
+
+  it("ignores member subrow clicks before the result arrives", () => {
+    activateExtension();
+    const root: FakeRoot = { children: [] };
+    const read1 = withResult(makeComponent("read", root, { file_path: "packages/a.ts" }));
+    const grep1 = makeComponent("grep", root, { pattern: "TODO" });
+    root.children.push(read1, grep1);
+
+    const leader = asPatched(read1);
+    leader.render(80);
+    leader.handleMouse({ type: "click", button: "left", width: 80, y: 1 });
+
+    const member = asPatched(grep1);
+    expect(member.render(80).length).toBe(1);
+    expect(member.handleMouse({ type: "click", button: "left", width: 80, y: 0 })).toBeUndefined();
+    expect(member.expanded).toBe(false);
+    expect(member.render(80).length).toBe(1);
+  });
+
+  it("ignores non-left clicks on aggregate rows", () => {
+    activateExtension();
+    const root: FakeRoot = { children: [] };
+    const read1 = withResult(makeComponent("read", root));
+    const read2 = withResult(makeComponent("read", root));
+    root.children.push(read1, read2);
+
+    const leader = asPatched(read1);
+    leader.render(80);
+    expect(leader.handleMouse({ type: "click", button: "right", width: 80, y: 1 })).toBeUndefined();
+    expect(leader.render(80)).toEqual(["", "  ❙  ◈ Read 2 files"]);
+  });
+
+  it("shows a subrow for members that join the group while expanded", () => {
+    activateExtension();
+    const root: FakeRoot = { children: [] };
+    const read1 = withResult(makeComponent("read", root, { file_path: "packages/a.ts" }));
+    const read2 = withResult(makeComponent("read", root, { file_path: "packages/b.ts" }));
+    root.children.push(read1, read2);
+
+    const leader = asPatched(read1);
+    leader.render(80);
+    leader.handleMouse({ type: "click", button: "left", width: 80, y: 1 });
+    asPatched(read2).render(80);
+    asPatched(read2).handleMouse({ type: "click", button: "left", width: 80, y: 0 });
+    expect(asPatched(read2).expanded).toBe(true);
+
+    const read3 = withResult(makeComponent("read", root, { file_path: "packages/c.ts" }));
+    root.children.push(read3);
+    expect(leader.render(80)).toEqual(["", "  ┃  ◈ Read 3 files", "  ┃     ◆ Read packages/a.ts"]);
+    expect(asPatched(read2).render(80).join("\n")).toContain("Read packages/b.ts");
+    expect(asPatched(read3).render(80)).toEqual(["  ┃     ◆ Read packages/c.ts"]);
+  });
+
+  it("keeps a standalone expanded read-only call out of a neighboring group", () => {
+    activateExtension();
+    const root: FakeRoot = { children: [] };
+    const stray = withResult(makeComponent("read", root, { file_path: "packages/x.ts" }));
+    const read1 = withResult(makeComponent("read", root, { file_path: "packages/a.ts" }));
+    const read2 = withResult(makeComponent("read", root, { file_path: "packages/b.ts" }));
+    root.children.push(stray, read1, read2);
+    stray.setExpanded(true);
+
+    const strayLines = asPatched(stray).render(80).join("\n");
+    expect(strayLines).toContain("Read packages/x.ts");
+    expect(strayLines).toContain("done");
+    expect(asPatched(read1).render(80)).toEqual(["  ❙  ◈ Read 2 files"]);
+    expect(asPatched(read2).render(80)).toEqual([]);
+  });
+
+  it("truncates subrow summaries to the terminal width", () => {
+    activateExtension();
+    const root: FakeRoot = { children: [] };
+    const longPath = "packages/very/deeply/nested/directory/structure/with/a/long/file/name.ts";
+    const read1 = withResult(makeComponent("read", root, { file_path: longPath }));
+    const read2 = withResult(makeComponent("read", root, { file_path: `${longPath}2` }));
+    root.children.push(read1, read2);
+
+    const leader = asPatched(read1);
+    leader.render(80);
+    leader.handleMouse({ type: "click", button: "left", width: 80, y: 1 });
+
+    for (const line of leader.render(30)) {
+      expect(visibleWidth(line)).toBeLessThanOrEqual(30);
+    }
+    for (const line of asPatched(read2).render(30)) {
+      expect(visibleWidth(line)).toBeLessThanOrEqual(30);
+    }
   });
 
   it("keeps the aggregate bullet while hovered", () => {

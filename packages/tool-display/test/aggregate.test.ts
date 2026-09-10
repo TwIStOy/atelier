@@ -4,9 +4,11 @@ import { describe, expect, it } from "vitest";
 import {
   type AggregateMemberState,
   aggregateRailSpec,
+  aggregateSubrowBodyWidth,
   aggregateSummary,
   isAggregateToolName,
   renderAggregateLine,
+  renderAggregateSubrowLine,
 } from "../src/aggregate.ts";
 
 const PLAIN_THEME: Theme = {
@@ -137,6 +139,11 @@ describe("renderAggregateLine", () => {
     expect(lines).toEqual(["  ❙  ◈ Searched 1 pattern, Read 2 files, Listed 1 dir"]);
   });
 
+  it("switches the rail to the run mark while the group is expanded", () => {
+    const lines = renderAggregateLine([member("read"), member("read")], PLAIN_THEME, 80, 0, true);
+    expect(lines).toEqual(["  ┃  ◈ Read 2 files"]);
+  });
+
   it("renders the standard red run rail, red bullet, and failed suffix when a member errored", () => {
     const lines = renderAggregateLine([member("read"), member("grep", { error: true })], ANSI_THEME, 80);
     expect(lines[0]).toBe(
@@ -173,5 +180,35 @@ describe("renderAggregateLine", () => {
     expect(lines.length).toBe(1);
     expect(stripTerminalSequences(lines[0]).endsWith("…")).toBe(true);
     expect(visibleWidth(lines[0])).toBeLessThanOrEqual(40);
+  });
+});
+
+describe("renderAggregateSubrowLine", () => {
+  it("renders a subrow indented under the aggregate bullet", () => {
+    const line = renderAggregateSubrowLine("Read packages/a.ts", "◆", "success", PLAIN_THEME, 80);
+    expect(line).toBe("  ┃     ◆ Read packages/a.ts");
+  });
+
+  it("colors the rail and bullet with the member status", () => {
+    const line = renderAggregateSubrowLine("Read packages/a.ts", "◆", "error", ANSI_THEME, 80);
+    expect(line).toBe("  \x1b[31m┃\x1b[39m     \x1b[31m◆\x1b[39m Read packages/a.ts");
+  });
+
+  it("keeps the rail plain when the member has no status", () => {
+    const line = renderAggregateSubrowLine("Searched", "⠋", undefined, ANSI_THEME, 80);
+    expect(line).toBe("  ┃     ⠋ Searched");
+  });
+
+  it("truncates the subrow to the terminal width", () => {
+    const header = "Grep ".repeat(30).trim();
+    const line = renderAggregateSubrowLine(header, "◆", "success", PLAIN_THEME, 40);
+    expect(visibleWidth(line)).toBeLessThanOrEqual(40);
+    expect(stripTerminalSequences(line).endsWith("…")).toBe(true);
+  });
+
+  it("exposes the subrow body width budget", () => {
+    expect(aggregateSubrowBodyWidth(80)).toBe(70);
+    expect(aggregateSubrowBodyWidth(12)).toBe(2);
+    expect(aggregateSubrowBodyWidth(8)).toBe(0);
   });
 });
