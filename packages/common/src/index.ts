@@ -200,6 +200,7 @@ export {
   clearRailTailSpacing,
   RAIL_BULLET_AGGREGATE,
   RAIL_BULLET_SINGLE,
+  RAIL_MARK_GLYPH,
   readRailTailSpacing,
   renderRailLines,
   setRailTailSpacing,
