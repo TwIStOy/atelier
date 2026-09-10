@@ -63,7 +63,12 @@ export type { ContentRenderer, ToolDisplayAdapter } from "./types.ts";
 import type { ExtensionAPI, Theme } from "@earendil-works/pi-coding-agent";
 import { ToolExecutionComponent } from "@earendil-works/pi-coding-agent";
 import { Container, Editor } from "@earendil-works/pi-tui";
-import { isExtensionDisabled } from "@htwang-contrib/common";
+import {
+  componentRendersLines,
+  findComponentContext,
+  isExtensionDisabled,
+  readRailTailSpacing,
+} from "@htwang-contrib/common";
 import { isAggregateToolName, renderAggregateLine } from "./aggregate.ts";
 import { registerToolDisplayConfigItems } from "./config.ts";
 import { globalToolDisplayRegistry } from "./registry.ts";
@@ -148,7 +153,7 @@ const FALLBACK_THEME: Theme = {
 } as Theme;
 
 function findPreviousVisibleSibling(root: unknown, target: object, width: number): unknown {
-  const context = findSiblingContext(root, target);
+  const context = findComponentContext(root, target);
   if (!context) return undefined;
   const { siblings, index } = context;
   for (let i = index - 1; i >= 0; i--) {
@@ -165,32 +170,6 @@ function findPreviousVisibleOf(component: ToolExecutionPatchThis, width: number)
   return findPreviousVisibleSibling(ui, component, width);
 }
 
-interface SiblingContext {
-  siblings: unknown[];
-  index: number;
-}
-
-function findSiblingContext(root: unknown, target: object): SiblingContext | undefined {
-  if (!root || typeof root !== "object") return undefined;
-  const children = (root as { children?: unknown }).children;
-  if (!Array.isArray(children)) return undefined;
-  const index = children.indexOf(target);
-  if (index >= 0) return { siblings: children, index };
-  for (const child of children) {
-    const found = findSiblingContext(child, target);
-    if (found) return found;
-  }
-  return undefined;
-}
-
-function siblingRendersLines(sibling: unknown, width: number): boolean {
-  if (typeof width !== "number" || width <= 0) return true;
-  if (!sibling || typeof sibling !== "object") return false;
-  const render = (sibling as { render?: (w: number) => string[] }).render;
-  if (typeof render !== "function") return false;
-  return render.call(sibling, width).length > 0;
-}
-
 function asToolExecution(component: unknown): ToolExecutionPatchThis | undefined {
   return component instanceof ToolExecutionComponent ? (component as unknown as ToolExecutionPatchThis) : undefined;
 }
@@ -204,7 +183,7 @@ type AggregateGroupRole = { role: "member" } | { role: "leader"; members: ToolEx
 
 function resolveAggregateRole(component: ToolExecutionPatchThis, width: number): AggregateGroupRole | undefined {
   if (!isAggregateCandidate(component)) return undefined;
-  const context = findSiblingContext((component as { ui?: unknown }).ui, component);
+  const context = findComponentContext((component as { ui?: unknown }).ui, component);
   if (!context) return undefined;
   const { siblings, index } = context;
 
@@ -216,7 +195,7 @@ function resolveAggregateRole(component: ToolExecutionPatchThis, width: number):
       if (isAggregateCandidate(tool)) followsAggregateSibling = true;
       break;
     }
-    if (siblingRendersLines(siblings[i], width)) break;
+    if (componentRendersLines(siblings[i], width)) break;
   }
   if (followsAggregateSibling) return { role: "member" };
 
@@ -227,7 +206,7 @@ function resolveAggregateRole(component: ToolExecutionPatchThis, width: number):
       if (tool.hideComponent) continue;
       if (!isAggregateCandidate(tool)) break;
       members.push(tool);
-    } else if (siblingRendersLines(siblings[i], width)) {
+    } else if (componentRendersLines(siblings[i], width)) {
       break;
     }
   }
@@ -244,10 +223,13 @@ function aggregateMemberStates(members: ToolExecutionPatchThis[]) {
 }
 
 function applyGroupSpacing(lines: string[], previous: unknown, ensureLeadingBlank: boolean): string[] {
-  if (previous instanceof ToolExecutionComponent) {
-    return lines.length > 0 && lines[0].trim() === "" ? lines.slice(1) : lines;
+  const hasLeadingBlank = lines.length > 0 && lines[0].trim() === "";
+  // A rail-tail marker means the sibling above already emitted the configured
+  // gap after its thinking rail line, so the tool must not add its own blank.
+  if (previous instanceof ToolExecutionComponent || readRailTailSpacing(previous) !== undefined) {
+    return hasLeadingBlank ? lines.slice(1) : lines;
   }
-  if (ensureLeadingBlank && (lines.length === 0 || lines[0].trim() !== "")) {
+  if (ensureLeadingBlank && !hasLeadingBlank) {
     return ["", ...lines];
   }
   return lines;

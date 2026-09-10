@@ -6,6 +6,7 @@ export const CONFIG_ID = "compact-thinking";
 export const DEFAULT_CONFIG: CompactThinkingConfig = {
   previewLines: 3,
   animationIntervalMs: 45,
+  blockSpacing: 0,
   summaryEnabled: false,
   summaryModel: "",
   summaryMinChars: 2000,
@@ -48,6 +49,18 @@ export function registerCompactThinkingConfigItems(): void {
       description: "Milliseconds between highlight-animation frames while thinking is active.",
       extensionLabel: "Compact Thinking",
       order: 10,
+    },
+    {
+      key: "blockSpacing",
+      type: "number",
+      label: "Blank Lines Around Thinking",
+      value: () => loadConfig().blockSpacing,
+      min: 0,
+      max: 5,
+      description:
+        "Blank lines before and after each thinking block. 0 keeps the rail column continuous with tool lines; always at least 1 against user messages and visible text.",
+      extensionLabel: "Compact Thinking",
+      order: 5,
     },
     {
       key: "summaryEnabled",

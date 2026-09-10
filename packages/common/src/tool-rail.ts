@@ -80,3 +80,23 @@ export class ToolRailComponent implements Component {
     this.inner.invalidate();
   }
 }
+
+// Cross-extension contract: a component whose rendered output ends with a
+// thinking-rail line marks itself with the number of blank lines it already
+// emitted after that rail line. Rail-aware siblings below (tool widgets) then
+// skip their own leading blank line so the value fully owns the gap.
+const RAIL_TAIL_SPACING_KEY = "__railTailSpacing";
+
+export function setRailTailSpacing(component: object, spacing: number): void {
+  (component as Record<string, unknown>)[RAIL_TAIL_SPACING_KEY] = spacing;
+}
+
+export function clearRailTailSpacing(component: object): void {
+  delete (component as Record<string, unknown>)[RAIL_TAIL_SPACING_KEY];
+}
+
+export function readRailTailSpacing(component: unknown): number | undefined {
+  if (component == null || typeof component !== "object") return undefined;
+  const value = (component as Record<string, unknown>)[RAIL_TAIL_SPACING_KEY];
+  return typeof value === "number" ? value : undefined;
+}

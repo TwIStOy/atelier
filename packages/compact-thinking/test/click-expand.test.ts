@@ -20,22 +20,22 @@ describe("compact thinking click expansion", () => {
     const component = makeComponent(makeMessage([{ type: "thinking", thinking: "l1\nl2\nl3\nl4\nl5\nl6" }]));
 
     const collapsed = component.render(80).map(stripTerminalSequences);
-    expect(collapsed).toHaveLength(2);
-    expect(collapsed[1].replace(/[ \t]+$/, "")).toBe("     ◆ Thinking...");
+    expect(collapsed).toHaveLength(1);
+    expect(collapsed[0].replace(/[ \t]+$/, "")).toBe("     ◆ Thinking...");
 
     const height = component.render(80).length;
-    expect(click(component, 1, height)).toMatchObject({ handled: true });
+    expect(click(component, 0, height)).toMatchObject({ handled: true });
 
     const expanded = component.render(80).map(stripTerminalSequences);
-    expect(expanded[1].replace(/[ \t]+$/, "")).toBe("  ┃  ◆ Thinking... ... (click to collapse)");
-    expect(expanded[2].replace(/[ \t]+$/, "")).toBe("  ┃");
-    expect(expanded[3].replace(/[ \t]+$/, "")).toBe("  ┃    l1");
+    expect(expanded[0].replace(/[ \t]+$/, "")).toBe("  ┃  ◆ Thinking... ... (click to collapse)");
+    expect(expanded[1].replace(/[ \t]+$/, "")).toBe("  ┃");
+    expect(expanded[2].replace(/[ \t]+$/, "")).toBe("  ┃    l1");
     expect(expanded[expanded.length - 1].replace(/[ \t]+$/, "")).toBe("  ┃    l6");
 
-    expect(click(component, 1, component.render(80).length)).toMatchObject({ handled: true });
+    expect(click(component, 0, component.render(80).length)).toMatchObject({ handled: true });
     const collapsedAgain = component.render(80).map(stripTerminalSequences);
-    expect(collapsedAgain).toHaveLength(2);
-    expect(collapsedAgain[1].replace(/[ \t]+$/, "")).toBe("     ◆ Thinking...");
+    expect(collapsedAgain).toHaveLength(1);
+    expect(collapsedAgain[0].replace(/[ \t]+$/, "")).toBe("     ◆ Thinking...");
   });
 
   it("ignores non-left-button and non-click events", () => {
@@ -43,7 +43,7 @@ describe("compact thinking click expansion", () => {
     const component = makeComponent(makeMessage([{ type: "thinking", thinking: "l1\nl2" }]));
     const height = component.render(80).length;
 
-    expect(click(component, 1, height, "right")).toBeUndefined();
+    expect(click(component, 0, height, "right")).toBeUndefined();
     expect(
       component.handleMouse({
         type: "wheel",
@@ -60,7 +60,7 @@ describe("compact thinking click expansion", () => {
         wheelDelta: -3,
       }),
     ).toBeUndefined();
-    expect(component.render(80).map(stripTerminalSequences)).toHaveLength(2);
+    expect(component.render(80).map(stripTerminalSequences)).toHaveLength(1);
   });
 
   it("expands only the clicked run", () => {
@@ -79,7 +79,7 @@ describe("compact thinking click expansion", () => {
     expect(collapsed.some((line) => line.trim() === "b1")).toBe(false);
 
     const height = component.render(80).length;
-    expect(click(component, 1, height)).toMatchObject({ handled: true });
+    expect(click(component, 0, height)).toMatchObject({ handled: true });
 
     const after = component.render(80).join("\n");
     expect(after).toContain("a1");

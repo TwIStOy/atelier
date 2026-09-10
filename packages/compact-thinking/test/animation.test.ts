@@ -44,8 +44,8 @@ describe("active thinking run rail wave", () => {
     const { session, component } = startActiveRun(PLAIN_THEME);
     try {
       const lines = component.render(80).map(stripTerminalSequences);
-      expect(lines).toHaveLength(2);
-      expect(lines[1].replace(/[ \t]+$/, "")).toBe("  ▌  ◆ Thinking... · 1ms");
+      expect(lines).toHaveLength(1);
+      expect(lines[0].replace(/[ \t]+$/, "")).toBe("  ▌  ◆ Thinking... · 1ms");
     } finally {
       session.shutdown();
       vi.useRealTimers();
@@ -56,7 +56,7 @@ describe("active thinking run rail wave", () => {
     vi.useFakeTimers();
     const { session, component } = startActiveRun(WAVE_THEME);
     try {
-      const line = component.render(80)[1];
+      const line = component.render(80)[0];
       expect(line).toContain("  \x1b[38;2;80;80;80m▌\x1b[39m  ◆ Thinking...");
     } finally {
       session.shutdown();
@@ -69,7 +69,7 @@ describe("active thinking run rail wave", () => {
     const { session, component } = startActiveRun(WAVE_THEME);
     try {
       vi.advanceTimersByTime(8 * TICK_MS);
-      const line = component.render(80)[1];
+      const line = component.render(80)[0];
       // brightness at frame 8, row 0 = (5/13)·sin²(8·2π·45/1400) ≈ 0.3838,
       // lerp(80, 212, 0.3838) ≈ 130.67 → 131; without the 5-row floor the
       // single-line block would cap at rows/13 ≈ 0.077 → 90.
@@ -101,13 +101,13 @@ describe("animation tick rebuild cadence", () => {
     vi.useFakeTimers();
     const { session, component } = startActiveRun(PLAIN_THEME);
     try {
-      expect(click(component, 1, component.render(80).length)).toMatchObject({ handled: true });
+      expect(click(component, 0, component.render(80).length)).toMatchObject({ handled: true });
       const spy = vi.spyOn(component as unknown as AssistantMessageComponent, "updateContent");
       vi.advanceTimersByTime(6 * TICK_MS);
       expect(spy).not.toHaveBeenCalled();
       expect(component.render(80).join("\n")).toContain("streaming thought");
 
-      expect(click(component, 1, component.render(80).length)).toMatchObject({ handled: true });
+      expect(click(component, 0, component.render(80).length)).toMatchObject({ handled: true });
       spy.mockClear();
       vi.advanceTimersByTime(2 * TICK_MS);
       expect(spy).toHaveBeenCalledTimes(1);

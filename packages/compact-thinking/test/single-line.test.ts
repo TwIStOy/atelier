@@ -41,8 +41,8 @@ describe("completed thinking run single-line rendering", () => {
     });
     const component = makeComponent(makeMessage([{ type: "thinking", thinking: "internal reasoning" }]));
     const lines = component.render(80).map(stripTerminalSequences);
-    expect(lines).toHaveLength(2);
-    expect(lines[1].replace(/[ \t]+$/, "")).toBe("     ◆ Thought for 5s — Parsed the config schema");
+    expect(lines).toHaveLength(1);
+    expect(lines[0].replace(/[ \t]+$/, "")).toBe("     ◆ Thought for 5s — Parsed the config schema");
     session.shutdown();
   });
 
@@ -50,7 +50,7 @@ describe("completed thinking run single-line rendering", () => {
     const session = activateExtension({ entries: [durationEntry(42, 0, 5000)] });
     const component = makeComponent(makeMessage([{ type: "thinking", thinking: "internal reasoning" }]));
     const lines = component.render(80).map(stripTerminalSequences);
-    expect(lines[1].replace(/[ \t]+$/, "")).toBe("     ◆ Thought for 5s");
+    expect(lines[0].replace(/[ \t]+$/, "")).toBe("     ◆ Thought for 5s");
     session.shutdown();
   });
 
@@ -60,7 +60,7 @@ describe("completed thinking run single-line rendering", () => {
       entries: [durationEntry(42, 0, 5000), summaryEntry(42, 0, "Parsed the config schema")],
     });
     const component = makeComponent(makeMessage([{ type: "thinking", thinking: "internal reasoning" }]));
-    const raw = component.render(80)[1];
+    const raw = component.render(80)[0];
     expect(raw).toContain("\x1b[90m◆\x1b[39m");
     expect(stripTerminalSequences(raw).replace(/[\t ]+$/, "")).toBe("     ◆ Thought for 5s — Parsed the config schema");
     session.shutdown();
@@ -74,7 +74,7 @@ describe("completed thinking run single-line rendering", () => {
     const component = makeComponent(makeMessage([{ type: "thinking", thinking: "internal reasoning" }]));
     const lines = component.render(40);
     const runLine = lines[lines.length - 1];
-    expect(lines).toHaveLength(2);
+    expect(lines).toHaveLength(1);
     expect(visibleWidth(runLine)).toBeLessThanOrEqual(40);
     expect(stripTerminalSequences(runLine).endsWith("…")).toBe(true);
     session.shutdown();
@@ -93,9 +93,9 @@ describe("completed thinking run single-line rendering", () => {
       emitAssistantUpdate(session, message, { type: "text_start" });
 
       const lines = component.render(80).map(stripTerminalSequences);
-      expect(lines).toHaveLength(2);
-      expect(lines[1].replace(/[ \t]+$/, "")).toMatch(/^ {5}◆ Thought for \d+ms \[ Summarizing\.\.\. \]$/);
-      expect(lines[1]).not.toContain("Summary:");
+      expect(lines).toHaveLength(1);
+      expect(lines[0].replace(/[ \t]+$/, "")).toMatch(/^ {5}◆ Thought for \d+ms \[ Summarizing\.\.\. \]$/);
+      expect(lines[0]).not.toContain("Summary:");
     } finally {
       session.shutdown();
       vi.useRealTimers();
@@ -108,15 +108,16 @@ describe("completed thinking run single-line rendering", () => {
       entries: [durationEntry(42, 0, 5000), summaryEntry(42, 0, "Parsed the config schema")],
     });
     const component = makeComponent(makeMessage([{ type: "thinking", thinking: "l1\nl2\nl3" }]));
-    expect(click(component, 1, component.render(80).length)).toMatchObject({ handled: true });
+    expect(click(component, 0, component.render(80).length)).toMatchObject({ handled: true });
 
     const lines = component.render(80);
-    expect(lines[1].startsWith("  \x1b[90m┃\x1b[39m  \x1b[90m◆\x1b[39m ")).toBe(true);
+    const railLine = lines[0].replace(/^\x1b\]133;[A-Z]\x07/, "");
+    expect(railLine.startsWith("  \x1b[90m┃\x1b[39m  \x1b[90m◆\x1b[39m ")).toBe(true);
     const stripped = lines.map((line) => stripTerminalSequences(line).replace(/[ \t]+$/, ""));
-    expect(stripped[1]).toBe("  ┃  ◆ Thought for 5s ... (click to collapse)");
-    expect(stripped[2]).toBe("  ┃");
-    expect(stripped[3]).toBe("  ┃    l1");
-    expect(stripped[5]).toBe("  ┃    l3");
+    expect(stripped[0]).toBe("  ┃  ◆ Thought for 5s ... (click to collapse)");
+    expect(stripped[1]).toBe("  ┃");
+    expect(stripped[2]).toBe("  ┃    l1");
+    expect(stripped[4]).toBe("  ┃    l3");
     expect(stripped.some((line) => line.includes("Parsed the config schema"))).toBe(false);
     session.shutdown();
   });

@@ -49,6 +49,8 @@ export {
   recordChildSessionStarted,
 } from "./agents/session-links.ts";
 export { shutdownChildSession } from "./agents/session-shutdown.ts";
+export type { ComponentSiblingContext } from "./component-tree.ts";
+export { componentRendersLines, findComponentContext } from "./component-tree.ts";
 export { mapConcurrent } from "./concurrency.ts";
 export type {
   BooleanConfigItem,
@@ -195,9 +197,12 @@ export type {
   RailStatus,
 } from "./tool-rail.ts";
 export {
+  clearRailTailSpacing,
   RAIL_BULLET_AGGREGATE,
   RAIL_BULLET_SINGLE,
+  readRailTailSpacing,
   renderRailLines,
+  setRailTailSpacing,
   TOOL_RAIL_LAYOUT,
   ToolRailComponent,
   toolRailBodyWidth,

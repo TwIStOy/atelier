@@ -5,6 +5,7 @@ import type { Component, Markdown } from "@earendil-works/pi-tui";
 export interface CompactThinkingConfig {
   previewLines: number;
   animationIntervalMs: number;
+  blockSpacing: number;
   summaryEnabled: boolean;
   summaryModel: string;
   summaryMinChars: number;
@@ -45,4 +46,5 @@ export interface AssistantInternals {
 
 export type PatchedPrototype = typeof AssistantMessageComponent.prototype & {
   updateContent: (message: AssistantMessage) => void;
+  render: (width: number) => string[];
 };

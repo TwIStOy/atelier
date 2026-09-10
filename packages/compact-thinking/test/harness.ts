@@ -32,6 +32,7 @@ export interface ActivateOptions {
   theme?: Theme;
   entries?: unknown[];
   ctx?: Record<string, unknown>;
+  tuiRoot?: { children: unknown[] };
 }
 
 export function activateExtension(options: ActivateOptions = {}): TestSession {
@@ -49,9 +50,15 @@ export function activateExtension(options: ActivateOptions = {}): TestSession {
   extension(pi as unknown as ExtensionAPI);
   const sessionStart = handlers.get("session_start")?.[0];
   if (!sessionStart) throw new Error("session_start handler not registered");
+  const setWidget = vi.fn((_key: string, content: unknown) => {
+    if (options.tuiRoot && typeof content === "function") {
+      Object.assign(options.tuiRoot, { invalidate: vi.fn(), requestRender: vi.fn() });
+      (content as (tui: unknown, theme: Theme) => unknown)(options.tuiRoot, options.theme ?? PLAIN_THEME);
+    }
+  });
   sessionStart(undefined, {
     mode: "tui",
-    ui: { theme: options.theme ?? PLAIN_THEME, setWidget: vi.fn() },
+    ui: { theme: options.theme ?? PLAIN_THEME, setWidget },
     modelRegistry: { getAvailable: () => [] },
     sessionManager: { getBranch: () => options.entries ?? [] },
     ...options.ctx,
