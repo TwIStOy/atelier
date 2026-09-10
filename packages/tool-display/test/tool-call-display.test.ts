@@ -187,6 +187,78 @@ describe("collapsed summary line placement", () => {
   });
 });
 
+describe("edit adapter collapsed single-line", () => {
+  it("renders header only when collapsed, with diff stats in the header", () => {
+    globalToolDisplayRegistry.register("edit", editAdapter);
+    const lines = renderCollapsed(
+      "edit",
+      { path: "src/foo.ts", edits: [{ oldText: "a\nb\nc", newText: "a\nX\nc" }] },
+      "Edited src/foo.ts",
+      false,
+    );
+    expect(lines.length).toBe(1);
+    expect(lines[0]).toContain("Edit");
+    expect(lines[0]).toContain("src/foo.ts");
+    expect(lines[0]).toContain("+1");
+    expect(lines[0]).toContain("-1");
+    expect(lines.join("\n")).not.toContain("└");
+  });
+
+  it("omits diff stats when there are no edits", () => {
+    globalToolDisplayRegistry.register("edit", editAdapter);
+    const lines = renderCollapsed("edit", { path: "src/foo.ts" }, "Edited src/foo.ts", false);
+    expect(lines.length).toBe(1);
+    expect(lines[0]).toContain("Edit");
+    expect(lines[0]).not.toContain("+");
+    expect(lines[0]).not.toContain("└");
+  });
+
+  it("omits diff stats when the header has no room for them", () => {
+    globalToolDisplayRegistry.register("edit", editAdapter);
+    const lines = renderToolCall(
+      {
+        toolName: "edit",
+        args: {
+          path: "src/some/very/long/path/that/will/not/fit/in/twenty/columns/foo.ts",
+          edits: [{ oldText: "a", newText: "b" }],
+        },
+        output: "Edited",
+        expanded: false,
+        isPartial: false,
+        isError: false,
+        registry: globalToolDisplayRegistry,
+      },
+      PLAIN_THEME,
+    ).render(20);
+    for (const line of lines) {
+      expect(visibleWidth(line)).toBeLessThanOrEqual(20);
+    }
+  });
+
+  it("keeps the diff view when expanded", () => {
+    globalToolDisplayRegistry.register("edit", editAdapter);
+    const lines = renderToolCall(
+      {
+        toolName: "edit",
+        args: { path: "src/foo.ts", edits: [{ oldText: "a\nb\nc", newText: "a\nX\nc" }] },
+        output: "Edited src/foo.ts",
+        expanded: true,
+        isPartial: false,
+        isError: false,
+        registry: globalToolDisplayRegistry,
+      },
+      PLAIN_THEME,
+    ).render(80);
+    const joined = lines
+      .join("\n")
+      .replace(/\x1b\[[0-9;]*m/g, "")
+      .replace(/\x1b\[[0-9;]*K/g, "");
+    expect(lines[0]).toContain("Edit");
+    expect(joined).toContain("-b");
+    expect(joined).toContain("+X");
+  });
+});
+
 describe("bash adapter command display width", () => {
   const LONG_CMD =
     "nix build .#default --print-build-logs --fallback --extra-experimental-features 'nix-command flakes ca-derivations' --cores 8 --max-jobs 4";
