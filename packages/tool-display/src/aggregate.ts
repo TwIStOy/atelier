@@ -54,12 +54,12 @@ export function aggregateRailSpec(members: readonly AggregateMemberState[], them
     if (member.isPartial) hasPartial = true;
   }
   if (hasError) {
-    return { mark: "aggregate", bullet: RAIL_BULLET_AGGREGATE, status: "error" };
+    return { mark: "run", bullet: RAIL_BULLET_AGGREGATE, status: "error" };
   }
   if (hasPartial) {
-    return { mark: "aggregate", bullet: spinnerGlyph(theme, spinAt) };
+    return { mark: "aggregate", bullet: spinnerGlyph(theme, spinAt), railStatus: "dim" };
   }
-  return { mark: "aggregate", bullet: RAIL_BULLET_AGGREGATE, status: "success" };
+  return { mark: "aggregate", bullet: RAIL_BULLET_AGGREGATE, status: "success", railStatus: "dim" };
 }
 
 export function renderAggregateLine(
@@ -68,6 +68,10 @@ export function renderAggregateLine(
   width: number,
   spinAt = Date.now(),
 ): string[] {
-  const body = aggregateSummary(members);
+  let body = aggregateSummary(members);
+  const failed = members.filter((member) => member.isError).length;
+  if (failed > 0) {
+    body += ` ${theme.fg("error", `· ${failed} failed`)}`;
+  }
   return renderRailLines([body], aggregateRailSpec(members, theme, spinAt), theme, width);
 }

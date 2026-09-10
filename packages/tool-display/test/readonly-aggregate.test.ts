@@ -197,14 +197,14 @@ describe("read-only tool aggregation", () => {
     expect(asPatched(read3).render(80).join("\n")).not.toContain("◈");
   });
 
-  it("renders the whole group red when any member failed", () => {
+  it("renders the whole group red with the standard run rail when any member failed", () => {
     activateExtension();
     const root: FakeRoot = { children: [] };
     const grep1 = withResult(makeComponent("grep", root));
     const read1 = withResult(makeComponent("read", root), true);
     root.children.push(grep1, read1);
 
-    expect(asPatched(grep1).render(80)).toEqual(["", "  ❙  ◈ Searched 1 pattern, Read 1 file"]);
+    expect(asPatched(grep1).render(80)).toEqual(["", "  ┃  ◈ Searched 1 pattern, Read 1 file · 1 failed"]);
     expect(asPatched(read1).render(80)).toEqual([]);
   });
 

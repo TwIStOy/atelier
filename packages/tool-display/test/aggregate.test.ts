@@ -15,7 +15,7 @@ const PLAIN_THEME: Theme = {
   bold: (text: string) => text,
 } as Theme;
 
-const ANSI_CODES: Record<string, string> = { success: "32", error: "31" };
+const ANSI_CODES: Record<string, string> = { success: "32", error: "31", dim: "90" };
 const ANSI_THEME: Theme = {
   fg: (color: string, text: string) => `\x1b[${ANSI_CODES[color]}m${text}\x1b[39m`,
   bg: (_c: string, text: string) => text,
@@ -95,17 +95,20 @@ describe("aggregateSummary", () => {
 });
 
 describe("aggregateRailSpec", () => {
-  it("marks completed groups green with the aggregate bullet", () => {
+  it("marks completed groups with a dim aggregate rail and a green bullet", () => {
     const spec = aggregateRailSpec([member("read"), member("grep")], PLAIN_THEME, 0);
     expect(spec.mark).toBe("aggregate");
     expect(spec.bullet).toBe("◈");
     expect(spec.status).toBe("success");
+    expect(spec.railStatus).toBe("dim");
   });
 
-  it("marks the group red when any member errored", () => {
+  it("switches to the standard run rail in red when any member errored", () => {
     const spec = aggregateRailSpec([member("read"), member("grep", { error: true })], PLAIN_THEME, 0);
+    expect(spec.mark).toBe("run");
     expect(spec.bullet).toBe("◈");
     expect(spec.status).toBe("error");
+    expect(spec.railStatus).toBeUndefined();
   });
 
   it("prefers the error state over a still-partial member", () => {
@@ -114,15 +117,17 @@ describe("aggregateRailSpec", () => {
       PLAIN_THEME,
       0,
     );
+    expect(spec.mark).toBe("run");
     expect(spec.bullet).toBe("◈");
     expect(spec.status).toBe("error");
   });
 
-  it("uses a spinner bullet while any member is partial", () => {
+  it("uses a spinner bullet with a dim aggregate rail while any member is partial", () => {
     const spec = aggregateRailSpec([member("read"), member("grep", { partial: true })], PLAIN_THEME, 0);
     expect(spec.mark).toBe("aggregate");
     expect(SPINNER_FRAMES).toContain(spec.bullet);
     expect(spec.status).toBeUndefined();
+    expect(spec.railStatus).toBe("dim");
   });
 });
 
@@ -132,18 +137,30 @@ describe("renderAggregateLine", () => {
     expect(lines).toEqual(["  ❙  ◈ Searched 1 pattern, Read 2 files, Listed 1 dir"]);
   });
 
-  it("colors the rail and bullet red when a member errored", () => {
+  it("renders the standard red run rail, red bullet, and failed suffix when a member errored", () => {
     const lines = renderAggregateLine([member("read"), member("grep", { error: true })], ANSI_THEME, 80);
-    expect(lines[0]).toBe("  \x1b[31m❙\x1b[39m  \x1b[31m◈\x1b[39m Read 1 file, Searched 1 pattern");
+    expect(lines[0]).toBe(
+      "  \x1b[31m┃\x1b[39m  \x1b[31m◈\x1b[39m Read 1 file, Searched 1 pattern \x1b[31m· 1 failed\x1b[39m",
+    );
   });
 
-  it("colors the rail and bullet green on success", () => {
+  it("counts every errored member in the failed suffix", () => {
+    const lines = renderAggregateLine(
+      [member("read", { error: true }), member("read", { error: true }), member("grep")],
+      PLAIN_THEME,
+      80,
+    );
+    expect(lines).toEqual(["  ┃  ◈ Read 2 files, Searched 1 pattern · 2 failed"]);
+  });
+
+  it("renders a dim rail with a green bullet on success", () => {
     const lines = renderAggregateLine([member("read"), member("read")], ANSI_THEME, 80);
-    expect(lines[0]).toBe("  \x1b[32m❙\x1b[39m  \x1b[32m◈\x1b[39m Read 2 files");
+    expect(lines[0]).toBe("  \x1b[90m❙\x1b[39m  \x1b[32m◈\x1b[39m Read 2 files");
   });
 
-  it("renders a spinner bullet with an uncolored rail while partial", () => {
+  it("renders a spinner bullet with a dim rail while partial", () => {
     const lines = renderAggregateLine([member("grep", { partial: true }), member("read")], ANSI_THEME, 80, 0);
+    expect(lines[0]).toContain("\x1b[90m❙\x1b[39m");
     expect(stripTerminalSequences(lines[0])).toBe("  ❙  ⠋ Searching…, Read 1 file");
   });
 

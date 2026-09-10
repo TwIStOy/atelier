@@ -295,7 +295,7 @@ export function renderToolCall(
       }
 
       const spec: RailSpec = {
-        mark: lines.length > 1 ? "run" : "none",
+        mark: "run",
         bullet: bullet.bullet,
         status: bullet.status,
       };
