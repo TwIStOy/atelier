@@ -197,6 +197,7 @@ export type {
 export {
   RAIL_BULLET_AGGREGATE,
   RAIL_BULLET_SINGLE,
+  RAIL_MARK_GLYPH,
   renderRailLines,
   TOOL_RAIL_LAYOUT,
   ToolRailComponent,

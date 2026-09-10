@@ -64,15 +64,21 @@ import type { ExtensionAPI, Theme } from "@earendil-works/pi-coding-agent";
 import { ToolExecutionComponent } from "@earendil-works/pi-coding-agent";
 import { Container, Editor } from "@earendil-works/pi-tui";
 import { isExtensionDisabled } from "@htwang-contrib/common";
-import { isAggregateToolName, renderAggregateLine } from "./aggregate.ts";
+import {
+  aggregateSubrowBodyWidth,
+  isAggregateToolName,
+  renderAggregateLine,
+  renderAggregateSubrowLine,
+} from "./aggregate.ts";
 import { registerToolDisplayConfigItems } from "./config.ts";
 import { globalToolDisplayRegistry } from "./registry.ts";
-import { renderToolCall } from "./tool-call-display.ts";
+import { formatGenericToolHeader, renderToolCall, type ToolDisplayRegistry, toolBullet } from "./tool-call-display.ts";
 import type { ToolDisplayAdapter } from "./types.ts";
 
 type ToolExecutionPatchThis = {
   hideComponent?: boolean;
   __tdHovered?: boolean;
+  __tdAggregateLeadingBlank?: boolean;
   toolName: string;
   args: Record<string, unknown>;
   expanded: boolean;
@@ -101,6 +107,7 @@ type PatchedMouseEvent = {
   type: string;
   button?: string;
   width?: number;
+  y?: number;
 };
 
 let hoveredTool: ToolExecutionPatchThis | undefined;
@@ -195,44 +202,101 @@ function asToolExecution(component: unknown): ToolExecutionPatchThis | undefined
   return component instanceof ToolExecutionComponent ? (component as unknown as ToolExecutionPatchThis) : undefined;
 }
 
-function isAggregateCandidate(component: unknown): component is ToolExecutionPatchThis {
-  const tool = asToolExecution(component);
-  return tool !== undefined && isAggregateToolName(tool.toolName) && !tool.expanded && !tool.hideComponent;
+interface AggregateGroupResolution {
+  role: "leader" | "member";
+  leader: ToolExecutionPatchThis;
+  members: ToolExecutionPatchThis[];
+  groupExpanded: boolean;
 }
 
-type AggregateGroupRole = { role: "member" } | { role: "leader"; members: ToolExecutionPatchThis[] };
+const aggregateGroupState = new WeakMap<ToolExecutionPatchThis, { expanded: boolean }>();
 
-function resolveAggregateRole(component: ToolExecutionPatchThis, width: number): AggregateGroupRole | undefined {
-  if (!isAggregateCandidate(component)) return undefined;
-  const context = findSiblingContext((component as { ui?: unknown }).ui, component);
-  if (!context) return undefined;
-  const { siblings, index } = context;
+function isAggregateToolComponent(component: unknown): component is ToolExecutionPatchThis {
+  const tool = asToolExecution(component);
+  return tool !== undefined && isAggregateToolName(tool.toolName) && !tool.hideComponent;
+}
 
-  let followsAggregateSibling = false;
+// A sequence member can head a group when it is collapsed, or when it already leads an
+// expanded group and was individually expanded through its own subrow.
+function isGroupHeadCandidate(tool: ToolExecutionPatchThis): boolean {
+  return !tool.expanded || aggregateGroupState.get(tool)?.expanded === true;
+}
+
+function aggregateSequenceHead(siblings: unknown[], index: number, width: number): ToolExecutionPatchThis | undefined {
+  const self = siblings[index] as ToolExecutionPatchThis;
+  let head: ToolExecutionPatchThis | undefined = isGroupHeadCandidate(self) ? self : undefined;
   for (let i = index - 1; i >= 0; i--) {
     const tool = asToolExecution(siblings[i]);
     if (tool) {
       if (tool.hideComponent) continue;
-      if (isAggregateCandidate(tool)) followsAggregateSibling = true;
-      break;
+      if (!isAggregateToolName(tool.toolName)) break;
+      if (isGroupHeadCandidate(tool)) head = tool;
+      continue;
     }
     if (siblingRendersLines(siblings[i], width)) break;
   }
-  if (followsAggregateSibling) return { role: "member" };
+  return head;
+}
 
-  const members: ToolExecutionPatchThis[] = [component];
-  for (let i = index + 1; i < siblings.length; i++) {
+function candidateRunHead(siblings: unknown[], index: number, width: number): ToolExecutionPatchThis {
+  let head = siblings[index] as ToolExecutionPatchThis;
+  for (let i = index - 1; i >= 0; i--) {
     const tool = asToolExecution(siblings[i]);
     if (tool) {
       if (tool.hideComponent) continue;
-      if (!isAggregateCandidate(tool)) break;
+      if (!isAggregateToolName(tool.toolName) || tool.expanded) break;
+      head = tool;
+      continue;
+    }
+    if (siblingRendersLines(siblings[i], width)) break;
+  }
+  return head;
+}
+
+function collectAggregateSequence(
+  siblings: unknown[],
+  startIndex: number,
+  width: number,
+  includeExpanded: boolean,
+): ToolExecutionPatchThis[] {
+  const members: ToolExecutionPatchThis[] = [];
+  for (let i = startIndex; i < siblings.length; i++) {
+    const tool = asToolExecution(siblings[i]);
+    if (tool) {
+      if (tool.hideComponent) continue;
+      if (!isAggregateToolName(tool.toolName)) break;
+      if (!includeExpanded && tool.expanded) break;
       members.push(tool);
     } else if (siblingRendersLines(siblings[i], width)) {
       break;
     }
   }
+  return members;
+}
+
+// The surrounding aggregate sequence is re-derived on every call so streaming arrivals and
+// session replay resolve identically. An expanded group keyed on its leader absorbs members
+// even while they are individually expanded; without group state, expanded widgets break
+// candidate runs exactly as before.
+function resolveAggregateRole(component: ToolExecutionPatchThis, width: number): AggregateGroupResolution | undefined {
+  if (!isAggregateToolComponent(component)) return undefined;
+  const context = findSiblingContext((component as { ui?: unknown }).ui, component);
+  if (!context) return undefined;
+  const { siblings, index } = context;
+
+  const head = aggregateSequenceHead(siblings, index, width);
+  if (head && aggregateGroupState.get(head)?.expanded) {
+    const members = collectAggregateSequence(siblings, siblings.indexOf(head), width, true);
+    if (members.length >= 2) {
+      return { role: component === head ? "leader" : "member", leader: head, members, groupExpanded: true };
+    }
+  }
+
+  if (component.expanded) return undefined;
+  const runHead = candidateRunHead(siblings, index, width);
+  const members = collectAggregateSequence(siblings, siblings.indexOf(runHead), width, false);
   if (members.length < 2) return undefined;
-  return { role: "leader", members };
+  return { role: component === runHead ? "leader" : "member", leader: runHead, members, groupExpanded: false };
 }
 
 function aggregateMemberStates(members: ToolExecutionPatchThis[]) {
@@ -241,6 +305,37 @@ function aggregateMemberStates(members: ToolExecutionPatchThis[]) {
     isPartial: member.isPartial,
     isError: member.result?.isError === true,
   }));
+}
+
+function renderAggregateMemberSubrow(
+  component: ToolExecutionPatchThis,
+  theme: Theme,
+  width: number,
+  registry: ToolDisplayRegistry,
+): string {
+  const bodyWidth = aggregateSubrowBodyWidth(width);
+  const adapter = registry.get(component.toolName);
+  const output = component.result ? component.getTextOutput?.() : undefined;
+  const header =
+    adapter?.formatCallHeader(
+      component.args,
+      theme,
+      component.result?.details,
+      component.isPartial,
+      false,
+      bodyWidth,
+      output,
+    ) ?? formatGenericToolHeader(component.toolName, component.args, theme, Math.max(1, bodyWidth));
+  const bullet = toolBullet(
+    component.toolName,
+    component.isPartial,
+    component.result?.isError === true,
+    component.result?.details,
+    theme,
+    Date.now(),
+    component.__tdHovered === true,
+  );
+  return renderAggregateSubrowLine((header.split("\n")[0] ?? "").trimEnd(), bullet.bullet, bullet.status, theme, width);
 }
 
 function applyGroupSpacing(lines: string[], previous: unknown, ensureLeadingBlank: boolean): string[] {
@@ -275,11 +370,37 @@ function patchToolExecutionRender(getTheme: () => Theme, registry: typeof global
     if (this.hideComponent) return [];
 
     const aggregateRole = resolveAggregateRole(this, width);
-    if (aggregateRole?.role === "member") return [];
+    if (aggregateRole?.role === "member") {
+      if (!aggregateRole.groupExpanded) return [];
+      if (!this.expanded) {
+        const theme = proto.__tdGetTheme?.() ?? FALLBACK_THEME;
+        return [renderAggregateMemberSubrow(this, theme, width, proto.__tdRegistry)];
+      }
+    }
+
+    let aggregatePrefix: string[] = [];
     if (aggregateRole?.role === "leader") {
       const theme = proto.__tdGetTheme?.() ?? FALLBACK_THEME;
-      const lines = renderAggregateLine(aggregateMemberStates(aggregateRole.members), theme, width);
-      return applyGroupSpacing(lines, findPreviousVisibleOf(this, width), true);
+      const lines = renderAggregateLine(
+        aggregateMemberStates(aggregateRole.members),
+        theme,
+        width,
+        Date.now(),
+        aggregateRole.groupExpanded,
+      );
+      const previous = findPreviousVisibleOf(this, width);
+      // Click routing must match the layout the TUI routed the event against, so the
+      // separator state is captured at render time instead of being recomputed from the
+      // mouse event's width.
+      this.__tdAggregateLeadingBlank = !(previous instanceof ToolExecutionComponent);
+      if (!aggregateRole.groupExpanded) {
+        return applyGroupSpacing(lines, previous, true);
+      }
+      if (!this.expanded) {
+        lines.push(renderAggregateMemberSubrow(this, theme, width, proto.__tdRegistry));
+        return applyGroupSpacing(lines, previous, true);
+      }
+      aggregatePrefix = lines;
     }
 
     const reg = proto.__tdRegistry;
@@ -319,15 +440,54 @@ function patchToolExecutionRender(getTheme: () => Theme, registry: typeof global
     const rendered = renderToolCall(opts, theme);
     const lines = rendered.render(width);
 
-    return applyGroupSpacing(lines, findPreviousVisibleOf(this, width), true);
+    return applyGroupSpacing([...aggregatePrefix, ...lines], findPreviousVisibleOf(this, width), true);
   };
 
   const originalHandleMouse = proto.handleMouse as
     | ((this: ToolExecutionPatchThis, event: PatchedMouseEvent) => unknown)
     | undefined;
+
+  function toggleAggregateGroup(aggregate: AggregateGroupResolution): void {
+    if (aggregateGroupState.get(aggregate.leader)?.expanded) {
+      aggregateGroupState.delete(aggregate.leader);
+      for (const member of aggregate.members) {
+        if (member.expanded) member.setExpanded(false);
+      }
+      return;
+    }
+    aggregateGroupState.set(aggregate.leader, { expanded: true });
+  }
+
+  function handleAggregateClick(
+    component: ToolExecutionPatchThis,
+    aggregate: AggregateGroupResolution,
+    event: PatchedMouseEvent,
+  ): { handled: true } | undefined {
+    if (aggregate.role === "leader") {
+      const summaryY = component.__tdAggregateLeadingBlank === true ? 1 : 0;
+      const y = event.y ?? 0;
+      if (aggregate.groupExpanded && y > summaryY) {
+        if (!component.expanded && !component.result) return undefined;
+        component.setExpanded(!component.expanded);
+        return { handled: true };
+      }
+      if (y < summaryY) return undefined;
+      toggleAggregateGroup(aggregate);
+      return { handled: true };
+    }
+    if (!aggregate.groupExpanded) return undefined;
+    if (!component.expanded && !component.result) return undefined;
+    component.setExpanded(!component.expanded);
+    return { handled: true };
+  }
+
   proto.handleMouse = function (this: ToolExecutionPatchThis, event: PatchedMouseEvent) {
-    if (event.type === "click" && resolveAggregateRole(this, event.width ?? 0) !== undefined) {
-      return undefined;
+    if (event.type === "click") {
+      const aggregateRole = resolveAggregateRole(this, event.width ?? 0);
+      if (aggregateRole) {
+        if (event.button !== "left") return undefined;
+        return handleAggregateClick(this, aggregateRole, event);
+      }
     }
     // Claim hover moves before the stock handler: for default-shell tools the stock
     // handleMouse delegates through Container.prototype.handleMouse, which the

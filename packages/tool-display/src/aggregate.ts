@@ -1,5 +1,13 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { RAIL_BULLET_AGGREGATE, type RailSpec, renderRailLines } from "@htwang-contrib/common";
+import { truncateToWidth } from "@earendil-works/pi-tui";
+import {
+  RAIL_BULLET_AGGREGATE,
+  RAIL_MARK_GLYPH,
+  type RailSpec,
+  type RailStatus,
+  renderRailLines,
+  TOOL_RAIL_LAYOUT,
+} from "@htwang-contrib/common";
 import { spinnerGlyph } from "./format.ts";
 
 export interface AggregateMemberState {
@@ -67,7 +75,33 @@ export function renderAggregateLine(
   theme: Theme,
   width: number,
   spinAt = Date.now(),
+  expanded = false,
 ): string[] {
   const body = aggregateSummary(members);
-  return renderRailLines([body], aggregateRailSpec(members, theme, spinAt), theme, width);
+  const spec = aggregateRailSpec(members, theme, spinAt);
+  if (expanded) spec.mark = "run";
+  return renderRailLines([body], spec, theme, width);
+}
+
+const SUBROW_BULLET_COLUMN = TOOL_RAIL_LAYOUT.bulletColumn + 3;
+const SUBROW_PREFIX_WIDTH = SUBROW_BULLET_COLUMN + 2;
+
+export function aggregateSubrowBodyWidth(width: number): number {
+  return Math.max(0, width - SUBROW_PREFIX_WIDTH);
+}
+
+export function renderAggregateSubrowLine(
+  header: string,
+  bullet: string,
+  status: RailStatus | undefined,
+  theme: Theme,
+  width: number,
+): string {
+  const railGlyph = RAIL_MARK_GLYPH.run;
+  const rail = status ? theme.fg(status, railGlyph) : railGlyph;
+  const styledBullet = status ? theme.fg(status, bullet) : bullet;
+  const lead = " ".repeat(TOOL_RAIL_LAYOUT.railColumn);
+  const gap = " ".repeat(SUBROW_BULLET_COLUMN - TOOL_RAIL_LAYOUT.railColumn - 1);
+  const line = `${lead}${rail}${gap}${styledBullet} ${header}`;
+  return truncateToWidth(line, width, "…");
 }

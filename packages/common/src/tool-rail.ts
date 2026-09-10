@@ -26,7 +26,7 @@ export interface RailSpec {
   bar?: RailBar;
 }
 
-const RAIL_MARK_GLYPH: Record<RailMark, string> = {
+export const RAIL_MARK_GLYPH: Record<RailMark, string> = {
   aggregate: "❙",
   run: "┃",
   none: "",
