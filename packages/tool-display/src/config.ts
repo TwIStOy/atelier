@@ -7,6 +7,8 @@ export interface ToolDisplayConfig {
   splitDiffMinWidth: number;
   editStyle: "single-line" | "two-line";
   readStyle: "single-line" | "two-line";
+  groupToolVerbs: boolean;
+  groupMaxVisible: number;
 }
 
 const CONFIG_NAME = "tool-display";
@@ -18,6 +20,8 @@ const CONFIG_SCHEMA: ExtensionConfigSchema<ToolDisplayConfig> = {
     splitDiffMinWidth: 100,
     editStyle: "single-line",
     readStyle: "two-line",
+    groupToolVerbs: true,
+    groupMaxVisible: 10,
   },
 };
 
@@ -95,6 +99,28 @@ export function registerToolDisplayConfigItems(): void {
         { label: "Two-line", value: "two-line" },
         { label: "Single-line", value: "single-line" },
       ],
+    },
+    {
+      key: "groupToolVerbs",
+      type: "boolean",
+      label: "Group Tool Calls",
+      value: () => loadConfig().groupToolVerbs,
+      description:
+        "Fold consecutive read-only tool calls (grep/glob/ls/read, plus names with a registered Aggregate Rule) into one aggregate summary row",
+      extensionLabel: "Tool Display",
+      order: 5,
+    },
+    {
+      key: "groupMaxVisible",
+      type: "number",
+      label: "Group Max Visible",
+      value: () => loadConfig().groupMaxVisible,
+      description:
+        "Hide older collapsed tool calls behind a truncation header when a dense run exceeds this many entries (0 disables truncation)",
+      extensionLabel: "Tool Display",
+      order: 6,
+      min: 0,
+      max: 100,
     },
   ]);
 }

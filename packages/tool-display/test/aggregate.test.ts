@@ -1,15 +1,21 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { stripTerminalSequences, visibleWidth } from "@earendil-works/pi-tui";
-import { describe, expect, it } from "vitest";
+import { aggregateRuleFor, registerAggregateRule, resetAggregateRulesForTest } from "@htwang-contrib/common";
+import { afterEach, describe, expect, it } from "vitest";
 import {
   type AggregateMemberState,
   aggregateRailSpec,
   aggregateSubrowBodyWidth,
   aggregateSummary,
-  isAggregateToolName,
   renderAggregateLine,
   renderAggregateSubrowLine,
+  renderTruncationLine,
+  truncationSummary,
 } from "../src/aggregate.ts";
+
+afterEach(() => {
+  resetAggregateRulesForTest();
+});
 
 const PLAIN_THEME: Theme = {
   fg: (_c: string, text: string) => text,
@@ -30,13 +36,13 @@ function member(toolName: string, opts: { partial?: boolean; error?: boolean } =
   return { toolName, isPartial: opts.partial ?? false, isError: opts.error ?? false };
 }
 
-describe("isAggregateToolName", () => {
-  it("accepts exactly the four read-only tools", () => {
+describe("aggregate rule lookup", () => {
+  it("covers exactly the four read-only tools by default", () => {
     for (const name of ["grep", "glob", "ls", "read"]) {
-      expect(isAggregateToolName(name)).toBe(true);
+      expect(aggregateRuleFor(name)).toBeDefined();
     }
     for (const name of ["bash", "edit", "write", "subagent", "todo_create", "web_search"]) {
-      expect(isAggregateToolName(name)).toBe(false);
+      expect(aggregateRuleFor(name)).toBeUndefined();
     }
   });
 });
@@ -93,6 +99,65 @@ describe("aggregateSummary", () => {
 
   it("ignores members outside the aggregate tool set", () => {
     expect(aggregateSummary([member("read"), member("bash")])).toBe("Read 1 file");
+  });
+
+  it("phrases members from extension-registered rules", () => {
+    registerAggregateRule("web_fetch", {
+      verb: "Fetched",
+      singular: "page",
+      plural: "pages",
+      progressive: "Fetching…",
+    });
+    expect(aggregateSummary([member("read"), member("web_fetch"), member("web_fetch")])).toBe(
+      "Read 1 file, Fetched 2 pages",
+    );
+    expect(aggregateRuleFor("web_fetch")).toBeDefined();
+  });
+});
+
+describe("truncationSummary", () => {
+  const hidden = (toolName: string, count: number, opts: { error?: boolean } = {}) =>
+    Array.from({ length: count }, () => member(toolName, opts));
+
+  it("phrases a uniform bash run as Ran N commands", () => {
+    expect(truncationSummary(hidden("bash", 2), true)).toBe("Ran 2 commands");
+    expect(truncationSummary(hidden("bash", 1), true)).toBe("Ran 1 command");
+  });
+
+  it("phrases a uniform edit-bucket run as Edited N files", () => {
+    expect(truncationSummary(hidden("edit", 3), true)).toBe("Edited 3 files");
+    expect(truncationSummary([...hidden("edit", 1), ...hidden("write", 1), ...hidden("apply_patch", 1)], true)).toBe(
+      "Edited 3 files",
+    );
+  });
+
+  it("falls back to N more for mixed or rule-less runs", () => {
+    expect(truncationSummary([...hidden("bash", 2), ...hidden("edit", 1)], true)).toBe("3 more");
+    expect(truncationSummary(hidden("todo_create", 4), true)).toBe("4 more");
+  });
+
+  it("keeps Aggregate Rule phrasing when the verb-group is off", () => {
+    expect(truncationSummary(hidden("read", 8), false)).toBe("Read 8 files");
+    expect(truncationSummary(hidden("grep", 2), false)).toBe("Searched 2 patterns");
+    expect(truncationSummary([...hidden("read", 2), ...hidden("grep", 1)], false)).toBe(
+      "Read 2 files, Searched 1 pattern",
+    );
+  });
+
+  it("uses Ran/Edited phrasing, not rules, while the verb-group is on", () => {
+    expect(truncationSummary(hidden("read", 3), true)).toBe("3 more");
+  });
+});
+
+describe("renderTruncationLine", () => {
+  it("renders the header with the aggregate rail and bullet", () => {
+    const lines = renderTruncationLine([member("bash"), member("bash")], true, PLAIN_THEME, 80);
+    expect(lines).toEqual(["  ❙  ◈ Ran 2 commands"]);
+  });
+
+  it("renders the failure suffix in red with the run rail when any hidden member errored", () => {
+    const lines = renderTruncationLine([member("bash"), member("bash", { error: true })], true, ANSI_THEME, 80);
+    expect(lines[0]).toBe("  \x1b[31m┃\x1b[39m  \x1b[31m◈\x1b[39m Ran 2 commands \x1b[31m· 1 failed\x1b[39m");
   });
 });
 

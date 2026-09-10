@@ -64,18 +64,27 @@ import type { ExtensionAPI, Theme } from "@earendil-works/pi-coding-agent";
 import { ToolExecutionComponent } from "@earendil-works/pi-coding-agent";
 import { Container, Editor } from "@earendil-works/pi-tui";
 import {
+  AGGREGATE_RULE_READY_EVENT,
+  AGGREGATE_RULE_REGISTER_EVENT,
+  type AggregateRule,
+  aggregateRuleFor,
   componentRendersLines,
   findComponentContext,
   isExtensionDisabled,
+  isThoughtMember,
+  isThoughtMemberClaimed,
+  isThoughtTransparent,
   readRailTailSpacing,
+  registerAggregateRule,
+  setThoughtMemberClaimed,
 } from "@htwang-contrib/common";
 import {
   aggregateSubrowBodyWidth,
-  isAggregateToolName,
   renderAggregateLine,
   renderAggregateSubrowLine,
+  renderTruncationLine,
 } from "./aggregate.ts";
-import { registerToolDisplayConfigItems } from "./config.ts";
+import { loadConfig, registerToolDisplayConfigItems } from "./config.ts";
 import { globalToolDisplayRegistry } from "./registry.ts";
 import { formatGenericToolHeader, renderToolCall, type ToolDisplayRegistry, toolBullet } from "./tool-call-display.ts";
 import type { ToolDisplayAdapter } from "./types.ts";
@@ -180,101 +189,173 @@ function asToolExecution(component: unknown): ToolExecutionPatchThis | undefined
   return component instanceof ToolExecutionComponent ? (component as unknown as ToolExecutionPatchThis) : undefined;
 }
 
-interface AggregateGroupResolution {
-  role: "leader" | "member";
-  leader: ToolExecutionPatchThis;
-  members: ToolExecutionPatchThis[];
-  groupExpanded: boolean;
-}
-
 const aggregateGroupState = new WeakMap<ToolExecutionPatchThis, { expanded: boolean }>();
 
-function isAggregateToolComponent(component: unknown): component is ToolExecutionPatchThis {
-  const tool = asToolExecution(component);
-  return tool !== undefined && isAggregateToolName(tool.toolName) && !tool.hideComponent;
-}
+type GroupRole =
+  | { role: "verb-leader"; members: ToolExecutionPatchThis[]; groupExpanded: boolean }
+  | { role: "truncation-leader"; hidden: ToolExecutionPatchThis[] }
+  | { role: "claimed"; groupExpanded: boolean };
 
-// A sequence member can head a group when it is collapsed, or when it already leads an
-// expanded group and was individually expanded through its own subrow.
-function isGroupHeadCandidate(tool: ToolExecutionPatchThis): boolean {
-  return !tool.expanded || aggregateGroupState.get(tool)?.expanded === true;
-}
-
-function aggregateSequenceHead(siblings: unknown[], index: number, width: number): ToolExecutionPatchThis | undefined {
-  const self = siblings[index] as ToolExecutionPatchThis;
-  let head: ToolExecutionPatchThis | undefined = isGroupHeadCandidate(self) ? self : undefined;
-  for (let i = index - 1; i >= 0; i--) {
-    const tool = asToolExecution(siblings[i]);
-    if (tool) {
-      if (tool.hideComponent) continue;
-      if (!isAggregateToolName(tool.toolName)) break;
-      if (isGroupHeadCandidate(tool)) head = tool;
-      continue;
-    }
-    if (componentRendersLines(siblings[i], width)) break;
-  }
-  return head;
-}
-
-function candidateRunHead(siblings: unknown[], index: number, width: number): ToolExecutionPatchThis {
-  let head = siblings[index] as ToolExecutionPatchThis;
-  for (let i = index - 1; i >= 0; i--) {
-    const tool = asToolExecution(siblings[i]);
-    if (tool) {
-      if (tool.hideComponent) continue;
-      if (!isAggregateToolName(tool.toolName) || tool.expanded) break;
-      head = tool;
-      continue;
-    }
-    if (componentRendersLines(siblings[i], width)) break;
-  }
-  return head;
-}
-
-function collectAggregateSequence(
-  siblings: unknown[],
-  startIndex: number,
-  width: number,
-  includeExpanded: boolean,
-): ToolExecutionPatchThis[] {
-  const members: ToolExecutionPatchThis[] = [];
-  for (let i = startIndex; i < siblings.length; i++) {
-    const tool = asToolExecution(siblings[i]);
-    if (tool) {
-      if (tool.hideComponent) continue;
-      if (!isAggregateToolName(tool.toolName)) break;
-      if (!includeExpanded && tool.expanded) break;
-      members.push(tool);
-    } else if (componentRendersLines(siblings[i], width)) {
-      break;
-    }
-  }
-  return members;
-}
-
-// The surrounding aggregate sequence is re-derived on every call so streaming arrivals and
-// session replay resolve identically. An expanded group keyed on its leader absorbs members
-// even while they are individually expanded; without group state, expanded widgets break
-// candidate runs exactly as before.
-function resolveAggregateRole(component: ToolExecutionPatchThis, width: number): AggregateGroupResolution | undefined {
-  if (!isAggregateToolComponent(component)) return undefined;
+// Grouping is recomputed from the chat sibling list on every render, so leader
+// election stays idempotent across streaming appends and session replay. The
+// scan covers the hard-break-bounded region around the component: verb-group
+// claims rule-registered tools and eligible ThoughtMembers first, then the
+// truncation layer folds what remains of over-long dense tool runs.
+function resolveGroupRole(component: ToolExecutionPatchThis, width: number): GroupRole | undefined {
   const context = findComponentContext((component as { ui?: unknown }).ui, component);
   if (!context) return undefined;
   const { siblings, index } = context;
+  const { groupToolVerbs, groupMaxVisible } = loadConfig();
 
-  const head = aggregateSequenceHead(siblings, index, width);
-  if (head && aggregateGroupState.get(head)?.expanded) {
-    const members = collectAggregateSequence(siblings, siblings.indexOf(head), width, true);
-    if (members.length >= 2) {
-      return { role: component === head ? "leader" : "member", leader: head, members, groupExpanded: true };
+  const isHardBreak = (sibling: unknown): boolean => {
+    if (asToolExecution(sibling)) return false;
+    if (isThoughtMember(sibling) || isThoughtTransparent(sibling)) return false;
+    return componentRendersLines(sibling, width);
+  };
+  let lo = index;
+  while (lo > 0 && !isHardBreak(siblings[lo - 1])) lo--;
+  let hi = index;
+  while (hi < siblings.length - 1 && !isHardBreak(siblings[hi + 1])) hi++;
+
+  type VerbClass = "member" | "thought" | "transparent" | "break";
+  const verbClasses = new Map<number, VerbClass>();
+  for (let i = lo; i <= hi; i++) {
+    const sibling = siblings[i];
+    const tool = asToolExecution(sibling);
+    if (tool) {
+      if (tool.hideComponent) {
+        verbClasses.set(i, "transparent");
+      } else if (tool.expanded) {
+        // A leader expanded through its own subrow keeps heading its expanded
+        // group; any other expanded tool is Transparent to the scan.
+        const headsExpandedGroup =
+          groupToolVerbs &&
+          aggregateRuleFor(tool.toolName) !== undefined &&
+          aggregateGroupState.get(tool)?.expanded === true;
+        verbClasses.set(i, headsExpandedGroup ? "member" : "transparent");
+      } else if (groupToolVerbs && aggregateRuleFor(tool.toolName) !== undefined) {
+        verbClasses.set(i, "member");
+      } else {
+        verbClasses.set(i, "break");
+      }
+    } else if (isThoughtMember(sibling)) {
+      verbClasses.set(i, "thought");
+    } else {
+      verbClasses.set(i, "transparent");
     }
   }
 
-  if (component.expanded) return undefined;
-  const runHead = candidateRunHead(siblings, index, width);
-  const members = collectAggregateSequence(siblings, siblings.indexOf(runHead), width, false);
-  if (members.length < 2) return undefined;
-  return { role: component === runHead ? "leader" : "member", leader: runHead, members, groupExpanded: false };
+  const spans: { leader: number; members: number[]; thoughts: number[]; groupExpanded: boolean }[] = [];
+  let i = lo;
+  while (i <= hi) {
+    if (verbClasses.get(i) !== "member") {
+      i++;
+      continue;
+    }
+    const leaderTool = asToolExecution(siblings[i]) as ToolExecutionPatchThis;
+    const groupExpanded = aggregateGroupState.get(leaderTool)?.expanded === true;
+    const members = [i];
+    const thoughts: number[] = [];
+    let lastMember = i;
+    let j = i + 1;
+    for (; j <= hi; j++) {
+      const cls = verbClasses.get(j);
+      if (cls === "member") {
+        members.push(j);
+        lastMember = j;
+      } else if (cls === "thought") {
+        thoughts.push(j);
+      } else if (cls === "transparent" && groupExpanded) {
+        // An expanded group keeps counting individually expanded members; they
+        // render their full rows in place instead of a subrow.
+        const tool = asToolExecution(siblings[j]);
+        if (tool?.expanded && !tool.hideComponent && aggregateRuleFor(tool.toolName) !== undefined) {
+          members.push(j);
+          lastMember = j;
+        }
+      } else if (cls !== "transparent") {
+        break;
+      }
+    }
+    spans.push({ leader: i, members, thoughts: thoughts.filter((t) => t < lastMember), groupExpanded });
+    i = j;
+  }
+
+  const claimedThoughts = new Set<number>();
+  for (const span of spans) {
+    if (span.groupExpanded) continue;
+    for (const t of span.thoughts) claimedThoughts.add(t);
+  }
+  for (let k = lo; k <= hi; k++) {
+    if (verbClasses.get(k) === "thought") {
+      setThoughtMemberClaimed(siblings[k] as object, claimedThoughts.has(k));
+    }
+  }
+
+  const spanCovered = new Set<number>();
+  for (const span of spans) {
+    for (const m of span.members) spanCovered.add(m);
+    for (const t of span.thoughts) spanCovered.add(t);
+  }
+
+  for (const span of spans) {
+    if (index === span.leader) {
+      return {
+        role: "verb-leader",
+        members: span.members.map((m) => asToolExecution(siblings[m]) as ToolExecutionPatchThis),
+        groupExpanded: span.groupExpanded,
+      };
+    }
+    if (span.members.includes(index)) return { role: "claimed", groupExpanded: span.groupExpanded };
+  }
+
+  if (groupMaxVisible > 0) {
+    const runs: number[][] = [];
+    let current: number[] = [];
+    const flushRun = () => {
+      if (current.length > 0) {
+        runs.push(current);
+        current = [];
+      }
+    };
+    for (let k = lo; k <= hi; k++) {
+      if (spanCovered.has(k)) {
+        flushRun();
+        continue;
+      }
+      const tool = asToolExecution(siblings[k]);
+      if (tool) {
+        if (!tool.hideComponent && !tool.expanded) current.push(k);
+        continue;
+      }
+      // Truncation folds contiguous collapsed tools: any sibling that keeps its
+      // own rows (unclaimed thought heading, streaming/expanded thinking panel)
+      // breaks the run. Zero-line leftovers (claimed thoughts, hidden widgets)
+      // are skipped without breaking.
+      if (isThoughtTransparent(siblings[k])) {
+        flushRun();
+        continue;
+      }
+      if (isThoughtMember(siblings[k]) && !isThoughtMemberClaimed(siblings[k])) {
+        flushRun();
+      }
+    }
+    flushRun();
+
+    for (const run of runs) {
+      if (run.length <= groupMaxVisible + 1) continue;
+      const hidden = run.slice(0, run.length - groupMaxVisible);
+      if (index === hidden[0]) {
+        return {
+          role: "truncation-leader",
+          hidden: hidden.map((m) => asToolExecution(siblings[m]) as ToolExecutionPatchThis),
+        };
+      }
+      if (hidden.includes(index)) return { role: "claimed", groupExpanded: false };
+    }
+  }
+
+  return undefined;
 }
 
 function aggregateMemberStates(members: ToolExecutionPatchThis[]) {
@@ -350,31 +431,31 @@ function patchToolExecutionRender(getTheme: () => Theme, registry: typeof global
   proto.render = function (this: ToolExecutionPatchThis, width: number): string[] {
     if (this.hideComponent) return [];
 
-    const aggregateRole = resolveAggregateRole(this, width);
-    if (aggregateRole?.role === "member") {
-      if (!aggregateRole.groupExpanded) return [];
+    const groupRole = resolveGroupRole(this, width);
+    if (groupRole?.role === "claimed") {
       if (!this.expanded) {
+        if (!groupRole.groupExpanded) return [];
         const theme = proto.__tdGetTheme?.() ?? FALLBACK_THEME;
         return [renderAggregateMemberSubrow(this, theme, width, proto.__tdRegistry)];
       }
     }
 
     let aggregatePrefix: string[] = [];
-    if (aggregateRole?.role === "leader") {
+    if (groupRole?.role === "verb-leader") {
       const theme = proto.__tdGetTheme?.() ?? FALLBACK_THEME;
       const lines = renderAggregateLine(
-        aggregateMemberStates(aggregateRole.members),
+        aggregateMemberStates(groupRole.members),
         theme,
         width,
         Date.now(),
-        aggregateRole.groupExpanded,
+        groupRole.groupExpanded,
       );
       const previous = findPreviousVisibleOf(this, width);
       // Click routing must match the layout the TUI routed the event against, so the
       // separator state is captured at render time instead of being recomputed from the
       // mouse event's width.
       this.__tdAggregateLeadingBlank = !(previous instanceof ToolExecutionComponent);
-      if (!aggregateRole.groupExpanded) {
+      if (!groupRole.groupExpanded) {
         return applyGroupSpacing(lines, previous, true);
       }
       if (!this.expanded) {
@@ -382,6 +463,16 @@ function patchToolExecutionRender(getTheme: () => Theme, registry: typeof global
         return applyGroupSpacing(lines, previous, true);
       }
       aggregatePrefix = lines;
+    }
+    if (groupRole?.role === "truncation-leader") {
+      const theme = proto.__tdGetTheme?.() ?? FALLBACK_THEME;
+      const lines = renderTruncationLine(
+        aggregateMemberStates(groupRole.hidden),
+        loadConfig().groupToolVerbs,
+        theme,
+        width,
+      );
+      return applyGroupSpacing(lines, findPreviousVisibleOf(this, width), true);
     }
 
     const reg = proto.__tdRegistry;
@@ -428,35 +519,35 @@ function patchToolExecutionRender(getTheme: () => Theme, registry: typeof global
     | ((this: ToolExecutionPatchThis, event: PatchedMouseEvent) => unknown)
     | undefined;
 
-  function toggleAggregateGroup(aggregate: AggregateGroupResolution): void {
-    if (aggregateGroupState.get(aggregate.leader)?.expanded) {
-      aggregateGroupState.delete(aggregate.leader);
-      for (const member of aggregate.members) {
+  function toggleAggregateGroup(leader: ToolExecutionPatchThis, members: ToolExecutionPatchThis[]): void {
+    if (aggregateGroupState.get(leader)?.expanded) {
+      aggregateGroupState.delete(leader);
+      for (const member of members) {
         if (member.expanded) member.setExpanded(false);
       }
       return;
     }
-    aggregateGroupState.set(aggregate.leader, { expanded: true });
+    aggregateGroupState.set(leader, { expanded: true });
   }
 
   function handleAggregateClick(
     component: ToolExecutionPatchThis,
-    aggregate: AggregateGroupResolution,
+    role: Extract<GroupRole, { role: "verb-leader" | "claimed" }>,
     event: PatchedMouseEvent,
   ): { handled: true } | undefined {
-    if (aggregate.role === "leader") {
+    if (role.role === "verb-leader") {
       const summaryY = component.__tdAggregateLeadingBlank === true ? 1 : 0;
       const y = event.y ?? 0;
-      if (aggregate.groupExpanded && y > summaryY) {
+      if (role.groupExpanded && y > summaryY) {
         if (!component.expanded && !component.result) return undefined;
         component.setExpanded(!component.expanded);
         return { handled: true };
       }
       if (y < summaryY) return undefined;
-      toggleAggregateGroup(aggregate);
+      toggleAggregateGroup(component, role.members);
       return { handled: true };
     }
-    if (!aggregate.groupExpanded) return undefined;
+    if (!role.groupExpanded) return undefined;
     if (!component.expanded && !component.result) return undefined;
     component.setExpanded(!component.expanded);
     return { handled: true };
@@ -464,10 +555,11 @@ function patchToolExecutionRender(getTheme: () => Theme, registry: typeof global
 
   proto.handleMouse = function (this: ToolExecutionPatchThis, event: PatchedMouseEvent) {
     if (event.type === "click") {
-      const aggregateRole = resolveAggregateRole(this, event.width ?? 0);
-      if (aggregateRole) {
+      const groupRole = resolveGroupRole(this, event.width ?? 0);
+      if (groupRole) {
         if (event.button !== "left") return undefined;
-        return handleAggregateClick(this, aggregateRole, event);
+        if (groupRole.role === "truncation-leader") return undefined;
+        return handleAggregateClick(this, groupRole, event);
       }
     }
     // Claim hover moves before the stock handler: for default-shell tools the stock
@@ -509,7 +601,13 @@ export default function (pi: ExtensionAPI) {
     globalToolDisplayRegistry.register(toolName, adapter);
   });
 
+  pi.events.on(AGGREGATE_RULE_REGISTER_EVENT, (data) => {
+    const { toolName, rule } = data as { toolName: string; rule: AggregateRule };
+    registerAggregateRule(toolName, rule);
+  });
+
   pi.events.emit("tool-display:ready", undefined);
+  pi.events.emit(AGGREGATE_RULE_READY_EVENT, undefined);
 
   pi.on("session_start", (_event, ctx) => {
     if (ctx.mode !== "tui") return;

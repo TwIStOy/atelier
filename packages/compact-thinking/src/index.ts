@@ -14,12 +14,17 @@ import {
   findComponentContext,
   isExtensionDisabled,
   isStaleCtxError,
+  isThoughtMember,
+  isThoughtMemberClaimed,
   RAIL_BULLET_SINGLE,
   type RailBar,
   type RailSpec,
   readRailTailSpacing,
   resolveModel,
   setRailTailSpacing,
+  setThoughtMember,
+  setThoughtMemberClaimed,
+  setThoughtTransparent,
   TOOL_RAIL_LAYOUT,
   ToolRailComponent,
 } from "@htwang-contrib/common";
@@ -198,7 +203,7 @@ export default function compactThinking(pi: ExtensionAPI) {
     for (let i = context.index - 1; i >= 0; i--) {
       const sibling = context.siblings[i];
       if (sibling instanceof ToolExecutionComponent) {
-        if ((sibling as { hideComponent?: boolean }).hideComponent) continue;
+        if ((sibling as unknown as { hideComponent?: boolean }).hideComponent) continue;
         return false;
       }
       if (!componentRendersLines(sibling, width)) continue;
@@ -208,6 +213,7 @@ export default function compactThinking(pi: ExtensionAPI) {
   }
 
   function patchedRender(this: AssistantMessageComponent, width: number): string[] {
+    if (isThoughtMember(this) && isThoughtMemberClaimed(this)) return [];
     const lines = originalRender.call(this, width);
     if (lines.length === 0 || !leadingBlankDropped.has(this)) return lines;
     return needsSeparatorAbove(this, width) ? ["", ...lines] : lines;
@@ -224,6 +230,9 @@ export default function compactThinking(pi: ExtensionAPI) {
     if (!self.hideThinkingBlock) {
       leadingBlankDropped.delete(component);
       clearRailTailSpacing(component);
+      setThoughtMember(component, false);
+      setThoughtMemberClaimed(component, false);
+      setThoughtTransparent(component, false);
       originalUpdateContent.call(this, message);
       for (const child of self.contentContainer.children) {
         const markdown = child as unknown as { defaultTextStyle?: unknown; paddingX?: number };
@@ -241,6 +250,25 @@ export default function compactThinking(pi: ExtensionAPI) {
     self.contentContainer.clear();
     const spacing = currentBlockSpacing();
     const items = collectRenderedItems(message, activeThinking);
+
+    // ThoughtMember eligibility: finished, collapsed, text-free. The component
+    // keeps building its heading row; tool-display's verb-group claims eligible
+    // members by stamping them, and only claimed members render zero lines (see
+    // patchedRender). The claim is cleared here on every content rebuild so a
+    // stale fold never survives a message change.
+    const streaming = activeThinking?.messageTimestamp === message.timestamp;
+    const hasExpandedRun = (expandedRuns.get(component)?.size ?? 0) > 0;
+    const hasTextItem = items.some((item) => item.kind === "text");
+    const hasNotice =
+      message.stopReason === "length" || message.stopReason === "aborted" || message.stopReason === "error";
+    const eligible = !streaming && !hasExpandedRun && !hasTextItem && !hasNotice && items.length > 0;
+    setThoughtMember(component, eligible);
+    setThoughtMemberClaimed(component, false);
+    setThoughtTransparent(
+      component,
+      !eligible && (streaming || hasExpandedRun) && !hasTextItem && !hasNotice && items.length > 0,
+    );
+
     const droppedLeadingBlank = items.length > 0 && items[0].kind === "thinking" && spacing === 0;
     if (droppedLeadingBlank) leadingBlankDropped.add(component);
     else leadingBlankDropped.delete(component);
