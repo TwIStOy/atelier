@@ -454,7 +454,8 @@ function patchToolExecutionRender(getTheme: () => Theme, registry: typeof global
       // Click routing must match the layout the TUI routed the event against, so the
       // separator state is captured at render time instead of being recomputed from the
       // mouse event's width.
-      this.__tdAggregateLeadingBlank = !(previous instanceof ToolExecutionComponent);
+      this.__tdAggregateLeadingBlank =
+        !(previous instanceof ToolExecutionComponent) && readRailTailSpacing(previous) === undefined;
       if (!groupRole.groupExpanded) {
         return applyGroupSpacing(lines, previous, true);
       }

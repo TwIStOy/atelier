@@ -3,7 +3,7 @@ import type { ExtensionAPI, Theme, ToolDefinition } from "@earendil-works/pi-cod
 import { initTheme, ToolExecutionComponent } from "@earendil-works/pi-coding-agent";
 import { stripTerminalSequences, visibleWidth } from "@earendil-works/pi-tui";
 import type * as Common from "@htwang-contrib/common";
-import { componentRendersLines } from "@htwang-contrib/common";
+import { componentRendersLines, setRailTailSpacing } from "@htwang-contrib/common";
 import { Type } from "@sinclair/typebox";
 import { describe, expect, it, vi } from "vitest";
 import extension from "../src/index.ts";
@@ -427,6 +427,21 @@ describe("read-only tool aggregation", () => {
 
     const leader = asPatched(read1);
     leader.render(80);
+    expect(leader.handleMouse({ type: "click", button: "left", width: 80, y: 0 })).toEqual({ handled: true });
+    expect(leader.render(80)).toEqual(["  ┃  ◈ Read 2 files", "  ┃     ◆ Read packages/a.ts"]);
+  });
+
+  it("toggles the group from the aggregate line that follows a rail-tail thinking block", () => {
+    activateExtension();
+    const root: FakeRoot = { children: [] };
+    const thinking = { render: () => ["     ◆ Thought for 3s"] };
+    setRailTailSpacing(thinking, 0);
+    const read1 = withResult(makeComponent("read", root, { file_path: "packages/a.ts" }));
+    const read2 = withResult(makeComponent("read", root, { file_path: "packages/b.ts" }));
+    root.children.push(thinking, read1, read2);
+
+    const leader = asPatched(read1);
+    expect(leader.render(80)).toEqual(["  ❙  ◈ Read 2 files"]);
     expect(leader.handleMouse({ type: "click", button: "left", width: 80, y: 0 })).toEqual({ handled: true });
     expect(leader.render(80)).toEqual(["  ┃  ◈ Read 2 files", "  ┃     ◆ Read packages/a.ts"]);
   });
