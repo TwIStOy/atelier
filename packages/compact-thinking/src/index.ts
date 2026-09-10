@@ -25,7 +25,7 @@ import {
 } from "@htwang-contrib/common";
 import { loadConfig, registerCompactThinkingConfigItems, setCachedModelOptions } from "./config.ts";
 import { DURATION_ENTRY_TYPE, restoreDurationEntries } from "./durations.ts";
-import { formatThoughtDuration, SingleLineText, StrictThinkingPreview } from "./preview.ts";
+import { ActiveThinkingPreview, formatThoughtDuration, SingleLineText, StrictThinkingPreview } from "./preview.ts";
 import {
   extractThinkingRun,
   getRunSummary,
@@ -42,11 +42,6 @@ const logger = createLogger("compact-thinking");
 const WIDGET_ID = "compact-thinking-render-loop";
 
 const THINKING_BAR = "▌";
-// The wave's brightness scales with the rendered row count (min(1, rows/13));
-// collapsed runs are single lines now, so floor the row count at the height of
-// the former collapsed block (heading + blank line + default preview) to keep
-// the wave as visible as before.
-const WAVE_MIN_ROWS = 5;
 
 const PASSTHROUGH_THEME: Theme = { fg: (_color: string, text: string) => text } as Theme;
 
@@ -136,9 +131,10 @@ export default function compactThinking(pi: ExtensionAPI) {
 
   function activeRailBar(): RailBar | undefined {
     if (!activeTheme) return undefined;
-    const wave = createWaveBar(activeTheme, () => animationFrame, config.animationIntervalMs);
-    if (wave) return (row, rows) => wave(row, Math.max(rows, WAVE_MIN_ROWS));
-    return activeTheme.fg("borderMuted", THINKING_BAR);
+    return (
+      createWaveBar(activeTheme, () => animationFrame, config.animationIntervalMs) ??
+      activeTheme.fg("borderMuted", THINKING_BAR)
+    );
   }
 
   function animatedText(text: string, baseStyle: (value: string) => string, animate: boolean) {
@@ -305,9 +301,12 @@ export default function compactThinking(pi: ExtensionAPI) {
         status: active ? undefined : "dim",
       };
       if (active) spec.bar = activeRailBar();
+      const previewText = previewSource.trim();
       const block = useExpanded
-        ? new StrictThinkingPreview(heading, previewSource.trim(), thinkingStyle)
-        : new SingleLineText(heading);
+        ? new StrictThinkingPreview(heading, previewText, thinkingStyle)
+        : active && config.previewLines > 0 && previewText
+          ? new ActiveThinkingPreview(heading, previewText, config.previewLines, thinkingStyle)
+          : new SingleLineText(heading);
       const rail = new ToolRailComponent(block, spec, activeTheme ?? PASSTHROUGH_THEME);
       self.contentContainer.addChild(
         new MouseRegion(rail, (event) => {

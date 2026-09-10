@@ -26,6 +26,38 @@ export class SingleLineText implements Component {
   invalidate(): void {}
 }
 
+export class ActiveThinkingPreview implements Component {
+  private heading: string;
+  private text: string;
+  private previewLines: number;
+  private style: (text: string) => string;
+  private cachedWidth = -1;
+  private cachedLines: string[] | undefined;
+
+  constructor(heading: string, text: string, previewLines: number, style: (text: string) => string) {
+    this.heading = heading;
+    this.text = text;
+    this.previewLines = previewLines;
+    this.style = style;
+  }
+
+  render(width: number): string[] {
+    if (this.cachedLines !== undefined && width === this.cachedWidth) return this.cachedLines;
+
+    const lines = new Text(this.style(this.text), 0, 0).render(width);
+    const heading = new Text(this.heading, 0, 0).render(width);
+    const result = [...heading, ...lines.slice(-this.previewLines)];
+    this.cachedWidth = width;
+    this.cachedLines = result;
+    return result;
+  }
+
+  invalidate(): void {
+    this.cachedWidth = -1;
+    this.cachedLines = undefined;
+  }
+}
+
 export class StrictThinkingPreview implements Component {
   private heading: string;
   private text: string;

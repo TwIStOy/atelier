@@ -10,6 +10,8 @@
 
 ### Fixed
 
+- Active thinking runs collapsed to a single heading line while streaming; they now render the heading plus the last `Preview Lines` (`previewLines`, default 3) thinking lines again, oldest first, with the wave running down the block's actual height — the single-line layout is kept for finished runs only. The 5-row wave-amplitude floor is retired with the single-line active block. ([#153](https://github.com/TwIStOy/pi-extensions/issues/153))
+
 - The animation tick no longer rebuilds streaming thinking components every frame. Each `updateContent` constructs a fresh `StrictThinkingPreview` with a cold wrap cache, so rebuilding at 45ms re-wrapped the entire (growing) thinking text twice as often as before and starved delta rendering — thinking text visibly arrived in bursts. The gutter wave now reads the animation frame lazily at render time (`createWaveBar` takes a `() => number`), so a plain `requestRender()` animates it; full `updateContent` rebuilds (needed for the heading highlight and duration) only run every other tick, restoring the previous 90ms cadence.
 
 ### Changed
