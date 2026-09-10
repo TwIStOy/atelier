@@ -4,6 +4,7 @@ import {
   registerSystemPromptContribution,
   SYSTEM_PROMPT_CONTRIBUTION_PRIORITIES,
 } from "@htwang-contrib/common";
+import { registerMemoryAggregateRules } from "./aggregate-rules.js";
 import { buildReorganizeMemoryPrompt } from "./commands/reorganize-memory-template.js";
 import { buildSelfImprovePrompt } from "./commands/self-improve-template.js";
 import { buildMemoryStatusReport } from "./memory-status.js";
@@ -18,6 +19,8 @@ export default function initMemory(pi: ExtensionAPI): void {
   const guard = pi as unknown as Record<symbol, boolean>;
   if (guard[INSTALL_GUARD]) return;
   guard[INSTALL_GUARD] = true;
+
+  registerMemoryAggregateRules();
 
   pi.registerCommand("memory-status", {
     description: "Show memory extension enablement, CLI health, resolved binary, and domain list.",
