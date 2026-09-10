@@ -1,11 +1,16 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { fileURLToPath } from "node:url";
 import { initTheme } from "@earendil-works/pi-coding-agent";
 import type { TUI } from "@earendil-works/pi-tui";
 import { describe, expect, it, vi } from "vitest";
 import { loadSubagentMessages } from "../../src/viewer/index.ts";
 import { buildSubagentConversation } from "../../src/viewer/render.ts";
+
+process.env.PI_PACKAGE_DIR = fileURLToPath(
+  new URL("../../../../node_modules/@earendil-works/pi-coding-agent", import.meta.url),
+);
 
 function makeMockTui(): TUI {
   const tui = {

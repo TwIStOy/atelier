@@ -2,11 +2,15 @@ import * as crypto from "node:crypto";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { fileURLToPath } from "node:url";
 import { initTheme } from "@earendil-works/pi-coding-agent";
 import { childSessionIndexPath, recordChildSessionFinished, recordChildSessionStarted } from "@htwang-contrib/common";
 import { describe, expect, it } from "vitest";
 import { loadSubagentRuns, refreshRunRunning } from "../../src/viewer/index.ts";
 
+process.env.PI_PACKAGE_DIR = fileURLToPath(
+  new URL("../../../../node_modules/@earendil-works/pi-coding-agent", import.meta.url),
+);
 initTheme(undefined, false);
 
 function makeHeader(id: string): string {

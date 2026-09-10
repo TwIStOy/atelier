@@ -2,6 +2,7 @@ import * as crypto from "node:crypto";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { fileURLToPath } from "node:url";
 import { initTheme, type Theme } from "@earendil-works/pi-coding-agent";
 import type { TUI } from "@earendil-works/pi-tui";
 import { childSessionIndexPath, recordChildSessionStarted } from "@htwang-contrib/common";
@@ -9,6 +10,9 @@ import { describe, expect, it, vi } from "vitest";
 import type { SubagentRunSummary } from "../../src/viewer/index.ts";
 import { SubagentViewerOverlay } from "../../src/viewer/overlay.ts";
 
+process.env.PI_PACKAGE_DIR = fileURLToPath(
+  new URL("../../../../node_modules/@earendil-works/pi-coding-agent", import.meta.url),
+);
 initTheme(undefined, false);
 
 function appendMsg(file: string, prevId: string | null, msg: unknown): string {
