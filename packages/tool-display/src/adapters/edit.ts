@@ -4,6 +4,7 @@ import type { Theme } from "@earendil-works/pi-coding-agent";
 import { visibleWidth } from "@earendil-works/pi-tui";
 import { generateUnifiedDiff, shortenPath } from "@htwang-contrib/common";
 import { diffLines } from "diff";
+import { loadConfig } from "../config.ts";
 import type { ToolDisplayAdapter } from "../types.ts";
 import { renderChangeBar, renderWithDelta, resolveIsSplit } from "./shared.ts";
 
@@ -95,14 +96,30 @@ export const editAdapter: ToolDisplayAdapter<EditArgs> = {
     const pathDisplay = path ? theme.fg("accent", path) : theme.fg("toolOutput", "...");
     const base = `${theme.fg("toolTitle", theme.bold("Edit"))} ${pathDisplay}`;
 
+    if (loadConfig().editStyle !== "single-line") return base;
+
     const suffix = buildDiffStatsSuffix(args ?? {}, theme, width);
     if (!suffix) return base;
     if (width !== undefined && visibleWidth(base) + 1 + visibleWidth(suffix) > width) return base;
     return `${base} ${suffix}`;
   },
 
-  formatCollapsedContent() {
-    return [];
+  formatCollapsedContent(args, _output, theme, width, _details?: unknown, _isPartial?: boolean, _spinAt?: number) {
+    if (loadConfig().editStyle === "single-line") return [];
+
+    const edits = getEdits(args);
+    if (edits.length === 0) return [theme.fg("muted", "└ no changes")];
+
+    const { added, removed } = countChanges(edits);
+    const parts: string[] = ["└"];
+    parts.push(theme.fg("muted", "diff"));
+    if (added > 0) parts.push(theme.fg("success", `+${added}`));
+    if (removed > 0) parts.push(theme.fg("error", `-${removed}`));
+    parts.push(theme.fg("muted", resolveIsSplit(width) ? "side-by-side" : "unified"));
+    if (added > 0 || removed > 0) {
+      parts.push(renderChangeBar(added, removed, theme));
+    }
+    return [theme.fg("muted", parts.join(" "))];
   },
 
   formatExpandedContent(args, _output, _theme, width, _details?: unknown) {

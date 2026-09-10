@@ -5,6 +5,8 @@ export interface ToolDisplayConfig {
   previewLines: number;
   diffMode: "auto" | "unified" | "side-by-side";
   splitDiffMinWidth: number;
+  editStyle: "single-line" | "two-line";
+  readStyle: "single-line" | "two-line";
 }
 
 const CONFIG_NAME = "tool-display";
@@ -14,6 +16,8 @@ const CONFIG_SCHEMA: ExtensionConfigSchema<ToolDisplayConfig> = {
     previewLines: 3,
     diffMode: "auto",
     splitDiffMinWidth: 100,
+    editStyle: "single-line",
+    readStyle: "two-line",
   },
 };
 
@@ -63,6 +67,34 @@ export function registerToolDisplayConfigItems(): void {
       order: 2,
       min: 40,
       max: 400,
+    },
+    {
+      key: "editStyle",
+      type: "select",
+      label: "Edit Style",
+      value: () => loadConfig().editStyle,
+      description:
+        'How the edit tool is rendered when collapsed: "single-line" puts the diff stats inline on the header, "two-line" keeps the legacy "└ diff +N -M" body row',
+      extensionLabel: "Tool Display",
+      order: 3,
+      options: [
+        { label: "Single-line", value: "single-line" },
+        { label: "Two-line", value: "two-line" },
+      ],
+    },
+    {
+      key: "readStyle",
+      type: "select",
+      label: "Read Style",
+      value: () => loadConfig().readStyle,
+      description:
+        'How the read tool is rendered when collapsed: "single-line" appends "· N lines" inline on the header, "two-line" keeps the legacy "└ N lines" body row',
+      extensionLabel: "Tool Display",
+      order: 4,
+      options: [
+        { label: "Two-line", value: "two-line" },
+        { label: "Single-line", value: "single-line" },
+      ],
     },
   ]);
 }

@@ -1,5 +1,7 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { shortenPath } from "@htwang-contrib/common";
+import { visibleWidth } from "@earendil-works/pi-tui";
+import { shortenPath, trimTrailingEmpty } from "@htwang-contrib/common";
+import { loadConfig } from "../config.ts";
 import type { ToolDisplayAdapter } from "../types.ts";
 import { formatLineCount, renderContentWithLineNumbers } from "./shared.ts";
 
@@ -18,14 +20,32 @@ function formatLineRange(args: ReadArgs, theme: Theme): string {
 }
 
 export const readAdapter: ToolDisplayAdapter<ReadArgs> = {
-  formatCallHeader(args, theme, _details?: unknown, _isPartial?: boolean, _expanded?: boolean) {
+  formatCallHeader(
+    args,
+    theme,
+    _details?: unknown,
+    _isPartial?: boolean,
+    _expanded?: boolean,
+    width?: number,
+    output?: string,
+  ) {
     const rawPath = args?.file_path ?? args?.path ?? "";
     const path = shortenPath(rawPath);
     const pathDisplay = path ? theme.fg("accent", path) : theme.fg("toolOutput", "...");
-    return `${theme.fg("toolTitle", theme.bold("Read"))} ${pathDisplay}${formatLineRange(args, theme)}`;
+    const base = `${theme.fg("toolTitle", theme.bold("Read"))} ${pathDisplay}${formatLineRange(args, theme)}`;
+
+    if (loadConfig().readStyle !== "single-line") return base;
+
+    if (!output) return base;
+    const count = trimTrailingEmpty(output.split("\n")).length;
+    if (count === 0) return base;
+    const suffix = theme.fg("dim", `· ${count} line${count !== 1 ? "s" : ""}`);
+    if (width !== undefined && visibleWidth(base) + 1 + visibleWidth(suffix) > width) return base;
+    return `${base} ${suffix}`;
   },
 
   formatCollapsedContent(_args, output, theme, _width, _details?: unknown, _isPartial?: boolean, _spinAt?: number) {
+    if (loadConfig().readStyle === "single-line") return [];
     if (!output) return [];
     return formatLineCount(output, theme);
   },
