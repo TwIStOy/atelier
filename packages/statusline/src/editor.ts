@@ -11,6 +11,7 @@ import type { EditorHintPayload } from "@htwang-contrib/common";
 import { loadConfig } from "./config.ts";
 
 const MIN_BODY_LINES = 1;
+const PROMPT_PREFIX_WIDTH = 2;
 
 function formatAbbreviatedCount(value: number, divisor: number, suffix: string): string {
   const scaled = (value / divisor).toFixed(1);
@@ -72,7 +73,7 @@ export class MyEditor extends CustomEditor {
     private readonly getCtx: () => ExtensionContext,
     private readonly pi: ExtensionAPI,
   ) {
-    super(tui, theme, keybindings, { paddingX: 1 });
+    super(tui, theme, keybindings, { paddingX: 0 });
     this.applyBorderColor();
   }
 
@@ -120,9 +121,9 @@ export class MyEditor extends CustomEditor {
     if (width < 12) return super.render(width);
 
     const innerWidth = Math.max(1, width - 2);
-    const base = super.render(innerWidth);
+    const base = super.render(Math.max(1, innerWidth - PROMPT_PREFIX_WIDTH));
     const { editorLines, popupLines } = splitEditorRender(base);
-    const body = [...editorLines];
+    const body = editorLines.map((line, index) => this.withPromptPrefix(line, index));
 
     while (body.length < MIN_BODY_LINES) {
       body.push(" ".repeat(innerWidth));
@@ -177,6 +178,18 @@ export class MyEditor extends CustomEditor {
     const home = process.env.HOME ?? "";
     const displayCwd = cwd === home ? "~" : cwd.startsWith(`${home}/`) ? `~/${cwd.slice(home.length + 1)}` : cwd;
     return ` ${displayCwd} `;
+  }
+
+  /**
+   * First body line renders the shell-style `❯ ` prompt; continuations get a
+   * matching 2-column hang indent. The gutter is drawn here (constructor uses
+   * `paddingX: 0`) because slicing the rendered line to re-insert the prefix
+   * corrupts pi-tui's zero-width CURSOR_MARKER downstream (its ESC gets eaten
+   * and the marker leaks into the terminal as literal `_pi:c`).
+   */
+  private withPromptPrefix(line: string, index: number): string {
+    const prompt = index === 0 ? `${this.fg("accent", "❯")} ` : "  ";
+    return ` ${prompt}${line}`;
   }
 
   private wrapBody(line: string, innerWidth: number): string {

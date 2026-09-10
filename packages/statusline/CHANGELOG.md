@@ -4,6 +4,7 @@
 
 ### Added
 
+- Shell-style prompt in the editor body: the first line is prefixed with `❯ ` (accent color) and continuation lines get a matching 2-column hang indent, so wrapped text stays aligned under the first character. The gutter is drawn by `MyEditor` itself (inner editor uses `paddingX: 0`) because re-slicing the rendered line corrupts pi-tui's zero-width cursor marker downstream.
 - `borderColor` config option (`/config` -> Statusline -> "Editor Border Color"): `Fixed dim` (default), `Fixed border color` (theme border role), or `Follow thinking level` for pi's built-in thinking-level colors.
 
 ### Changed
