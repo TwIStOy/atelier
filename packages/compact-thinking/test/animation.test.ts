@@ -44,8 +44,9 @@ describe("active thinking run rail wave", () => {
     const { session, component } = startActiveRun(PLAIN_THEME);
     try {
       const lines = component.render(80).map(stripTerminalSequences);
-      expect(lines).toHaveLength(1);
+      expect(lines).toHaveLength(2);
       expect(lines[0].replace(/[ \t]+$/, "")).toBe("  ▌  ◆ Thinking... · 1ms");
+      expect(lines[1].replace(/[ \t]+$/, "")).toBe("  ▌    streaming thought");
     } finally {
       session.shutdown();
       vi.useRealTimers();
@@ -64,16 +65,16 @@ describe("active thinking run rail wave", () => {
     }
   });
 
-  it("keeps the wave visible on the single-line block by flooring the row count", () => {
+  it("scales the wave amplitude with the real row count", () => {
     vi.useFakeTimers();
     const { session, component } = startActiveRun(WAVE_THEME);
     try {
       vi.advanceTimersByTime(8 * TICK_MS);
       const line = component.render(80)[0];
-      // brightness at frame 8, row 0 = (5/13)·sin²(8·2π·45/1400) ≈ 0.3838,
-      // lerp(80, 212, 0.3838) ≈ 130.67 → 131; without the 5-row floor the
-      // single-line block would cap at rows/13 ≈ 0.077 → 90.
-      expect(line).toContain("  \x1b[38;2;131;131;131m▌\x1b[39m  ◆ Thinking...");
+      // brightness at frame 8, row 0 = (2/13)·sin²(8·2π·45/1400) ≈ 0.1535,
+      // lerp(80, 212, 0.1535) ≈ 100.27 → 100. The active block renders the
+      // heading plus preview lines, so the amplitude follows the actual height.
+      expect(line).toContain("  \x1b[38;2;100;100;100m▌\x1b[39m  ◆ Thinking...");
     } finally {
       session.shutdown();
       vi.useRealTimers();
