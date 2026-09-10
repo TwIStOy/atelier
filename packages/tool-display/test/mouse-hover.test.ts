@@ -67,7 +67,7 @@ function activateExtension(): void {
   sessionStart(undefined, { mode: "tui", ui: { theme: PLAIN_THEME } });
 }
 
-function makeComponent(toolName: string): PatchedComponent {
+function makeComponent(toolName: string, renderShell: "self" | "default" = "self"): PatchedComponent {
   const toolDefinition: ToolDefinition = {
     name: toolName,
     label: toolName,
@@ -76,7 +76,7 @@ function makeComponent(toolName: string): PatchedComponent {
     execute: async () => ({ content: [], details: {} }),
     renderCall: () => new Text("header"),
     renderResult: () => new Text("result"),
-    renderShell: "self",
+    renderShell,
   };
   const fakeUi = undefined as unknown as ConstructorParameters<typeof ToolExecutionComponent>[5];
   return new ToolExecutionComponent(
@@ -119,6 +119,19 @@ function moveOffHoveredTool(): void {
   (container as unknown as { handleMouse(event: PatchedMouseEvent): unknown }).handleMouse(
     mouseEvent({ y: 0, height: 1 }),
   );
+}
+
+// At runtime the transcript dispatches through the same Container class
+// ToolExecutionComponent extends; this module's pi-tui import may resolve to a
+// different copy, so derive the real base class to reproduce that topology.
+function makeRuntimeContainer(): {
+  addChild(component: unknown): void;
+  handleMouse(event: PatchedMouseEvent): unknown;
+} {
+  const baseProto = Object.getPrototypeOf(ToolExecutionComponent.prototype) as {
+    constructor: new () => { addChild(component: unknown): void; handleMouse(event: PatchedMouseEvent): unknown };
+  };
+  return new baseProto.constructor();
 }
 
 describe("hover affordance", () => {
@@ -199,6 +212,38 @@ describe("hover affordance", () => {
       handled: true,
       render: true,
     });
+    expect(component.__tdHovered).toBe(false);
+    expect(firstHeaderLine(component)[5]).toBe("◆");
+  });
+
+  it("keeps hover stable while the cursor moves within a default-shell widget", () => {
+    activateExtension();
+    globalToolDisplayRegistry.register("hovertool", fakeAdapter);
+    const component = withResult(makeComponent("hovertool", "default"));
+    expect(firstHeaderLine(component)[5]).toBe("◆");
+
+    const parent = makeRuntimeContainer();
+    parent.addChild(component);
+
+    const first = parent.handleMouse(mouseEvent({ y: 1, height: 3 })) as
+      | { handled?: boolean; render?: boolean }
+      | undefined;
+    expect(first?.handled).toBe(true);
+    expect(first?.render).toBe(true);
+    expect(component.__tdHovered).toBe(true);
+    expect(firstHeaderLine(component)[5]).toBe("›");
+
+    for (let i = 0; i < 3; i++) {
+      const next = parent.handleMouse(mouseEvent({ y: 2, height: 3 })) as
+        | { handled?: boolean; render?: boolean }
+        | undefined;
+      expect(next?.handled).toBe(true);
+      expect(next?.render).toBeUndefined();
+      expect(component.__tdHovered).toBe(true);
+      expect(firstHeaderLine(component)[5]).toBe("›");
+    }
+
+    moveOffHoveredTool();
     expect(component.__tdHovered).toBe(false);
     expect(firstHeaderLine(component)[5]).toBe("◆");
   });

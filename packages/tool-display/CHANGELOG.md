@@ -22,6 +22,7 @@
 
 ### Fixed
 
+- Hovering a collapsed tool widget no longer flickers the status bullet between `◆` and `›` while the cursor moves across it. The patched `ToolExecutionComponent.handleMouse` used to delegate to the stock handler first; for default-shell tools that call routes through `Container.prototype.handleMouse`, which the hover-leave patch treats as an otherwise-unclaimed `move` and clears hover while the cursor is still inside the widget — re-claimed on the next move, cleared again on the one after, alternating the bullet per event. The patch now claims hover `move`s before the stock delegation. The hover-leave wrapper is also installed on the `Container` base class `ToolExecutionComponent` actually extends, since this module's `pi-tui` import can resolve to a different copy of the class than the component's.
 - Adapter-rendered tool blocks are click-expandable again in fullscreen mode. pi's per-block mouse expansion wraps renderer output in `MouseRegion`s inside `ToolExecutionComponent`, but the patched `render` bypasses that tree: `edit` (the only `renderShell: "self"` tool) gates `handleMouse` on `selfRenderHeight`, which only the stock `render` updates, so clicks never toggled; default-shell tools only toggled when the stale child heights happened to cover the clicked line. The patch now also overrides `handleMouse`: unhandled left clicks on a finished adapter-rendered block toggle `setExpanded`, matching the stock `createResultRegion` semantics (nested regions and OSC 8 links still win).
 
 ### Removed

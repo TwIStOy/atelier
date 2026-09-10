@@ -112,36 +112,33 @@ function clearHoveredTool(): boolean {
   return true;
 }
 
-function installHoverLeavePatches() {
-  const containerProto = Container.prototype as unknown as {
+function patchHoverLeave(target: object): void {
+  const proto = target as {
     __tdHoverLeavePatched?: boolean;
     handleMouse?: (this: unknown, event: PatchedMouseEvent) => unknown;
   };
-  if (containerProto.__tdHoverLeavePatched) return;
-  containerProto.__tdHoverLeavePatched = true;
-  const originalContainerHandleMouse = containerProto.handleMouse;
-  containerProto.handleMouse = function (this: unknown, event: PatchedMouseEvent) {
-    const result = originalContainerHandleMouse?.call(this, event);
+  if (proto.__tdHoverLeavePatched) return;
+  proto.__tdHoverLeavePatched = true;
+  const original = proto.handleMouse;
+  proto.handleMouse = function (this: unknown, event: PatchedMouseEvent) {
+    const result = original?.call(this, event);
     if (!result && (event.type === "move" || event.type === "wheel") && clearHoveredTool()) {
       return { handled: true, render: true };
     }
     return result;
   };
+}
 
-  const editorProto = Editor.prototype as unknown as {
-    __tdHoverLeavePatched?: boolean;
-    handleMouse?: (this: unknown, event: PatchedMouseEvent) => unknown;
-  };
-  if (editorProto.__tdHoverLeavePatched) return;
-  editorProto.__tdHoverLeavePatched = true;
-  const originalEditorHandleMouse = editorProto.handleMouse;
-  editorProto.handleMouse = function (this: unknown, event: PatchedMouseEvent) {
-    const result = originalEditorHandleMouse?.call(this, event);
-    if (!result && (event.type === "move" || event.type === "wheel") && clearHoveredTool()) {
-      return { handled: true, render: true };
-    }
-    return result;
-  };
+function installHoverLeavePatches() {
+  patchHoverLeave(Container.prototype);
+  // ToolExecutionComponent may extend a different Container instance than the one
+  // this module resolves (duplicate pi-tui copies in the dependency tree); patch its
+  // actual base class so hover-leave covers the real dispatch chain.
+  const baseContainerProto = Object.getPrototypeOf(ToolExecutionComponent.prototype);
+  if (baseContainerProto && baseContainerProto !== Container.prototype) {
+    patchHoverLeave(baseContainerProto);
+  }
+  patchHoverLeave(Editor.prototype);
 }
 
 const FALLBACK_THEME: Theme = {
@@ -332,16 +329,20 @@ function patchToolExecutionRender(getTheme: () => Theme, registry: typeof global
     if (event.type === "click" && resolveAggregateRole(this, event.width ?? 0) !== undefined) {
       return undefined;
     }
-    const childResult = originalHandleMouse?.call(this, event);
-    if (childResult) return childResult;
-    if (event.type === "move") {
-      if (!this.result || this.expanded) return undefined;
+    // Claim hover moves before the stock handler: for default-shell tools the stock
+    // handleMouse delegates through Container.prototype.handleMouse, which the
+    // hover-leave patch treats as an unclaimed move and clears hover while the cursor
+    // is still inside this widget — flipping the bullet between › and ◆ on every move.
+    if (event.type === "move" && this.result && !this.expanded) {
       if (hoveredTool === this && this.__tdHovered) return { handled: true };
       clearHoveredTool();
       hoveredTool = this;
       this.__tdHovered = true;
       return { handled: true, render: true };
     }
+    const childResult = originalHandleMouse?.call(this, event);
+    if (childResult) return childResult;
+    if (event.type === "move") return undefined;
     if (!proto.__tdRegistry.get(this.toolName)) return undefined;
     // Adapter-rendered blocks bypass the stock MouseRegion wrappers: the patched render
     // never updates selfRenderHeight (edit is renderShell "self"), and default-shell child
