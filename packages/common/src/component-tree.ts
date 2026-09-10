@@ -1,7 +1,11 @@
+import { getGlobalState } from "./global-state.ts";
+
 export interface ComponentSiblingContext {
   siblings: unknown[];
   index: number;
 }
+
+export const COMPONENT_RENDERS_LINES_PROBE_KEY = "htwang-contrib-common:component-renders-lines-probe";
 
 export function findComponentContext(root: unknown, target: object): ComponentSiblingContext | undefined {
   if (!root || typeof root !== "object") return undefined;
@@ -21,5 +25,12 @@ export function componentRendersLines(component: unknown, width: number): boolea
   if (!component || typeof component !== "object") return false;
   const render = (component as { render?: (w: number) => string[] }).render;
   if (typeof render !== "function") return false;
-  return render.call(component, width).length > 0;
+  const probe = getGlobalState(COMPONENT_RENDERS_LINES_PROBE_KEY, () => ({ depth: 0 }));
+  if (probe.depth > 0) return true;
+  probe.depth++;
+  try {
+    return render.call(component, width).length > 0;
+  } finally {
+    probe.depth--;
+  }
 }

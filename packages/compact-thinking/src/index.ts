@@ -187,6 +187,8 @@ export default function compactThinking(pi: ExtensionAPI) {
   // sibling renders into the rail column (a tool execution or a rail-tail marked
   // assistant message). Against anything else (user message, notices, plain
   // assistant text) the stock component always kept one blank line above.
+  // Tool executions are classified by identity so this walk never calls their
+  // render — those patches scan siblings during render and would ping-pong.
   // Decided at render time: updateContent also runs while a message component is
   // not yet attached to the chat container, so the sibling above is only known
   // once rendering actually happens.
@@ -195,8 +197,12 @@ export default function compactThinking(pi: ExtensionAPI) {
     if (!context) return false;
     for (let i = context.index - 1; i >= 0; i--) {
       const sibling = context.siblings[i];
+      if (sibling instanceof ToolExecutionComponent) {
+        if ((sibling as { hideComponent?: boolean }).hideComponent) continue;
+        return false;
+      }
       if (!componentRendersLines(sibling, width)) continue;
-      return !(sibling instanceof ToolExecutionComponent) && readRailTailSpacing(sibling) === undefined;
+      return readRailTailSpacing(sibling) === undefined;
     }
     return false;
   }

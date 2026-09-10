@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- `componentRendersLines` no longer recurses without bound when two patched renders probe each other. Compact-thinking's leading-blank walk and tool-display's grouping/spacing both call sibling `render` to decide visibility; those patches also scan siblings during `render`, which previously overflowed the call stack (`RangeError: Maximum call stack size exceeded` in `findComponentContext` / `truncateToWidth`). A nested probe now treats the sibling as visible and returns without calling `render` again. Probe depth is stored on `globalThis` so duplicate copies of this package (separate extension loaders) share the same guard.
+
 ### Added
 
 - Component-tree sibling lookup (`findComponentContext` / `componentRendersLines` in `src/component-tree.ts`): locate a component's containing `children` array by identity (recursive walk from any root) and probe whether a sibling renders any lines at a given width. Extracted from tool-display's chat-sibling scanning and now also used by compact-thinking to decide, at render time, whether a thinking-led message joins the rail column of the sibling above or keeps a separator blank line.

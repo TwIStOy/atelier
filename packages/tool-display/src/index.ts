@@ -157,9 +157,8 @@ function findPreviousVisibleSibling(root: unknown, target: object, width: number
   if (!context) return undefined;
   const { siblings, index } = context;
   for (let i = index - 1; i >= 0; i--) {
-    const candidate = siblings[i] as { render?: (w: number) => string[] };
-    if (typeof candidate?.render !== "function") continue;
-    if (candidate.render(width).length > 0) return candidate;
+    const candidate = siblings[i];
+    if (componentRendersLines(candidate, width)) return candidate;
   }
   return null;
 }

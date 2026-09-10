@@ -3,6 +3,7 @@ import type { ExtensionAPI, Theme, ToolDefinition } from "@earendil-works/pi-cod
 import { initTheme, ToolExecutionComponent } from "@earendil-works/pi-coding-agent";
 import { stripTerminalSequences, visibleWidth } from "@earendil-works/pi-tui";
 import type * as Common from "@htwang-contrib/common";
+import { componentRendersLines } from "@htwang-contrib/common";
 import { Type } from "@sinclair/typebox";
 import { describe, expect, it, vi } from "vitest";
 import extension from "../src/index.ts";
@@ -170,6 +171,22 @@ describe("read-only tool aggregation", () => {
 
     expect(asPatched(read1).render(80).join("\n")).not.toContain("◈");
     expect(asPatched(read2).render(80).join("\n")).not.toContain("◈");
+  });
+
+  it("does not overflow when a previous sibling probes this tool from render", () => {
+    activateExtension();
+    const root: FakeRoot = { children: [] };
+    const read1 = withResult(makeComponent("read", root));
+    const read2 = withResult(makeComponent("read", root));
+    const thinking = {
+      render(width: number) {
+        return componentRendersLines(read1, width) ? ["     ◆ Thought for 3s"] : [];
+      },
+    };
+    root.children.push(thinking, read1, read2);
+
+    expect(asPatched(read1).render(80)).toEqual(["", "  ❙  ◈ Read 2 files"]);
+    expect(asPatched(read2).render(80)).toEqual([]);
   });
 
   it("skips zero-line siblings instead of breaking the group", () => {
