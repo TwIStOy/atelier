@@ -85,6 +85,7 @@ import {
   renderTruncationLine,
 } from "./aggregate.ts";
 import { loadConfig, registerToolDisplayConfigItems } from "./config.ts";
+import { isMcpTool, MCP_STATUS_EVENT, mcpDisplayName, refreshMcpTools } from "./mcp.ts";
 import { globalToolDisplayRegistry } from "./registry.ts";
 import { formatGenericToolHeader, renderToolCall, type ToolDisplayRegistry, toolBullet } from "./tool-call-display.ts";
 import type { ToolDisplayAdapter } from "./types.ts";
@@ -480,7 +481,8 @@ function patchToolExecutionRender(getTheme: () => Theme, registry: typeof global
     const adapter = reg.get(this.toolName);
     const callR = this.getCallRenderer?.();
     const resultR = this.result ? this.getResultRenderer?.() : undefined;
-    if (!adapter && (callR != null || resultR != null)) {
+    const mcpOwned = !adapter && isMcpTool(this.toolName, this.toolDefinition?.label) && loadConfig().mcpToolCalls;
+    if (!adapter && (callR != null || resultR != null) && !mcpOwned) {
       const lines = originalRender.call(this, width) as string[];
       return applyGroupSpacing(lines, findPreviousVisibleOf(this, width), false);
     }
@@ -507,6 +509,7 @@ function patchToolExecutionRender(getTheme: () => Theme, registry: typeof global
       startedAtMs: timing.startedAtMs,
       endedAtMs: timing.endedAtMs,
       hoverAffordance: this.__tdHovered === true && !this.expanded,
+      displayName: mcpOwned ? mcpDisplayName(this.toolName, this.toolDefinition?.label) : undefined,
     };
 
     const theme = proto.__tdGetTheme?.() ?? FALLBACK_THEME;
@@ -577,7 +580,10 @@ function patchToolExecutionRender(getTheme: () => Theme, registry: typeof global
     const childResult = originalHandleMouse?.call(this, event);
     if (childResult) return childResult;
     if (event.type === "move") return undefined;
-    if (!proto.__tdRegistry.get(this.toolName)) return undefined;
+    const ownedByPatch =
+      proto.__tdRegistry.get(this.toolName) !== undefined ||
+      (isMcpTool(this.toolName, this.toolDefinition?.label) && loadConfig().mcpToolCalls);
+    if (!ownedByPatch) return undefined;
     // Adapter-rendered blocks bypass the stock MouseRegion wrappers: the patched render
     // never updates selfRenderHeight (edit is renderShell "self"), and default-shell child
     // heights no longer match our rendered lines. Finish unhandled left clicks ourselves,
@@ -607,6 +613,10 @@ export default function (pi: ExtensionAPI) {
     registerAggregateRule(toolName, rule);
   });
 
+  pi.events.on(MCP_STATUS_EVENT, () => {
+    refreshMcpTools(pi);
+  });
+
   pi.events.emit("tool-display:ready", undefined);
   pi.events.emit(AGGREGATE_RULE_READY_EVENT, undefined);
 
@@ -617,11 +627,13 @@ export default function (pi: ExtensionAPI) {
     if (ctx.ui?.theme) {
       activeTheme = ctx.ui.theme;
     }
+    refreshMcpTools(pi);
     patchToolExecutionRender(() => activeTheme, globalToolDisplayRegistry);
   });
 
   pi.on("before_agent_start", () => {
     if (!isTui) return;
+    refreshMcpTools(pi);
     patchToolExecutionRender(() => activeTheme, globalToolDisplayRegistry);
   });
 }

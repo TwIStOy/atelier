@@ -38,7 +38,7 @@ export function formatToolArgs(args: Record<string, unknown>): string {
     .join(", ");
 }
 
-function snakeToCamelCase(s: string): string {
+export function snakeToCamelCase(s: string): string {
   return s
     .split("_")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
@@ -50,9 +50,10 @@ export function formatGenericToolHeader(
   args: Record<string, unknown>,
   theme: Theme,
   width: number,
+  displayName?: string,
 ): string {
-  const displayName = snakeToCamelCase(toolName);
-  const namePart = theme.fg("toolTitle", theme.bold(displayName));
+  const name = displayName ?? snakeToCamelCase(toolName);
+  const namePart = theme.fg("toolTitle", theme.bold(name));
   const argStr = formatToolArgs(args);
   if (!argStr) return truncateToWidth(namePart, width, "…");
 
@@ -191,6 +192,7 @@ export interface ToolCallDisplayOpts {
   startedAtMs?: number;
   endedAtMs?: number;
   hoverAffordance?: boolean;
+  displayName?: string;
 }
 
 export function renderToolCall(
@@ -229,7 +231,7 @@ export function renderToolCall(
             innerWidth,
             opts.output,
           )
-        : formatGenericToolHeader(opts.toolName, opts.args, theme, innerWidth);
+        : formatGenericToolHeader(opts.toolName, opts.args, theme, innerWidth, opts.displayName);
 
       const headerLines = headerText.split("\n");
       if (timerPart) headerLines[0] = timerPart + headerLines[0];
