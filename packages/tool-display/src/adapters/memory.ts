@@ -1,7 +1,19 @@
-import { truncateToWidth } from "@earendil-works/pi-tui";
+import type { Theme } from "@earendil-works/pi-coding-agent";
+import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { diffLines } from "diff";
+import { loadConfig } from "../config.ts";
 import type { ToolDisplayAdapter } from "../types.ts";
 import { formatExpandedToolOutputLines } from "./shared.ts";
+
+function isSingleLine(): boolean {
+  return loadConfig().memoryStyle === "single-line";
+}
+
+function inlineSuffix(base: string, suffix: string, width?: number): string {
+  if (!suffix) return base;
+  if (width !== undefined && visibleWidth(base) + 1 + visibleWidth(suffix) > width) return base;
+  return `${base} ${suffix}`;
+}
 
 interface MemoryCreateArgs {
   parent_uri?: string;
@@ -18,28 +30,33 @@ interface MemoryCreateDetails {
   content_lines?: number;
 }
 
+function createSummary(theme: Theme, args: MemoryCreateArgs | undefined, details: unknown): string {
+  const d = details as MemoryCreateDetails | undefined;
+  const preview = d?.content_preview ?? args?.content?.slice(0, 120) ?? "";
+  const lines = d?.content_lines ?? args?.content?.split("\n").length ?? 0;
+  const first = preview.split("\n")[0] ?? "";
+  const truncated = first.length > 100 ? `${first.slice(0, 99)}…` : first;
+  const moreHint = lines > 1 ? theme.fg("dim", ` · ${lines - 1} more`) : "";
+  return `${theme.fg("success", "created")} ${theme.fg("dim", truncated)}${moreHint}`;
+}
+
 export const memoryCreateAdapter: ToolDisplayAdapter<MemoryCreateArgs> = {
-  formatCallHeader(args, theme) {
+  formatCallHeader(args, theme, details, _isPartial, _expanded, width) {
     const uri = args?.parent_uri ?? "";
     const title = args?.title ?? "";
     const suffix = title ? ` → ${title}` : "";
-    return (
+    const base =
       theme.fg("toolTitle", theme.bold("Memory create")) +
       " " +
       theme.fg("accent", uri) +
-      (suffix ? theme.fg("dim", suffix) : "")
-    );
+      (suffix ? theme.fg("dim", suffix) : "");
+    if (!isSingleLine()) return base;
+    return inlineSuffix(base, createSummary(theme, args, details), width);
   },
 
   formatCollapsedContent(args, _output, theme, width, details) {
-    const d = details as MemoryCreateDetails | undefined;
-    const preview = d?.content_preview ?? args?.content?.slice(0, 120) ?? "";
-    const lines = d?.content_lines ?? args?.content?.split("\n").length ?? 0;
-    const first = preview.split("\n")[0] ?? "";
-    const truncated = first.length > 100 ? `${first.slice(0, 99)}…` : first;
-    const moreHint = lines > 1 ? theme.fg("dim", ` · ${lines - 1} more`) : "";
-    const line = `└ ${theme.fg("success", "created")} ${theme.fg("dim", truncated)}${moreHint}`;
-    return [truncateToWidth(line, width, "…")];
+    if (isSingleLine()) return [];
+    return [truncateToWidth(`└ ${createSummary(theme, args, details)}`, width, "…")];
   },
 
   formatExpandedContent(args, _output, theme, width) {
@@ -66,22 +83,30 @@ interface MemoryReadDetails {
   content_lines?: number;
 }
 
+function readSummary(theme: Theme, details: unknown): string {
+  const d = details as MemoryReadDetails | undefined;
+  const count = d?.content_lines ?? 0;
+  if (count === 0) return theme.fg("muted", "empty");
+  const preview = d?.content_preview?.split("\n")[0] ?? "";
+  const truncated = preview.length > 100 ? `${preview.slice(0, 99)}…` : preview;
+  return `${theme.fg("success", `${count} line${count === 1 ? "" : "s"}`)} ${theme.fg("dim", truncated)}`;
+}
+
 export const memoryReadAdapter: ToolDisplayAdapter<MemoryReadArgs> = {
-  formatCallHeader(args, theme) {
+  formatCallHeader(args, theme, details, _isPartial, _expanded, width) {
     const uri = args?.uri ?? "";
-    return `${theme.fg("toolTitle", theme.bold("Memory read"))} ${theme.fg("accent", uri)}`;
+    const base = `${theme.fg("toolTitle", theme.bold("Memory read"))} ${theme.fg("accent", uri)}`;
+    if (!isSingleLine()) return base;
+    return inlineSuffix(base, readSummary(theme, details), width);
   },
 
   formatCollapsedContent(_args, _output, theme, width, details) {
+    if (isSingleLine()) return [];
     const d = details as MemoryReadDetails | undefined;
-    const count = d?.content_lines ?? 0;
-    const preview = d?.content_preview?.split("\n")[0] ?? "";
-    const truncated = preview.length > 100 ? `${preview.slice(0, 99)}…` : preview;
-    if (count === 0) {
+    if ((d?.content_lines ?? 0) === 0) {
       return [theme.fg("muted", "└ empty")];
     }
-    const line = `└ ${theme.fg("success", `${count} line${count === 1 ? "" : "s"}`)} ${theme.fg("dim", truncated)}`;
-    return [truncateToWidth(line, width, "…")];
+    return [truncateToWidth(`└ ${readSummary(theme, details)}`, width, "…")];
   },
 
   formatExpandedContent(_args, _output, theme, width, details) {
@@ -118,28 +143,34 @@ interface MemoryUpdateDetails {
   disclosure?: string;
 }
 
+function updateSummary(theme: Theme, details: unknown): string {
+  const d = details as MemoryUpdateDetails | undefined;
+  const parts: string[] = [];
+  if (d?.mode === "patch") {
+    if ((d?.diff_adds ?? 0) > 0) parts.push(theme.fg("success", `+${d!.diff_adds}`));
+    if ((d?.diff_removes ?? 0) > 0) parts.push(theme.fg("error", `-${d!.diff_removes}`));
+  } else if (d?.mode === "append") {
+    parts.push(theme.fg("success", "appended"));
+  }
+  const meta: string[] = [];
+  if (d?.priority !== undefined) meta.push(`p${d.priority}`);
+  if (d?.disclosure !== undefined) meta.push("disclosure");
+  const diffSummary = parts.length > 0 ? parts.join(" ") : theme.fg("success", "updated");
+  const metaStr = meta.length > 0 ? ` · ${meta.join(", ")}` : "";
+  return `${diffSummary}${theme.fg("dim", metaStr)}`;
+}
+
 export const memoryUpdateAdapter: ToolDisplayAdapter<MemoryUpdateArgs> = {
-  formatCallHeader(args, theme) {
+  formatCallHeader(args, theme, details, _isPartial, _expanded, width) {
     const uri = args?.uri ?? "";
-    return `${theme.fg("toolTitle", theme.bold("Memory update"))} ${theme.fg("accent", uri)}`;
+    const base = `${theme.fg("toolTitle", theme.bold("Memory update"))} ${theme.fg("accent", uri)}`;
+    if (!isSingleLine()) return base;
+    return inlineSuffix(base, updateSummary(theme, details), width);
   },
 
   formatCollapsedContent(_args, _output, theme, width, details) {
-    const d = details as MemoryUpdateDetails | undefined;
-    const parts: string[] = [];
-    if (d?.mode === "patch") {
-      if ((d?.diff_adds ?? 0) > 0) parts.push(theme.fg("success", `+${d!.diff_adds}`));
-      if ((d?.diff_removes ?? 0) > 0) parts.push(theme.fg("error", `-${d!.diff_removes}`));
-    } else if (d?.mode === "append") {
-      parts.push(theme.fg("success", "appended"));
-    }
-    const meta: string[] = [];
-    if (d?.priority !== undefined) meta.push(`p${d.priority}`);
-    if (d?.disclosure !== undefined) meta.push("disclosure");
-    const diffSummary = parts.length > 0 ? parts.join(" ") : theme.fg("success", "updated");
-    const metaStr = meta.length > 0 ? ` · ${meta.join(", ")}` : "";
-    const line = `└ ${diffSummary}${theme.fg("dim", metaStr)}`;
-    return [truncateToWidth(line, width, "…")];
+    if (isSingleLine()) return [];
+    return [truncateToWidth(`└ ${updateSummary(theme, details)}`, width, "…")];
   },
 
   formatExpandedContent(args, _output, theme, width, details) {
@@ -174,12 +205,15 @@ interface MemoryDeleteArgs {
 }
 
 export const memoryDeleteAdapter: ToolDisplayAdapter<MemoryDeleteArgs> = {
-  formatCallHeader(args, theme) {
+  formatCallHeader(args, theme, _details, _isPartial, _expanded, width) {
     const uri = args?.uri ?? "";
-    return `${theme.fg("toolTitle", theme.bold("Memory delete"))} ${theme.fg("accent", uri)}`;
+    const base = `${theme.fg("toolTitle", theme.bold("Memory delete"))} ${theme.fg("accent", uri)}`;
+    if (!isSingleLine()) return base;
+    return inlineSuffix(base, theme.fg("success", "deleted"), width);
   },
 
   formatCollapsedContent(_args, _output, theme) {
+    if (isSingleLine()) return [];
     return [theme.fg("muted", "└ deleted")];
   },
 
@@ -199,30 +233,39 @@ interface MemorySearchDetails {
   items?: Array<{ uri: string; snippet?: string }>;
 }
 
+function searchSummary(theme: Theme, details: unknown): string {
+  const d = details as MemorySearchDetails | undefined;
+  const total = d?.total ?? 0;
+  if (total === 0) return theme.fg("muted", "no results");
+  const first = d?.items?.[0];
+  const parts: string[] = [theme.fg("success", `${total} result${total === 1 ? "" : "s"}`)];
+  if (first) {
+    parts.push(" ");
+    parts.push(theme.fg("accent", first.uri));
+    if (first.snippet) {
+      const snip = first.snippet.length > 80 ? `${first.snippet.slice(0, 79)}…` : first.snippet;
+      parts.push(` ${theme.fg("dim", snip)}`);
+    }
+  }
+  const more = total > 1 ? theme.fg("dim", ` · ${total - 1} more`) : "";
+  return parts.join("") + more;
+}
+
 export const memorySearchAdapter: ToolDisplayAdapter<MemorySearchArgs> = {
-  formatCallHeader(args, theme) {
+  formatCallHeader(args, theme, details, _isPartial, _expanded, width) {
     const query = args?.query ?? "";
-    return `${theme.fg("toolTitle", theme.bold("Memory search"))} ${theme.fg("accent", query)}`;
+    const base = `${theme.fg("toolTitle", theme.bold("Memory search"))} ${theme.fg("accent", query)}`;
+    if (!isSingleLine()) return base;
+    return inlineSuffix(base, searchSummary(theme, details), width);
   },
 
   formatCollapsedContent(_args, _output, theme, width, details) {
+    if (isSingleLine()) return [];
     const d = details as MemorySearchDetails | undefined;
-    const total = d?.total ?? 0;
-    if (total === 0) {
+    if ((d?.total ?? 0) === 0) {
       return [theme.fg("muted", "└ no results")];
     }
-    const first = d?.items?.[0];
-    const parts: string[] = ["└ ", theme.fg("success", `${total} result${total === 1 ? "" : "s"}`)];
-    if (first) {
-      parts.push(" ");
-      parts.push(theme.fg("accent", first.uri));
-      if (first.snippet) {
-        const snip = first.snippet.length > 80 ? `${first.snippet.slice(0, 79)}…` : first.snippet;
-        parts.push(` ${theme.fg("dim", snip)}`);
-      }
-    }
-    const more = total > 1 ? theme.fg("dim", ` · ${total - 1} more`) : "";
-    return [truncateToWidth(parts.join("") + more, width, "…")];
+    return [truncateToWidth(`└ ${searchSummary(theme, details)}`, width, "…")];
   },
 
   formatExpandedContent(_args, _output, theme, _width, details) {
@@ -250,16 +293,23 @@ interface MemoryListArgs {
   domain?: string;
 }
 
+function listSummary(theme: Theme, output: string): string {
+  if (!output) return theme.fg("muted", "empty");
+  const n = output.split("\n").length;
+  return theme.fg("success", `${n} line${n === 1 ? "" : "s"}`);
+}
+
 export const memoryListAdapter: ToolDisplayAdapter<MemoryListArgs> = {
-  formatCallHeader(args, theme) {
+  formatCallHeader(args, theme, _details, _isPartial, _expanded, width, output) {
     const domain = args?.domain ?? "";
-    return `${theme.fg("toolTitle", theme.bold("Memory list"))} ${theme.fg("accent", domain || "(all)")}`;
+    const base = `${theme.fg("toolTitle", theme.bold("Memory list"))} ${theme.fg("accent", domain || "(all)")}`;
+    if (!isSingleLine()) return base;
+    return inlineSuffix(base, listSummary(theme, output ?? ""), width);
   },
 
   formatCollapsedContent(_args, output, theme) {
-    if (!output) return [theme.fg("muted", "└ empty")];
-    const n = output.split("\n").length;
-    return [`└ ${theme.fg("success", `${n} line${n === 1 ? "" : "s"}`)}`];
+    if (isSingleLine()) return [];
+    return [`└ ${listSummary(theme, output)}`];
   },
 
   formatExpandedContent(_args, output, theme, width) {
@@ -280,26 +330,31 @@ interface MemoryAliasDetails {
 }
 
 export const memoryAliasAdapter: ToolDisplayAdapter<MemoryAliasArgs> = {
-  formatCallHeader(args, theme, _details) {
+  formatCallHeader(args, theme, details, _isPartial, _expanded, width) {
     const isRemove = !!args?.remove_uri;
+    let base: string;
     if (isRemove) {
-      return (
+      base =
         theme.fg("toolTitle", theme.bold("Memory alias")) +
         " " +
         theme.fg("accent", args!.remove_uri!) +
-        theme.fg("dim", " (remove)")
-      );
+        theme.fg("dim", " (remove)");
+    } else {
+      const suffix = args?.target_uri ? ` → ${args.target_uri}` : "";
+      base =
+        theme.fg("toolTitle", theme.bold("Memory alias")) +
+        " " +
+        theme.fg("accent", args?.new_uri ?? "") +
+        (suffix ? theme.fg("dim", suffix) : "");
     }
-    const suffix = args?.target_uri ? ` → ${args.target_uri}` : "";
-    return (
-      theme.fg("toolTitle", theme.bold("Memory alias")) +
-      " " +
-      theme.fg("accent", args?.new_uri ?? "") +
-      (suffix ? theme.fg("dim", suffix) : "")
-    );
+    if (!isSingleLine()) return base;
+    const d = details as MemoryAliasDetails | undefined;
+    const label = d?.is_remove ? "removed" : "created";
+    return inlineSuffix(base, theme.fg("success", label), width);
   },
 
   formatCollapsedContent(_args, _output, theme, _width, details) {
+    if (isSingleLine()) return [];
     const d = details as MemoryAliasDetails | undefined;
     const label = d?.is_remove ? "removed" : "created";
     return [`└ ${theme.fg("success", label)}`];
@@ -322,28 +377,33 @@ interface MemoryTriggersDetails {
   removed?: number;
 }
 
+function triggersSummary(theme: Theme, details: unknown): string {
+  const d = details as MemoryTriggersDetails | undefined;
+  const parts: string[] = [];
+  if ((d?.added ?? 0) > 0) parts.push(theme.fg("success", `+${d!.added} keyword${d!.added === 1 ? "" : "s"}`));
+  if ((d?.removed ?? 0) > 0) parts.push(theme.fg("error", `-${d!.removed} keyword${d!.removed === 1 ? "" : "s"}`));
+  return parts.length > 0 ? parts.join(", ") : theme.fg("success", "updated");
+}
+
 export const memoryTriggersAdapter: ToolDisplayAdapter<MemoryTriggersArgs> = {
-  formatCallHeader(args, theme) {
+  formatCallHeader(args, theme, details, _isPartial, _expanded, width) {
     const uri = args?.uri ?? "";
     const parts: string[] = [];
     if (args?.add?.length) parts.push(`+${args.add.length}`);
     if (args?.remove?.length) parts.push(`-${args.remove.length}`);
     const suffix = parts.length > 0 ? ` ${parts.join(" ")}` : "";
-    return (
+    const base =
       theme.fg("toolTitle", theme.bold("Memory triggers")) +
       " " +
       theme.fg("accent", uri) +
-      (suffix ? theme.fg("dim", suffix) : "")
-    );
+      (suffix ? theme.fg("dim", suffix) : "");
+    if (!isSingleLine()) return base;
+    return inlineSuffix(base, triggersSummary(theme, details), width);
   },
 
   formatCollapsedContent(_args, _output, theme, _width, details) {
-    const d = details as MemoryTriggersDetails | undefined;
-    const parts: string[] = [];
-    if ((d?.added ?? 0) > 0) parts.push(theme.fg("success", `+${d!.added} keyword${d!.added === 1 ? "" : "s"}`));
-    if ((d?.removed ?? 0) > 0) parts.push(theme.fg("error", `-${d!.removed} keyword${d!.removed === 1 ? "" : "s"}`));
-    const detail = parts.length > 0 ? parts.join(", ") : theme.fg("success", "updated");
-    return [`└ ${detail}`];
+    if (isSingleLine()) return [];
+    return [`└ ${triggersSummary(theme, details)}`];
   },
 
   formatExpandedContent(_args, _output, _theme) {
@@ -362,22 +422,30 @@ interface MemoryHistoryDetails {
   versions?: string[];
 }
 
+function historySummary(theme: Theme, details: unknown): string {
+  const d = details as MemoryHistoryDetails | undefined;
+  const total = d?.total ?? 0;
+  if (total === 0) return theme.fg("muted", "no versions");
+  const first = d?.versions?.[0] ?? "";
+  const more = total > 1 ? theme.fg("dim", ` · ${total - 1} more`) : "";
+  return `${theme.fg("success", `${total} version${total === 1 ? "" : "s"}`)} ${theme.fg("dim", first)}${more}`;
+}
+
 export const memoryHistoryAdapter: ToolDisplayAdapter<MemoryHistoryArgs> = {
-  formatCallHeader(args, theme) {
+  formatCallHeader(args, theme, details, _isPartial, _expanded, width) {
     const uri = args?.uri ?? "";
-    return `${theme.fg("toolTitle", theme.bold("Memory history"))} ${theme.fg("accent", uri)}`;
+    const base = `${theme.fg("toolTitle", theme.bold("Memory history"))} ${theme.fg("accent", uri)}`;
+    if (!isSingleLine()) return base;
+    return inlineSuffix(base, historySummary(theme, details), width);
   },
 
   formatCollapsedContent(_args, _output, theme, width, details) {
+    if (isSingleLine()) return [];
     const d = details as MemoryHistoryDetails | undefined;
-    const total = d?.total ?? 0;
-    if (total === 0) {
+    if ((d?.total ?? 0) === 0) {
       return [theme.fg("muted", "└ no versions")];
     }
-    const first = d?.versions?.[0] ?? "";
-    const more = total > 1 ? theme.fg("dim", ` · ${total - 1} more`) : "";
-    const line = `└ ${theme.fg("success", `${total} version${total === 1 ? "" : "s"}`)} ${theme.fg("dim", first)}${more}`;
-    return [truncateToWidth(line, width, "…")];
+    return [truncateToWidth(`└ ${historySummary(theme, details)}`, width, "…")];
   },
 
   formatExpandedContent(_args, _output, theme, _width, details) {
@@ -398,21 +466,29 @@ interface MemoryDomainsDetails {
   domains?: string[];
 }
 
+function domainsSummary(theme: Theme, details: unknown): string {
+  const d = details as MemoryDomainsDetails | undefined;
+  const total = d?.total ?? 0;
+  if (total === 0) return theme.fg("muted", "none");
+  const first = d?.domains?.[0] ?? "";
+  const more = total > 1 ? theme.fg("dim", ` · ${total - 1} more`) : "";
+  return `${theme.fg("success", `${total} domain${total === 1 ? "" : "s"}`)} ${theme.fg("dim", first)}${more}`;
+}
+
 export const memoryDomainsAdapter: ToolDisplayAdapter<Record<string, unknown>> = {
-  formatCallHeader(_args, theme) {
-    return theme.fg("toolTitle", theme.bold("Memory domains"));
+  formatCallHeader(_args, theme, details, _isPartial, _expanded, width) {
+    const base = theme.fg("toolTitle", theme.bold("Memory domains"));
+    if (!isSingleLine()) return base;
+    return inlineSuffix(base, domainsSummary(theme, details), width);
   },
 
   formatCollapsedContent(_args, _output, theme, width, details) {
+    if (isSingleLine()) return [];
     const d = details as MemoryDomainsDetails | undefined;
-    const total = d?.total ?? 0;
-    if (total === 0) {
+    if ((d?.total ?? 0) === 0) {
       return [theme.fg("muted", "└ none")];
     }
-    const first = d?.domains?.[0] ?? "";
-    const more = total > 1 ? theme.fg("dim", ` · ${total - 1} more`) : "";
-    const line = `└ ${theme.fg("success", `${total} domain${total === 1 ? "" : "s"}`)} ${theme.fg("dim", first)}${more}`;
-    return [truncateToWidth(line, width, "…")];
+    return [truncateToWidth(`└ ${domainsSummary(theme, details)}`, width, "…")];
   },
 
   formatExpandedContent(_args, _output, theme, _width, details) {

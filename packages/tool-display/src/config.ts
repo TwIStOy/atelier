@@ -7,6 +7,7 @@ export interface ToolDisplayConfig {
   splitDiffMinWidth: number;
   editStyle: "single-line" | "two-line";
   readStyle: "single-line" | "two-line";
+  memoryStyle: "single-line" | "two-line";
   groupToolVerbs: boolean;
   groupMaxVisible: number;
   mcpToolCalls: boolean;
@@ -21,6 +22,7 @@ const CONFIG_SCHEMA: ExtensionConfigSchema<ToolDisplayConfig> = {
     splitDiffMinWidth: 100,
     editStyle: "single-line",
     readStyle: "two-line",
+    memoryStyle: "single-line",
     groupToolVerbs: true,
     groupMaxVisible: 10,
     mcpToolCalls: true,
@@ -103,6 +105,20 @@ export function registerToolDisplayConfigItems(): void {
       ],
     },
     {
+      key: "memoryStyle",
+      type: "select",
+      label: "Memory Style",
+      value: () => loadConfig().memoryStyle,
+      description:
+        'How memory tools are rendered when collapsed: "single-line" appends the result summary inline on the header, "two-line" keeps the legacy "└ ..." body row',
+      extensionLabel: "Tool Display",
+      order: 5,
+      options: [
+        { label: "Single-line", value: "single-line" },
+        { label: "Two-line", value: "two-line" },
+      ],
+    },
+    {
       key: "groupToolVerbs",
       type: "boolean",
       label: "Group Tool Calls",
@@ -110,7 +126,7 @@ export function registerToolDisplayConfigItems(): void {
       description:
         "Fold consecutive read-only tool calls (grep/glob/ls/read, plus names with a registered Aggregate Rule) into one aggregate summary row",
       extensionLabel: "Tool Display",
-      order: 5,
+      order: 6,
     },
     {
       key: "groupMaxVisible",
@@ -120,7 +136,7 @@ export function registerToolDisplayConfigItems(): void {
       description:
         "Hide older collapsed tool calls behind a truncation header when a dense run exceeds this many entries (0 disables truncation)",
       extensionLabel: "Tool Display",
-      order: 6,
+      order: 7,
       min: 0,
       max: 100,
     },
@@ -132,7 +148,7 @@ export function registerToolDisplayConfigItems(): void {
       description:
         "Take over rendering of pi-mcp-adapter tool calls (mcp proxy and direct server tools) instead of the adapter's own renderers",
       extensionLabel: "Tool Display",
-      order: 7,
+      order: 8,
     },
   ]);
 }

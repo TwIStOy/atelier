@@ -4,6 +4,11 @@ import { join } from "node:path";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { editAdapter as editAdapterType } from "../src/adapters/edit.ts";
+import type {
+  memoryReadAdapter as memoryReadAdapterType,
+  memorySearchAdapter as memorySearchAdapterType,
+  memoryUpdateAdapter as memoryUpdateAdapterType,
+} from "../src/adapters/memory.ts";
 import type { readAdapter as readAdapterType } from "../src/adapters/read.ts";
 import type { renderToolCall as renderToolCallType } from "../src/tool-call-display.ts";
 
@@ -16,6 +21,9 @@ const PLAIN_THEME: Theme = {
 let tmpDir: string;
 let editAdapter: typeof editAdapterType;
 let readAdapter: typeof readAdapterType;
+let memoryReadAdapter: typeof memoryReadAdapterType;
+let memoryUpdateAdapter: typeof memoryUpdateAdapterType;
+let memorySearchAdapter: typeof memorySearchAdapterType;
 let renderToolCall: typeof renderToolCallType;
 let globalToolDisplayRegistry: typeof import("../src/registry.ts").globalToolDisplayRegistry;
 
@@ -23,14 +31,18 @@ beforeEach(async () => {
   tmpDir = mkdtempSync(join(tmpdir(), "tool-display-style-"));
   vi.stubEnv("XDG_CONFIG_HOME", tmpDir);
   vi.resetModules();
-  const [editMod, readMod, renderMod, registryMod] = await Promise.all([
+  const [editMod, readMod, memoryMod, renderMod, registryMod] = await Promise.all([
     import("../src/adapters/edit.ts"),
     import("../src/adapters/read.ts"),
+    import("../src/adapters/memory.ts"),
     import("../src/tool-call-display.ts"),
     import("../src/registry.ts"),
   ]);
   editAdapter = editMod.editAdapter;
   readAdapter = readMod.readAdapter;
+  memoryReadAdapter = memoryMod.memoryReadAdapter;
+  memoryUpdateAdapter = memoryMod.memoryUpdateAdapter;
+  memorySearchAdapter = memoryMod.memorySearchAdapter;
   renderToolCall = renderMod.renderToolCall;
   globalToolDisplayRegistry = registryMod.globalToolDisplayRegistry;
 });
@@ -53,12 +65,14 @@ function renderCollapsed(
   output: string,
   isError = false,
   width = 80,
+  details?: unknown,
 ): string[] {
   return renderToolCall(
     {
       toolName,
       args,
       output,
+      details,
       expanded: false,
       isPartial: false,
       isError,
@@ -118,6 +132,78 @@ describe("editStyle config", () => {
     expect(lines.length).toBe(1);
     expect(lines[0]).toContain("Edit");
     expect(lines[0]).not.toContain("└");
+  });
+});
+
+describe("memoryStyle config", () => {
+  it("renders the collapsed memory-read as a single line with an inline summary by default", () => {
+    globalToolDisplayRegistry.register("memory-read", memoryReadAdapter);
+    const lines = renderCollapsed("memory-read", { uri: "core://agent" }, "{}", false, 80, {
+      uri: "core://agent",
+      content_preview: "hello world\nsecond",
+      content_lines: 2,
+    });
+    expect(lines.length).toBe(1);
+    expect(lines[0]).toContain("Memory read");
+    expect(lines[0]).toContain("core://agent");
+    expect(lines[0]).toContain("2 lines");
+    expect(lines.join("\n")).not.toContain("└");
+  });
+
+  it("renders the collapsed memory-read as a two-line block when memoryStyle is two-line", () => {
+    writeConfig({ memoryStyle: "two-line" });
+    globalToolDisplayRegistry.register("memory-read", memoryReadAdapter);
+    const lines = renderCollapsed("memory-read", { uri: "core://agent" }, "{}", false, 80, {
+      uri: "core://agent",
+      content_preview: "hello world\nsecond",
+      content_lines: 2,
+    });
+    expect(lines.length).toBe(2);
+    expect(lines[0]).toContain("Memory read");
+    expect(lines[0]).not.toContain("2 lines");
+    expect(lines[1]).toContain("└");
+    expect(lines[1]).toContain("2 lines");
+  });
+
+  it("renders the collapsed memory-update diff stats inline by default", () => {
+    globalToolDisplayRegistry.register("memory-update", memoryUpdateAdapter);
+    const lines = renderCollapsed("memory-update", { uri: "core://agent" }, "{}", false, 80, {
+      uri: "core://agent",
+      mode: "patch",
+      diff_adds: 3,
+      diff_removes: 1,
+      priority: 4,
+    });
+    expect(lines.length).toBe(1);
+    expect(lines[0]).toContain("+3");
+    expect(lines[0]).toContain("-1");
+    expect(lines[0]).toContain("p4");
+    expect(lines.join("\n")).not.toContain("└");
+  });
+
+  it("renders the collapsed memory-search summary inline by default", () => {
+    globalToolDisplayRegistry.register("memory-search", memorySearchAdapter);
+    const lines = renderCollapsed("memory-search", { query: "foo" }, "{}", false, 120, {
+      query: "foo",
+      total: 2,
+      items: [{ uri: "core://agent/identity", snippet: "snippet text" }],
+    });
+    expect(lines.length).toBe(1);
+    expect(lines[0]).toContain("Memory search");
+    expect(lines[0]).toContain("2 results");
+    expect(lines.join("\n")).not.toContain("└");
+  });
+
+  it("shows an inline empty marker for memory-read with no content", () => {
+    globalToolDisplayRegistry.register("memory-read", memoryReadAdapter);
+    const lines = renderCollapsed("memory-read", { uri: "core://agent" }, "{}", false, 80, {
+      uri: "core://agent",
+      content_preview: "",
+      content_lines: 0,
+    });
+    expect(lines.length).toBe(1);
+    expect(lines[0]).toContain("empty");
+    expect(lines.join("\n")).not.toContain("└");
   });
 });
 
