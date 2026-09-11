@@ -9,6 +9,7 @@ export interface ToolDisplayConfig {
   readStyle: "single-line" | "two-line";
   groupToolVerbs: boolean;
   groupMaxVisible: number;
+  mcpToolCalls: boolean;
 }
 
 const CONFIG_NAME = "tool-display";
@@ -22,6 +23,7 @@ const CONFIG_SCHEMA: ExtensionConfigSchema<ToolDisplayConfig> = {
     readStyle: "two-line",
     groupToolVerbs: true,
     groupMaxVisible: 10,
+    mcpToolCalls: true,
   },
 };
 
@@ -121,6 +123,16 @@ export function registerToolDisplayConfigItems(): void {
       order: 6,
       min: 0,
       max: 100,
+    },
+    {
+      key: "mcpToolCalls",
+      type: "boolean",
+      label: "Render MCP Tool Calls",
+      value: () => loadConfig().mcpToolCalls,
+      description:
+        "Take over rendering of pi-mcp-adapter tool calls (mcp proxy and direct server tools) instead of the adapter's own renderers",
+      extensionLabel: "Tool Display",
+      order: 7,
     },
   ]);
 }
