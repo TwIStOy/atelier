@@ -5,6 +5,7 @@
 ### Fixed
 
 - `componentRendersLines` no longer recurses without bound when two patched renders probe each other. Compact-thinking's leading-blank walk and tool-display's grouping/spacing both call sibling `render` to decide visibility; those patches also scan siblings during `render`, which previously overflowed the call stack (`RangeError: Maximum call stack size exceeded` in `findComponentContext` / `truncateToWidth`). A nested probe now treats the sibling as visible and returns without calling `render` again. Probe depth is stored on `globalThis` so duplicate copies of this package (separate extension loaders) share the same guard.
+- Extension config reads/writes (`readConfig` / `writeConfig` / `updateConfig` and the key-level helpers) now resolve `extensions.json`'s path on every call instead of capturing it in a module-level constant. In a real session the `XDG_CONFIG_HOME` environment is static so behavior is unchanged, but tests that stub the env after the module first evaluated previously kept reading the stale path.
 
 ### Added
 

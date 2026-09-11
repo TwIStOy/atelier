@@ -8,12 +8,20 @@ export interface ExtensionConfigSchema<T> {
 
 type ConfigFile = Record<string, Record<string, unknown>>;
 
-const CONFIG_PATH = configPath();
-
 function configPath(): string {
   const xdg = process.env.XDG_CONFIG_HOME;
   const base = xdg ? join(xdg, "pi") : join(homedir(), ".config", "pi");
   return join(base, "extensions.json");
+}
+
+function readConfigFile(): ConfigFile {
+  const path = configPath();
+  try {
+    if (!existsSync(path)) return {};
+    return JSON.parse(readFileSync(path, "utf8"));
+  } catch {
+    return {};
+  }
 }
 
 function ensureDir(filePath: string): void {
@@ -23,20 +31,12 @@ function ensureDir(filePath: string): void {
   }
 }
 
-function readConfigFile(): ConfigFile {
-  try {
-    if (!existsSync(CONFIG_PATH)) return {};
-    return JSON.parse(readFileSync(CONFIG_PATH, "utf8"));
-  } catch {
-    return {};
-  }
-}
-
 function writeConfigFile(data: ConfigFile): void {
-  ensureDir(CONFIG_PATH);
-  const tmp = `${CONFIG_PATH}.tmp.${process.pid}.${Date.now()}`;
+  const path = configPath();
+  ensureDir(path);
+  const tmp = `${path}.tmp.${process.pid}.${Date.now()}`;
   writeFileSync(tmp, `${JSON.stringify(data, null, 2)}\n`, "utf8");
-  renameSync(tmp, CONFIG_PATH);
+  renameSync(tmp, path);
 }
 
 export function readConfig<T>(extensionId: string, schema: ExtensionConfigSchema<T>): T {
