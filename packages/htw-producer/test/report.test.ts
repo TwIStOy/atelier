@@ -1,57 +1,38 @@
-import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { describe, expect, test } from "vitest";
 import { DiffTracker } from "../src/diff-tracker.ts";
-import { createGitContextCache, type GitRunner } from "../src/git-context.ts";
+import { createGitContextCache } from "../src/git-context.ts";
 import { buildReport, computeSessionCost, summarizeToolArgs } from "../src/report.ts";
+import { type CtxOpts, gitRunner, mockCtx, NO_GIT_RUNNER } from "./helpers.ts";
 
-const GIT_TABLE: Record<string, string> = {
-  "git rev-parse --git-common-dir": "/srv/repo/.git",
-  "git rev-parse --is-inside-work-tree": "true",
-  "git rev-parse --show-toplevel": "/srv/repo",
-  "git branch --show-current": "main",
-  "git worktree list --porcelain": "worktree /srv/repo\nHEAD x\nbranch refs/heads/main\n",
-};
+const diff = new DiffTracker();
 
-const NO_GIT_RUNNER: GitRunner = () => {
-  throw new Error("no git");
-};
-
-function gitRunner(): GitRunner {
-  return (command) => {
-    const out = GIT_TABLE[command];
-    if (!out) throw new Error(`boom: ${command}`);
-    return out;
-  };
+interface ReportOpts extends CtxOpts {
+  id?: string;
+  status?: "working" | "idle" | "waiting" | "error" | "ended";
+  tool?: { name: string; args: unknown };
+  thinking?: boolean;
+  lastUserInput?: string;
+  env?: NodeJS.ProcessEnv;
+  pid?: number;
+  hostname?: string;
+  git?: boolean;
 }
 
-interface CtxOpts {
-  cwd?: string;
-  tokens?: number | null;
-  window?: number;
-  percent?: number | null;
-  model?: unknown;
-  branch?: unknown[];
-  sessionName?: string;
-}
-
-function mockCtx(opts: CtxOpts = {}): ExtensionContext {
-  return {
-    cwd: opts.cwd ?? "/srv/repo",
-    model: opts.model ?? { id: "claude-sonnet-4.5", name: "Claude Sonnet 4.5", provider: "anthropic" },
-    getContextUsage: () => {
-      if (opts.tokens === null && opts.percent === null) return undefined;
-      return {
-        tokens: opts.tokens ?? 50000,
-        contextWindow: opts.window ?? 200000,
-        percent: opts.percent ?? 25,
-      };
-    },
-    sessionManager: {
-      getSessionId: () => "abc123",
-      getSessionName: () => opts.sessionName,
-      getBranch: () => opts.branch ?? [],
-    },
-  } as unknown as ExtensionContext;
+function report(opts: ReportOpts = {}) {
+  return buildReport({
+    ctx: mockCtx(opts),
+    id: opts.id ?? "abc123",
+    startedAt: 1700_000_000,
+    status: opts.status ?? "working",
+    tool: opts.tool,
+    thinking: opts.thinking,
+    lastUserInput: opts.lastUserInput,
+    diff: diff.snapshot(),
+    gitCache: createGitContextCache(opts.git === false ? NO_GIT_RUNNER : gitRunner()),
+    env: opts.env ?? {},
+    pid: opts.pid,
+    hostname: opts.hostname ?? "",
+  });
 }
 
 describe("summarizeToolArgs", () => {
@@ -82,205 +63,103 @@ describe("computeSessionCost", () => {
       { type: "message", message: { role: "assistant", usage: { cost: { total: 0.25 } } } },
       { type: "message", message: { role: "user", content: "hi" } },
     ];
-    expect(computeSessionCost(mockCtx({ branch }) as ExtensionContext)).toBeCloseTo(0.35);
+    expect(computeSessionCost(mockCtx({ branch }))).toBeCloseTo(0.35);
   });
 
   test("zero when no assistant messages", () => {
-    expect(computeSessionCost(mockCtx() as ExtensionContext)).toBe(0);
+    expect(computeSessionCost(mockCtx())).toBe(0);
   });
 });
 
 describe("buildReport", () => {
-  const diff = new DiffTracker();
-
   test("required fields are always present and shaped per schema", () => {
-    const report = buildReport({
-      ctx: mockCtx(),
-      sessionId: "abc123",
-      startedAt: 1700_000_000,
-      status: "working",
-      diff: diff.snapshot(),
-      gitCache: createGitContextCache(NO_GIT_RUNNER),
-      env: {},
-    });
-    expect(report.id).toBe("abc123");
-    expect(report.cwd).toBe("/srv/repo");
-    expect(report.status).toBe("working");
-    expect(report.started_at).toBe(1700_000_000);
-    expect(report.context).toEqual({ percent: 25, used: 50000, window: 200000 });
-    expect(report.diff).toEqual({ add: 0, delete: 0 });
+    const out = report();
+    expect(out.id).toBe("abc123");
+    expect(out.cwd).toBe("/srv/repo");
+    expect(out.status).toBe("working");
+    expect(out.started_at).toBe(1700_000_000);
+    expect(out.context).toEqual({ percent: 25, used: 50000, window: 200000 });
+    expect(out.diff).toEqual({ add: 0, delete: 0 });
+    expect(out.project).toBe("/srv/repo/.git");
+    expect(out.worktree).toEqual({ root: "/srv/repo", main: "/srv/repo", branch: "main" });
   });
 
   test("falls back to basename project outside a repo", () => {
-    const report = buildReport({
-      ctx: mockCtx({ cwd: "/home/me/myproj" }),
-      sessionId: "x",
-      startedAt: 1,
-      status: "idle",
-      diff: diff.snapshot(),
-      gitCache: createGitContextCache(NO_GIT_RUNNER),
-      env: {},
-    });
-    expect(report.project).toBe("myproj");
-    expect(report.worktree).toBeUndefined();
-  });
-
-  test("includes worktree when inside a repo", () => {
-    const report = buildReport({
-      ctx: mockCtx(),
-      sessionId: "x",
-      startedAt: 1,
-      status: "idle",
-      diff: diff.snapshot(),
-      gitCache: createGitContextCache(gitRunner()),
-      env: {},
-    });
-    expect(report.project).toBe("/srv/repo/.git");
-    expect(report.worktree).toEqual({ root: "/srv/repo", main: "/srv/repo", branch: "main" });
+    const out = report({ git: false, cwd: "/home/me/myproj" });
+    expect(out.project).toBe("myproj");
+    expect(out.worktree).toBeUndefined();
   });
 
   test("tool field mirrors current tool with sanitized args", () => {
-    const report = buildReport({
-      ctx: mockCtx(),
-      sessionId: "x",
-      startedAt: 1,
+    const out = report({
       status: "working",
       tool: { name: "edit", args: { file: "a.ts", edits: [{ oldText: "x", newText: "y" }] } },
-      diff: diff.snapshot(),
-      gitCache: createGitContextCache(NO_GIT_RUNNER),
-      env: {},
     });
-    expect(report.tool).toEqual({ name: "edit", args: { file: "a.ts" } });
+    expect(out.tool).toEqual({ name: "edit", args: { file: "a.ts" } });
+  });
+
+  test("thinking and last_user_input carried when known", () => {
+    const out = report({ thinking: true, lastUserInput: "fix the failing test" });
+    expect(out.thinking).toBe(true);
+    expect(out.last_user_input).toBe("fix the failing test");
+  });
+
+  test("last_user_input omitted when empty", () => {
+    const out = report({ lastUserInput: "" });
+    expect(out.last_user_input).toBeUndefined();
+  });
+
+  test("host reported when known, omitted when empty", () => {
+    expect(report({ hostname: "asuka" }).host).toBe("asuka");
+    expect(report({ hostname: "" }).host).toBeUndefined();
   });
 
   test("omits optional fields when absent (agent is always sent)", () => {
-    const report = buildReport({
-      ctx: mockCtx(),
-      sessionId: "x",
-      startedAt: 1,
-      status: "idle",
-      diff: diff.snapshot(),
-      gitCache: createGitContextCache(NO_GIT_RUNNER),
-      env: {},
-    });
-    expect(report.agent).toBe("pi");
-    expect(report.title).toBeUndefined();
-    expect(report.tool).toBeUndefined();
-    expect(report.worktree).toBeUndefined();
-    expect(report.cost).toBeUndefined();
-    expect(report.tmux_pane).toBeUndefined();
-    expect(report.pid).toBeUndefined();
+    const out = report({ status: "idle", git: false });
+    expect(out.agent).toBe("pi");
+    expect(out.title).toBeUndefined();
+    expect(out.tool).toBeUndefined();
+    expect(out.worktree).toBeUndefined();
+    expect(out.cost).toBeUndefined();
+    expect(out.tmux_pane).toBeUndefined();
+    expect(out.pid).toBeUndefined();
+    expect(out.thinking).toBeUndefined();
   });
 
   test("title comes from the session name when set", () => {
-    const report = buildReport({
-      ctx: mockCtx({ sessionName: "Refactor auth" }),
-      sessionId: "x",
-      startedAt: 1,
-      status: "idle",
-      diff: diff.snapshot(),
-      gitCache: createGitContextCache(NO_GIT_RUNNER),
-      env: {},
-    });
-    expect(report.title).toBe("Refactor auth");
+    expect(report({ sessionName: "Refactor auth" }).title).toBe("Refactor auth");
   });
 
   test("title falls back to the first user prompt when no session name", () => {
     const branch = [{ type: "message", message: { role: "user", content: "fix the login bug\non line 42" } }];
-    const report = buildReport({
-      ctx: mockCtx({ branch }),
-      sessionId: "x",
-      startedAt: 1,
-      status: "working",
-      diff: diff.snapshot(),
-      gitCache: createGitContextCache(NO_GIT_RUNNER),
-      env: {},
-    });
-    expect(report.title).toBe("fix the login bug on line 42");
+    expect(report({ branch }).title).toBe("fix the login bug on line 42");
   });
 
   test("title truncates long prompts to a single line", () => {
     const long = `Implement ${"a".repeat(200)}`;
-    const report = buildReport({
-      ctx: mockCtx({ branch: [{ type: "message", message: { role: "user", content: long } }] }),
-      sessionId: "x",
-      startedAt: 1,
-      status: "idle",
-      diff: diff.snapshot(),
-      gitCache: createGitContextCache(NO_GIT_RUNNER),
-      env: {},
-    });
-    const title = report.title ?? "";
+    const out = report({ branch: [{ type: "message", message: { role: "user", content: long } }] });
+    const title = out.title ?? "";
     expect(title.length).toBeLessThanOrEqual(80);
     expect(title.endsWith("…")).toBe(true);
   });
 
-  test("session name takes priority over the first user prompt", () => {
-    const branch = [{ type: "message", message: { role: "user", content: "hello" } }];
-    const report = buildReport({
-      ctx: mockCtx({ sessionName: "Named", branch }),
-      sessionId: "x",
-      startedAt: 1,
-      status: "idle",
-      diff: diff.snapshot(),
-      gitCache: createGitContextCache(NO_GIT_RUNNER),
-      env: {},
-    });
-    expect(report.title).toBe("Named");
-  });
-
   test("includes tmux_pane and pid when available", () => {
-    const report = buildReport({
-      ctx: mockCtx(),
-      sessionId: "x",
-      startedAt: 1,
-      status: "idle",
-      diff: diff.snapshot(),
-      gitCache: createGitContextCache(NO_GIT_RUNNER),
-      env: { TMUX_PANE: "%12" },
-      pid: 4242,
-    });
-    expect(report.tmux_pane).toBe("%12");
-    expect(report.pid).toBe(4242);
+    const out = report({ env: { TMUX_PANE: "%12" }, pid: 4242 });
+    expect(out.tmux_pane).toBe("%12");
+    expect(out.pid).toBe(4242);
   });
 
   test("clamps and rounds percent into 0..=100", () => {
-    const report = buildReport({
-      ctx: mockCtx({ percent: 133.333, tokens: 999 }),
-      sessionId: "x",
-      startedAt: 1,
-      status: "idle",
-      diff: diff.snapshot(),
-      gitCache: createGitContextCache(NO_GIT_RUNNER),
-      env: {},
-    });
-    expect(report.context.percent).toBe(100);
+    expect(report({ percent: 133.333, tokens: 999 }).context.percent).toBe(100);
   });
 
   test("derives percent from tokens/window when percent missing", () => {
-    const report = buildReport({
-      ctx: mockCtx({ percent: null, tokens: 50000, window: 200000 }),
-      sessionId: "x",
-      startedAt: 1,
-      status: "idle",
-      diff: diff.snapshot(),
-      gitCache: createGitContextCache(NO_GIT_RUNNER),
-      env: {},
-    });
-    expect(report.context.percent).toBe(25);
-    expect(report.context.used).toBe(50000);
+    const out = report({ percent: null, tokens: 50000, window: 200000 }).context;
+    expect(out.percent).toBe(25);
+    expect(out.used).toBe(50000);
   });
 
   test("zero percent when context usage unknown", () => {
-    const report = buildReport({
-      ctx: mockCtx({ percent: null, tokens: null, window: 200000 }),
-      sessionId: "x",
-      startedAt: 1,
-      status: "idle",
-      diff: diff.snapshot(),
-      gitCache: createGitContextCache(NO_GIT_RUNNER),
-      env: {},
-    });
-    expect(report.context).toEqual({ percent: 0 });
+    expect(report({ percent: null, tokens: null }).context).toEqual({ percent: 0 });
   });
 });

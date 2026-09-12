@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { postReport, type RequestFn } from "../src/client.ts";
+import { postEvent, postReport, type RequestFn } from "../src/client.ts";
+import type { EventEnvelope } from "../src/event.ts";
 import type { Report } from "../src/report.ts";
 
 const REPORT: Report = {
@@ -12,6 +13,13 @@ const REPORT: Report = {
   diff: { add: 0, delete: 0 },
 };
 
+const ENVELOPE: EventEnvelope = {
+  harness: "pi",
+  session_id: "abc123",
+  cwd: "/srv/repo",
+  event: { type: "turn_completed" },
+};
+
 interface FakeReq {
   handlers: Record<string, ((arg?: unknown) => void)[]>;
   written: string[];
@@ -20,10 +28,17 @@ interface FakeReq {
   timeoutMs?: number;
 }
 
-function makeRequestFn(): { fn: RequestFn; req: FakeReq; respond: (status: number) => void } {
+function makeRequestFn(): {
+  fn: RequestFn;
+  req: FakeReq;
+  respond: (status: number) => void;
+  options: () => Record<string, unknown> | undefined;
+} {
   const req: FakeReq = { handlers: {}, written: [], ended: false, destroyed: false };
   let captured: ((status: number) => void) | undefined;
-  const fn = ((_options, callback) => {
+  let capturedOptions: Record<string, unknown> | undefined;
+  const fn = ((options, callback) => {
+    capturedOptions = options as Record<string, unknown>;
     captured = (status) => callback({ statusCode: status });
     return {
       on(event: string, handler: (arg?: unknown) => void) {
@@ -55,8 +70,27 @@ function makeRequestFn(): { fn: RequestFn; req: FakeReq; respond: (status: numbe
       },
     };
   }) as RequestFn;
-  return { fn, req, respond: (status) => captured?.(status) };
+  return { fn, req, respond: (status) => captured?.(status), options: () => capturedOptions };
 }
+
+describe("postEvent", () => {
+  test("targets /v1/events with the envelope body", async () => {
+    const { fn, req, respond, options } = makeRequestFn();
+    const promise = postEvent("127.0.0.1", 7482, ENVELOPE, { requestFn: fn });
+    expect(options()?.path).toBe("/v1/events");
+    expect(options()?.method).toBe("POST");
+    expect(req.written[0]).toBe(JSON.stringify(ENVELOPE));
+    respond(204);
+    await expect(promise).resolves.toEqual({ ok: true, statusCode: 204 });
+  });
+
+  test("resolves ok=false on 400 schema rejection", async () => {
+    const { fn, respond } = makeRequestFn();
+    const promise = postEvent("127.0.0.1", 7482, ENVELOPE, { requestFn: fn });
+    respond(400);
+    await expect(promise).resolves.toEqual({ ok: false, statusCode: 400 });
+  });
+});
 
 describe("postReport", () => {
   test("writes JSON body, ends request, resolves ok on 204", async () => {

@@ -1,3 +1,4 @@
+import { hostname as osHostname } from "node:os";
 import type { AssistantMessage, UserMessage } from "@earendil-works/pi-ai";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { userMessageText } from "@htwang-contrib/common";
@@ -44,6 +45,9 @@ export interface Report {
   started_at?: number;
   agent?: string;
   title?: string;
+  host?: string;
+  last_user_input?: string;
+  thinking?: boolean;
 }
 
 export const AGENT_HARNESS = "pi";
@@ -78,6 +82,8 @@ function modelName(ctx: ExtensionContext): string {
   if (!model) return "unknown";
   return model.name || model.id || "unknown";
 }
+
+export { modelName };
 
 function firstUserPrompt(ctx: ExtensionContext): string | undefined {
   for (const entry of ctx.sessionManager.getBranch()) {
@@ -123,14 +129,17 @@ export function computeSessionCost(ctx: ExtensionContext): number {
 
 export interface BuildReportInput {
   ctx: ExtensionContext;
-  sessionId: string;
+  id: string;
   startedAt: number;
   status: SessionStatus;
   tool?: { name: string; args: unknown } | undefined;
+  thinking?: boolean;
+  lastUserInput?: string;
   diff: DiffCounts;
   gitCache: GitContextCache;
   env?: NodeJS.ProcessEnv;
   pid?: number;
+  hostname?: string;
 }
 
 function buildContextField(ctx: ExtensionContext): ContextUsage {
@@ -157,12 +166,14 @@ function clampContext(field: ContextUsage): ContextUsage {
   return result;
 }
 
+export { buildContextField };
+
 export function buildReport(input: BuildReportInput): Report {
-  const { ctx, sessionId, startedAt, status, tool, diff, gitCache, env, pid } = input;
+  const { ctx, id, startedAt, status, tool, thinking, lastUserInput, diff, gitCache, env, pid, hostname } = input;
   const git = gitCache.get(ctx.cwd);
 
   const report: Report = {
-    id: sessionId,
+    id,
     project: git.project,
     cwd: ctx.cwd,
     model: modelName(ctx),
@@ -197,6 +208,14 @@ export function buildReport(input: BuildReportInput): Report {
 
   const title = deriveTitle(ctx);
   if (title) report.title = title;
+
+  const host = hostname ?? osHostname();
+  if (host.length > 0) report.host = host;
+
+  if (lastUserInput && lastUserInput.length > 0) {
+    report.last_user_input = lastUserInput;
+  }
+  if (typeof thinking === "boolean") report.thinking = thinking;
 
   return report;
 }

@@ -1,4 +1,5 @@
 import { type RequestOptions, request } from "node:http";
+import type { EventEnvelope } from "./event.ts";
 import type { Report } from "./report.ts";
 
 export interface PostResult {
@@ -26,10 +27,16 @@ export interface PostOptions {
   requestFn?: RequestFn;
 }
 
-export function postReport(host: string, port: number, report: Report, options: PostOptions = {}): Promise<PostResult> {
+function postJson(
+  host: string,
+  port: number,
+  path: string,
+  body: unknown,
+  options: PostOptions = {},
+): Promise<PostResult> {
   const timeoutMs = options.timeoutMs ?? 1500;
   const requestFn = options.requestFn ?? DEFAULT_REQUEST;
-  const body = JSON.stringify(report);
+  const payload = JSON.stringify(body);
 
   return new Promise((resolve) => {
     let settled = false;
@@ -45,11 +52,11 @@ export function postReport(host: string, port: number, report: Report, options: 
         {
           host,
           port,
-          path: "/v1/reports",
+          path,
           method: "POST",
           headers: {
             "content-type": "application/json",
-            "content-length": Buffer.byteLength(body).toString(),
+            "content-length": Buffer.byteLength(payload).toString(),
             connection: "close",
           },
           timeout: timeoutMs,
@@ -75,10 +82,23 @@ export function postReport(host: string, port: number, report: Report, options: 
     });
 
     try {
-      req.write(body);
+      req.write(payload);
       req.end();
     } catch (err) {
       finish({ ok: false, error: err instanceof Error ? err.message : String(err) });
     }
   });
+}
+
+export function postReport(host: string, port: number, report: Report, options: PostOptions = {}): Promise<PostResult> {
+  return postJson(host, port, "/v1/reports", report, options);
+}
+
+export function postEvent(
+  host: string,
+  port: number,
+  envelope: EventEnvelope,
+  options: PostOptions = {},
+): Promise<PostResult> {
+  return postJson(host, port, "/v1/events", envelope, options);
 }
