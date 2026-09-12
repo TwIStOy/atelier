@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Aggregate rules for all six `todo_*` tools, so consecutive todo tool calls collapse into one verb-group summary line (e.g. `Created 5 tasks, Updated 1 task`) in tool-display instead of one block per call.
+
 ## [0.6.1] - 2026-09-01
 
 ### Added
