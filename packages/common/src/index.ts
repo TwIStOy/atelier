@@ -158,6 +158,21 @@ export {
   isStaleCtxError,
 } from "./session-cache.ts";
 export { SessionLifecycle } from "./session-lifecycle.ts";
+export type { SessionTitleConfig, TitleOutcome } from "./session-title.ts";
+export {
+  abortSessionTitle,
+  captureSessionFirstPrompt,
+  ensureSessionTitle,
+  firstUserPrompt,
+  getSessionTitle,
+  initSessionTitleService,
+  loadSessionTitleConfig,
+  onSessionTitle,
+  parseSessionTitle,
+  resetSessionTitle,
+  SESSION_TITLE_CONFIG_ID,
+  summarizeSessionTitle,
+} from "./session-title.ts";
 export type { SideCallResult } from "./side-call.ts";
 export { executeSideCall } from "./side-call.ts";
 export { getAvailableSkillNames } from "./skills.ts";
