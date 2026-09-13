@@ -38,12 +38,25 @@ change landing while unfocused would be lost forever.
 
 ## Configuration
 
-Surfaced via the `/config` command under the **Pi-Herdr** extension.
+Surfaced via the `/config` command: the tab-title toggle lives under the
+**Pi-Herdr** extension; the title generation settings are shared under the
+**Session Title** section (see below).
 
-| Key       | Default | Description                                                         |
-| --------- | ------- | ------------------------------------------------------------------- |
-| `enabled` | `true`  | Turn tab-title updates on/off.                                      |
-| `model`   | `""`    | Model used to summarize the session. Empty = current session model. |
+| Key                     | Default | Description                                                         |
+| ----------------------- | ------- | ------------------------------------------------------------------- |
+| Pi-Herdr `enabled`      | `true`  | Turn tab-title updates on/off.                                      |
+| Session Title `enabled` | `true`  | Turn LLM title generation on/off (shared with other consumers).      |
+| Session Title `model`   | `""`    | Model used to generate the title. Empty = current session model.     |
+
+## Shared title generation
+
+The title comes from `@htwang-contrib/common`'s session-title service: a
+process-wide singleton that generates the title once per session from the
+first user prompt (LLM side-call via `executeSideCall` over the prompt
+captured from `before_agent_start`, falling back to the session branch for
+resumed sessions). herdr is one consumer of that title — other extensions
+(e.g. `htw-producer`, which reports it to the htw daemon) share the same
+generated value instead of re-requesting it.
 
 ## How it works
 
@@ -69,16 +82,11 @@ On session start the extension snapshots the tab's original label (via
 the tab already shows one of our own titles (a `⏺`/`❓`/`✓` prefix, e.g. left
 over from a previous run), it falls back to the tab's `number` instead.
 
-The title is produced by an LLM side-call (`@htwang-contrib/common`'s
-`executeSideCall`) over the session's **first user prompt** (extracted from the
-branch via `branchToMessages`). It is generated once per session; failures fall
-back to the previous title so the tab is never blank.
-
 ## Files
 
 - `herdr-client.ts` — env detection + thin herdr CLI client (pane get / tab
   get / tab rename). Pure JSON parsing is split out for unit tests.
 - `state.ts` — `AgentState`, icons, title builder, ask-question summarizer.
-- `summarizer.ts` — config, first-prompt title generation.
+- `config.ts` — the herdr tab-title toggle.
 - `index.ts` — entry point: gates on herdr env, registers config items, wires
   events, debounces renders behind an active-pane guard.

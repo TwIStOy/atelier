@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Breaking Changes
+
+- The title-generation config moved to the shared `session-title` config section (`/config` → Session Title): `herdr.model` is now `session-title.model`. `herdr.enabled` remains and now gates only the tab renaming, not title generation (which `htw-producer` may still request).
+
+### Changed
+
+- Title generation is now shared via `@htwang-contrib/common`'s session-title service: the title is generated once per process and reused by every consumer (herdr tab title, htw-producer reports) instead of per-extension.
+- Removed `src/summarizer.ts`; the first-prompt title generation lives in `@htwang-contrib/common`.
+
 ## [0.4.0] - 2026-07-31
 
 ### Changed
