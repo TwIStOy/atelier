@@ -1,7 +1,7 @@
 import { hostname as osHostname } from "node:os";
 import type { AssistantMessage, UserMessage } from "@earendil-works/pi-ai";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { userMessageText } from "@htwang-contrib/common";
+import { getSessionTitle, userMessageText } from "@htwang-contrib/common";
 import type { DiffCounts } from "./diff-tracker.ts";
 import type { GitContextCache } from "./git-context.ts";
 
@@ -105,9 +105,17 @@ function toSingleLine(text: string, maxLen: number): string {
   return `${line.slice(0, maxLen - 1)}…`;
 }
 
+/**
+ * The title reported to the daemon: an explicit session name wins, then the
+ * shared LLM-generated session title (same value herdr shows on its tab),
+ * then a truncated first user prompt as a bootstrap label until the
+ * generated title lands.
+ */
 export function deriveTitle(ctx: ExtensionContext): string | undefined {
   const name = ctx.sessionManager.getSessionName();
   if (name && name.trim().length > 0) return name.trim();
+  const generated = getSessionTitle();
+  if (generated) return generated;
   const prompt = firstUserPrompt(ctx);
   if (!prompt) return undefined;
   return toSingleLine(prompt, TITLE_MAX_LEN) || undefined;

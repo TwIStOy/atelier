@@ -4,6 +4,16 @@
 
 ### Added
 
+- Report a `title_changed` event when the shared LLM-generated session title
+  latches (`POST /v1/events`; the daemon folds the envelope's `title`
+  attribute without touching status).
+- The session `title` now prefers the shared session title from
+  `@htwang-contrib/common`'s session-title service (generated once per
+  session from the first user prompt, reused with herdr) between the session
+  name and the first-prompt fallback, on both snapshot and event envelopes.
+- Request the shared title at `session_start` / `before_agent_start` /
+  `agent_end`; register the shared **Session Title** config section
+  (`enabled` / `model`).
 - Report session moments through the htw daemon's event ingestion surface
   (`POST /v1/events`, ADR-0004): `session_started`, `user_prompt`,
   `thinking_started`/`thinking_finished`, `tool_started`/`tool_finished`,

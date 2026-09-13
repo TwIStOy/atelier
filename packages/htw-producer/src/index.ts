@@ -1,5 +1,13 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { createLogger, isExtensionDisabled } from "@htwang-contrib/common";
+import {
+  captureSessionFirstPrompt,
+  createLogger,
+  ensureSessionTitle,
+  initSessionTitleService,
+  isExtensionDisabled,
+  onSessionTitle,
+  resetSessionTitle,
+} from "@htwang-contrib/common";
 import { postEvent, postReport } from "./client.ts";
 import { loadConfig, registerHtwProducerConfigItems } from "./config.ts";
 import { DiffTracker } from "./diff-tracker.ts";
@@ -147,9 +155,21 @@ export default function htwProducer(pi: ExtensionAPI): void {
   if (isExtensionDisabled("htw-producer")) return;
   logger.info("extension loaded");
   registerHtwProducerConfigItems();
+  // Shared session-title service: generates the title once per session for
+  // every consumer (herdr tab titles reuse the same value).
+  initSessionTitleService(pi);
+  // Push a title_changed event the moment the (async) generated title
+  // latches — the daemon folds the envelope's title attribute into the
+  // session without touching its status.
+  onSessionTitle((title) => {
+    const session = active;
+    if (!session || !title) return;
+    sendEvent(session, { type: "title_changed" });
+  });
 
   pi.on("session_start", (_event, ctx) => {
     const id = sessionId(ctx);
+    resetSessionTitle();
     active = {
       sessionId: id,
       startedAt: startedAtFor(id),
@@ -166,12 +186,17 @@ export default function htwProducer(pi: ExtensionAPI): void {
     bindContext(active, ctx);
     startHeartbeat();
     sendEvent(active, { type: "session_started" });
+    // A resumed session may already carry its first prompt on the branch —
+    // request the shared title up front.
+    void ensureSessionTitle(ctx);
   });
 
   pi.on("before_agent_start", (event, ctx) => {
     const session = active;
     if (!session) return;
     bindContext(session, ctx);
+    captureSessionFirstPrompt(event.prompt);
+    void ensureSessionTitle(ctx);
     const prompt = truncatePrompt(event.prompt);
     if (prompt.length === 0) return;
     session.lastUserInput = prompt;
@@ -238,6 +263,9 @@ export default function htwProducer(pi: ExtensionAPI): void {
     const session = active;
     if (!session) return;
     bindContext(session, ctx);
+    // The first prompt may only be readable from the branch after the turn
+    // completes — a cheap retry point for the shared title.
+    void ensureSessionTitle(ctx);
     for (let i = event.messages.length - 1; i >= 0; i--) {
       const message = event.messages[i];
       if (message && typeof message === "object" && (message as { role?: string }).role === "assistant") {

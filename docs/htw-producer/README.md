@@ -27,7 +27,7 @@ the agent's main flow.
 | `tmux_pane` | `$TMUX_PANE` when present |
 | `started_at` | first `session_start` for this session id (Unix epoch seconds) |
 | `agent` | always `"pi"` (the harness label) |
-| `title` | `getSessionName()` if set, else the first user prompt (single-lined, ≤80 chars); omitted when neither is available |
+| `title` | `getSessionName()` if set, else the shared LLM-generated session title (see below), else the first user prompt (single-lined, ≤80 chars); omitted when none is available |
 
 ### Status derivation
 
@@ -65,6 +65,26 @@ Surfaced in the `/config` popup under **HTW Producer** (persists to
 | `enabled` | `true` | Master switch; when off, no reports are sent |
 | `host` | `127.0.0.1` | Daemon bind address |
 | `port` | `7482` | Daemon port |
+
+## Session title
+
+The title is the shared session title from `@htwang-contrib/common`'s
+session-title service — the same LLM-generated value herdr shows on its tab,
+requested **once per session** from the first user prompt (side-call, never
+on the agent's main flow). The producer:
+
+- requests it at `session_start` (a resumed session may already carry its
+  first prompt on the branch), `before_agent_start` (prompt captured directly
+  from the event) and `agent_end` (cheap retry point);
+- emits a `title_changed` event the moment the generated title latches — the
+  daemon folds the envelope's remembered `title` attribute without touching
+  the session's status;
+- reports the chain `sessionName` > generated title > truncated first prompt
+  on every snapshot/event envelope, so the daemon has a bootstrap label even
+  before the generated title lands.
+
+Generation is configured in `/config` under the shared **Session Title**
+section (enabled/model), not under HTW Producer.
 
 ## Scope notes
 

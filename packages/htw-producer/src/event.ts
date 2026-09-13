@@ -23,6 +23,7 @@ export type EventKind =
   | "waiting_for_user"
   | "turn_completed"
   | "turn_failed"
+  | "title_changed"
   | "session_ended";
 
 export interface EventPayload {
