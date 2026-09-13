@@ -199,6 +199,20 @@ describe("session title service", () => {
     expect(getSessionTitle()).toBe("Second");
   });
 
+  test("resetSessionTitle installs a fresh abort signal for the next generation", async () => {
+    // Mirrors executeSideCall's real pre-abort behavior: an already-aborted
+    // signal settles the call without ever reaching the model.
+    sideCall.mockImplementation(async (opts: { signal?: AbortSignal }) => {
+      if (opts.signal?.aborted) return { ok: false, aborted: true, stopReason: "aborted" };
+      return { ok: true, answer: "Fresh" };
+    });
+    // beforeEach already ran resetSessionTitle() — the production sequence
+    // (session_start reset → before_agent_start ensure) starts from there.
+    const branch = [userEntry("after reset", "1")];
+    await ensureSessionTitle(ctxWith(branch));
+    expect(getSessionTitle()).toBe("Fresh");
+  });
+
   test("the captured first prompt feeds the side-call even with an empty branch", async () => {
     captureSessionFirstPrompt("");
     captureSessionFirstPrompt("  ");

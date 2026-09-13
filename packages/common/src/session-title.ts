@@ -200,6 +200,8 @@ function titleState(): SessionTitleState {
 export function resetSessionTitle(): void {
   const state = titleState();
   state.abort.abort();
+  // Replace the controller: the aborted one would fail every later side-call.
+  state.abort = new AbortController();
   state.title = "";
   state.generated = false;
   state.firstPrompt = "";
