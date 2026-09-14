@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Aggregate rules for `web_fetch` and `web_search`, so consecutive calls collapse into one verb-group summary line (e.g. `Fetched 2 pages, Searched 1 query`) in tool-display.
+
 ## [0.4.0] - 2026-07-31
 
 ### Changed

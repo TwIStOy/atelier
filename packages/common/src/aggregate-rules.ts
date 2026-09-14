@@ -1,3 +1,5 @@
+import { getGlobalState } from "./global-state.ts";
+
 /**
  * Aggregate Rule registry: `toolName → { verb, singular, plural, progressive }`.
  *
@@ -31,7 +33,18 @@ const BUILTIN_RULES: Readonly<Record<string, AggregateRule>> = {
   read: { verb: "Read", singular: "file", plural: "files", progressive: "Reading…" },
 };
 
-const registry = new Map<string, AggregateRule>();
+// The registry lives in Symbol.for-keyed global state and built-ins seed inside
+// the init callback: pi loads each extension through a separate jiti module graph
+// (moduleCache: false), so every extension re-evaluates this module. A plain
+// module-level Map would give each extension its own copy, and a top-level
+// reset would wipe registrations made by earlier-loaded extensions.
+const registry = getGlobalState("htwang-contrib-aggregate-rules", () => {
+  const map = new Map<string, AggregateRule>();
+  for (const [name, rule] of Object.entries(BUILTIN_RULES)) {
+    map.set(name, rule);
+  }
+  return map;
+});
 
 function resetRegistry(): void {
   registry.clear();
@@ -39,8 +52,6 @@ function resetRegistry(): void {
     registry.set(name, rule);
   }
 }
-
-resetRegistry();
 
 function rulesEqual(a: AggregateRule, b: AggregateRule): boolean {
   return a.verb === b.verb && a.singular === b.singular && a.plural === b.plural && a.progressive === b.progressive;
