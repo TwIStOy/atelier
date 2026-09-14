@@ -3,6 +3,7 @@ import { visibleWidth } from "@earendil-works/pi-tui";
 import { describe, expect, it } from "vitest";
 import { bashAdapter } from "../src/adapters/bash.ts";
 import { editAdapter } from "../src/adapters/edit.ts";
+import { readAdapter } from "../src/adapters/read.ts";
 import { subagentAdapter } from "../src/adapters/subagent.ts";
 import { todoCreateAdapter, todoUpdateAdapter } from "../src/adapters/todo.ts";
 import { writeAdapter } from "../src/adapters/write.ts";
@@ -56,7 +57,7 @@ describe("renderToolCall collapsed error reason", () => {
       true,
     );
     const joined = lines.join("\n");
-    expect(joined).toContain("Write");
+    expect(joined).toContain("Wrote");
     expect(joined).toContain("File has been modified since you read it");
   });
 
@@ -116,6 +117,60 @@ describe("renderToolCall collapsed error reason", () => {
     const iconCount = body.filter((l) => l.includes("\ue654")).length;
     expect(iconCount).toBe(1);
     expect(body[0].includes("\ue654")).toBe(true);
+  });
+});
+
+describe("file tool verb tense", () => {
+  it("shows progressive verbs while the tool is running", () => {
+    globalToolDisplayRegistry.register("read", readAdapter);
+    globalToolDisplayRegistry.register("write", writeAdapter);
+    globalToolDisplayRegistry.register("edit", editAdapter);
+
+    const renderPartial = (toolName: string, args: Record<string, unknown>) =>
+      renderToolCall(
+        {
+          toolName,
+          args,
+          output: "",
+          expanded: false,
+          isPartial: true,
+          isError: false,
+          registry: globalToolDisplayRegistry,
+        },
+        PLAIN_THEME,
+      ).render(80)[0];
+
+    expect(renderPartial("read", { path: "src/foo.ts" })).toContain("Reading src/foo.ts");
+    expect(renderPartial("write", { path: "src/foo.ts", content: "a" })).toContain("Writing src/foo.ts");
+    expect(renderPartial("edit", { path: "src/foo.ts", edits: [{ oldText: "a", newText: "b" }] })).toContain(
+      "Editing src/foo.ts",
+    );
+  });
+
+  it("shows past-tense verbs once the tool settles", () => {
+    globalToolDisplayRegistry.register("read", readAdapter);
+    globalToolDisplayRegistry.register("write", writeAdapter);
+    globalToolDisplayRegistry.register("edit", editAdapter);
+
+    const renderSettled = (toolName: string, args: Record<string, unknown>, output: string) =>
+      renderToolCall(
+        {
+          toolName,
+          args,
+          output,
+          expanded: false,
+          isPartial: false,
+          isError: false,
+          registry: globalToolDisplayRegistry,
+        },
+        PLAIN_THEME,
+      ).render(80)[0];
+
+    expect(renderSettled("read", { path: "src/foo.ts" }, "a")).toContain("Read src/foo.ts");
+    expect(renderSettled("write", { path: "src/foo.ts", content: "a" }, "done")).toContain("Wrote src/foo.ts");
+    expect(renderSettled("edit", { path: "src/foo.ts", edits: [{ oldText: "a", newText: "b" }] }, "done")).toContain(
+      "Edited src/foo.ts",
+    );
   });
 });
 
@@ -300,7 +355,7 @@ describe("bash adapter command display width", () => {
       PLAIN_THEME,
     ).render(40);
     expect(lines.length).toBeGreaterThan(1);
-    expect(lines[0]).toContain("Bash");
+    expect(lines[0]).toContain("Running");
   });
 
   it("keeps multi-line command rows on the rail with bodies aligned to the body column", () => {
@@ -317,7 +372,7 @@ describe("bash adapter command display width", () => {
       },
       PLAIN_THEME,
     ).render(80);
-    expect(lines[0]).toBe("  ┃  ◆ Bash set -e");
+    expect(lines[0]).toBe("  ┃  ◆ Ran set -e");
     expect(lines[1]).toBe("  ┃    for slug in a b; do");
     expect(lines[2]).toBe('  ┃      echo "$slug"');
     expect(lines[3]).toBe("  ┃    done · 1 line");
@@ -359,7 +414,7 @@ describe("bash adapter command display width", () => {
       PLAIN_THEME,
     ).render(width);
     const joined = lines.join("\n");
-    expect(joined).toContain("Bash build the package");
+    expect(joined).toContain("Running build the package");
     expect(joined).toContain("in /r");
     expect(joined).not.toContain(LONG_CMD);
   });
@@ -401,7 +456,7 @@ describe("bash adapter command display width", () => {
     const joined = lines.join("\n");
     expect(joined).toContain("$ set -e");
     expect(joined).toContain("for slug in a b; do");
-    expect(lines[0]).toContain("Bash run loop");
+    expect(lines[0]).toContain("Ran run loop");
   });
 
   it("renders a single-line description header regardless of command length", () => {
@@ -413,7 +468,7 @@ describe("bash adapter command display width", () => {
       false,
       60,
     );
-    expect(header).toBe("Bash build in /r");
+    expect(header).toBe("Ran build in /r");
   });
 });
 
@@ -422,7 +477,7 @@ describe("bash collapsed output line count", () => {
     globalToolDisplayRegistry.register("bash", bashAdapter);
     const lines = renderCollapsed("bash", { command: "npm run build" }, "a\nb\nc\n", false);
     expect(lines.length).toBe(1);
-    expect(lines[0]).toContain("Bash npm run build · 3 lines");
+    expect(lines[0]).toContain("Ran npm run build · 3 lines");
     expect(lines.join("\n")).not.toContain("└");
   });
 
@@ -441,7 +496,7 @@ describe("bash collapsed output line count", () => {
       PLAIN_THEME,
     ).render(15);
     const joined = lines.join("\n");
-    expect(joined).toContain("Bash");
+    expect(joined).toContain("Ran");
     expect(joined).not.toContain("· ");
     for (const line of lines) {
       expect(visibleWidth(line)).toBeLessThanOrEqual(15);
@@ -552,7 +607,7 @@ describe("tool call timer", () => {
     for (const line of lines) {
       expect(visibleWidth(line)).toBeLessThanOrEqual(40);
     }
-    expect(joined).toContain("Bash");
+    expect(joined).toContain("Running");
   });
 
   it("freezes the timer at the final elapsed time once the tool completes", () => {

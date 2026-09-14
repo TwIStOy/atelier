@@ -18,11 +18,12 @@ function buildLineCountSuffix(args: WriteArgs, theme: Theme): string {
 }
 
 export const writeAdapter: ToolDisplayAdapter<WriteArgs> = {
-  formatCallHeader(args, theme, _details?: unknown, _isPartial?: boolean, _expanded?: boolean, width?: number) {
+  formatCallHeader(args, theme, _details?: unknown, isPartial?: boolean, _expanded?: boolean, width?: number) {
     const rawPath = args?.file_path ?? args?.path ?? "";
     const path = shortenPath(rawPath);
     const pathDisplay = path ? theme.fg("accent", path) : theme.fg("toolOutput", "...");
-    const base = `${theme.fg("toolTitle", theme.bold("Write"))} ${pathDisplay}`;
+    const verb = isPartial ? "Writing" : "Wrote";
+    const base = `${theme.fg("toolTitle", theme.bold(verb))} ${pathDisplay}`;
 
     if (loadConfig().writeStyle !== "single-line") return base;
 

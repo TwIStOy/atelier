@@ -71,7 +71,7 @@ const WORKFLOW_DETAILS = {
 describe("tool call rail column layout", () => {
   it("renders a single-line tool call with a run rail, bullet at column 5, body at column 7", () => {
     const lines = render("bash", { command: "echo hi" }, { output: "hi" });
-    expect(lines).toEqual(["  ┃  ◆ Bash echo hi · 1 line"]);
+    expect(lines).toEqual(["  ┃  ◆ Ran echo hi · 1 line"]);
   });
 
   it("renders multi-line blocks with a run rail on every row and the bullet only on the first", () => {
@@ -115,12 +115,12 @@ describe("tool call rail column layout", () => {
 
   it("keeps the timer as the leading segment of the first body line", () => {
     const lines = render("bash", { command: "echo hi" }, { output: "hi", startedAtMs: 1000, endedAtMs: 1500 });
-    expect(lines[0]).toBe("  ┃  ◆ 500 ms Bash echo hi · 1 line");
+    expect(lines[0]).toBe("  ┃  ◆ 500 ms Ran echo hi · 1 line");
   });
 
   it("replaces the bullet diamond with › when hover affordance is on", () => {
     const lines = render("bash", { command: "echo hi" }, { output: "hi", hoverAffordance: true });
-    expect(lines).toEqual(["  ┃  › Bash echo hi · 1 line"]);
+    expect(lines).toEqual(["  ┃  › Ran echo hi · 1 line"]);
   });
 });
 

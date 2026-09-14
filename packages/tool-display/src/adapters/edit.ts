@@ -90,11 +90,12 @@ function buildDiffStatsSuffix(args: EditArgs, theme: Theme, width: number | unde
 }
 
 export const editAdapter: ToolDisplayAdapter<EditArgs> = {
-  formatCallHeader(args, theme, _details?: unknown, _isPartial?: boolean, _expanded?: boolean, width?: number) {
+  formatCallHeader(args, theme, _details?: unknown, isPartial?: boolean, _expanded?: boolean, width?: number) {
     const rawPath = args?.file_path ?? args?.path ?? "";
     const path = shortenPath(rawPath);
     const pathDisplay = path ? theme.fg("accent", path) : theme.fg("toolOutput", "...");
-    const base = `${theme.fg("toolTitle", theme.bold("Edit"))} ${pathDisplay}`;
+    const verb = isPartial ? "Editing" : "Edited";
+    const base = `${theme.fg("toolTitle", theme.bold(verb))} ${pathDisplay}`;
 
     if (loadConfig().editStyle !== "single-line") return base;
 

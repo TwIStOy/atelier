@@ -95,7 +95,7 @@ describe("editStyle config", () => {
       "Edited src/foo.ts",
     );
     expect(lines.length).toBe(1);
-    expect(lines[0]).toContain("Edit");
+    expect(lines[0]).toContain("Edited");
     expect(lines[0]).toContain("src/foo.ts");
     expect(lines[0]).toContain("+1");
     expect(lines[0]).toContain("-1");
@@ -111,7 +111,7 @@ describe("editStyle config", () => {
       "Edited src/foo.ts",
     );
     expect(lines.length).toBe(2);
-    expect(lines[0]).toContain("Edit");
+    expect(lines[0]).toContain("Edited");
     expect(lines[0]).toContain("src/foo.ts");
     expect(lines[0]).not.toContain("+1");
     expect(lines[0]).not.toContain("-1");
@@ -134,7 +134,7 @@ describe("editStyle config", () => {
     globalToolDisplayRegistry.register("edit", editAdapter);
     const lines = renderCollapsed("edit", { path: "src/foo.ts" }, "Edited src/foo.ts");
     expect(lines.length).toBe(1);
-    expect(lines[0]).toContain("Edit");
+    expect(lines[0]).toContain("Edited");
     expect(lines[0]).not.toContain("└");
   });
 });
@@ -216,7 +216,7 @@ describe("writeStyle config", () => {
     globalToolDisplayRegistry.register("write", writeAdapter);
     const lines = renderCollapsed("write", { path: "src/foo.ts", content: "a\nb\nc" }, "Wrote src/foo.ts");
     expect(lines.length).toBe(1);
-    expect(lines[0]).toContain("Write");
+    expect(lines[0]).toContain("Wrote");
     expect(lines[0]).toContain("src/foo.ts");
     expect(lines[0]).toContain("+3");
     expect(lines.join("\n")).not.toContain("└");
@@ -227,7 +227,7 @@ describe("writeStyle config", () => {
     globalToolDisplayRegistry.register("write", writeAdapter);
     const lines = renderCollapsed("write", { path: "src/foo.ts", content: "a\nb\nc" }, "Wrote src/foo.ts");
     expect(lines.length).toBe(2);
-    expect(lines[0]).toContain("Write");
+    expect(lines[0]).toContain("Wrote");
     expect(lines[0]).not.toContain("+3");
     expect(lines[1]).toContain("└");
     expect(lines[1]).toContain("3 lines");
@@ -251,7 +251,7 @@ describe("writeStyle config", () => {
       false,
       20,
     );
-    expect(lines.join("\n")).toContain("Write");
+    expect(lines.join("\n")).toContain("Wrote");
     expect(lines.join("\n")).not.toContain("+3");
     expect(lines.join("\n")).not.toContain("└");
   });

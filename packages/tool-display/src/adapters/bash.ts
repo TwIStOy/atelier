@@ -10,22 +10,23 @@ interface BashArgs {
   workdir?: string;
 }
 
-const TITLE = "Bash";
+const PARTIAL_TITLE = "Running";
+const SETTLED_TITLE = "Ran";
 
-function firstLinePrefixWidth(): number {
-  return visibleWidth(TITLE) + 1;
+function firstLinePrefixWidth(title: string): number {
+  return visibleWidth(title) + 1;
 }
 
 function lastLineSuffixWidth(cwd: string): number {
   return cwd ? visibleWidth(` in ${shortenPath(cwd)}`) : 0;
 }
 
-function singleLineBudget(cwd: string, width: number): number {
-  return Math.max(1, width - firstLinePrefixWidth() - lastLineSuffixWidth(cwd));
+function singleLineBudget(title: string, cwd: string, width: number): number {
+  return Math.max(1, width - firstLinePrefixWidth(title) - lastLineSuffixWidth(cwd));
 }
 
-function continuationWrapWidth(cwd: string, width: number): number {
-  return Math.max(1, Math.min(width - firstLinePrefixWidth(), width - lastLineSuffixWidth(cwd)));
+function continuationWrapWidth(title: string, cwd: string, width: number): number {
+  return Math.max(1, Math.min(width - firstLinePrefixWidth(title), width - lastLineSuffixWidth(cwd)));
 }
 
 function outputLineSuffix(output: string | undefined, theme: Theme): string {
@@ -40,7 +41,7 @@ export const bashAdapter: ToolDisplayAdapter<BashArgs> = {
     args,
     theme,
     _details?: unknown,
-    _isPartial?: boolean,
+    isPartial?: boolean,
     _expanded?: boolean,
     width?: number,
     output?: string,
@@ -49,7 +50,8 @@ export const bashAdapter: ToolDisplayAdapter<BashArgs> = {
     const desc = args?.description ?? "";
     const cwd = args?.workdir ?? "";
 
-    const titlePart = `${theme.fg("toolTitle", theme.bold(TITLE))} `;
+    const title = isPartial ? PARTIAL_TITLE : SETTLED_TITLE;
+    const titlePart = `${theme.fg("toolTitle", theme.bold(title))} `;
     const cwdPart = cwd ? ` ${theme.fg("dim", `in ${shortenPath(cwd)}`)}` : "";
 
     let header: string;
@@ -58,11 +60,11 @@ export const bashAdapter: ToolDisplayAdapter<BashArgs> = {
     if (desc) {
       header = `${titlePart}${theme.fg("accent", desc)}${cwdPart}`;
       if (width !== undefined) lastLineBudget = width;
-    } else if (width === undefined || visibleWidth(cmd) <= singleLineBudget(cwd, width)) {
+    } else if (width === undefined || visibleWidth(cmd) <= singleLineBudget(title, cwd, width)) {
       header = `${titlePart}${theme.fg("muted", cmd)}${cwdPart}`;
       if (width !== undefined) lastLineBudget = width;
     } else {
-      const wrapWidth = continuationWrapWidth(cwd, width);
+      const wrapWidth = continuationWrapWidth(title, cwd, width);
       const lines = wrapTextWithAnsi(cmd, wrapWidth).map((line) => theme.fg("muted", line));
 
       if (lines.length === 1) {

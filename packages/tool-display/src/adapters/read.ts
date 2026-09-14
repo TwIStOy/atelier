@@ -24,7 +24,7 @@ export const readAdapter: ToolDisplayAdapter<ReadArgs> = {
     args,
     theme,
     _details?: unknown,
-    _isPartial?: boolean,
+    isPartial?: boolean,
     _expanded?: boolean,
     width?: number,
     output?: string,
@@ -32,7 +32,8 @@ export const readAdapter: ToolDisplayAdapter<ReadArgs> = {
     const rawPath = args?.file_path ?? args?.path ?? "";
     const path = shortenPath(rawPath);
     const pathDisplay = path ? theme.fg("accent", path) : theme.fg("toolOutput", "...");
-    const base = `${theme.fg("toolTitle", theme.bold("Read"))} ${pathDisplay}${formatLineRange(args, theme)}`;
+    const verb = isPartial ? "Reading" : "Read";
+    const base = `${theme.fg("toolTitle", theme.bold(verb))} ${pathDisplay}${formatLineRange(args, theme)}`;
 
     if (loadConfig().readStyle !== "single-line") return base;
 
