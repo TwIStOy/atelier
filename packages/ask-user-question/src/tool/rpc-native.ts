@@ -38,14 +38,28 @@ async function askSingleSelect(
   const displays = question.options.map(formatOptionLabel);
   const choice = await ui.select(buildSingleSelectTitle(question), displays);
   if (choice === undefined) return null;
-  const option = question.options[displays.indexOf(choice)];
-  if (!option) return null;
+  // Hosts answer in one of three shapes: the bare option label (hosts that
+  // render their own UI from the tool args), the full display string
+  // (generic dropdown hosts), or free text via their "Type something."
+  // affordance. Only the first two resolve to an option; anything else is a
+  // custom answer, never a cancellation.
+  const option =
+    question.options.find((o) => o.label === choice) ??
+    question.options[displays.indexOf(choice)];
+  if (option) {
+    return {
+      questionIndex: index,
+      question: question.question,
+      kind: "option",
+      answer: option.label,
+      preview: previewText(option),
+    };
+  }
   return {
     questionIndex: index,
     question: question.question,
-    kind: "option",
-    answer: option.label,
-    preview: previewText(option),
+    kind: "custom",
+    answer: choice,
   };
 }
 

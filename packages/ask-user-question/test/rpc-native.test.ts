@@ -99,6 +99,35 @@ describe("ask_user_question — RPC native dialogs", () => {
     expect(title).toContain("beta-mockup");
   });
 
+  it("bare option label (args-driven host) resolves to the option", async () => {
+    const { tools, pi } = createMockPi();
+    registerAskUserQuestionTool(pi);
+    const select = vi.fn(async () => "Beta");
+    const ctx = createMockCtx({ mode: "rpc", ui: createMockUI({ select }) });
+
+    const res = await runTool(tools, oneQuestion(), ctx);
+
+    expect(res.details.cancelled).toBe(false);
+    const answer = res.details.answers[0] as { kind: string; answer: string };
+    expect(answer.kind).toBe("option");
+    expect(answer.answer).toBe("Beta");
+  });
+
+  it("free-text answer becomes a custom answer instead of cancelling", async () => {
+    const { tools, pi } = createMockPi();
+    registerAskUserQuestionTool(pi);
+    const select = vi.fn(async () => "Actually, use chrono instead");
+    const ctx = createMockCtx({ mode: "rpc", ui: createMockUI({ select }) });
+
+    const res = await runTool(tools, oneQuestion(), ctx);
+
+    expect(res.details.cancelled).toBe(false);
+    const answer = res.details.answers[0] as { kind: string; answer: string };
+    expect(answer.kind).toBe("custom");
+    expect(answer.answer).toBe("Actually, use chrono instead");
+    expect(res.content[0].text).toContain("Actually, use chrono instead");
+  });
+
   it("single-select folds option descriptions into the dropdown and maps back to the pure label", async () => {
     const { tools, pi } = createMockPi();
     registerAskUserQuestionTool(pi);
