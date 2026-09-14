@@ -10,6 +10,7 @@ import type {
   memoryUpdateAdapter as memoryUpdateAdapterType,
 } from "../src/adapters/memory.ts";
 import type { readAdapter as readAdapterType } from "../src/adapters/read.ts";
+import type { writeAdapter as writeAdapterType } from "../src/adapters/write.ts";
 import type { renderToolCall as renderToolCallType } from "../src/tool-call-display.ts";
 
 const PLAIN_THEME: Theme = {
@@ -21,6 +22,7 @@ const PLAIN_THEME: Theme = {
 let tmpDir: string;
 let editAdapter: typeof editAdapterType;
 let readAdapter: typeof readAdapterType;
+let writeAdapter: typeof writeAdapterType;
 let memoryReadAdapter: typeof memoryReadAdapterType;
 let memoryUpdateAdapter: typeof memoryUpdateAdapterType;
 let memorySearchAdapter: typeof memorySearchAdapterType;
@@ -31,15 +33,17 @@ beforeEach(async () => {
   tmpDir = mkdtempSync(join(tmpdir(), "tool-display-style-"));
   vi.stubEnv("XDG_CONFIG_HOME", tmpDir);
   vi.resetModules();
-  const [editMod, readMod, memoryMod, renderMod, registryMod] = await Promise.all([
+  const [editMod, readMod, writeMod, memoryMod, renderMod, registryMod] = await Promise.all([
     import("../src/adapters/edit.ts"),
     import("../src/adapters/read.ts"),
+    import("../src/adapters/write.ts"),
     import("../src/adapters/memory.ts"),
     import("../src/tool-call-display.ts"),
     import("../src/registry.ts"),
   ]);
   editAdapter = editMod.editAdapter;
   readAdapter = readMod.readAdapter;
+  writeAdapter = writeMod.writeAdapter;
   memoryReadAdapter = memoryMod.memoryReadAdapter;
   memoryUpdateAdapter = memoryMod.memoryUpdateAdapter;
   memorySearchAdapter = memoryMod.memorySearchAdapter;
@@ -203,6 +207,52 @@ describe("memoryStyle config", () => {
     });
     expect(lines.length).toBe(1);
     expect(lines[0]).toContain("empty");
+    expect(lines.join("\n")).not.toContain("└");
+  });
+});
+
+describe("writeStyle config", () => {
+  it("renders the collapsed write as a single line with the line count in the header by default", () => {
+    globalToolDisplayRegistry.register("write", writeAdapter);
+    const lines = renderCollapsed("write", { path: "src/foo.ts", content: "a\nb\nc" }, "Wrote src/foo.ts");
+    expect(lines.length).toBe(1);
+    expect(lines[0]).toContain("Write");
+    expect(lines[0]).toContain("src/foo.ts");
+    expect(lines[0]).toContain("+3");
+    expect(lines.join("\n")).not.toContain("└");
+  });
+
+  it("renders the collapsed write as a two-line block when writeStyle is two-line", () => {
+    writeConfig({ writeStyle: "two-line" });
+    globalToolDisplayRegistry.register("write", writeAdapter);
+    const lines = renderCollapsed("write", { path: "src/foo.ts", content: "a\nb\nc" }, "Wrote src/foo.ts");
+    expect(lines.length).toBe(2);
+    expect(lines[0]).toContain("Write");
+    expect(lines[0]).not.toContain("+3");
+    expect(lines[1]).toContain("└");
+    expect(lines[1]).toContain("3 lines");
+  });
+
+  it("keeps the legacy empty-file row when writeStyle is two-line", () => {
+    writeConfig({ writeStyle: "two-line" });
+    globalToolDisplayRegistry.register("write", writeAdapter);
+    const lines = renderCollapsed("write", { path: "src/foo.ts", content: "" }, "Wrote src/foo.ts");
+    expect(lines.length).toBe(2);
+    expect(lines[1]).toContain("└");
+    expect(lines[1]).toContain("empty file");
+  });
+
+  it("drops the inline line-count suffix when the header has no room for it", () => {
+    globalToolDisplayRegistry.register("write", writeAdapter);
+    const lines = renderCollapsed(
+      "write",
+      { path: "src/some/very/long/path/that/will/not/fit/in/a/narrow/terminal/foo.ts", content: "a\nb\nc" },
+      "Wrote src/foo.ts",
+      false,
+      20,
+    );
+    expect(lines.join("\n")).toContain("Write");
+    expect(lines.join("\n")).not.toContain("+3");
     expect(lines.join("\n")).not.toContain("└");
   });
 });

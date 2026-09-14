@@ -6,6 +6,7 @@ export interface ToolDisplayConfig {
   diffMode: "auto" | "unified" | "side-by-side";
   splitDiffMinWidth: number;
   editStyle: "single-line" | "two-line";
+  writeStyle: "single-line" | "two-line";
   readStyle: "single-line" | "two-line";
   memoryStyle: "single-line" | "two-line";
   groupToolVerbs: boolean;
@@ -21,6 +22,7 @@ const CONFIG_SCHEMA: ExtensionConfigSchema<ToolDisplayConfig> = {
     diffMode: "auto",
     splitDiffMinWidth: 100,
     editStyle: "single-line",
+    writeStyle: "single-line",
     readStyle: "two-line",
     memoryStyle: "single-line",
     groupToolVerbs: true,
@@ -91,6 +93,20 @@ export function registerToolDisplayConfigItems(): void {
       ],
     },
     {
+      key: "writeStyle",
+      type: "select",
+      label: "Write Style",
+      value: () => loadConfig().writeStyle,
+      description:
+        'How the write tool is rendered when collapsed: "single-line" puts the line-count stat inline on the header, "two-line" keeps the legacy "└ N lines" body row',
+      extensionLabel: "Tool Display",
+      order: 4,
+      options: [
+        { label: "Single-line", value: "single-line" },
+        { label: "Two-line", value: "two-line" },
+      ],
+    },
+    {
       key: "readStyle",
       type: "select",
       label: "Read Style",
@@ -98,7 +114,7 @@ export function registerToolDisplayConfigItems(): void {
       description:
         'How the read tool is rendered when collapsed: "single-line" appends "· N lines" inline on the header, "two-line" keeps the legacy "└ N lines" body row',
       extensionLabel: "Tool Display",
-      order: 4,
+      order: 5,
       options: [
         { label: "Two-line", value: "two-line" },
         { label: "Single-line", value: "single-line" },
@@ -112,7 +128,7 @@ export function registerToolDisplayConfigItems(): void {
       description:
         'How memory tools are rendered when collapsed: "single-line" appends the result summary inline on the header, "two-line" keeps the legacy "└ ..." body row',
       extensionLabel: "Tool Display",
-      order: 5,
+      order: 6,
       options: [
         { label: "Single-line", value: "single-line" },
         { label: "Two-line", value: "two-line" },
@@ -126,7 +142,7 @@ export function registerToolDisplayConfigItems(): void {
       description:
         "Fold consecutive read-only tool calls (grep/glob/ls/read, plus names with a registered Aggregate Rule) into one aggregate summary row",
       extensionLabel: "Tool Display",
-      order: 6,
+      order: 7,
     },
     {
       key: "groupMaxVisible",
@@ -136,7 +152,7 @@ export function registerToolDisplayConfigItems(): void {
       description:
         "Hide older collapsed tool calls behind a truncation header when a dense run exceeds this many entries (0 disables truncation)",
       extensionLabel: "Tool Display",
-      order: 7,
+      order: 8,
       min: 0,
       max: 100,
     },
@@ -148,7 +164,7 @@ export function registerToolDisplayConfigItems(): void {
       description:
         "Take over rendering of pi-mcp-adapter tool calls (mcp proxy and direct server tools) instead of the adapter's own renderers",
       extensionLabel: "Tool Display",
-      order: 8,
+      order: 9,
     },
   ]);
 }
