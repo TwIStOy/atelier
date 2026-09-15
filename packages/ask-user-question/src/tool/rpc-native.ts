@@ -43,9 +43,7 @@ async function askSingleSelect(
   // (generic dropdown hosts), or free text via their "Type something."
   // affordance. Only the first two resolve to an option; anything else is a
   // custom answer, never a cancellation.
-  const option =
-    question.options.find((o) => o.label === choice) ??
-    question.options[displays.indexOf(choice)];
+  const option = question.options.find((o) => o.label === choice) ?? question.options[displays.indexOf(choice)];
   if (option) {
     return {
       questionIndex: index,
