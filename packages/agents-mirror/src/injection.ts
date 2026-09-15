@@ -47,7 +47,7 @@ export async function injectDirectoryContext(input: InjectDirectoryContextInput)
     const canonicalMirrorRoot = await realpathSafe(input.mirrorRoot);
     if (canonicalMirrorRoot) {
       const rel = relative(contained.canonicalRoot, contained.canonicalPath);
-      mirrorCandidates = await findMirrorAgentsMdUp(canonicalMirrorRoot, rel, fileNames);
+      mirrorCandidates = await findMirrorAgentsMdUp(canonicalMirrorRoot, contained.canonicalRoot, rel, fileNames);
     }
   }
 
@@ -83,6 +83,7 @@ export async function injectDirectoryContext(input: InjectDirectoryContextInput)
     });
 
     injectedText += formatDirectoryContext({
+      directory: candidate.appliesTo,
       absolutePath: candidate.path,
       content: truncated.result,
       truncated: truncated.truncated,
@@ -98,6 +99,7 @@ export async function injectDirectoryContext(input: InjectDirectoryContextInput)
 interface Candidate {
   path: string;
   directory: string;
+  appliesTo: string;
   source: AgentsSource;
 }
 
@@ -141,7 +143,7 @@ async function findAgentsMdUp(
     if (current === stopDir) break;
     const found = await firstExisting(current, fileNames);
     if (found) {
-      collected.push({ path: found, directory: current, source });
+      collected.push({ path: found, directory: current, appliesTo: current, source });
     }
     const parent = dirname(current);
     if (parent === current) break;
@@ -153,6 +155,7 @@ async function findAgentsMdUp(
 
 async function findMirrorAgentsMdUp(
   canonicalMirrorRoot: string,
+  canonicalRoot: string,
   rel: string,
   fileNames: readonly string[],
 ): Promise<Candidate[]> {
@@ -164,7 +167,7 @@ async function findMirrorAgentsMdUp(
     const dir = join(canonicalMirrorRoot, ...dirParts);
     const found = await firstExisting(dir, fileNames);
     if (found) {
-      collected.push({ path: found, directory: dir, source: "mirror" });
+      collected.push({ path: found, directory: dir, appliesTo: join(canonicalRoot, ...dirParts), source: "mirror" });
     }
   }
   return collected;

@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Injected directory context blocks now state which directory triggered the injection: `[Directory Context for <directory>: <file path>]`. For mirror-sourced files the directory shown is the corresponding project-side directory the rules apply to.
+
 ## [0.4.0] - 2026-07-31
 
 ### Added

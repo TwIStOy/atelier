@@ -89,6 +89,25 @@ describe("injectDirectoryContext", () => {
     ]);
   });
 
+  it("names the triggering project directory in the injected text for mirror files", async () => {
+    writeAgents(join(tree.mirror, "src", "components"), "MIRROR_COMP");
+    touch(join(tree.project, "src", "components"), "Button.tsx");
+
+    const cache = new InjectionCache();
+    const result = await injectDirectoryContext({
+      filePath: join(tree.project, "src", "components", "Button.tsx"),
+      projectRoot: tree.project,
+      mirrorRoot: tree.mirror,
+      cache,
+      sessionKey: "s1",
+      fileNames: FILE_NAMES,
+    });
+
+    expect(result.injectedText).toContain(
+      `[Directory Context for ${join(tree.project, "src", "components")}: ${join(tree.mirror, "src", "components", "AGENTS.md")}]`,
+    );
+  });
+
   it("combines project then mirror, each outermost-first", async () => {
     writeAgents(join(tree.project, "src"), "PROJECT_SRC");
     writeAgents(join(tree.project, "src", "components"), "PROJECT_COMP");
