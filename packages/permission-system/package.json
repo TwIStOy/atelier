@@ -14,7 +14,7 @@
     "@htwang-contrib/common": "*",
     "tree-sitter-bash": "^0.25.1",
     "web-tree-sitter": "^0.27.0",
-    "zod": "^4.4.3"
+    "zod": "^4.6.2"
   },
   "devDependencies": {
     "@earendil-works/pi-coding-agent": "^0.85.1",
