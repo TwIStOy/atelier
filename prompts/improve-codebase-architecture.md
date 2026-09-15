@@ -11,28 +11,7 @@ $@
 
 Surface architectural friction and propose **deepening opportunities** — refactors that turn shallow modules into deep ones. The aim is testability and AI-navigability.
 
-This command is _informed_ by the project's domain model and built on a shared design vocabulary (inlined below). Also useful when exploring alternative interfaces: load `skills/design-an-interface/SKILL.md` and use its design-it-twice parallel sub-agent pattern. Domain language lives in `CONTEXT.md`; ADRs in `docs/adr/` (or `docs/<slug>/adr/`) record decisions this command should not re-litigate.
-
-## Architecture vocabulary
-
-Use these terms **exactly** in every suggestion — don't drift into "component," "service," "API," or "boundary."
-
-| Term | Meaning |
-|---|---|
-| **Module** | Anything with an interface and an implementation. Scale-agnostic: function, class, package, or tier-spanning slice. _Avoid_: unit, component, service. |
-| **Interface** | Everything a caller must know to use the module correctly: type signature, invariants, ordering, error modes, config, performance. _Avoid_: API, signature (too narrow). |
-| **Implementation** | What's inside a module. Distinct from **Adapter** (role at a seam vs substance inside). |
-| **Depth** | Leverage at the interface: behaviour exercised per unit of interface a caller must learn. **Deep** = lots of behaviour behind a small interface; **shallow** = interface nearly as complex as the implementation. |
-| **Seam** _(Michael Feathers)_ | A place where you can alter behaviour without editing in that place; the *location* of a module's interface. _Avoid_: boundary. |
-| **Adapter** | A concrete thing that satisfies an interface at a seam. Role, not substance. |
-| **Leverage** | What callers get from depth: more capability per unit of interface learned. |
-| **Locality** | What maintainers get from depth: change, bugs, knowledge, and verification concentrate in one place. |
-
-**Principles to apply:**
-
-- **The deletion test.** Imagine deleting the module. If complexity vanishes, it was a pass-through. If complexity reappears across N callers, it was earning its keep.
-- **The interface is the test surface.** Callers and tests cross the same seam. If you want to test *past* the interface, the module is probably the wrong shape.
-- **One adapter means a hypothetical seam. Two adapters means a real one.** Don't introduce a seam unless something actually varies across it.
+This command is _informed_ by the project's domain model and built on a shared design vocabulary. Load `skills/codebase-design/SKILL.md` first and use its terms **exactly** in every suggestion — **module**, **interface**, **depth**, **seam**, **adapter**, **leverage**, **locality** — never drifting into "component," "service," "API," or "boundary." When exploring alternative interfaces, use its design-it-twice parallel sub-agent pattern (`skills/codebase-design/references/DESIGN-IT-TWICE.md`). Domain language lives in `CONTEXT.md`; ADRs in `docs/adr/` (or `docs/<slug>/adr/`) record decisions this command should not re-litigate.
 
 Also useful: `skills/code-philosophy/SKILL.md` for local coding style (guard clauses, parse-don't-validate) — orthogonal to this vocabulary.
 
@@ -74,7 +53,7 @@ For each candidate, render a card with:
 
 End the report with a **Top recommendation** section: which candidate you'd tackle first and why.
 
-**Use CONTEXT.md vocabulary for the domain, and the architecture vocabulary above for the design.** If `CONTEXT.md` defines "Order," talk about "the Order intake module" — not "the FooBarHandler," and not "the Order service."
+**Use CONTEXT.md vocabulary for the domain, and the `codebase-design` vocabulary for the design.** If `CONTEXT.md` defines "Order," talk about "the Order intake module" — not "the FooBarHandler," and not "the Order service."
 
 **ADR conflicts**: if a candidate contradicts an existing ADR, only surface it when the friction is real enough to warrant revisiting the ADR. Mark it clearly in the card (e.g. a warning callout: _"contradicts ADR-0007 — but worth reopening because…"_). Don't list every theoretical refactor an ADR forbids.
 
@@ -91,4 +70,4 @@ Side effects happen inline as decisions crystallize — run the `domain-modeling
 - **Naming a deepened module after a concept not in `CONTEXT.md`?** Add the term to `CONTEXT.md`. Create the file lazily if it doesn't exist.
 - **Sharpening a fuzzy term during the conversation?** Update `CONTEXT.md` right there.
 - **User rejects the candidate with a load-bearing reason?** Offer an ADR, framed as: _"Want me to record this as an ADR so future architecture reviews don't re-suggest it?"_ Only offer when the reason would actually be needed by a future explorer to avoid re-suggesting the same thing — skip ephemeral reasons ("not worth it right now") and self-evident ones.
-- **Want to explore alternative interfaces for the deepened module?** Load `skills/design-an-interface/SKILL.md` and use its design-it-twice parallel sub-agent pattern.
+- **Want to explore alternative interfaces for the deepened module?** Load `skills/codebase-design/references/DESIGN-IT-TWICE.md` and use its design-it-twice parallel sub-agent pattern.

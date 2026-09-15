@@ -10,7 +10,7 @@
 
 | 类型 | 如何触发 | 成员 |
 |---|---|---|
-| **Skill**(model-invoked) | 正常说话——agent 把你的请求和每个 skill 的 `description` 做语义匹配,自动加载。不需要斜杠命令。 | `grilling`、`domain-modeling`、`tdd`、`code-review`、`diagnosing-bugs`、`write-a-skill` |
+| **Skill**(model-invoked) | 正常说话——agent 把你的请求和每个 skill 的 `description` 做语义匹配,自动加载。不需要斜杠命令。 | `grilling`、`domain-modeling`、`tdd`、`code-review`、`codebase-design`、`diagnosing-bugs`、`research`、`write-a-skill` |
 | **Prompt**(user-invoked) | 显式打 `/command`。只能手动触发。 | `/setup-agent-repo-context`、`/grill-with-docs`、`/triage`、`/improve-codebase-architecture`、`/to-spec`、`/to-tickets`、`/implement`、`/wizard`、`/wait-what` |
 
 触发是**语义匹配**,所以中文英文都行——但英文关键词最稳。拿不准就直接点名:"用 tdd skill 来做"。
@@ -65,8 +65,17 @@
   1. 先定 scope(用户给方向,或从 `git log` 热点推断)。
   2. 用 `subagent`/`explore` 扫代码,按 deep-module 词汇(module/interface/depth/seam/adapter/leverage/locality)记摩擦点。
   3. 写一份自包含 HTML 报告到 `$TMPDIR/architecture-review-<ts>.html`(Tailwind + Mermaid CDN),打开给用户挑。
-  4. 用户选中后进入 `grilling` + `domain-modeling` 循环;需要备选接口时加载 `design-an-interface`。
+  4. 用户选中后进入 `grilling` + `domain-modeling` 循环;需要备选接口时用 `codebase-design` 的 design-it-twice 模式。
 - **资源**:`prompts-resource/improve-codebase-architecture/HTML-REPORT.md`。
+
+### `codebase-design` —— deep module 设计词汇表
+
+- **触发词**:"design/improve this module's interface"、"where should the seam go"、"find deepening opportunities"、"make this more testable",或任何模块设计/重构讨论。
+- **何时用**:设计或重构模块时需要一套共享的架构语言;`/improve-codebase-architecture` 和其他 skill 也依赖它。
+- **词汇**:module / interface / implementation / depth / seam / adapter / leverage / locality——严格使用,不许漂移成 "component"、"service"、"API"、"boundary"。
+- **原则**:deletion test(删掉它,复杂度是消失还是散落到 N 个调用方)、interface is the test surface、one adapter = hypothetical seam(两个 adapter 才是真 seam)。
+- **资源**:`references/DEEPENING.md`(按依赖类别安全地加深模块簇:in-process / local-substitutable / remote-but-owned / true external,以及 replace-don't-layer 测试策略);`references/DESIGN-IT-TWICE.md`(并行子 agent 生成 3+ 个截然不同的接口方案再对比)。
+- **历史**:上游把 `design-an-interface` 吸收进了这个 skill(design-it-twice 成为其参考文件);本仓库 2026-09 同步时随之删除了 `design-an-interface`。
 
 ### `/to-spec` —— 把当前对话收成一份 spec
 
@@ -131,6 +140,14 @@
 - **6 个阶段**:建回路并收紧 → 复现并最小化 → 提假设(3–5 条排序、可证伪)→ 插桩(一次只动一个变量,日志打 `[DEBUG-xxxx]` 标签)→ 修 + 在正确的 seam 上写回归测试 → 清理。
 - **人肉回路兜底**:当必须人来点击时,用自带的 `skills/diagnosing-bugs/scripts/hitl-loop.template.sh` 把回路结构化。
 
+### `research` —— 后台子 agent 调研落盘
+
+- **触发词**:"research X"、"look into this topic"、"gather docs/API facts"、"调研一下这个问题"。
+- **何时用**:有一个值得查证的问题,阅读量不适合当前会话背;你想继续干活,让调研在后台跑。
+- **机制**:用 `subagent` 工具 `background: true` 起一个后台子 agent(立即返回 job id),需要结论时用 `subagent_status` 轮询。
+- **纪律**:只认**一手来源**(官方文档、源码、spec、第一方 API),每条结论回溯到拥有它的那个来源;二级转述不算证据。
+- **产物**:单个 Markdown 文件,每条结论带引用;存放位置跟随仓库已有惯例,没有惯例就选个合理位置并告知。
+
 ## 推荐工作流
 
 ### 完整闭环 —— 从想法到合并
@@ -170,6 +187,7 @@
 - 只测一个功能 → "do X with TDD"
 - 只评审一次改动 → "review since main"
 - 出 bug 了 → "debug this" / "diagnose X"(触发 `diagnosing-bugs`)
+- 要调研一个主题、背不动阅读量 → "research X"(触发 `research`,后台子 agent 落盘 Markdown)
 - 看不懂 agent 在说什么 → `/wait-what`
 - 要人肉走一遍配置/迁移 → `/wizard`
 
@@ -180,7 +198,7 @@
 - **`code-review` 真的会起子 agent。** 你会看到两个 `general-purpose` 子任务并发跑、上下文彼此隔离。这种隔离正是要点——别把它们合并。
 - **`code-review` 要一个固定点。** 给它 `review since main`、`review since HEAD~5`、`review since <tag>` 等。不给的话它会问你要。
 - **`diagnosing-bugs` 强制顺序。** 在 tight、red-capable 的反馈回路建立前,它拒绝理论化——如果你觉得它「不肯直接猜」很慢,那正是纪律在起作用。遇到必须人肉点击的 bug,它会回落到自带的 `skills/diagnosing-bugs/scripts/hitl-loop.template.sh`。
-- **交叉引用都能解析。** `tdd` 指向 `code-review`;`grill-with-docs` / `triage` / `improve-codebase-architecture` 加载 `grilling` + `domain-modeling`;`implement` 加载 `tdd` + `code-review`;`tdd`、`domain-modeling`、`diagnosing-bugs`、`improve-codebase-architecture` 都读 `CONTEXT.md`。所有目标在本仓库都存在。
+- **交叉引用都能解析。** `tdd` 指向 `code-review`;`grill-with-docs` / `triage` / `improve-codebase-architecture` 加载 `grilling` + `domain-modeling`;`improve-codebase-architecture` 还加载 `codebase-design`(词汇 + design-it-twice);`implement` 加载 `tdd` + `code-review`;`tdd`、`domain-modeling`、`diagnosing-bugs`、`improve-codebase-architecture` 都读 `CONTEXT.md`。所有目标在本仓库都存在。
 - **Prompt 资源路径从仓库根解析。** 例如 `prompts-resource/triage/AGENT-BRIEF.md`、`prompts-resource/improve-codebase-architecture/HTML-REPORT.md`、`prompts-resource/setup-agent-repo-context/`——pi 从 cwd 解析路径,不是从 prompt 文件所在目录。
 - **`docs/agents/*` 是 per-repo 配置。** `/triage`、`/to-spec`、`/to-tickets`、`/implement` 优先读它们;缺失时回落到内联的 `gh` / `.scratch` 默认。
 
@@ -192,7 +210,9 @@
 - **`/skill-name` 交叉调用 → 显式加载。** pi 的 skill 不是斜杠命令,所以 prompt 点名 skill 并让 agent 去读它们的 `SKILL.md`(例如 `implement` 加载 `tdd` + `code-review`)。
 - **`code-review` 的子 agent 机制。** 原文「两个 `Agent` 工具调用」改成一次 `subagent` 调用、`tasks` 数组里放两项(`agent_type: "general-purpose"`),并发执行且上下文隔离。
 - **`setup-matt-pocock-skills` → `/setup-agent-repo-context`。** 改名并去掉所有 Matt 专属字样;产物仍写 `docs/agents/{issue-tracker,triage-labels,domain}.md`。优先编辑 `AGENTS.md`(pi 约定),其次 `CLAUDE.md`。`/triage` / `/to-spec` / `/to-tickets` / `/implement` 优先读这些文件,缺失时回落到内联 `gh` / `.scratch` 默认。
-- **`improve-codebase-architecture` 内联了 codebase-design 词汇。** 上游依赖 model-invoked 的 `codebase-design` skill;本仓库未移植该 skill(和 `code-philosophy` + `design-an-interface` 有重叠),于是把 module/interface/depth/seam/adapter/leverage/locality 词汇和三条原则直接写进 prompt。接口备选仍指向已有的 `design-an-interface`。
+- **`improve-codebase-architecture` 加载 `codebase-design` 获取词汇。** 上游同样让该命令调用 model-invoked 的 `codebase-design` skill;本仓库把 prompt 里原内联的词汇表换成显式加载 `skills/codebase-design/SKILL.md`,避免双份维护。接口备选指向上游吸收了 `design-an-interface` 的 `references/DESIGN-IT-TWICE.md`。
+- **`design-an-interface` 已删除(2026-09)。** 上游把它废弃并吸收进 `codebase-design`;本仓库同步删除,原 prompt/文档引用改指 `codebase-design`。
+- **`research` 移植为 model-invoked skill(2026-09)。** 上游的 "background agent" 机制适配为 `subagent` 工具的 `background: true` + `subagent_status` 轮询。
 - **Prompt 附带资源放在 `prompts-resource/<name>/`。** 例如 `triage` 的 `AGENT-BRIEF.md` / `OUT-OF-SCOPE.md`,`improve-codebase-architecture` 的 `HTML-REPORT.md`。入口 prompt 用仓库根相对路径引用。
 - **reference 文件移进 `references/`。** mattpocock 把它们当同级文件放;本仓库 skill 的约定是 `references/` 子目录。链接相应更新。文件名沿用上游(`tests.md`、`mocking.md`、`CONTEXT-FORMAT.md`、`ADR-FORMAT.md`),因为仓库本来就已混用大小写。
 - **`diagnosing-bugs` 的脚本路径。** 两处 `hitl-loop.template.sh` 引用都改成完整仓库路径(`skills/diagnosing-bugs/scripts/...`),因为 pi 从 cwd 解析文件路径,而不是从 skill 目录。Phase 6 现在只做清理;上游已把 post-mortem 移交 `/improve-codebase-architecture` 的段落整个删除(model-invoked skill 不能调 user-invoked prompt,且实践中很少触发),本仓库同步。
