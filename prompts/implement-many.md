@@ -1,5 +1,5 @@
 ---
-description: Fan out N implement targets into parallel git worktrees — one pi agent per pane, in a single new tmux window or one herdr workspace per target opened by herdr worktree; each pane is seeded with /implement-with-pr, which implements unattended, opens a PR, keeps it green, and waits for the user to merge
+description: Fan out N implement targets into parallel git worktrees — one pi agent per pane, in a single new tmux window or one herdr workspace per target opened by herdr worktree; each pane is seeded with /implement-with-pr, which implements unattended, opens a PR, keeps it green and handles review comments, and waits for the user to merge
 argument-hint: "<#issue | spec-path | description> ..."
 ---
 
@@ -139,7 +139,7 @@ Give the user a table:
 
 | Pane | Target | Branch | Worktree |
 
-Plus how to switch to the fan-out (tmux: `<prefix> <win-index>`; herdr: each target's own workspace, labeled with its slug — see `herdr workspace list`), and a note that each agent runs `/implement-with-pr` independently (load → TDD → review → commit → push → PR), then babysits its PR — watching CI, rebasing on conflicts or base-branch moves — until the user merges it; agents never merge themselves. Commits and pushes are non-interactive because the panes run unattended.
+Plus how to switch to the fan-out (tmux: `<prefix> <win-index>`; herdr: each target's own workspace, labeled with its slug — see `herdr workspace list`), and a note that each agent runs `/implement-with-pr` independently (load → TDD → review → commit → push → PR), then babysits its PR — watching CI, rebasing on conflicts or base-branch moves, and reacting to and acting on review comments — until the user merges it; agents never merge themselves. Commits and pushes are non-interactive because the panes run unattended.
 
 ## Discipline
 
