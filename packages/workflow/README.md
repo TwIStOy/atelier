@@ -79,7 +79,7 @@ return report;
 
 ### Child sessions
 
-Children run through the shared `runChildAgent` runner (`@htwang-contrib/common`): real token-usage accounting, sessions under `~/.agent/workflow/session`, and by-parent link records — so workflow children appear in the subagents **`/view-subagents`** viewer like any other child run. Children never receive the `workflow` or `subagent` tools (no recursive orchestration), and `protect-secrets` / `extra-tools` / `web-tools` / inference factories are loaded exactly as for `subagent` children.
+Children run through the shared `runChildAgent` runner (`@htwang-contrib/common`): real token-usage accounting, sessions under `~/.agent/workflow/session`, and by-parent link records — so workflow children appear in the subagents **`/view-subagents`** viewer like any other child run. Children never receive the `workflow` or `subagent` tools (no recursive orchestration). Child extensions come from the shared child-extension registry: any extension loaded in the parent that self-registered via `registerChildExtensionFactory` (e.g. `protect-secrets`, `extra-tools`, `web-tools`, `toori`, `git-clone` in this repo's default config) is loaded into every workflow child, exactly as for `subagent` children.
 
 ## Persistence: save and resume
 

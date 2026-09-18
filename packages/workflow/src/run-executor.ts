@@ -1,11 +1,7 @@
 import { randomUUID } from "node:crypto";
-import type { AgentToolUpdateCallback, ExtensionContext, ExtensionFactory } from "@earendil-works/pi-coding-agent";
+import type { AgentToolUpdateCallback, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, formatSize, truncateHead } from "@earendil-works/pi-coding-agent";
 import { runChildAgent } from "@htwang-contrib/common";
-import extraTools from "@htwang-contrib/extra-tools";
-import protectSecrets from "@htwang-contrib/protect-secrets";
-import toori from "@htwang-contrib/toori";
-import webTools from "@htwang-contrib/web-tools";
 import { Type } from "typebox";
 import { loadWorkflowConfig } from "./config.ts";
 import { createStreamingWorkflowDisplay, createWidgetWorkflowDisplay, type WorkflowDisplay } from "./display.ts";
@@ -21,8 +17,6 @@ import {
 } from "./run-store.ts";
 import { parseWorkflowScript } from "./script.ts";
 import { type SavedWorkflowScope, saveWorkflowScript } from "./script-store.ts";
-
-const WORKFLOW_CHILD_FACTORIES: ExtensionFactory[] = [protectSecrets, extraTools, webTools, toori];
 
 export type ExecuteWorkflowOptions = {
   script?: string;
@@ -52,7 +46,6 @@ function buildRunner(ctx: ExtensionContext): WorkflowAgentRunner {
         isolated: call.isolated,
         max_turns: call.max_turns,
         agent_type: call.agent_type,
-        extensionFactories: WORKFLOW_CHILD_FACTORIES,
         sessionDir: WORKFLOW_SESSION_DIR,
         outputSchema: call.schema ? Type.Unsafe(call.schema) : undefined,
         onProgress: (p) => onProgress(p.tool_calls),
