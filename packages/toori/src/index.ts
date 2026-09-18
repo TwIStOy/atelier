@@ -1,5 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { createLogger, isExtensionDisabled } from "@htwang-contrib/common";
+import { createLogger, isExtensionDisabled, registerChildExtensionFactory } from "@htwang-contrib/common";
 import { refreshCatalog } from "./catalog.ts";
 import { COMMAND_NAME, ENV_VAR, handleRefreshCommand, PROVIDER_ID } from "./command.ts";
 
@@ -7,8 +7,9 @@ const logger = createLogger("toori");
 
 const SESSION_AFFINITY_HEADER = "x-lite-session-id";
 
-export default async function (pi: ExtensionAPI) {
+export default async function toori(pi: ExtensionAPI) {
   if (isExtensionDisabled("toori")) return;
+  registerChildExtensionFactory("toori", toori);
   logger.info("extension loaded");
   pi.registerProvider(PROVIDER_ID, {
     name: "Toori",

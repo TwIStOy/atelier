@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- The extension now self-registers into the shared child-extension registry (`registerChildExtensionFactory` from `@htwang-contrib/common`), so child agent sessions (`subagent` / `workflow`) can resolve and call toori-served models whenever toori is loaded in the parent session (previously hardcoded into the child factory lists).
+
 ## [0.6.1] - 2026-09-01
 
 ### Fixed
