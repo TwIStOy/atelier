@@ -64,7 +64,7 @@
 - **机制**:
   1. 先定 scope(用户给方向,或从 `git log` 热点推断)。
   2. 用 `subagent`/`explore` 扫代码,按 deep-module 词汇(module/interface/depth/seam/adapter/leverage/locality)记摩擦点。
-  3. 写一份自包含 HTML 报告到 `$TMPDIR/architecture-review-<ts>.html`(Tailwind + Mermaid CDN),打开给用户挑。
+  3. 写一份中文自包含 HTML 报告到 `$TMPDIR/architecture-review-<ts>/index.html`(Tailwind + Mermaid CDN);macOS 上直接 `open`,其余环境用 `python3 -m http.server --bind 0.0.0.0` 起后台服务，按局域网/Tailscale/公网各 IPv4 地址给出可点击 URL，供用户从 Mac 访问。
   4. 用户选中后进入 `grilling` + `domain-modeling` 循环;需要备选接口时用 `codebase-design` 的 design-it-twice 模式。
 - **资源**:`prompts-resource/improve-codebase-architecture/HTML-REPORT.md`。
 

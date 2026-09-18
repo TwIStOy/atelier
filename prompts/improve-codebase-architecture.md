@@ -38,7 +38,20 @@ Apply the **deletion test** to anything you suspect is shallow: would deleting i
 
 ### 2. Present candidates as an HTML report
 
-Write a self-contained HTML file to the OS temp directory so nothing lands in the repo. Resolve the temp dir from `$TMPDIR`, falling back to `/tmp` (or `%TEMP%` on Windows), and write to `<tmpdir>/architecture-review-<timestamp>.html` so each run gets a fresh file. Open it for the user — `xdg-open <path>` on Linux, `open <path>` on macOS, `start <path>` on Windows — and tell them the absolute path.
+Write the report in Chinese — see HTML-REPORT.md for the language rules and the glossary's fixed Chinese renderings. Keep technical tokens (file paths, identifiers, commands) verbatim.
+
+The report is a self-contained HTML file that never lands in the repo: resolve the temp dir from `$TMPDIR`, falling back to `/tmp`, and create a fresh directory `<tmpdir>/architecture-review-<timestamp>/` holding a single `index.html`. The directory must contain only the report — on non-macOS machines it gets served over HTTP.
+
+Deliver it:
+
+- Detect the OS with `uname -s`. On `Darwin` (macOS) the user is local: run `open <dir>/index.html` and tell them the absolute path.
+- Otherwise the user reads the report remotely from their Mac. Start an HTTP server bound to `0.0.0.0`, detached so it outlives this session:
+
+  ```bash
+  nohup python3 -u -m http.server 0 --bind 0.0.0.0 --directory <dir> > <tmpdir>/architecture-review-<timestamp>.log 2>&1 &
+  ```
+
+  Port `0` makes the OS pick a free port; the unbuffered banner in the log file names it (`Serving HTTP on 0.0.0.0 port <N>`). Then give the user one clickable URL per IPv4 address the host has (`ip -4 -brief addr show scope global`) — LAN, Tailscale (`100.64.0.0/10`), and public alike — so they can reach it however their Mac is connected, and mention the server PID so they can stop it later.
 
 The report uses **Tailwind via CDN** for layout and styling, and **Mermaid via CDN** for diagrams where a graph/flow/sequence reliably communicates the structure. Mix Mermaid with hand-crafted CSS/SVG visuals — use Mermaid when relationships are graph-shaped (call graphs, dependencies, sequences), and hand-built divs/SVG when you want something more editorial (mass diagrams, cross-sections, collapse animations). Each candidate gets a **before/after visualisation**. Be visual.
 
@@ -46,20 +59,20 @@ For each candidate, render a card with:
 
 - **Files** — which files/modules are involved
 - **Problem** — why the current architecture is causing friction
-- **Solution** — plain English description of what would change
+- **Solution** — plain Chinese description of what would change
 - **Benefits** — explained in terms of locality and leverage, and how tests would improve
 - **Before / After diagram** — side-by-side, custom-drawn, illustrating the shallowness and the deepening
-- **Recommendation strength** — one of `Strong`, `Worth exploring`, `Speculative`, rendered as a badge
+- **Recommendation strength** — one of 「强烈推荐」, 「值得探索」, 「试探性」, rendered as a badge
 
-End the report with a **Top recommendation** section: which candidate you'd tackle first and why.
+End the report with a **Top recommendation** section (heading 「首选建议」): which candidate you'd tackle first and why.
 
 **Use CONTEXT.md vocabulary for the domain, and the `codebase-design` vocabulary for the design.** If `CONTEXT.md` defines "Order," talk about "the Order intake module" — not "the FooBarHandler," and not "the Order service."
 
-**ADR conflicts**: if a candidate contradicts an existing ADR, only surface it when the friction is real enough to warrant revisiting the ADR. Mark it clearly in the card (e.g. a warning callout: _"contradicts ADR-0007 — but worth reopening because…"_). Don't list every theoretical refactor an ADR forbids.
+**ADR conflicts**: if a candidate contradicts an existing ADR, only surface it when the friction is real enough to warrant revisiting the ADR. Mark it clearly in the card (e.g. a warning callout: 「与 ADR-0007 冲突——但值得重开，因为……」). Don't list every theoretical refactor an ADR forbids.
 
 See `prompts-resource/improve-codebase-architecture/HTML-REPORT.md` for the full HTML scaffold, diagram patterns, and styling guidance.
 
-Do NOT propose interfaces yet. After the file is written, ask the user: "Which of these would you like to explore?"
+Do NOT propose interfaces yet. After the report is delivered, ask the user, in Chinese: 「想深入探讨哪一个?」
 
 ### 3. Grilling loop
 
