@@ -62,7 +62,7 @@ export function formatSubagentAgentInspect(
     `frontmatter tools (subset of Pi defaults for this isolation mode; unknown names omitted): ${fmToolsDisplay}`,
     `effective child tools (${isolated ? "isolated" : "non-isolated"}): ${toolsEffective}`,
     "",
-    "Child session: DefaultResourceLoader uses noExtensions: true, noSkills, noPromptTemplates, noThemes, noContextFiles; extensionFactories includes protect-secrets and extra-tools (grep, glob, ls).",
+    "Child session: DefaultResourceLoader uses noExtensions: true, noSkills, noPromptTemplates, noThemes, noContextFiles; extensionFactories come from the shared child-extension registry (extensions loaded in the main session self-register via registerChildExtensionFactory).",
     "",
     "Batch mode: per-task tool fields override the same keys for that row only (task > batch tool args > persona > defaults_by_agent_type).",
   ];

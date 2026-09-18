@@ -1,6 +1,7 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import {
   isExtensionDisabled,
+  registerChildExtensionFactory,
   registerSystemPromptContribution,
   registerTuiCommands,
   SYSTEM_PROMPT_CONTRIBUTION_PRIORITIES,
@@ -15,6 +16,7 @@ import { runSubagentViewerCommand } from "./viewer/command.ts";
 
 export default function (pi: ExtensionAPI) {
   if (isExtensionDisabled("subagents")) return;
+  registerChildExtensionFactory("git-clone", gitCloneExtension);
   registerSubagentsConfig();
   registerSubagentTool(pi);
   registerSubagentStatusTool(pi);

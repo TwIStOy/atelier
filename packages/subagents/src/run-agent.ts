@@ -1,12 +1,7 @@
-import type { ExtensionAPI, ExtensionContext, ExtensionFactory } from "@earendil-works/pi-coding-agent";
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { ChildAgentProgress, ChildAgentUsageSnapshot, RunChildAgentResult } from "@htwang-contrib/common";
 import { runChildAgent } from "@htwang-contrib/common";
-import extraTools from "@htwang-contrib/extra-tools";
-import protectSecrets from "@htwang-contrib/protect-secrets";
-import toori from "@htwang-contrib/toori";
-import webTools from "@htwang-contrib/web-tools";
 import { buildSubagentAgentCatalog, type SubagentAgentCatalog } from "./agent-catalog.ts";
-import { registerGitCloneTool } from "./git-clone/index.ts";
 import { SUBAGENT_SESSION_DIR } from "./paths.ts";
 
 export {
@@ -15,18 +10,6 @@ export {
   parseThinking,
 } from "@htwang-contrib/common";
 export { assistantMessageText } from "@htwang-contrib/common/child-agent";
-
-const gitCloneExtension = (pi: ExtensionAPI) => {
-  registerGitCloneTool(pi);
-};
-
-const CHILD_SESSION_EXTENSION_FACTORIES: ExtensionFactory[] = [
-  protectSecrets,
-  extraTools,
-  webTools,
-  toori,
-  gitCloneExtension,
-];
 
 export type SubagentUsageSnapshot = ChildAgentUsageSnapshot;
 
@@ -92,7 +75,6 @@ export async function runSubAgent(
     {
       ...input,
       catalog: catalog ?? buildSubagentAgentCatalog(ctx.cwd),
-      extensionFactories: CHILD_SESSION_EXTENSION_FACTORIES,
       sessionDir: SUBAGENT_SESSION_DIR,
       onProgress: onChildProgress,
     },

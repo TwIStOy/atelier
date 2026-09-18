@@ -8,6 +8,7 @@
 
 ### Changed
 
+- Child sessions no longer hardcode their extension list (the old `CHILD_SESSION_EXTENSION_FACTORIES` with `protect-secrets` / `extra-tools` / `web-tools` / `toori` / `git-clone` is gone, along with the corresponding package dependencies). Children now load exactly the factories in the shared child-extension registry (`registerChildExtensionFactory` in `@htwang-contrib/common`): this repo's packages self-register when loaded in the parent session — `protect-secrets`, `extra-tools`, `web-tools` and `toori` in their own default exports, `git-clone` from this extension. Consequences: disabling one of those extensions on the parent also removes it from children (previously `protect-secrets` and `extra-tools` were forced into every child even when absent from the parent), and any extension can now join child sessions without changes here.
 - `/view-subagents` is now registered only when pi runs in TUI mode (via `registerTuiCommands` from `@htwang-contrib/common`); its viewer is a `ctx.ui.custom` overlay, which resolves `undefined` in RPC mode. `/subagents-agents` stays available in RPC because `ctx.ui.select`/`ctx.ui.editor` dialogs are wired through the RPC protocol.
 
 ## [0.6.1] - 2026-09-01
