@@ -2,7 +2,7 @@
 
 Findings from investigating pi internals while building the `hide-models` feature. Captured so future features in `packages/experience` (and other extensions touching the model registry or config) don't have to re-derive these.
 
-All paths are relative to `node_modules/@earendil-works/pi-coding-agent/dist/` unless noted. Verified against pi-coding-agent `0.80.3`.
+All paths are relative to `node_modules/@earendil-works/pi-coding-agent/dist/` unless noted. Verified against pi-coding-agent `0.85.1` (originally `0.80.3`; see the regression note below for what changed in between).
 
 ---
 
@@ -10,45 +10,43 @@ All paths are relative to `node_modules/@earendil-works/pi-coding-agent/dist/` u
 
 ### There is no filter API or event
 
-The model picker reads models directly from the registry:
+Every model-list consumer reads `session.modelRuntime` directly:
 
 ```
-modes/interactive/components/model-selector.js:105   await this.modelRegistry.getAvailable()
-modes/interactive/interactive-mode.js:327,3450,3561,3960   this.session.modelRegistry.getAvailable()
-core/model-resolver.js:210,276,462,507               getAvailable() / getAll()
-core/agent-session.js:1173                           this._modelRegistry.getAvailable()
-modes/rpc/rpc-mode.js:361,377                        session.modelRegistry.getAvailable()
-cli/list-models.js:29                                modelRegistry.getAvailable()
+modes/interactive/components/model-selector.js:104   this.modelRuntime.getAvailableSnapshot()
+modes/interactive/interactive-mode.js:421,3775,4059,4087,4093,4197,4267,4746   this.session.modelRuntime.getAvailableSnapshot()
+modes/rpc/rpc-mode.js:368,384                        session.modelRuntime.getAvailableSnapshot()
+cli/list-models.js:41                                await modelRuntime.getAvailable()
 ```
 
-`ExtensionAPI` exposes only `registerProvider` / `unregisterProvider` / `setModel` — no list, no filter, no `model_list` event. `unregisterProvider` reloads built-ins from disk, so it cannot remove built-in providers/models. **The only way to hide models is to wrap the registry methods.**
+`ExtensionAPI` exposes only `registerProvider` / `unregisterProvider` / `setModel` — no list, no filter, no `model_list` event. `unregisterProvider` does not remove built-in providers/models. **The only way to hide models is to wrap the runtime's accessor methods.**
 
-### `ModelRegistry` is exported and patchable
+### `ModelRegistry` is a facade; `ModelRuntime` is the real surface
 
 ```ts
-import { ModelRegistry } from "@earendil-works/pi-coding-agent";
+import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 ```
 
-`ModelRegistry.prototype.getAll` / `getAvailable` are normal instance methods (`core/model-registry.d.ts`). All registry instances share the prototype, so patching the prototype covers every consumer above.
+- `ModelRuntime` (`core/model-runtime.js`) owns the model catalog: `getAvailableSnapshot()` returns the sync `snapshot.available` array (**what the picker renders**), `getAvailable(providerId?)` is the async path used by `pi --list-models`, `getModels()`/`getModel()` resolve specific models (unpatched — current/default model resolution must keep working).
+- `ModelRegistry` (`core/model-registry.js`) is a per-extension compatibility facade whose methods delegate to `this.runtime` (public field in JS, `private` in the .d.ts). Its own doc comment: "Coding-agent internals use ModelRuntime directly."
 
-- `getAll(): Model<Api>[]` — every built-in + custom model.
-- `getAvailable(): Model<Api>[]` — subset with auth configured. **This is what the picker renders.**
-- `find(provider, modelId)`, `registerProvider(name, config)`, `unregisterProvider(name)` also exist.
+**Regression note (0.80 → 0.85):** the original `hide-models` implementation patched `ModelRegistry.prototype.getAvailable`/`getAll`, which intercepted every consumer on ≤0.80. pi then moved internals to `ModelRuntime` and kept `ModelRegistry` only as the extension-facing facade — the prototype patch kept installing cleanly but nothing called it anymore, so hide rules silently stopped filtering anything. The shape canary in `model-patch.test.ts` exists to fail loudly if this drift happens again.
 
-`Model` (`@earendil-works/pi-ai`, re-exported from `./types.ts`) carries `id: string`, `provider: ProviderId`, `name`, `api`, `baseUrl`, … Match hide rules against `provider` + `id`.
+`Model` (`@earendil-works/pi-ai`) carries `id: string`, `provider: ProviderId`, `name`, `api`, `baseUrl`, … Match hide rules against `provider` + `id`.
 
 ### Patch shape used by `hide-models`
 
-- Store the original methods on the prototype under `Symbol.for("experience.modelRegistry.originals")` so the patch is **idempotent across `/reload`** (re-importing the extension module finds the stored originals instead of re-wrapping its own previous wrapper → no double-filter / lost ref).
-- The wrapper calls the stored original via `.call(this)`, then filters. No recursion.
+- Patch `ModelRuntime.prototype.getAvailableSnapshot` + `getAvailable`; all instances share the prototype, so every consumer above is covered.
+- Store the original methods on the prototype under `Symbol.for("experience.modelRuntime.originals")` so the patch is **idempotent across `/reload`** (re-importing the extension module finds the stored originals instead of re-wrapping its own previous wrapper → no double-filter / lost ref).
+- The runtime `suppress` flag lives on the prototype too (`Symbol.for("experience.modelRuntime.suppress")`), not in module state — a re-evaluated module's `setSuppress` would otherwise write a fresh closure variable the surviving wrapper never reads. `reset` (temporary pass-through) therefore survives `/reload`.
 - The wrapper **re-reads config on every call** (`readConfig` does fresh `readFileSync`), so edits from `/config` or `add`/`remove` apply on the next picker open with no re-patch needed.
-- A runtime `suppress` flag implements `reset` (temporary pass-through) without un-patching the prototype.
+- Internal bookkeeping that reads `this.snapshot` directly (e.g. `registerProvider`) stays unfiltered by design; only the accessor methods are wrapped.
 
 See `packages/experience/src/hide-models/model-patch.ts`.
 
-### Getting a registry instance inside an extension
+### Getting a runtime instance inside an extension
 
-`ExtensionContext.modelRegistry` (and `ExtensionCommandContext.modelRegistry`) is the live registry. Capture it in `session_start` (`ctx.modelRegistry`) so ConfigItem option builders — which receive no `ctx` — can enumerate models later.
+`ExtensionContext.modelRegistry` (and `ExtensionCommandContext.modelRegistry`) is the facade; its `.runtime` field is the live `ModelRuntime`. Capture it in `session_start` (`ctx.modelRegistry`) so ConfigItem option builders — which receive no `ctx` — can enumerate models later. For unfiltered listings (the `/config` multiselect must still show hidden models so they can be un-hidden), call the stored-original `getAvailableSnapshot` via the helpers in `model-patch.ts`.
 
 ---
 
