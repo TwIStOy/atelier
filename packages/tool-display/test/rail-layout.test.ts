@@ -114,8 +114,8 @@ describe("tool call rail column layout", () => {
   });
 
   it("keeps the timer as the leading segment of the first body line", () => {
-    const lines = render("bash", { command: "echo hi" }, { output: "hi", startedAtMs: 1000, endedAtMs: 1500 });
-    expect(lines[0]).toBe("  ┃  ◆ 500 ms Ran echo hi · 1 line");
+    const lines = render("bash", { command: "echo hi" }, { output: "hi", startedAtMs: 0, endedAtMs: 95_000 });
+    expect(lines[0]).toBe("  ┃  ◆ 1:35 Ran echo hi · 1 line");
   });
 
   it("replaces the bullet diamond with › when hover affordance is on", () => {

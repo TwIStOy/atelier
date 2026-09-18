@@ -13,6 +13,8 @@ export function spinnerGlyph(theme: Theme, nowMs = Date.now()): string {
 const MS_THRESHOLD = 3000;
 const SECONDS_THRESHOLD = 90;
 
+export const TIMER_MIN_ELAPSED_MS = 60_000;
+
 export function formatDuration(elapsedMs: number): string {
   if (elapsedMs < MS_THRESHOLD) return `${Math.max(0, Math.round(elapsedMs))} ms`;
   const totalSeconds = elapsedMs / 1000;

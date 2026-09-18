@@ -576,14 +576,14 @@ describe("tool call timer", () => {
         isPartial: true,
         isError: false,
         registry: globalToolDisplayRegistry,
-        startedAtMs: 1000,
-        endedAtMs: 1500,
+        startedAtMs: 0,
+        endedAtMs: 95_000,
       },
       PLAIN_THEME,
     ).render(80);
     const first = lines[0] ?? "";
-    expect(first).toContain("500 ms");
-    expect(first.indexOf("500 ms")).toBeLessThan(first.indexOf("Read"));
+    expect(first).toContain("1:35");
+    expect(first.indexOf("1:35")).toBeLessThan(first.indexOf("Read"));
   });
 
   it("keeps the timer on the first line and never overflows narrow terminals", () => {
@@ -598,12 +598,12 @@ describe("tool call timer", () => {
         isError: false,
         registry: globalToolDisplayRegistry,
         startedAtMs: 0,
-        endedAtMs: 2500,
+        endedAtMs: 95_000,
       },
       PLAIN_THEME,
     ).render(40);
     const joined = lines.join("\n");
-    expect(lines[0]).toContain("2500 ms");
+    expect(lines[0]).toContain("1:35");
     for (const line of lines) {
       expect(visibleWidth(line)).toBeLessThanOrEqual(40);
     }
@@ -621,11 +621,30 @@ describe("tool call timer", () => {
         isError: false,
         registry: globalToolDisplayRegistry,
         startedAtMs: 1000,
-        endedAtMs: 5200,
+        endedAtMs: 126_000,
       },
       PLAIN_THEME,
     ).render(80);
-    expect(lines[0]).toContain("4.20s");
+    expect(lines[0]).toContain("2:05");
+  });
+
+  it("hides the timer for calls that finish within a minute", () => {
+    const lines = renderToolCall(
+      {
+        toolName: "read",
+        args: { path: "foo.txt" },
+        output: "done",
+        expanded: false,
+        isPartial: false,
+        isError: false,
+        registry: globalToolDisplayRegistry,
+        startedAtMs: 0,
+        endedAtMs: 59_999,
+      },
+      PLAIN_THEME,
+    ).render(80);
+    expect(lines[0]).not.toContain(" ms");
+    expect(lines[0]).not.toMatch(/\d+s\b/);
   });
 
   it("omits the timer when no timing is provided", () => {

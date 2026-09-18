@@ -10,7 +10,7 @@ import {
 } from "@htwang-contrib/common";
 import { formatExpandedToolOutputLines } from "./adapters/shared.ts";
 import { loadConfig } from "./config.ts";
-import { formatDuration, spinnerGlyph } from "./format.ts";
+import { formatDuration, spinnerGlyph, TIMER_MIN_ELAPSED_MS } from "./format.ts";
 import type { ContentRenderer, ToolDisplayAdapter } from "./types.ts";
 
 export type { ContentRenderer, ToolDisplayAdapter };
@@ -216,7 +216,8 @@ export function renderToolCall(
         opts.hoverAffordance === true,
       );
 
-      const timerLabel = elapsedMs !== undefined ? formatDuration(elapsedMs) : undefined;
+      const timerLabel =
+        elapsedMs !== undefined && elapsedMs >= TIMER_MIN_ELAPSED_MS ? formatDuration(elapsedMs) : undefined;
       const timerPart = timerLabel ? `${theme.fg("dim", timerLabel)} ` : "";
       const timerWidth = timerLabel ? visibleWidth(timerLabel) + 1 : 0;
       const innerWidth = Math.max(1, bodyWidth - timerWidth);
