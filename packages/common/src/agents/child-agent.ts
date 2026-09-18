@@ -63,7 +63,7 @@ export type RunChildAgentInput = {
   max_turns?: number;
   agent_type?: string;
   catalog?: AgentPersonaCatalog;
-  extensionFactories: ExtensionFactory[];
+  extensionFactories?: ExtensionFactory[];
   sessionDir: string;
   outputSchema?: TSchema;
   stream?: { task_index: number; task_total: number };
@@ -328,7 +328,7 @@ export async function runChildAgent(
       agentDir,
       settingsManager,
       noExtensions: true,
-      extensionFactories: [...input.extensionFactories, ...getChildExtensionFactories()],
+      extensionFactories: [...(input.extensionFactories ?? []), ...getChildExtensionFactories()],
       noSkills: true,
       noPromptTemplates: true,
       noThemes: true,
