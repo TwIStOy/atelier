@@ -26,6 +26,7 @@ import {
   personaSystemPrompt,
   resolvePersonaId,
 } from "./agent-personas.ts";
+import { getChildExtensionFactories } from "./child-extensions.ts";
 import { resolveChildToolNames } from "./child-tools.ts";
 import { type PersonaTypeDefaults, personaDefaultsForType, readPersonaDefaultsByType } from "./persona-defaults.ts";
 import { recordChildSessionFinished, recordChildSessionStarted } from "./session-links.ts";
@@ -327,7 +328,7 @@ export async function runChildAgent(
       agentDir,
       settingsManager,
       noExtensions: true,
-      extensionFactories: input.extensionFactories,
+      extensionFactories: [...input.extensionFactories, ...getChildExtensionFactories()],
       noSkills: true,
       noPromptTemplates: true,
       noThemes: true,

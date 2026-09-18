@@ -29,6 +29,11 @@ export {
   STRUCTURED_OUTPUT_TOOL_NAME,
 } from "./agents/child-agent.ts";
 export {
+  CHILD_EXTENSION_FACTORIES_STATE_KEY,
+  getChildExtensionFactories,
+  registerChildExtensionFactory,
+} from "./agents/child-extensions.ts";
+export {
   CHILD_DELEGATION_TOOL_NAMES,
   childSessionToolNames,
   resolveChildToolNames,
