@@ -14,8 +14,6 @@
   },
   "dependencies": {
     "@htwang-contrib/common": "*",
-    "@htwang-contrib/extra-tools": "*",
-    "@htwang-contrib/protect-secrets": "*",
     "@sinclair/typebox": "^0.34.52"
   }
 }

@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { TextContent } from "@earendil-works/pi-ai";
-import type { ExtensionContext, ExtensionFactory } from "@earendil-works/pi-coding-agent";
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import {
   type AgentSession,
   type AgentSessionEvent,
@@ -17,13 +17,11 @@ import {
   SettingsManager,
   truncateHead,
 } from "@earendil-works/pi-coding-agent";
-import extraTools from "@htwang-contrib/extra-tools";
-import protectSecrets from "@htwang-contrib/protect-secrets";
+import { getChildExtensionFactories } from "@htwang-contrib/common";
 import { loadGoalConfig, resolveVerifierModel } from "./config.ts";
 import type { Goal } from "./types.ts";
 
 const VERIFIER_TOOLS = ["read", "bash", "grep", "glob", "ls"];
-const VERIFIER_EXTENSION_FACTORIES: ExtensionFactory[] = [protectSecrets, extraTools];
 const TURN_GRACE = 3;
 const FORMAT_NUDGE =
   "Your previous response did not end with a valid verdict line. Based on your investigation so far, do not run more tools — respond now with a brief summary ending with exactly one line on its own: VERDICT: COMPLETE or VERDICT: INCOMPLETE.";
@@ -145,7 +143,7 @@ export async function verifyGoalCompletion(
     agentDir,
     settingsManager,
     noExtensions: true,
-    extensionFactories: VERIFIER_EXTENSION_FACTORIES,
+    extensionFactories: getChildExtensionFactories(),
     noPromptTemplates: true,
     noThemes: true,
     noContextFiles: true,
