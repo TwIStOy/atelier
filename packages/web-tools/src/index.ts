@@ -56,7 +56,12 @@ export { YouComProvider } from "./providers/youcom.ts";
 export { ZaiProvider } from "./providers/zai.ts";
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { createLogger, isExtensionDisabled, registerAggregateRule } from "@htwang-contrib/common";
+import {
+  createLogger,
+  isExtensionDisabled,
+  registerAggregateRule,
+  registerChildExtensionFactory,
+} from "@htwang-contrib/common";
 import { registerWebToolsConfigItems } from "./config.ts";
 import { registerWebFetchTool } from "./fetch/index.ts";
 import { buildInterceptors } from "./interceptors/index.ts";
@@ -73,8 +78,9 @@ export {
 export { ProviderError, throwIfApiError } from "./providers/errors.ts";
 export { registerWebFetchTool, registerWebSearchTool };
 
-export default function (pi: ExtensionAPI): void {
+export default function webTools(pi: ExtensionAPI): void {
   if (isExtensionDisabled("web-tools")) return;
+  registerChildExtensionFactory("web-tools", webTools);
   logger.info("extension loaded");
   registerAggregateRule("web_fetch", { verb: "Fetched", singular: "page", plural: "pages", progressive: "Fetching…" });
   registerAggregateRule("web_search", {
