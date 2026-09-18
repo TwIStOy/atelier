@@ -1,5 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { isExtensionDisabled } from "@htwang-contrib/common";
+import { isExtensionDisabled, registerChildExtensionFactory } from "@htwang-contrib/common";
 import { checkBashCommand, DEFAULT_PROTECTED_PATHS } from "./bash-check.ts";
 import { loadProjectConfig } from "./config.ts";
 
@@ -27,8 +27,9 @@ function checkPath(
   return null;
 }
 
-export default function (pi: ExtensionAPI) {
+export default function protectSecrets(pi: ExtensionAPI) {
   if (isExtensionDisabled("protect-secrets")) return;
+  registerChildExtensionFactory("protect-secrets", protectSecrets);
 
   pi.on("session_start", (_event, ctx) => {
     const { issues } = loadProjectConfig(ctx.cwd);

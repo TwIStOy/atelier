@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- The extension now self-registers into the shared child-extension registry (`registerChildExtensionFactory` from `@htwang-contrib/common`), so `subagent` / `workflow` / goal-verifier child sessions enforce the same protected-path guards whenever the extension is loaded in the parent session. Previously children received it through a hardcoded list inside the `subagents` package, regardless of what the parent loaded.
+
 ## [0.6.0] - 2026-08-19
 
 ### Added
