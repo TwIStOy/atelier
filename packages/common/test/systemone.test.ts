@@ -19,7 +19,7 @@ import {
   systemOneScore,
 } from "@htwang-contrib/common/systemone";
 import { afterEach, beforeEach, describe, expect, expectTypeOf, test, vi } from "vitest";
-import { clearConfigItems, getConfigItems, setConfigKey, writeConfig } from "../src/config/index.ts";
+import { clearConfigItems, getConfigItems, readRawConfig, setConfigKey, writeConfig } from "../src/config/index.ts";
 
 const request = {
   state: { ticket: "I was charged twice and need a refund today.", customer: { paid: true } },
@@ -168,6 +168,104 @@ describe("System One", () => {
     expect(JSON.parse(String(fetcher.mock.calls[1][1]?.body)).model).toBe("updated-model");
     const modelItem = items.find((item) => item.key === "model");
     expect(typeof modelItem?.value === "function" && modelItem.value()).toBe("updated-model");
+  });
+
+  test.each(["$SYSTEMONE_TEST_KEY", "{env:SYSTEMONE_TEST_KEY}"])(
+    "resolves the configured %s reference before the default environment key on every call",
+    async (reference) => {
+      setConfigKey(SYSTEM_ONE_CONFIG_ID, "apiKey", ` ${reference} `);
+      vi.stubEnv("SYSTEMONE_TEST_KEY", " first-key ");
+      vi.stubEnv("TYPESAFE_API_KEY", "default-key");
+      const fetcher = successfulFetch();
+
+      expect(loadSystemOneConfig().apiKey).toBe("first-key");
+      await systemOne(request, { fetch: fetcher });
+      vi.stubEnv("SYSTEMONE_TEST_KEY", "second-key");
+      await systemOne(request, { fetch: fetcher });
+
+      expect(fetcher.mock.calls.map(([, init]) => new Headers(init?.headers).get("Authorization"))).toEqual([
+        "Bearer first-key",
+        "Bearer second-key",
+      ]);
+      expect(readRawConfig(SYSTEM_ONE_CONFIG_ID)?.apiKey).toBe(` ${reference} `);
+    },
+  );
+
+  test.each(["$SYSTEMONE_TEST_KEY", "{env:SYSTEMONE_TEST_KEY}"])(
+    "keeps %s in the config editor instead of exposing the resolved credential",
+    (reference) => {
+      setConfigKey(SYSTEM_ONE_CONFIG_ID, "apiKey", reference);
+      vi.stubEnv("SYSTEMONE_TEST_KEY", "secret-value");
+      vi.stubEnv("TYPESAFE_API_KEY", "default-secret");
+      registerSystemOneConfigItems();
+      const item = getConfigItems(SYSTEM_ONE_CONFIG_ID).find((item) => item.key === "apiKey");
+      expect(item?.secret).toBe(true);
+      expect(typeof item?.value === "function" && item.value()).toBe(reference);
+      setConfigKey(SYSTEM_ONE_CONFIG_ID, "apiKey", "{env:SYSTEMONE_UNSET_TEST_KEY}");
+      vi.stubEnv("SYSTEMONE_UNSET_TEST_KEY", undefined);
+      expect(typeof item?.value === "function" && item.value()).toBe("{env:SYSTEMONE_UNSET_TEST_KEY}");
+    },
+  );
+
+  test.each(["$SYSTEMONE_TEST_KEY", "{env:SYSTEMONE_TEST_KEY}"])(
+    "rejects a missing or blank referenced key (%s) without falling back or making a request",
+    async (reference) => {
+      setConfigKey(SYSTEM_ONE_CONFIG_ID, "apiKey", reference);
+      vi.stubEnv("TYPESAFE_API_KEY", "default-key");
+      const fetcher = successfulFetch();
+
+      for (const value of [undefined, "", "   "]) {
+        vi.stubEnv("SYSTEMONE_TEST_KEY", value);
+        expect(loadSystemOneConfig().apiKey).toBe("");
+        await expect(systemOne(request, { fetch: fetcher })).rejects.toBeInstanceOf(SystemOneError);
+      }
+      expect(fetcher).not.toHaveBeenCalled();
+    },
+  );
+
+  test.each(["$SYSTEMONE_CALL_TEST_KEY", "{env:SYSTEMONE_CALL_TEST_KEY}"])(
+    "supports the per-call %s reference even when the saved reference is unset",
+    async (reference) => {
+      setConfigKey(SYSTEM_ONE_CONFIG_ID, "apiKey", "$SYSTEMONE_UNSET_TEST_KEY");
+      vi.stubEnv("SYSTEMONE_UNSET_TEST_KEY", undefined);
+      vi.stubEnv("SYSTEMONE_CALL_TEST_KEY", "call-key");
+      vi.stubEnv("TYPESAFE_API_KEY", "default-key");
+      const fetcher = successfulFetch();
+
+      await systemOne(request, { apiKey: reference, fetch: fetcher });
+      await systemOne(request, { apiKey: "literal-override", fetch: fetcher });
+      expect(fetcher.mock.calls.map(([, init]) => new Headers(init?.headers).get("Authorization"))).toEqual([
+        "Bearer call-key",
+        "Bearer literal-override",
+      ]);
+
+      setConfigKey(SYSTEM_ONE_CONFIG_ID, "apiKey", "saved-key");
+      vi.stubEnv("SYSTEMONE_CALL_TEST_KEY", undefined);
+      fetcher.mockClear();
+      await expect(systemOne(request, { apiKey: reference, fetch: fetcher })).rejects.toBeInstanceOf(SystemOneError);
+      expect(fetcher).not.toHaveBeenCalled();
+    },
+  );
+
+  test("only resolves a whole reference once and treats resolved values as credentials", async () => {
+    vi.stubEnv("SYSTEMONE_TEST_KEY", "$SYSTEMONE_NESTED_TEST_KEY");
+    vi.stubEnv("SYSTEMONE_NESTED_TEST_KEY", "nested-key");
+    setConfigKey(SYSTEM_ONE_CONFIG_ID, "apiKey", "$SYSTEMONE_TEST_KEY");
+    const fetcher = successfulFetch();
+    await systemOne(request, { fetch: fetcher });
+    await systemOne(request, { apiKey: "key-$SYSTEMONE_TEST_KEY", fetch: fetcher });
+    expect(fetcher.mock.calls.map(([, init]) => new Headers(init?.headers).get("Authorization"))).toEqual([
+      "Bearer $SYSTEMONE_NESTED_TEST_KEY",
+      "Bearer key-$SYSTEMONE_TEST_KEY",
+    ]);
+  });
+
+  test("does not put an implicit environment key into the config editor", () => {
+    vi.stubEnv("TYPESAFE_API_KEY", "default-secret");
+    registerSystemOneConfigItems();
+    const item = getConfigItems(SYSTEM_ONE_CONFIG_ID).find((item) => item.key === "apiKey");
+    expect(typeof item?.value === "function" && item.value()).toBe("");
+    expect(loadSystemOneConfig().apiKey).toBe("default-secret");
   });
 
   test("rejects missing or explicitly blank credentials before contacting the API", async () => {

@@ -85,16 +85,42 @@ Settings use the existing `extensions.json` configuration store:
 
 | Setting | Environment override | Meaning |
 | --- | --- | --- |
-| `apiKey` | `TYPESAFE_API_KEY` | Bearer credential; displayed as a secret in `/config` |
+| `apiKey` | `TYPESAFE_API_KEY` | Literal credential or `$VAR` / `{env:VAR}` reference; displayed as a secret in `/config` |
 | `baseUrl` | `TYPESAFE_BASE_URL` | API root before `/v1/systemone` |
 | `model` | `TYPESAFE_DEFAULT_MODEL` | Default model, overridable by `request.model` |
 | `timeoutMs` | — | Per-attempt timeout in milliseconds, including body delivery |
 | `maxRetries` | — | Retries after the initial attempt; `0` disables retries |
 
-Precedence is explicit call options, nonblank environment values, persisted
-settings, then defaults. `loadSystemOneConfig()` returns the effective shared
-configuration. Every `systemOne()` call reloads configuration so edits affect the
-next request without recreating a client.
+For `baseUrl` and `model`, explicit call values take precedence over nonblank
+environment values, persisted settings, and defaults. API key precedence is
+described below. `loadSystemOneConfig()` returns the effective shared configuration.
+Every `systemOne()` call reloads configuration so edits affect the next request
+without recreating a client.
+
+To use another environment variable for the API key, store a reference string:
+
+```json
+{
+  "systemone": {
+    "apiKey": "$MY_TYPESAFE_KEY"
+  }
+}
+```
+
+`"apiKey": "{env:MY_TYPESAFE_KEY}"` is equivalent. These are strings, not JSON
+objects. Enter either form directly in **System One → API Key** in `/config`.
+Variable names must start with a letter or underscore and contain only letters,
+digits, and underscores. Only whole-value references are expanded, once per
+call; values containing embedded references remain literal credentials.
+
+For the API key, precedence is a per-call `options.apiKey`, an explicit reference
+in the saved setting, nonblank `TYPESAFE_API_KEY`, then a saved literal key.
+`options.apiKey` accepts both reference forms too. An unset or blank referenced
+variable resolves to an empty key; `systemOne()` rejects before making a request
+and does not fall back to another credential. `loadSystemOneConfig()` returns the
+resolved key, while `/config` edits and persists the original setting, never the
+secret read from the environment. Export the variable before starting Pi so the
+process can read it.
 
 For a gateway exposing `/api/v1/systemone`, set `baseUrl` to
 `https://gateway.example.com/api`. The SDK appends `/v1/systemone` and removes

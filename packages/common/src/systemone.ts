@@ -61,11 +61,21 @@ const CONFIG_SCHEMA: ExtensionConfigSchema<SystemOneConfig> = {
   },
 };
 
+function resolveApiKey(value: string, fallback = ""): string {
+  const trimmed = value.trim();
+  const reference = /^(?:\$([A-Za-z_][A-Za-z0-9_]*)|\{env:([A-Za-z_][A-Za-z0-9_]*)\})$/.exec(trimmed);
+  if (reference) {
+    const name = reference[1] ?? reference[2];
+    return process.env[name]?.trim() ?? "";
+  }
+  return fallback.trim() || trimmed;
+}
+
 export function loadSystemOneConfig(): SystemOneConfig {
   const config = readConfig(SYSTEM_ONE_CONFIG_ID, CONFIG_SCHEMA);
   return {
     ...config,
-    apiKey: process.env.TYPESAFE_API_KEY?.trim() || config.apiKey,
+    apiKey: resolveApiKey(config.apiKey, process.env.TYPESAFE_API_KEY),
     baseUrl: process.env.TYPESAFE_BASE_URL?.trim() || config.baseUrl,
     model: process.env.TYPESAFE_DEFAULT_MODEL?.trim() || config.model,
   };
@@ -77,11 +87,13 @@ export function registerSystemOneConfigItems(): void {
       key: "apiKey",
       type: "string",
       label: "API Key",
-      value: () => loadSystemOneConfig().apiKey,
-      description: "TypeSafe API key. TYPESAFE_API_KEY takes precedence over this setting.",
+      value: () => readConfig(SYSTEM_ONE_CONFIG_ID, CONFIG_SCHEMA).apiKey,
+      description:
+        "API key or $VAR / {env:VAR} reference. References take precedence; otherwise TYPESAFE_API_KEY overrides a literal key.",
       extensionLabel: "System One",
       secret: true,
       envVar: "TYPESAFE_API_KEY",
+      placeholder: "$MY_TYPESAFE_KEY or {env:MY_TYPESAFE_KEY}",
       order: 0,
     },
     {
@@ -136,9 +148,11 @@ export async function systemOne<const Q extends Questions>(
   }
 
   const config = loadSystemOneConfig();
-  const apiKey = (options.apiKey ?? config.apiKey).trim();
+  const apiKey = options.apiKey === undefined ? config.apiKey : resolveApiKey(options.apiKey);
   if (!apiKey) {
-    throw new TypeSafeError("System One API key is missing. Set TYPESAFE_API_KEY or configure System One in /config.");
+    throw new TypeSafeError(
+      "System One API key is missing. Check the referenced environment variable, set TYPESAFE_API_KEY, or configure System One in /config.",
+    );
   }
 
   const client = new TypeSafeClient({
