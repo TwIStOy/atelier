@@ -62,6 +62,7 @@ export {
   registerAggregateRule,
   resetAggregateRulesForTest,
 } from "./aggregate-rules.ts";
+export { AsyncAnnotations } from "./async-annotations.ts";
 export type { ComponentSiblingContext } from "./component-tree.ts";
 export { componentRendersLines, findComponentContext } from "./component-tree.ts";
 export { mapConcurrent } from "./concurrency.ts";
