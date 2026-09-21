@@ -8,7 +8,13 @@ import {
   TypeSafeClient,
   TypeSafeError,
 } from "@typesafe-ai/sdk";
-import { type ExtensionConfigSchema, readConfig, registerConfigItems } from "./config/index.ts";
+import {
+  type ExtensionConfigSchema,
+  getConfigEnvVar,
+  readConfig,
+  registerConfigItems,
+  resolveConfigValue,
+} from "./config/index.ts";
 
 export type {
   ChoiceQuestion as SystemOneChoiceQuestion,
@@ -61,21 +67,12 @@ const CONFIG_SCHEMA: ExtensionConfigSchema<SystemOneConfig> = {
   },
 };
 
-function resolveApiKey(value: string, fallback = ""): string {
-  const trimmed = value.trim();
-  const reference = /^(?:\$([A-Za-z_][A-Za-z0-9_]*)|\{env:([A-Za-z_][A-Za-z0-9_]*)\})$/.exec(trimmed);
-  if (reference) {
-    const name = reference[1] ?? reference[2];
-    return process.env[name]?.trim() ?? "";
-  }
-  return fallback.trim() || trimmed;
-}
-
 export function loadSystemOneConfig(): SystemOneConfig {
   const config = readConfig(SYSTEM_ONE_CONFIG_ID, CONFIG_SCHEMA);
+  const apiKey = resolveConfigValue(config.apiKey);
   return {
     ...config,
-    apiKey: resolveApiKey(config.apiKey, process.env.TYPESAFE_API_KEY),
+    apiKey: getConfigEnvVar(config.apiKey) === undefined ? process.env.TYPESAFE_API_KEY?.trim() || apiKey : apiKey,
     baseUrl: process.env.TYPESAFE_BASE_URL?.trim() || config.baseUrl,
     model: process.env.TYPESAFE_DEFAULT_MODEL?.trim() || config.model,
   };
@@ -148,7 +145,7 @@ export async function systemOne<const Q extends Questions>(
   }
 
   const config = loadSystemOneConfig();
-  const apiKey = options.apiKey === undefined ? config.apiKey : resolveApiKey(options.apiKey);
+  const apiKey = options.apiKey === undefined ? config.apiKey : resolveConfigValue(options.apiKey);
   if (!apiKey) {
     throw new TypeSafeError(
       "System One API key is missing. Check the referenced environment variable, set TYPESAFE_API_KEY, or configure System One in /config.",
