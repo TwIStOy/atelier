@@ -7,10 +7,12 @@
   "exports": {
     ".": "./src/index.ts",
     "./child-agent": "./src/agents/child-agent.ts",
+    "./systemone": "./src/systemone.ts",
     "./time": "./src/time.ts"
   },
   "dependencies": {
     "@earendil-works/pi-agent-core": "^0.85.1",
+    "@typesafe-ai/sdk": "^0.6.0",
     "cli-table3": "^0.6.5",
     "diff": "^9.0.0",
     "typebox": "1.3.28"

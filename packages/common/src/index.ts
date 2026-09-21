@@ -199,6 +199,36 @@ export {
   unregisterSystemPromptContribution,
 } from "./system-prompt-contributions.ts";
 export type {
+  SystemOneChoiceQuestion,
+  SystemOneChoiceResponse,
+  SystemOneConfig,
+  SystemOneNoulQuestion,
+  SystemOneNoulResponse,
+  SystemOneOptions,
+  SystemOneQuestion,
+  SystemOneQuestions,
+  SystemOneRequest,
+  SystemOneResult,
+  SystemOneScoreQuestion,
+  SystemOneScoreResponse,
+  SystemOneState,
+  SystemOneUsage,
+} from "./systemone.ts";
+export {
+  loadSystemOneConfig,
+  registerSystemOneConfigItems,
+  SYSTEM_ONE_CONFIG_ID,
+  SystemOneAbortError,
+  SystemOneAPIError,
+  SystemOneConnectionError,
+  SystemOneError,
+  SystemOneTimeoutError,
+  systemOne,
+  systemOneChoice,
+  systemOneNoul,
+  systemOneScore,
+} from "./systemone.ts";
+export type {
   TelemetryDeltaType,
   TelemetryFormatOptions,
   TelemetryModelRef,
