@@ -1,5 +1,5 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
+import { truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 import { shortenPath, trimTrailingEmpty } from "@htwang-contrib/common";
 import type { ToolDisplayAdapter } from "../types.ts";
 import { formatExpandedToolOutputLines } from "./shared.ts";
@@ -45,6 +45,7 @@ export const bashAdapter: ToolDisplayAdapter<BashArgs> = {
     _expanded?: boolean,
     width?: number,
     output?: string,
+    headerAnnotation?: string,
   ) {
     const cmd = args?.command ?? "";
     const desc = args?.description ?? "";
@@ -76,7 +77,23 @@ export const bashAdapter: ToolDisplayAdapter<BashArgs> = {
       }
     }
 
-    const suffix = outputLineSuffix(output, theme);
+    const lineCount = outputLineSuffix(output, theme);
+    if (headerAnnotation) {
+      const annotation = theme.fg("muted", `· ${headerAnnotation}`);
+      const suffix = [lineCount, annotation].filter(Boolean).join(" ");
+      if (width === undefined || visibleWidth(suffix) + 5 <= width) {
+        const headerLines = header.split("\n");
+        const last = headerLines.at(-1) ?? "";
+        if (!desc && width !== undefined && visibleWidth(last) + 1 + visibleWidth(suffix) > width) {
+          return [...headerLines, suffix].join("\n");
+        }
+        const label = width === undefined ? last : truncateToWidth(last, width - visibleWidth(suffix) - 1, "…");
+        headerLines[headerLines.length - 1] = `${label} ${suffix}`;
+        return headerLines.join("\n");
+      }
+    }
+
+    const suffix = lineCount;
     if (suffix && lastLineBudget !== undefined) {
       const headerLines = header.split("\n");
       const last = headerLines[headerLines.length - 1] ?? "";

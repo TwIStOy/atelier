@@ -193,6 +193,7 @@ export interface ToolCallDisplayOpts {
   endedAtMs?: number;
   hoverAffordance?: boolean;
   displayName?: string;
+  headerAnnotation?: string;
 }
 
 export function renderToolCall(
@@ -231,6 +232,7 @@ export function renderToolCall(
             opts.expanded,
             innerWidth,
             opts.output,
+            opts.headerAnnotation,
           )
         : formatGenericToolHeader(opts.toolName, opts.args, theme, innerWidth, opts.displayName);
 

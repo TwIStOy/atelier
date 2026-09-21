@@ -62,20 +62,24 @@ export type { ContentRenderer, ToolDisplayAdapter } from "./types.ts";
 
 import type { ExtensionAPI, Theme } from "@earendil-works/pi-coding-agent";
 import { ToolExecutionComponent } from "@earendil-works/pi-coding-agent";
-import { Container, Editor } from "@earendil-works/pi-tui";
+import { Container, Editor, type TUI } from "@earendil-works/pi-tui";
 import {
   AGGREGATE_RULE_READY_EVENT,
   AGGREGATE_RULE_REGISTER_EVENT,
   type AggregateRule,
+  AsyncAnnotations,
   aggregateRuleFor,
   componentRendersLines,
+  createLogger,
   findComponentContext,
   isExtensionDisabled,
   isThoughtMember,
   isThoughtMemberClaimed,
   isThoughtTransparent,
+  loadSystemOneConfig,
   readRailTailSpacing,
   registerAggregateRule,
+  registerSystemOneConfigItems,
   setThoughtMemberClaimed,
 } from "@htwang-contrib/common";
 import {
@@ -84,6 +88,7 @@ import {
   renderAggregateSubrowLine,
   renderTruncationLine,
 } from "./aggregate.ts";
+import { assessBashCommand, type BashAssessment, formatBashAssessment } from "./bash-assessment.ts";
 import { loadConfig, registerToolDisplayConfigItems } from "./config.ts";
 import { isMcpTool, MCP_STATUS_EVENT, mcpDisplayName, refreshMcpTools } from "./mcp.ts";
 import { globalToolDisplayRegistry } from "./registry.ts";
@@ -95,6 +100,7 @@ type ToolExecutionPatchThis = {
   __tdHovered?: boolean;
   __tdAggregateLeadingBlank?: boolean;
   toolName: string;
+  toolCallId: string;
   args: Record<string, unknown>;
   expanded: boolean;
   isPartial: boolean;
@@ -372,6 +378,7 @@ function renderAggregateMemberSubrow(
   theme: Theme,
   width: number,
   registry: ToolDisplayRegistry,
+  headerAnnotation?: string,
 ): string {
   const bodyWidth = aggregateSubrowBodyWidth(width);
   const adapter = registry.get(component.toolName);
@@ -385,6 +392,7 @@ function renderAggregateMemberSubrow(
       false,
       bodyWidth,
       output,
+      headerAnnotation,
     ) ?? formatGenericToolHeader(component.toolName, component.args, theme, Math.max(1, bodyWidth));
   const bullet = toolBullet(
     component.toolName,
@@ -411,10 +419,15 @@ function applyGroupSpacing(lines: string[], previous: unknown, ensureLeadingBlan
   return lines;
 }
 
-function patchToolExecutionRender(getTheme: () => Theme, registry: typeof globalToolDisplayRegistry) {
+function patchToolExecutionRender(
+  getTheme: () => Theme,
+  registry: typeof globalToolDisplayRegistry,
+  getHeaderAnnotation: (toolCallId: string) => string | undefined,
+) {
   const proto: any = ToolExecutionComponent.prototype;
   proto.__tdGetTheme = getTheme;
   proto.__tdRegistry = registry;
+  proto.__tdGetHeaderAnnotation = getHeaderAnnotation;
 
   installHoverLeavePatches();
 
@@ -431,13 +444,14 @@ function patchToolExecutionRender(getTheme: () => Theme, registry: typeof global
   const originalRender = proto.render;
   proto.render = function (this: ToolExecutionPatchThis, width: number): string[] {
     if (this.hideComponent) return [];
+    const headerAnnotation = this.toolName === "bash" ? proto.__tdGetHeaderAnnotation?.(this.toolCallId) : undefined;
 
     const groupRole = resolveGroupRole(this, width);
     if (groupRole?.role === "claimed") {
       if (!this.expanded) {
         if (!groupRole.groupExpanded) return [];
         const theme = proto.__tdGetTheme?.() ?? FALLBACK_THEME;
-        return [renderAggregateMemberSubrow(this, theme, width, proto.__tdRegistry)];
+        return [renderAggregateMemberSubrow(this, theme, width, proto.__tdRegistry, headerAnnotation)];
       }
     }
 
@@ -461,7 +475,7 @@ function patchToolExecutionRender(getTheme: () => Theme, registry: typeof global
         return applyGroupSpacing(lines, previous, true);
       }
       if (!this.expanded) {
-        lines.push(renderAggregateMemberSubrow(this, theme, width, proto.__tdRegistry));
+        lines.push(renderAggregateMemberSubrow(this, theme, width, proto.__tdRegistry, headerAnnotation));
         return applyGroupSpacing(lines, previous, true);
       }
       aggregatePrefix = lines;
@@ -510,6 +524,7 @@ function patchToolExecutionRender(getTheme: () => Theme, registry: typeof global
       endedAtMs: timing.endedAtMs,
       hoverAffordance: this.__tdHovered === true && !this.expanded,
       displayName: mcpOwned ? mcpDisplayName(this.toolName, this.toolDefinition?.label) : undefined,
+      headerAnnotation,
     };
 
     const theme = proto.__tdGetTheme?.() ?? FALLBACK_THEME;
@@ -599,6 +614,19 @@ export default function (pi: ExtensionAPI) {
   if (isExtensionDisabled("tool-display")) return;
   let activeTheme: Theme = FALLBACK_THEME;
   let isTui = false;
+  let tui: TUI | undefined;
+  const logger = createLogger("tool-display");
+  const assessments = new AsyncAnnotations<BashAssessment>(
+    () => {
+      tui?.invalidate();
+      tui?.requestRender();
+    },
+    (error) => logger.warn(`Bash assessment failed: ${String(error)}`),
+  );
+  const getHeaderAnnotation = (toolCallId: string) => {
+    const assessment = assessments.get(toolCallId);
+    return assessment ? formatBashAssessment(assessment) : undefined;
+  };
 
   pi.events.on("tool-display:register", (data) => {
     const { toolName, adapter } = data as {
@@ -621,19 +649,44 @@ export default function (pi: ExtensionAPI) {
   pi.events.emit(AGGREGATE_RULE_READY_EVENT, undefined);
 
   pi.on("session_start", (_event, ctx) => {
-    if (ctx.mode !== "tui") return;
-    isTui = true;
+    assessments.reset();
+    isTui = ctx.mode === "tui";
+    if (!isTui) return;
     registerToolDisplayConfigItems();
+    registerSystemOneConfigItems();
+    ctx.ui.setWidget?.("tool-display:render-handle", (ui) => {
+      tui = ui;
+      return { render: () => [], invalidate() {} };
+    });
     if (ctx.ui?.theme) {
       activeTheme = ctx.ui.theme;
     }
     refreshMcpTools(pi);
-    patchToolExecutionRender(() => activeTheme, globalToolDisplayRegistry);
+    patchToolExecutionRender(() => activeTheme, globalToolDisplayRegistry, getHeaderAnnotation);
+  });
+
+  pi.on("tool_call", (event, ctx) => {
+    if (!isTui || event.toolName !== "bash") return;
+    try {
+      if (!loadSystemOneConfig().apiKey?.trim()) return;
+      const command = event.input.command;
+      if (typeof command !== "string" || !command.trim()) return;
+      const cwd = "workdir" in event.input && typeof event.input.workdir === "string" ? event.input.workdir : ctx.cwd;
+      assessments.request(event.toolCallId, (signal) => assessBashCommand(command, cwd, signal), ctx.signal);
+    } catch (error) {
+      logger.warn(`Bash assessment setup failed: ${String(error)}`);
+    }
+  });
+
+  pi.on("session_shutdown", () => {
+    isTui = false;
+    assessments.dispose();
+    tui = undefined;
   });
 
   pi.on("before_agent_start", () => {
     if (!isTui) return;
     refreshMcpTools(pi);
-    patchToolExecutionRender(() => activeTheme, globalToolDisplayRegistry);
+    patchToolExecutionRender(() => activeTheme, globalToolDisplayRegistry, getHeaderAnnotation);
   });
 }

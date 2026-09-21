@@ -1,0 +1,215 @@
+import { fileURLToPath } from "node:url";
+import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
+import { initTheme, ToolExecutionComponent } from "@earendil-works/pi-coding-agent";
+import { type TUI, visibleWidth } from "@earendil-works/pi-tui";
+import type * as Common from "@htwang-contrib/common";
+import { afterEach, describe, expect, test, vi } from "vitest";
+import type { BashAssessment } from "../src/bash-assessment.ts";
+import extension from "../src/index.ts";
+
+const mocks = vi.hoisted(() => ({
+  assess: vi.fn(),
+  register: vi.fn(),
+  warn: vi.fn(),
+  key: "test-key",
+  configError: false,
+}));
+
+vi.mock("../src/bash-assessment.ts", async (importOriginal) => ({
+  ...(await importOriginal<{ formatBashAssessment(value: BashAssessment): string }>()),
+  assessBashCommand: mocks.assess,
+}));
+
+vi.mock("@htwang-contrib/common", async (importOriginal) => ({
+  ...(await importOriginal<typeof Common>()),
+  isExtensionDisabled: () => false,
+  loadSystemOneConfig: () => {
+    if (mocks.configError) throw new Error("Invalid config");
+    return { apiKey: mocks.key };
+  },
+  registerSystemOneConfigItems: mocks.register,
+  createLogger: () => ({ warn: mocks.warn }),
+  readConfig: (_name: string, schema: { defaults: Record<string, unknown> }) => schema.defaults,
+}));
+
+process.env.PI_PACKAGE_DIR = fileURLToPath(
+  new URL("../../../node_modules/@earendil-works/pi-coding-agent", import.meta.url),
+);
+initTheme("dark", false);
+
+const theme = {
+  fg: (_color: string, text: string) => text,
+  bg: (_color: string, text: string) => text,
+  bold: (text: string) => text,
+} as Theme;
+
+function activate(mode = "tui") {
+  const handlers = new Map<string, (event: unknown, ctx: ExtensionContext) => unknown>();
+  const root = { children: [] as unknown[], requestRender: vi.fn(), invalidate: vi.fn() };
+  const ctx = {
+    mode,
+    cwd: "/project",
+    signal: new AbortController().signal,
+    ui: {
+      theme,
+      setWidget: (_name: string, factory: (tui: TUI) => unknown) => factory(root as unknown as TUI),
+    },
+  } as unknown as ExtensionContext;
+  const pi = {
+    on: (event: string, handler: (event: unknown, ctx: ExtensionContext) => unknown) => handlers.set(event, handler),
+    events: { on: vi.fn(), emit: vi.fn() },
+  } as unknown as ExtensionAPI;
+  extension(pi);
+  const emit = (name: string, event: unknown = {}) => handlers.get(name)?.(event, ctx);
+  emit("session_start");
+  const component = (id: string, args: { command: string; description?: string }) => {
+    const tool = new ToolExecutionComponent("bash", id, args, {}, undefined, root as unknown as TUI, "/project");
+    tool.updateResult({ content: [{ type: "text", text: "first\nsecond\n" }], details: {}, isError: false }, false);
+    root.children.push(tool);
+    return tool;
+  };
+  return { emit, component, root, ctx };
+}
+
+afterEach(() => {
+  vi.clearAllMocks();
+  mocks.key = "test-key";
+  mocks.configError = false;
+});
+
+describe("Bash header assessment annotation", () => {
+  test("returns immediately without changing the tool call and appends scores after the output count", async () => {
+    const { emit, component, root } = activate();
+    let resolve: (value: BashAssessment) => void = () => {};
+    mocks.assess.mockReturnValueOnce(new Promise<BashAssessment>((done) => (resolve = done)));
+    const args = { command: "printf 'first\\nsecond\\n'", description: "Print lines" };
+    const tool = component("bash-1", args);
+    const event = { toolName: "bash", toolCallId: "bash-1", input: args };
+    expect(emit("tool_call", event)).toBeUndefined();
+    expect(tool.render(120).join("\n")).not.toContain("destructive");
+    await vi.waitFor(() => expect(mocks.assess).toHaveBeenCalledTimes(1));
+    resolve({ destructive: 0.9, exfiltration: 0.8 });
+    await vi.waitFor(() => expect(root.requestRender).toHaveBeenCalled());
+
+    expect(tool.render(120).join("\n")).toContain("Ran Print lines · 2 lines · destructive 90.0% · exfiltration 80.0%");
+    expect(event.input).toEqual(args);
+    expect(mocks.register).toHaveBeenCalledTimes(1);
+    expect(mocks.assess.mock.calls[0][0]).toBe(args.command);
+    expect(mocks.assess.mock.calls[0][1]).toBe("/project");
+    for (const width of [1, 20, 50, 80]) {
+      for (const line of tool.render(width)) expect(visibleWidth(line)).toBeLessThanOrEqual(width);
+    }
+    emit("tool_call", event);
+    expect(mocks.assess).toHaveBeenCalledTimes(1);
+    emit("session_shutdown");
+  });
+
+  test("keeps scores attached to their IDs when concurrent calls complete out of order", async () => {
+    const { emit, component, root } = activate();
+    let resolveFirst: (value: BashAssessment) => void = () => {};
+    mocks.assess.mockReturnValueOnce(new Promise<BashAssessment>((done) => (resolveFirst = done)));
+    mocks.assess.mockResolvedValueOnce({ destructive: 0.2, exfiltration: 0.3 });
+    const first = component("first", { command: "same command" });
+    const second = component("second", { command: "same command" });
+    for (const id of ["first", "second"]) {
+      emit("tool_call", { toolName: "bash", toolCallId: id, input: { command: "same command" } });
+    }
+    await vi.waitFor(() => expect(root.requestRender).toHaveBeenCalledTimes(1));
+    expect(first.render(120).join("\n")).not.toContain("destructive");
+    expect(second.render(120).join("\n")).toContain("destructive 20.0% · exfiltration 30.0%");
+    resolveFirst({ destructive: 0.7, exfiltration: 0.6 });
+    await vi.waitFor(() => expect(root.requestRender).toHaveBeenCalledTimes(2));
+    expect(first.render(120).join("\n")).toContain("destructive 70.0% · exfiltration 60.0%");
+    expect(second.render(120).join("\n")).toContain("destructive 20.0% · exfiltration 30.0%");
+    emit("session_shutdown");
+  });
+
+  test("keeps line counts and scores visible by clipping a long description", async () => {
+    const { emit, component, root } = activate();
+    mocks.assess.mockResolvedValueOnce({ destructive: 0.01, exfiltration: 0.02 });
+    const args = { command: "echo test", description: "Long description ".repeat(20) };
+    const tool = component("long", args);
+    emit("tool_call", { toolName: "bash", toolCallId: "long", input: args });
+    await vi.waitFor(() => expect(root.requestRender).toHaveBeenCalled());
+    const header = tool.render(100).at(-1);
+    expect(header).toContain("…");
+    expect(header).toContain("· 2 lines · destructive 1.0% · exfiltration 2.0%");
+    expect(visibleWidth(header ?? "")).toBeLessThanOrEqual(100);
+    tool.setExpanded(true);
+    expect(tool.render(100).join("\n")).toContain("destructive 1.0% · exfiltration 2.0%");
+    emit("session_shutdown");
+  });
+
+  test("assessment failures do not mark a successful tool as failed", async () => {
+    const { emit, component } = activate();
+    mocks.assess.mockRejectedValueOnce(new Error("Service unavailable"));
+    const tool = component("failed-assessment", { command: "echo test" });
+    expect(
+      emit("tool_call", { toolName: "bash", toolCallId: "failed-assessment", input: { command: "echo test" } }),
+    ).toBeUndefined();
+    await vi.waitFor(() => expect(mocks.warn).toHaveBeenCalled());
+    expect(tool.render(120).join("\n")).toContain("Ran echo test · 2 lines");
+    expect(tool.render(120).join("\n")).not.toContain("destructive");
+    emit("session_shutdown");
+  });
+
+  test("preserves the full command when the scores need a header continuation line", async () => {
+    const { emit, component, root } = activate();
+    mocks.assess.mockResolvedValueOnce({ destructive: 0.01, exfiltration: 0.02 });
+    const args = { command: "npm run build --workspace packages/common --foreground-scripts --loglevel verbose" };
+    const tool = component("wrapped", args);
+    emit("tool_call", { toolName: "bash", toolCallId: "wrapped", input: args });
+    await vi.waitFor(() => expect(root.requestRender).toHaveBeenCalled());
+    const lines = tool.render(80);
+    expect(lines.join(" ").replaceAll("┃", "").replace(/\s+/g, "")).toContain(args.command.replace(/\s+/g, ""));
+    expect(lines.join("\n")).toContain("· 2 lines · destructive 1.0% · exfiltration 2.0%");
+    for (const line of lines) expect(visibleWidth(line)).toBeLessThanOrEqual(80);
+    emit("session_shutdown");
+  });
+
+  test("aborts pending assessment on session shutdown and discards late results", async () => {
+    const { emit, component, root } = activate();
+    let resolve: (value: BashAssessment) => void = () => {};
+    mocks.assess.mockReturnValueOnce(new Promise<BashAssessment>((done) => (resolve = done)));
+    const tool = component("pending", { command: "echo test" });
+    emit("tool_call", { toolName: "bash", toolCallId: "pending", input: { command: "echo test" } });
+    await vi.waitFor(() => expect(mocks.assess).toHaveBeenCalled());
+    const signal = mocks.assess.mock.calls[0][2] as AbortSignal;
+    emit("session_shutdown");
+    expect(signal.aborted).toBe(true);
+    emit("session_start");
+    resolve({ destructive: 1, exfiltration: 1 });
+    await new Promise((done) => setImmediate(done));
+    expect(root.requestRender).not.toHaveBeenCalled();
+    expect(tool.render(120).join("\n")).not.toContain("destructive");
+    emit("session_shutdown");
+  });
+
+  test("skips restored tools, non-bash tools, and calls without credentials", () => {
+    const { emit, component } = activate();
+    component("restored", { command: "echo restored" }).render(80);
+    emit("tool_call", { toolName: "read", input: { path: "test" } });
+    mocks.key = "";
+    emit("tool_call", { toolName: "bash", toolCallId: "new", input: { command: "echo new" } });
+    expect(mocks.assess).not.toHaveBeenCalled();
+    emit("session_shutdown");
+  });
+
+  test("does not assess Bash calls outside TUI mode", () => {
+    const { emit } = activate("print");
+    emit("tool_call", { toolName: "bash", toolCallId: "new", input: { command: "echo new" } });
+    expect(mocks.assess).not.toHaveBeenCalled();
+    emit("session_shutdown");
+  });
+
+  test("does not block a Bash call when assessment configuration cannot be loaded", () => {
+    const { emit } = activate();
+    mocks.configError = true;
+    expect(
+      emit("tool_call", { toolName: "bash", toolCallId: "config-failure", input: { command: "echo test" } }),
+    ).toBeUndefined();
+    expect(mocks.warn).toHaveBeenCalled();
+    expect(mocks.assess).not.toHaveBeenCalled();
+    emit("session_shutdown");
+  });
+});
