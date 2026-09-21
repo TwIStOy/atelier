@@ -1,12 +1,20 @@
 import {
   type ExtensionAPI,
   getMarkdownTheme,
+  parseSkillBlock,
   type Theme,
   type ThemeColor,
   UserMessageComponent,
 } from "@earendil-works/pi-coding-agent";
-import { Markdown, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
-import { isExtensionDisabled } from "@htwang-contrib/common";
+import { Markdown, type TUI, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import {
+  AsyncAnnotations,
+  createLogger,
+  isExtensionDisabled,
+  loadSystemOneConfig,
+  registerSystemOneConfigItems,
+} from "@htwang-contrib/common";
+import { classifyMessageComplexity, formatMessageComplexity, type MessageComplexity } from "./complexity.ts";
 
 const PREFIX_MARKER = "▌ ";
 
@@ -54,10 +62,11 @@ function styledLine(line: string, width: number, theme: Theme | undefined, color
 }
 
 function renderUserMessage(
-  instance: any,
+  instance: unknown,
   width: number,
   theme: Theme | undefined,
   color: ThemeColor,
+  getComplexity: (text: string) => MessageComplexity | undefined,
 ): string[] | undefined {
   const text = findMarkdownText(instance);
   if (text === undefined) return undefined;
@@ -68,21 +77,37 @@ function renderUserMessage(
   const lines = renderer.render(contentWidth);
   const body = lines.length > 0 ? lines : [""];
 
-  return ["", ...body.map((line) => styledLine(line, width, theme, color))];
+  const rendered = ["", ...body.map((line) => styledLine(line, width, theme, color))];
+  const complexity = getComplexity(text);
+  if (complexity) {
+    const label = `  ${formatMessageComplexity(complexity)}`;
+    rendered.push(truncateToWidth(theme ? theme.fg("muted", label) : label, width, "…"));
+  }
+  return rendered.map((line) => truncateToWidth(line, width, ""));
 }
 
-function patchUserMessageRender(getTheme: () => Theme | undefined, getThinkingLevel: () => string): void {
-  const proto: any = UserMessageComponent.prototype;
+function patchUserMessageRender(
+  getTheme: () => Theme | undefined,
+  getThinkingLevel: () => string,
+  getComplexity: (text: string) => MessageComplexity | undefined,
+): void {
+  const proto = UserMessageComponent.prototype as UserMessageComponent & {
+    __patched?: boolean;
+    __getTheme?: () => Theme | undefined;
+    __getThinkingLevel?: () => string;
+    __getComplexity?: (text: string) => MessageComplexity | undefined;
+  };
   proto.__getTheme = getTheme;
   proto.__getThinkingLevel = getThinkingLevel;
+  proto.__getComplexity = getComplexity;
 
   if (proto.__patched) return;
 
   const originalRender = proto.render;
   proto.render = function (width: number): string[] {
     const theme = proto.__getTheme?.();
-    const color = getThinkingColor(proto.__getThinkingLevel() ?? "off");
-    const custom = renderUserMessage(this, width, theme, color);
+    const color = getThinkingColor(proto.__getThinkingLevel?.() ?? "off");
+    const custom = renderUserMessage(this, width, theme, color, (text) => proto.__getComplexity?.(text));
     return custom ?? originalRender.call(this, width);
   };
   proto.__patched = true;
@@ -92,17 +117,57 @@ export default function (pi: ExtensionAPI) {
   if (isExtensionDisabled("user-message")) return;
   let activeTheme: Theme | undefined;
   let activeThinkingLevel = "off";
+  let tui: TUI | undefined;
+  let isTui = false;
+  const logger = createLogger("user-message");
+  const annotations = new AsyncAnnotations<MessageComplexity>(
+    () => {
+      tui?.invalidate();
+      tui?.requestRender();
+    },
+    (error) => logger.warn(`Message complexity assessment failed: ${String(error)}`),
+  );
 
   const getTheme = () => activeTheme;
   const getThinkingLevel = () => activeThinkingLevel;
+  const getComplexity = (text: string) => annotations.get(text);
 
-  patchUserMessageRender(getTheme, getThinkingLevel);
+  patchUserMessageRender(getTheme, getThinkingLevel, getComplexity);
 
   pi.on("session_start", (_event, ctx) => {
-    if (!ctx.hasUI) return;
+    annotations.reset();
+    isTui = ctx.mode === "tui";
+    if (!isTui) return;
+    registerSystemOneConfigItems();
     activeTheme = ctx.ui.theme;
     activeThinkingLevel = pi.getThinkingLevel();
-    patchUserMessageRender(getTheme, getThinkingLevel);
+    ctx.ui.setWidget("user-message:render-handle", (ui) => {
+      tui = ui;
+      return { render: () => [], invalidate() {} };
+    });
+    patchUserMessageRender(getTheme, getThinkingLevel, getComplexity);
+  });
+
+  pi.on("message_start", (event, ctx) => {
+    if (!isTui || event.message.role !== "user" || !loadSystemOneConfig().apiKey?.trim()) return;
+    const content = event.message.content;
+    const renderedText =
+      typeof content === "string"
+        ? content
+        : content
+            .filter((part) => part.type === "text")
+            .map((part) => part.text)
+            .join("");
+    const skill = parseSkillBlock(renderedText);
+    const text = skill ? (skill.userMessage ?? "") : renderedText;
+    if (!text.trim()) return;
+    annotations.request(text, (signal) => classifyMessageComplexity(text, signal), ctx.signal);
+  });
+
+  pi.on("session_shutdown", () => {
+    isTui = false;
+    annotations.dispose();
+    tui = undefined;
   });
 
   pi.on("thinking_level_select", (event) => {
@@ -111,6 +176,6 @@ export default function (pi: ExtensionAPI) {
 
   pi.on("before_agent_start", () => {
     activeThinkingLevel = pi.getThinkingLevel();
-    patchUserMessageRender(getTheme, getThinkingLevel);
+    patchUserMessageRender(getTheme, getThinkingLevel, getComplexity);
   });
 }
