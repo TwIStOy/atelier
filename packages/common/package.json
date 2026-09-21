@@ -7,6 +7,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./child-agent": "./src/agents/child-agent.ts",
+    "./config": "./src/config/index.ts",
     "./systemone": "./src/systemone.ts",
     "./time": "./src/time.ts"
   },

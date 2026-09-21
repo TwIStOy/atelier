@@ -31,3 +31,4 @@ export {
   updateConfig,
   writeConfig,
 } from "./extension-config.ts";
+export { getConfigEnvVar, resolveConfigValue } from "./resolve-value.ts";
