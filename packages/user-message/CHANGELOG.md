@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- New TUI user messages are classified through System One into `flash`, `middle`, and `flagship` model tiers, with all three probabilities displayed in a muted row below the message. Classification runs in the background and does not switch models. Registers the shared System One configuration section, including its default model setting; requires a configured API key. Rendering and session replay do not trigger inference, and pending requests are cancelled on turn cancellation or session shutdown.
+
 ## [0.5.0] - 2026-08-12
 
 ### Fixed
