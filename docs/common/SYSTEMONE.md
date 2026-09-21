@@ -122,6 +122,11 @@ resolved key, while `/config` edits and persists the original setting, never the
 secret read from the environment. Export the variable before starting Pi so the
 process can read it.
 
+Environment references use the shared
+[`resolveConfigValue` / `getConfigEnvVar` helpers](CONFIG-VALUES.md), exported from
+`@htwang-contrib/common/config` and the main common entry. System One owns its
+credential precedence and missing-key error handling.
+
 For a gateway exposing `/api/v1/systemone`, set `baseUrl` to
 `https://gateway.example.com/api`. The SDK appends `/v1/systemone` and removes
 trailing slashes from the configured root. Do not include `/v1/systemone` in

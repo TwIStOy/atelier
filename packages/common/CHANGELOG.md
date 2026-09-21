@@ -12,6 +12,7 @@
 
 ### Added
 
+- Public `resolveConfigValue(value, env?)` and `getConfigEnvVar(value)` helpers resolve string configuration values from `$VAR` / `{env:VAR}` references without service-specific fallback rules. Exported from the main entry and the Pi-independent `@htwang-contrib/common/config` subpath. System One now uses these helpers while retaining its credential precedence and validation.
 - System One `apiKey` settings and per-call overrides accept `$VAR` and `{env:VAR}` environment-variable references. Explicit references take precedence over `TYPESAFE_API_KEY`, resolve on each call, and reject missing credentials without falling back. The configuration editor preserves the reference instead of exposing or persisting the resolved secret.
 - `AsyncAnnotations<T>` shares background display-annotation deduplication, cancellation, and stale-result guards between user-message and tool-display. Requests do not block event handlers; reset and disposal abort pending work and discard late results.
 - Shared TypeSafe System One interface (`systemOne`) with typed `noul`, `choice`, and `score` builders, reusable response and error types, live ConfigItem settings, environment and per-call overrides, cancellation, timeouts, and SDK retries. Available from the main entry and the Pi-independent `@htwang-contrib/common/systemone` subpath. Uses the official `@typesafe-ai/sdk`; see `docs/common/SYSTEMONE.md` for configuration and examples.
