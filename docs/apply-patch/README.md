@@ -44,7 +44,8 @@ Providers with `compat.supportsOpenAIGrammarTools` receive an OpenAI custom gram
 Rendering lives in `packages/tool-display/src/adapters/apply-patch.ts` (registered for tool name `apply_patch`) and follows this repo's Edit/Write style:
 
 - Header: `ApplyPatch <path>` (bold title + accent path, `+N more` for multi-file patches, `...` while streaming).
-- Collapsed: `└ patch [i/n] +N -M unified|side-by-side · F files [change bar]`, with `✗ N failed` when hunks failed. The header status icon turns red on failures.
+- Collapsed: single line by default, with `[i/n] +N -M unified|side-by-side · F files [change bar]` appended to the header when it fits. Includes `✗ N failed` when hunks failed; the header status icon turns red on failures. The entire stats suffix is omitted when the header has no room for it.
+- Set **Tool Display → ApplyPatch Style** in `/config` to `Two-line` to show the stats on a separate `└ patch …` row. The setting is stored as `applyPatchStyle` under `"tool-display"` in `extensions.json` (`"single-line"` or `"two-line"`) and takes effect on the next render.
 - Expanded: per-file unified diffs rendered through the same `delta` pipeline as Edit (side-by-side on wide terminals), with `├`/`└` per-file headers for multi-file patches and a `✗` failure list.
 
 The tool itself defines no `renderCall`/`renderResult`; without tool-display it falls back to pi's generic rendering.
