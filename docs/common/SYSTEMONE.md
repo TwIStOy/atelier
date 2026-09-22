@@ -192,19 +192,36 @@ With a System One API key configured, the TUI uses two display-only consumers:
 - **User messages:** one Choice question classifies the least expensive suitable
   model tier as `flash`, `middle`, or `flagship`. All three probabilities appear in
   a muted row immediately below the message. The classifier considers reasoning,
-  ambiguity, and scope rather than text length. It does not switch models.
+  ambiguity, and scope rather than text length. It uses the current system prompt
+  and complete active conversation, including earlier messages, tool calls and
+  results, extension context, and compaction or branch summaries, to interpret
+  follow-ups such as "continue". It does not switch models.
 - **Bash tool calls:** two independent Noul questions estimate the probability of
   destructive effects and data exfiltration from the command and working
   directory. Percentages appear after the output count:
   `Ran … · 12 lines · destructive 3.0% · exfiltration 1.0%`.
   These scores do not block, approve, modify, or otherwise control commands.
+  **Tool Display → Bash Assessments** in `/config` controls both scores and
+  defaults to enabled. Set `"tool-display": { "bashAssessment": false }` in
+  `extensions.json` to disable new assessment requests and hide existing scores.
+  The setting is read on each tool event and render; changing it does not require
+  a reload. Requests already in progress may finish, but their scores stay hidden
+  while disabled.
 
 Both consumers run in the background and refresh the transcript when a result
 arrives. They use the shared default model and configuration. Requests are only
-started for new TUI message/tool events; rendering and replay do not trigger
-inference. Identical visible message text shares one classification within the
-session; Bash assessments are keyed by tool-call ID. Message classifications use
-visible text only, without surrounding conversation or image data.
+started for new TUI messages and tool calls; rendering and replay do not trigger
+inference. User-message classification starts at the next `context` event, using
+a snapshot of its messages and Pi's current system prompt. It includes context
+changes from earlier extension handlers; later handlers and provider payload
+rewrites are outside that snapshot. Text and tool results are not truncated by
+the classifier. Images are represented by their type and MIME type without
+forwarding binary image data to the text classifier.
+
+Each user message has its own classification, so repeated text in different
+turns can receive different scores. Results remain attached to their message
+rows across rerenders and branch or compaction rebuilds. Bash assessments are
+keyed by tool-call ID.
 
 Pending requests follow turn cancellation and session shutdown. Scores live in
 memory and are cleared on reload or session replacement. Missing credentials
