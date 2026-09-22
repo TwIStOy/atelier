@@ -13,6 +13,7 @@ export interface ToolDisplayConfig {
   groupToolVerbs: boolean;
   groupMaxVisible: number;
   mcpToolCalls: boolean;
+  bashAssessment: boolean;
 }
 
 const CONFIG_NAME = "tool-display";
@@ -30,6 +31,7 @@ const CONFIG_SCHEMA: ExtensionConfigSchema<ToolDisplayConfig> = {
     groupToolVerbs: true,
     groupMaxVisible: 10,
     mcpToolCalls: true,
+    bashAssessment: true,
   },
 };
 
@@ -181,6 +183,15 @@ export function registerToolDisplayConfigItems(): void {
         "Take over rendering of pi-mcp-adapter tool calls (mcp proxy and direct server tools) instead of the adapter's own renderers",
       extensionLabel: "Tool Display",
       order: 10,
+    },
+    {
+      key: "bashAssessment",
+      type: "boolean",
+      label: "Bash Assessments",
+      value: () => loadConfig().bashAssessment,
+      description: "Assess Bash commands with System One and show destructive and exfiltration probabilities",
+      extensionLabel: "Tool Display",
+      order: 11,
     },
   ]);
 }

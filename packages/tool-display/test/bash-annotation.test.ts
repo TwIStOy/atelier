@@ -3,6 +3,7 @@ import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-c
 import { initTheme, ToolExecutionComponent } from "@earendil-works/pi-coding-agent";
 import { type TUI, visibleWidth } from "@earendil-works/pi-tui";
 import type * as Common from "@htwang-contrib/common";
+import { getConfigItems } from "@htwang-contrib/common";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import type { BashAssessment } from "../src/bash-assessment.ts";
 import extension from "../src/index.ts";
@@ -13,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   warn: vi.fn(),
   key: "test-key",
   configError: false,
+  bashAssessment: true,
 }));
 
 vi.mock("../src/bash-assessment.ts", async (importOriginal) => ({
@@ -29,7 +31,10 @@ vi.mock("@htwang-contrib/common", async (importOriginal) => ({
   },
   registerSystemOneConfigItems: mocks.register,
   createLogger: () => ({ warn: mocks.warn }),
-  readConfig: (_name: string, schema: { defaults: Record<string, unknown> }) => schema.defaults,
+  readConfig: (_name: string, schema: { defaults: Record<string, unknown> }) => ({
+    ...schema.defaults,
+    bashAssessment: mocks.bashAssessment,
+  }),
 }));
 
 process.env.PI_PACKAGE_DIR = fileURLToPath(
@@ -75,6 +80,7 @@ afterEach(() => {
   vi.clearAllMocks();
   mocks.key = "test-key";
   mocks.configError = false;
+  mocks.bashAssessment = true;
 });
 
 describe("Bash header assessment annotation", () => {
@@ -210,6 +216,54 @@ describe("Bash header assessment annotation", () => {
     ).toBeUndefined();
     expect(mocks.warn).toHaveBeenCalled();
     expect(mocks.assess).not.toHaveBeenCalled();
+    emit("session_shutdown");
+  });
+
+  test("disabling assessments skips requests and hides cached scores without changing tool output", async () => {
+    const { emit, component, root } = activate();
+    mocks.assess.mockResolvedValueOnce({ destructive: 0.1, exfiltration: 0.2 });
+    const tool = component("assessed", { command: "echo test" });
+    emit("tool_call", { toolName: "bash", toolCallId: "assessed", input: { command: "echo test" } });
+    await vi.waitFor(() => expect(root.requestRender).toHaveBeenCalled());
+    expect(tool.render(120).join("\n")).toContain("destructive 10.0%");
+    const setting = getConfigItems("tool-display").find((item) => item.key === "bashAssessment");
+    expect(setting).toMatchObject({ type: "boolean", label: "Bash Assessments" });
+    if (typeof setting?.value !== "function") throw new Error("Missing Bash assessment setting getter");
+    expect(setting.value()).toBe(true);
+    mocks.bashAssessment = false;
+    expect(setting.value()).toBe(false);
+    mocks.configError = true;
+    const next = component("disabled", { command: "echo next" });
+    expect(
+      emit("tool_call", { toolName: "bash", toolCallId: "disabled", input: { command: "echo next" } }),
+    ).toBeUndefined();
+    await new Promise((done) => setImmediate(done));
+    expect(mocks.assess).toHaveBeenCalledTimes(1);
+    expect(mocks.warn).not.toHaveBeenCalled();
+    expect(tool.render(120).join("\n")).toContain("Ran echo test · 2 lines");
+    expect(tool.render(120).join("\n")).not.toMatch(/destructive|exfiltration/);
+    expect(next.render(120).join("\n")).not.toMatch(/destructive|exfiltration/);
+    tool.setExpanded(true);
+    const expanded = tool.render(120).join("\n");
+    expect(expanded).toContain("first");
+    expect(expanded).toContain("second");
+    expect(expanded).not.toMatch(/destructive|exfiltration/);
+    mocks.bashAssessment = true;
+    expect(tool.render(120).join("\n")).toContain("destructive 10.0% · exfiltration 20.0%");
+    emit("session_shutdown");
+  });
+
+  test("does not display a pending assessment that finishes after the setting is disabled", async () => {
+    const { emit, component, root } = activate();
+    let resolve: (value: BashAssessment) => void = () => {};
+    mocks.assess.mockReturnValueOnce(new Promise<BashAssessment>((done) => (resolve = done)));
+    const tool = component("pending", { command: "echo test" });
+    emit("tool_call", { toolName: "bash", toolCallId: "pending", input: { command: "echo test" } });
+    await vi.waitFor(() => expect(mocks.assess).toHaveBeenCalled());
+    mocks.bashAssessment = false;
+    resolve({ destructive: 1, exfiltration: 1 });
+    await vi.waitFor(() => expect(root.requestRender).toHaveBeenCalled());
+    expect(tool.render(120).join("\n")).not.toMatch(/destructive|exfiltration/);
     emit("session_shutdown");
   });
 });

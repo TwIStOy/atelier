@@ -4,6 +4,7 @@
 
 ### Added
 
+- Added the `bashAssessment` setting (default `true`), exposed as **Bash Assessments** in `/config`. Disabling it skips new System One requests and hides both destructive and exfiltration scores, including cached results, without changing Bash execution or output.
 - Bash tool calls receive asynchronous System One `destructive` and `exfiltration` probability annotations, displayed after the header's output-line count. Scores are associated with tool-call IDs and only affect display; failures, cancellation, and configuration errors never gate execution. Registers the shared System One configuration section and cancels pending assessments on turn cancellation or session shutdown.
 - New `applyPatchStyle` ConfigItem (surfaced in `/config` under Tool Display) controls how `apply_patch` renders when collapsed. `"single-line"` (default) puts patch stats, progress, and failure counts inline on the header when they fit; `"two-line"` keeps the separate `└ patch …` row. Expanded per-file diffs are unchanged.
 - New `writeStyle` ConfigItem (surfaced in `/config` under Tool Display) controls how the `write` tool renders when collapsed. `"single-line"` (default) appends the line-count stat inline to the header (`Write src/foo.ts +12`, success-colored, dropped entirely when the header fills the width), mirroring `editStyle`; `"two-line"` keeps the legacy header + `└ N lines` body row (with `└ empty file` for empty writes).

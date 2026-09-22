@@ -624,6 +624,7 @@ export default function (pi: ExtensionAPI) {
     (error) => logger.warn(`Bash assessment failed: ${String(error)}`),
   );
   const getHeaderAnnotation = (toolCallId: string) => {
+    if (!loadConfig().bashAssessment) return undefined;
     const assessment = assessments.get(toolCallId);
     return assessment ? formatBashAssessment(assessment) : undefined;
   };
@@ -668,7 +669,7 @@ export default function (pi: ExtensionAPI) {
   pi.on("tool_call", (event, ctx) => {
     if (!isTui || event.toolName !== "bash") return;
     try {
-      if (!loadSystemOneConfig().apiKey?.trim()) return;
+      if (!loadConfig().bashAssessment || !loadSystemOneConfig().apiKey?.trim()) return;
       const command = event.input.command;
       if (typeof command !== "string" || !command.trim()) return;
       const cwd = "workdir" in event.input && typeof event.input.workdir === "string" ? event.input.workdir : ctx.cwd;
