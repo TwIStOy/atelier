@@ -4,7 +4,7 @@
 
 ### Changed
 
-- `/implement-with-pr`: PR babysitting is now a single poll loop (60–90s) covering state, CI, and review feedback. Comment/review handling added: react to each new reviewer comment with `eyes` first, then analyze — reply to questions and notes, implement change requests on the same branch with the same TDD/commit discipline and reply noting the fixing commit. CI checking moved from the blocking `gh pr checks --watch` to exit-code polling (`0` pass / `1` fail / `8` pending) so comments are seen while CI runs. `/implement-many` descriptions updated to match.
+- `/implement-with-pr`: stops after opening the PR. The babysitting loop (state/CI polling, rebase handling, review-comment reactions and replies) is removed; `/implement-many` descriptions updated to match.
 
 ## [0.6.1] - 2026-09-01
 

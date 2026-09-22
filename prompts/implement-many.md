@@ -1,5 +1,5 @@
 ---
-description: Fan out N implement targets into parallel git worktrees — one pi agent per pane, in a single new tmux window or one herdr workspace per target opened by herdr worktree; each pane is seeded with /implement-with-pr, which implements unattended, opens a PR, keeps it green and handles review comments, and waits for the user to merge
+description: Fan out N implement targets into parallel git worktrees — one pi agent per pane, in a single new tmux window or one herdr workspace per target opened by herdr worktree; each pane is seeded with /implement-with-pr, which implements unattended, opens a PR, and stops
 argument-hint: "<#issue | spec-path | description> ..."
 ---
 
@@ -96,7 +96,7 @@ Panes come back in index order from `tmux list-panes -t "$SESSION:$WIN" -F '#{pa
 
 ### 5. Seed each pane with /implement-with-pr
 
-`/implement-with-pr` carries the whole unattended contract itself: implement from the issue without asking questions, then commit, push, open a PR, keep it green (CI + rebase), and wait for the user to merge. So the seed is just the template invocation — no contract file, no `--append-system-prompt`. The template expands server-side, so do not paste an expanded brief, and pass `<target>` as the single message arg (a second CLI message arg is dropped; trailing prose gets swallowed into the template's `$@`, i.e. its "Work to implement" section):
+`/implement-with-pr` carries the whole unattended contract itself: implement from the issue without asking questions, then commit, push, and open a PR. So the seed is just the template invocation — no contract file, no `--append-system-prompt`. The template expands server-side, so do not paste an expanded brief, and pass `<target>` as the single message arg (a second CLI message arg is dropped; trailing prose gets swallowed into the template's `$@`, i.e. its "Work to implement" section):
 
 ```
 # per pane (tmux):
@@ -124,7 +124,7 @@ This persists trust for that worktree dir; the dialog does not recur for trusted
 
 ### 7. Verify every seed expanded
 
-~15–20s after accepting, capture each pane and confirm the `/implement-with-pr` body is showing (steps 1–6, "Discipline") and the agent has begun booting (`memory read system://boot`, fetching the issue) — **not** the bare string `/implement-with-pr #N` and **not** a stalled blank pane:
+~15–20s after accepting, capture each pane and confirm the `/implement-with-pr` body is showing (steps 1–5, "Discipline") and the agent has begun booting (`memory read system://boot`, fetching the issue) — **not** the bare string `/implement-with-pr #N` and **not** a stalled blank pane:
 
 ```
 tmux:  tmux capture-pane -t "$SESSION:$WIN.<pane>" -p | tail -25
@@ -139,7 +139,7 @@ Give the user a table:
 
 | Pane | Target | Branch | Worktree |
 
-Plus how to switch to the fan-out (tmux: `<prefix> <win-index>`; herdr: each target's own workspace, labeled with its slug — see `herdr workspace list`), and a note that each agent runs `/implement-with-pr` independently (load → TDD → review → commit → push → PR), then babysits its PR — watching CI, rebasing on conflicts or base-branch moves, and reacting to and acting on review comments — until the user merges it; agents never merge themselves. Commits and pushes are non-interactive because the panes run unattended.
+Plus how to switch to the fan-out (tmux: `<prefix> <win-index>`; herdr: each target's own workspace, labeled with its slug — see `herdr workspace list`), and a note that each agent runs `/implement-with-pr` independently (load → TDD → review → commit → push → PR) and then stops; the user takes the PR from there — agents never babysit, merge, or enable auto-merge. Commits and pushes are non-interactive because the panes run unattended.
 
 ## Discipline
 
