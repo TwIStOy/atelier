@@ -1,5 +1,8 @@
+import type { UserMessage } from "@earendil-works/pi-ai";
 import {
+  buildSessionContext,
   type ExtensionAPI,
+  type ExtensionContext,
   getMarkdownTheme,
   parseSkillBlock,
   type Theme,
@@ -10,13 +13,36 @@ import { Markdown, type TUI, truncateToWidth, visibleWidth } from "@earendil-wor
 import {
   AsyncAnnotations,
   createLogger,
+  findComponentContext,
   isExtensionDisabled,
   loadSystemOneConfig,
   registerSystemOneConfigItems,
 } from "@htwang-contrib/common";
-import { classifyMessageComplexity, formatMessageComplexity, type MessageComplexity } from "./complexity.ts";
+import {
+  classifyMessageComplexity,
+  formatMessageComplexity,
+  type MessageComplexity,
+  type MessageComplexityContext,
+} from "./complexity.ts";
 
 const PREFIX_MARKER = "▌ ";
+
+function messageKey(message: UserMessage): string {
+  return JSON.stringify([message.timestamp, message.content]);
+}
+
+function visibleMessageText(message: UserMessage): string {
+  const content = message.content;
+  const text =
+    typeof content === "string"
+      ? content
+      : content
+          .filter((part) => part.type === "text")
+          .map((part) => part.text)
+          .join("");
+  const skill = parseSkillBlock(text);
+  return skill ? (skill.userMessage ?? "") : text;
+}
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
@@ -62,11 +88,11 @@ function styledLine(line: string, width: number, theme: Theme | undefined, color
 }
 
 function renderUserMessage(
-  instance: unknown,
+  instance: UserMessageComponent,
   width: number,
   theme: Theme | undefined,
   color: ThemeColor,
-  getComplexity: (text: string) => MessageComplexity | undefined,
+  getComplexity: (instance: UserMessageComponent, text: string) => MessageComplexity | undefined,
 ): string[] | undefined {
   const text = findMarkdownText(instance);
   if (text === undefined) return undefined;
@@ -78,7 +104,7 @@ function renderUserMessage(
   const body = lines.length > 0 ? lines : [""];
 
   const rendered = ["", ...body.map((line) => styledLine(line, width, theme, color))];
-  const complexity = getComplexity(text);
+  const complexity = getComplexity(instance, text);
   if (complexity) {
     const label = `  ${formatMessageComplexity(complexity)}`;
     rendered.push(truncateToWidth(theme ? theme.fg("muted", label) : label, width, "…"));
@@ -89,13 +115,13 @@ function renderUserMessage(
 function patchUserMessageRender(
   getTheme: () => Theme | undefined,
   getThinkingLevel: () => string,
-  getComplexity: (text: string) => MessageComplexity | undefined,
+  getComplexity: (instance: UserMessageComponent, text: string) => MessageComplexity | undefined,
 ): void {
   const proto = UserMessageComponent.prototype as UserMessageComponent & {
     __patched?: boolean;
     __getTheme?: () => Theme | undefined;
     __getThinkingLevel?: () => string;
-    __getComplexity?: (text: string) => MessageComplexity | undefined;
+    __getComplexity?: (instance: UserMessageComponent, text: string) => MessageComplexity | undefined;
   };
   proto.__getTheme = getTheme;
   proto.__getThinkingLevel = getThinkingLevel;
@@ -107,7 +133,9 @@ function patchUserMessageRender(
   proto.render = function (width: number): string[] {
     const theme = proto.__getTheme?.();
     const color = getThinkingColor(proto.__getThinkingLevel?.() ?? "off");
-    const custom = renderUserMessage(this, width, theme, color, (text) => proto.__getComplexity?.(text));
+    const custom = renderUserMessage(this, width, theme, color, (instance, text) =>
+      proto.__getComplexity?.(instance, text),
+    );
     return custom ?? originalRender.call(this, width);
   };
   proto.__patched = true;
@@ -119,6 +147,9 @@ export default function (pi: ExtensionAPI) {
   let activeThinkingLevel = "off";
   let tui: TUI | undefined;
   let isTui = false;
+  const pendingMessages = new Map<string, UserMessage>();
+  const messageKeys = new Map<string, string[]>();
+  let componentKeys = new WeakMap<UserMessageComponent, string>();
   const logger = createLogger("user-message");
   const annotations = new AsyncAnnotations<MessageComplexity>(
     () => {
@@ -130,14 +161,44 @@ export default function (pi: ExtensionAPI) {
 
   const getTheme = () => activeTheme;
   const getThinkingLevel = () => activeThinkingLevel;
-  const getComplexity = (text: string) => annotations.get(text);
+  const getComplexity = (instance: UserMessageComponent, text: string) => {
+    let key = componentKeys.get(instance);
+    if (key === undefined) {
+      const context = findComponentContext(tui, instance);
+      if (!context) return undefined;
+      const occurrence = context.siblings
+        .slice(0, context.index)
+        .filter((sibling) => sibling instanceof UserMessageComponent && findMarkdownText(sibling) === text).length;
+      key = messageKeys.get(text)?.[occurrence];
+      if (key === undefined) return undefined;
+      componentKeys.set(instance, key);
+    }
+    return annotations.get(key);
+  };
+
+  const refreshMessageKeys = (ctx: ExtensionContext) => {
+    messageKeys.clear();
+    componentKeys = new WeakMap();
+    for (const message of buildSessionContext(ctx.sessionManager.getBranch()).messages) {
+      if (message.role !== "user") continue;
+      const text = visibleMessageText(message);
+      if (!text) continue;
+      const keys = messageKeys.get(text) ?? [];
+      keys.push(messageKey(message));
+      messageKeys.set(text, keys);
+    }
+  };
 
   patchUserMessageRender(getTheme, getThinkingLevel, getComplexity);
 
   pi.on("session_start", (_event, ctx) => {
     annotations.reset();
+    pendingMessages.clear();
+    messageKeys.clear();
+    componentKeys = new WeakMap();
     isTui = ctx.mode === "tui";
     if (!isTui) return;
+    refreshMessageKeys(ctx);
     registerSystemOneConfigItems();
     activeTheme = ctx.ui.theme;
     activeThinkingLevel = pi.getThinkingLevel();
@@ -148,25 +209,54 @@ export default function (pi: ExtensionAPI) {
     patchUserMessageRender(getTheme, getThinkingLevel, getComplexity);
   });
 
-  pi.on("message_start", (event, ctx) => {
+  pi.on("message_start", (event) => {
     if (!isTui || event.message.role !== "user" || !loadSystemOneConfig().apiKey?.trim()) return;
-    const content = event.message.content;
-    const renderedText =
-      typeof content === "string"
-        ? content
-        : content
-            .filter((part) => part.type === "text")
-            .map((part) => part.text)
-            .join("");
-    const skill = parseSkillBlock(renderedText);
-    const text = skill ? (skill.userMessage ?? "") : renderedText;
+    const text = visibleMessageText(event.message);
     if (!text.trim()) return;
-    annotations.request(text, (signal) => classifyMessageComplexity(text, signal), ctx.signal);
+    pendingMessages.set(messageKey(event.message), event.message);
+  });
+
+  pi.on("context", (event, ctx) => {
+    if (!isTui || pendingMessages.size === 0) return;
+    const messages = [...pendingMessages];
+    pendingMessages.clear();
+    try {
+      refreshMessageKeys(ctx);
+      if (!loadSystemOneConfig().apiKey?.trim()) return;
+      const context: MessageComplexityContext = {
+        systemPrompt: ctx.getSystemPrompt(),
+        messages: structuredClone(event.messages),
+      };
+      for (const [key, message] of messages) {
+        annotations.request(
+          key,
+          (signal) => classifyMessageComplexity(visibleMessageText(message), context, signal),
+          ctx.signal,
+        );
+      }
+    } catch (error) {
+      logger.warn(`Message complexity setup failed: ${String(error)}`);
+    }
+  });
+
+  const onContextChanged = (_event: unknown, ctx: ExtensionContext) => {
+    if (!isTui) return;
+    pendingMessages.clear();
+    refreshMessageKeys(ctx);
+  };
+  pi.on("session_tree", onContextChanged);
+  pi.on("session_compact", onContextChanged);
+
+  pi.on("agent_end", () => {
+    pendingMessages.clear();
   });
 
   pi.on("session_shutdown", () => {
     isTui = false;
     annotations.dispose();
+    pendingMessages.clear();
+    messageKeys.clear();
+    componentKeys = new WeakMap();
     tui = undefined;
   });
 

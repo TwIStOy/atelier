@@ -6,6 +6,10 @@
 
 - New TUI user messages are classified through System One into `flash`, `middle`, and `flagship` model tiers, with all three probabilities displayed in a muted row below the message. Classification runs in the background and does not switch models. Registers the shared System One configuration section, including its default model setting; requires a configured API key. Rendering and session replay do not trigger inference, and pending requests are cancelled on turn cancellation or session shutdown.
 
+### Changed
+
+- Complexity classification now uses the current system prompt and the complete active conversation from the next `context` event, including full tool results and compaction or branch summaries. Image attachments retain type markers without forwarding image bytes. Repeated message text is classified separately for each turn, with results associated with the correct transcript row through rerenders, compaction, and tree navigation.
+
 ## [0.5.0] - 2026-08-12
 
 ### Fixed
