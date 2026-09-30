@@ -1,7 +1,8 @@
 import type { ConfigItem } from "@htwang-contrib/common";
 import { describe, expect, test } from "vitest";
-import { buildSelectDisplayOptions, filterSelectOptions } from "../src/config-registry.ts";
+import { buildSelectDisplayOptions, filterRows, filterSelectOptions } from "../src/config-registry.ts";
 import type { SettingRow } from "../src/types.ts";
+import { PACKAGE_TAB_PREFIX, TAB_ALL } from "../src/types.ts";
 
 function makeRow(item: ConfigItem, currentValue: unknown): SettingRow {
   return {
@@ -42,6 +43,49 @@ describe("filterSelectOptions", () => {
     ];
     const result = filterSelectOptions(opts, "v0");
     expect(result).toHaveLength(0);
+  });
+
+  test("matches model abbreviations and ranks closer matches first", () => {
+    const opts = makeOptions(["toori/deepseek-v4.1-flash", "toori/gpt-6", "dsv4f"]);
+    expect(filterSelectOptions(opts, "DSV4F").map((option) => option.label)).toEqual([
+      "dsv4f",
+      "toori/deepseek-v4.1-flash",
+    ]);
+  });
+
+  test("matches whitespace and slash-separated tokens in any order", () => {
+    const opts = makeOptions(["toori/deepseek-v4.1-flash", "toori/gpt-6", "other/deepseek-v4.1-flash"]);
+    for (const query of ["flash toori", " toori / dsv4f "]) {
+      expect(filterSelectOptions(opts, query).map((option) => option.label)).toEqual(["toori/deepseek-v4.1-flash"]);
+    }
+    expect(filterSelectOptions(opts, "toori nonexistent")).toEqual([]);
+  });
+});
+
+describe("filterRows", () => {
+  const tier = {
+    ...makeRow(
+      { key: "modelTiers.cheap", type: "string", label: "Cheap Model", value: "" },
+      "toori/deepseek-v4.1-flash",
+    ),
+    extensionId: "subagents",
+    extensionLabel: "Subagents",
+  };
+  const summary = makeRow({ key: "summaryModel", type: "string", label: "Summary Model", value: "" }, "");
+  const rows = [tier, summary];
+
+  test("matches fuzzy queries across setting fields", () => {
+    expect(filterRows(rows, "CHPMDL", TAB_ALL)).toEqual([tier]);
+    expect(filterRows(rows, "dsv4f sbag", TAB_ALL)).toEqual([tier]);
+    expect(filterRows(rows, "summdl", TAB_ALL)[0]).toBe(summary);
+    expect(filterRows(rows, "nonexistent", TAB_ALL)).toEqual([]);
+  });
+
+  test("retains tab scope and unfiltered ordering", () => {
+    expect(filterRows(rows, " ", TAB_ALL)).toEqual(rows);
+    expect(filterRows(rows, "mdl", `${PACKAGE_TAB_PREFIX}ext`)).toEqual([summary]);
+    expect(filterRows(rows, "dsv4f", `${PACKAGE_TAB_PREFIX}ext`)).toEqual([]);
+    expect(filterRows(rows, "", `${PACKAGE_TAB_PREFIX}subagents`)).toEqual([tier]);
   });
 });
 
@@ -94,7 +138,7 @@ describe("buildSelectDisplayOptions — multiselect", () => {
 
   test("filter applies to multiselect", () => {
     const row = makeRow(item, ["v0"]);
-    const { options } = buildSelectDisplayOptions(row, "amm");
+    const { options } = buildSelectDisplayOptions(row, "gma");
     expect(options.map((o) => o.label)).toEqual(["Gamma"]);
   });
 });
@@ -122,6 +166,14 @@ describe("buildSelectDisplayOptions — reorderable", () => {
     const { options, reorderableOrder } = buildSelectDisplayOptions(row, "o");
     expect(options.map((o) => o.label)).toEqual(["Four", "Two", "One"]);
     expect(reorderableOrder.get(JSON.stringify("v3"))).toBe(1);
+    expect(reorderableOrder.get(JSON.stringify("v1"))).toBe(2);
+  });
+
+  test("fuzzy matching preserves the configured order of selected items", () => {
+    const row = makeRow({ ...item, options: makeOptions(["deepseek-v4.1-flash", "dsv4f", "gpt-6"]) }, ["v0", "v1"]);
+    const { options, reorderableOrder } = buildSelectDisplayOptions(row, "dsv4f");
+    expect(options.map((option) => option.label)).toEqual(["deepseek-v4.1-flash", "dsv4f"]);
+    expect(reorderableOrder.get(JSON.stringify("v0"))).toBe(1);
     expect(reorderableOrder.get(JSON.stringify("v1"))).toBe(2);
   });
 

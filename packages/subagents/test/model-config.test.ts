@@ -144,20 +144,51 @@ describe("subagent model configuration", () => {
 
   it("registers config controls whose persistence keys drive runtime selection", async () => {
     registerSubagentsConfig();
-    registerSubagentModelConfig(buildAgentPersonaCatalog(dir));
+    registerSubagentModelConfig(buildAgentPersonaCatalog(dir), ctx.modelRegistry);
     const items = getConfigItems("subagents");
     expect(items.some((item) => item.key === "reportUsage")).toBe(true);
     const tierItem = items.find((item) => item.key === "modelTiers.cheap");
     const agentItem = items.find((item) => item.key === "agentModels.explore");
-    if (!tierItem || !agentItem || agentItem.type !== "select") throw new Error("missing model controls");
+    if (tierItem?.type !== "select" || agentItem?.type !== "select") throw new Error("missing model controls");
     const options = typeof agentItem.options === "function" ? agentItem.options() : agentItem.options;
     expect(options.map((option) => option.value)).toEqual(["", "cheap", "middle", "flagship"]);
-    setConfigKey("subagents", tierItem.key, "test/small-v2");
+    const modelOptions = typeof tierItem.options === "function" ? tierItem.options() : tierItem.options;
+    const selectedModel = modelOptions.find((option) => option.value === "test/small-v2");
+    expect(selectedModel).toEqual({ label: "test/small-v2", value: "test/small-v2" });
+    setConfigKey("subagents", tierItem.key, selectedModel?.value);
     setConfigKey("subagents", agentItem.key, "cheap");
     expect(await run("explore")).toBe(models[2]);
     expect(typeof tierItem.value === "function" ? tierItem.value() : tierItem.value).toBe("test/small-v2");
     setConfigKey("subagents", agentItem.key, "");
     expect(await run("explore")).toBe(models[0]);
+  });
+
+  it("offers only currently available models for every tier and refreshes lazy options", () => {
+    const available = vi.spyOn(ctx.modelRegistry, "getAvailable").mockReturnValue([models[1], models[3]]);
+    registerSubagentModelConfig(buildAgentPersonaCatalog(dir), ctx.modelRegistry);
+    const tierItems = getConfigItems("subagents").filter((item) => item.key.startsWith("modelTiers."));
+    expect(tierItems).toHaveLength(3);
+    for (const item of tierItems) {
+      if (item.type !== "select" || typeof item.options !== "function") throw new Error("missing model selector");
+      expect(item.options()).toEqual([
+        { label: "Current session", value: "" },
+        { label: "test/small-v1", value: "test/small-v1" },
+        { label: "test/medium", value: "test/medium" },
+      ]);
+    }
+    available.mockReturnValue([models[2]]);
+    for (const item of tierItems) {
+      if (item.type !== "select" || typeof item.options !== "function") throw new Error("missing model selector");
+      expect(item.options()).toEqual([
+        { label: "Current session", value: "" },
+        { label: "test/small-v2", value: "test/small-v2" },
+      ]);
+    }
+    available.mockReturnValue([]);
+    for (const item of tierItems) {
+      if (item.type !== "select" || typeof item.options !== "function") throw new Error("missing model selector");
+      expect(item.options()).toEqual([{ label: "Current session", value: "" }]);
+    }
   });
 
   it("keeps single and batch orchestration from masking configured persona models", async () => {

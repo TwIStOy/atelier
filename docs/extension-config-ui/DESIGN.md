@@ -208,6 +208,8 @@ Tab 来源：每个注册了 `ConfigItem` 的 `extensionId` 自动成为一个 t
 
 ### 4.3 搜索过滤
 
+The settings search and select/multiselect option filters use Pi's `fuzzyFilter`: matching is case-insensitive, query characters may be nonconsecutive, and space- or slash-separated tokens must all match in any order. Settings and ordinary options rank by match quality. Reorderable options keep their configured selected-first order while applying the same fuzzy matching. An empty query restores the unfiltered order.
+
 搜索范围（大小写不敏感）：
 - 扩展 ID / 显示名
 - 配置项 `key`、`label`、`description`、`type`

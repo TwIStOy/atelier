@@ -1,3 +1,4 @@
+import type { ModelRegistry } from "@earendil-works/pi-coding-agent";
 import {
   type AgentPersonaCatalog,
   type ConfigItem,
@@ -8,14 +9,20 @@ import {
   SUBAGENT_MODEL_TIERS,
 } from "@htwang-contrib/common";
 
-export function registerSubagentModelConfig(catalog: AgentPersonaCatalog): void {
+export function registerSubagentModelConfig(catalog: AgentPersonaCatalog, modelRegistry: ModelRegistry): void {
   const items: ConfigItem[] = SUBAGENT_MODEL_TIERS.map((tier, index) => ({
     key: `modelTiers.${tier}`,
-    type: "string",
+    type: "select",
     label: `${tier} Model`,
     value: () => loadSubagentModelConfig().modelTiers[tier] ?? "",
-    placeholder: "provider/model-id",
-    description: `Model used by the ${tier} tier. Leave empty to use the current session model.`,
+    options: () => [
+      { label: "Current session", value: "" },
+      ...modelRegistry.getAvailable().map((model) => ({
+        label: `${model.provider}/${model.id}`,
+        value: `${model.provider}/${model.id}`,
+      })),
+    ],
+    description: `Model used by the ${tier} tier. Select Current session to use the parent session model.`,
     extensionLabel: "Subagents",
     order: index + 1,
   }));

@@ -2,7 +2,7 @@
 
 Configure `cheap`, `middle`, and `flagship` once, then assign a tier to each persona. Changing a tier's model updates every persona using that tier on its next run. Single calls, parallel batches, background calls, and workflow agents share the same resolution.
 
-Open `/config` → **Subagents** to edit the three model patterns and each discovered persona's tier. Select **Current session** for a persona to inherit the parent session's model. `/subagents-agents` shows the effective model after resolving configuration and persona defaults.
+Open `/config` → **Subagents** to choose each tier's model from the currently available `provider/model-id` list and assign each discovered persona's tier. Type directly in a model list to fuzzy-filter it: abbreviations such as `dsv4f` match `deepseek-v4.1-flash`, and space-separated terms such as `flash toori` match both the model and provider. Select **Current session** for a tier or persona to inherit the parent session's model. `/subagents-agents` shows the effective model after resolving configuration and persona defaults.
 
 Settings are stored in `~/.config/pi/extensions.json`, or `$XDG_CONFIG_HOME/pi/extensions.json` when set:
 

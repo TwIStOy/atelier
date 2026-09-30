@@ -1,5 +1,11 @@
-import { describe, expect, test } from "vitest";
-import { computeLayout } from "../src/popup.ts";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
+import type { Component, TUI } from "@earendil-works/pi-tui";
+import { clearConfigItems, readRawConfig, registerConfigItems } from "@htwang-contrib/common";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { computeLayout, openConfigPopup } from "../src/popup.ts";
 import { DEFAULT_MAX_HEIGHT_PCT } from "../src/types.ts";
 
 const ABSOLUTE_CAP = 26;
@@ -37,5 +43,74 @@ describe("computeLayout", () => {
       const { bodyRows } = computeLayout(rows);
       expect(rows - bodyRows).toBeGreaterThanOrEqual(3);
     }
+  });
+});
+
+describe("model selection with fuzzy search", () => {
+  const configId = "fuzzy-models-test";
+  let dir: string;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "config-fuzzy-test-"));
+    vi.stubEnv("XDG_CONFIG_HOME", dir);
+    registerConfigItems(configId, [
+      {
+        key: "summaryModel",
+        type: "select",
+        label: "Summary Model",
+        value: "",
+        options: [
+          { label: "Current session", value: "" },
+          { label: "toori/gpt-6", value: "toori/gpt-6" },
+          { label: "toori/deepseek-v4.1-flash", value: "toori/deepseek-v4.1-flash" },
+          { label: "other/deepseek-v4.1-flash", value: "other/deepseek-v4.1-flash" },
+        ],
+      },
+    ]);
+  });
+
+  afterEach(() => {
+    clearConfigItems(configId);
+    vi.unstubAllEnvs();
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  test("typing filters settings and model options, then saves the displayed match", async () => {
+    const theme = {
+      fg: (_color: string, text: string) => text,
+      bg: (_color: string, text: string) => text,
+      bold: (text: string) => text,
+      inverse: (text: string) => text,
+    } as Theme;
+    const ctx = {
+      ui: {
+        notify: vi.fn(),
+        custom: async (
+          factory: (tui: TUI, theme: Theme, kb: unknown, done: () => void) => Component | Promise<Component>,
+        ) => {
+          const tui = { terminal: { rows: 50 }, requestRender: vi.fn() } as unknown as TUI;
+          const component = await factory(tui, theme, {}, () => {});
+          for (const char of "summdl") component.handleInput?.(char);
+          expect(component.render(90).join("\n")).toContain("Summary Model");
+          component.handleInput?.("\r");
+          for (const char of "dsv4f toori") component.handleInput?.(char);
+          const rendered = component.render(90).join("\n");
+          expect(rendered).toContain("toori/deepseek-v4.1-flash");
+          expect(rendered).not.toContain("toori/gpt-6");
+          expect(rendered).not.toContain("other/deepseek-v4.1-flash");
+          component.handleInput?.("\r");
+          expect(readRawConfig(configId)?.summaryModel).toBe("toori/deepseek-v4.1-flash");
+          component.handleInput?.("\r");
+          for (const char of "no-match") component.handleInput?.(char);
+          expect(component.render(90).join("\n")).toContain("No matching options.");
+          component.handleInput?.("\r");
+          expect(readRawConfig(configId)?.summaryModel).toBe("toori/deepseek-v4.1-flash");
+          component.handleInput?.("\x1b");
+          component.handleInput?.("\r");
+          expect(readRawConfig(configId)?.summaryModel).toBe("");
+        },
+      },
+    } as unknown as ExtensionContext;
+    await openConfigPopup({} as ExtensionAPI, ctx);
   });
 });

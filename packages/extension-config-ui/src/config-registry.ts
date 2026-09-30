@@ -1,3 +1,4 @@
+import { fuzzyFilter } from "@earendil-works/pi-tui";
 import type {
   ConfigItemRegistry,
   ConfigItemSelectOption,
@@ -68,10 +69,8 @@ export function buildTabs(rows: SettingRow[]): TabDef[] {
 export function filterRows(rows: SettingRow[], search: string, tab: string): SettingRow[] {
   const extensionId = tab.startsWith(PACKAGE_TAB_PREFIX) ? tab.slice(PACKAGE_TAB_PREFIX.length) : undefined;
   const scoped = extensionId ? rows.filter((r) => r.extensionId === extensionId) : rows;
-  const query = search.trim().toLowerCase();
-  if (!query) return scoped;
-  return scoped.filter((row) => {
-    const hay = [
+  return fuzzyFilter(scoped, search, (row) =>
+    [
       row.extensionId,
       row.extensionLabel,
       row.item.key,
@@ -79,11 +78,8 @@ export function filterRows(rows: SettingRow[], search: string, tab: string): Set
       row.item.description ?? "",
       row.item.type,
       String(row.currentValue),
-    ]
-      .join("\n")
-      .toLowerCase();
-    return hay.includes(query);
-  });
+    ].join("\n"),
+  );
 }
 
 export function saveSetting(row: SettingRow, newValue: unknown): void {
@@ -155,9 +151,7 @@ export interface SelectDisplayResult {
 }
 
 export function filterSelectOptions(options: ConfigItemSelectOption[], query: string): ConfigItemSelectOption[] {
-  const q = query.trim().toLowerCase();
-  if (!q) return options;
-  return options.filter((opt) => opt.label.toLowerCase().includes(q));
+  return fuzzyFilter(options, query, (opt) => opt.label);
 }
 
 export function buildSelectDisplayOptions(row: SettingRow, query: string): SelectDisplayResult {
@@ -185,9 +179,10 @@ export function buildSelectDisplayOptions(row: SettingRow, query: string): Selec
     .filter((o): o is ConfigItemSelectOption => o !== undefined);
   const unselected = opts.filter((o) => !selectedSet.has(JSON.stringify(o.value)));
   const ordered = [...selected, ...unselected];
+  const matching = new Set(filterSelectOptions(ordered, query));
 
   return {
-    options: filterSelectOptions(ordered, query),
+    options: ordered.filter((option) => matching.has(option)),
     reorderableOrder,
     canFilter,
   };

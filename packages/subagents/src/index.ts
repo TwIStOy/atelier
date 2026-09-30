@@ -23,7 +23,7 @@ export default function (pi: ExtensionAPI) {
   registerSubagentStatusTool(pi);
 
   pi.on("session_start", (_event, ctx) => {
-    registerSubagentModelConfig(buildSubagentAgentCatalog(ctx.cwd));
+    registerSubagentModelConfig(buildSubagentAgentCatalog(ctx.cwd), ctx.modelRegistry);
   });
 
   pi.registerCommand("subagents-agents", {
