@@ -4,7 +4,12 @@
 
 ### Changed
 
+- Upgrade the Pi packages from 0.85.1 to 0.99.1, including native virtual model and classifier APIs.
 - `/implement-with-pr`: stops after opening the PR. The babysitting loop (state/CI polling, rebase handling, review-comment reactions and replies) is removed; `/implement-many` descriptions updated to match.
+
+### Added
+
+- `virtual-model` extension with configurable three-tier complexity routing and a persistent session-wide minimum tier. See `docs/virtual-model/README.md`.
 
 ## [0.6.1] - 2026-09-01
 

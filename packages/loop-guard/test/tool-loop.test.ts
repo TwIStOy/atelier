@@ -15,9 +15,10 @@ function run(
   input: unknown,
   resultText: string,
   isError = false,
+  options = OPTIONS,
 ): ReturnType<ToolLoopDetector["checkCall"]> {
-  const detection = detector.checkCall(toolName, input, OPTIONS);
-  detector.recordResult(toolName, input, resultText, isError, OPTIONS);
+  const detection = detector.checkCall(toolName, input, options);
+  detector.recordResult(toolName, input, resultText, isError, options);
   return detection;
 }
 

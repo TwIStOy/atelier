@@ -27,6 +27,7 @@
     { "path": "packages/working-indicator" },
     { "path": "packages/moshi-hooks-extra" },
     { "path": "packages/heap-probe" },
+    { "path": "packages/virtual-model" },
     { "path": "packages/apply-patch" }
   ]
 }

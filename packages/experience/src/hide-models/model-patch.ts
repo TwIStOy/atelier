@@ -27,7 +27,7 @@ type PatchedPrototype = {
 
 // ModelRegistry is a per-extension compatibility facade; its `runtime` field is
 // private in the .d.ts but is the live ModelRuntime every host surface reads.
-type RegistryFacade = ModelRegistry & { runtime: ModelRuntime };
+type RegistryFacade = { runtime: ModelRuntime };
 
 let capturedRuntime: ModelRuntime | null = null;
 
@@ -48,7 +48,7 @@ export function isSuppressed(): boolean {
 }
 
 export function captureRegistry(registry: ModelRegistry): void {
-  capturedRuntime = (registry as RegistryFacade).runtime;
+  capturedRuntime = (registry as unknown as RegistryFacade).runtime;
 }
 
 function callSnapshotOriginal(runtime: ModelRuntime): ModelArray {
@@ -93,7 +93,7 @@ export function listAllModels(registry: ModelRegistry): ModelArray {
 }
 
 export function listAvailableModels(registry: ModelRegistry): ModelArray {
-  return callSnapshotOriginal((registry as RegistryFacade).runtime);
+  return callSnapshotOriginal((registry as unknown as RegistryFacade).runtime);
 }
 
 export function buildHideRuleOptions(): ConfigItemSelectOption<string>[] {

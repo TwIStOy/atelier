@@ -1,3 +1,4 @@
+import * as systemOne from "@earendil-works/pi-ai/api/typesafe-system-one";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { createLogger, isExtensionDisabled, registerChildExtensionFactory } from "@htwang-contrib/common";
 import { refreshCatalog } from "./catalog.ts";
@@ -16,6 +17,7 @@ export default async function toori(pi: ExtensionAPI) {
     baseUrl: "https://toori.twistoy.cn/api/v1",
     apiKey: `$${ENV_VAR}`,
     api: "openai-completions",
+    classifiers: { "typesafe-system-one": systemOne },
     authHeader: true,
     models: [],
     refreshModels: (context) => refreshCatalog(context),

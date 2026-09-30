@@ -4,7 +4,12 @@
 
 ### Added
 
+- Catalog entries advertising `typesafe-systemone` are registered as native Pi classifiers, so Jev can be selected as the virtual model judge and uses the gateway's `/api/v1/systemone` endpoint.
 - The extension now self-registers into the shared child-extension registry (`registerChildExtensionFactory` from `@htwang-contrib/common`), so child agent sessions (`subagent` / `workflow`) can resolve and call toori-served models whenever toori is loaded in the parent session (previously hardcoded into the child factory lists).
+
+### Changed
+
+- Narrow chat-family overrides to Pi 0.99.1's chat model configuration type while preserving classifier entries in the shared catalog.
 
 ## [0.6.1] - 2026-09-01
 

@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- Keep the ModelRegistry private-runtime bridge and its test fixture compatible with Pi 0.99.1 declarations without intersecting conflicting private fields.
 - `hide-models` filters models again on pi ≥0.85. The patch now wraps `ModelRuntime.prototype.getAvailableSnapshot`/`getAvailable` (the surface the model picker, `pi --list-models`, and RPC model lists actually read) instead of `ModelRegistry.prototype`, which pi turned into an extension-facing compatibility facade that no internal consumer calls — rules silently stopped filtering anything after the pi upgrade. The runtime `suppress` flag (`/hide-models reset`) now lives on the prototype instead of module state, so it keeps working after `/reload` re-evaluates the extension module. A shape canary test fails loudly if pi renames the runtime accessors again.
 
 ## [0.4.0] - 2026-07-31

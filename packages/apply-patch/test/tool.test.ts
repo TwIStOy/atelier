@@ -1,6 +1,6 @@
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionToolContext } from "@earendil-works/pi-coding-agent";
 import { afterEach, describe, expect, it } from "vitest";
 import { isOpenAIGptModel, registerApplyPatchExtension, syncToolset } from "../src/index.ts";
 import { APPLY_PATCH_LARK_GRAMMAR } from "../src/patch.ts";
@@ -50,7 +50,7 @@ describe("createApplyPatchTool", () => {
   it("requires input", async () => {
     const tool = createApplyPatchTool();
     await expect(
-      tool.execute("id", { input: "" }, undefined, undefined, { cwd: "/tmp" } as ExtensionContext),
+      tool.execute("id", { input: "" }, undefined, undefined, { cwd: "/tmp" } as ExtensionToolContext),
     ).rejects.toThrow("input is required");
   });
 
@@ -76,7 +76,7 @@ describe("createApplyPatchTool", () => {
         const firstText = update.content.find((block) => block.type === "text")?.text;
         updates.push({ text: firstText ?? "", details: update.details });
       },
-      { cwd: directory } as ExtensionContext,
+      { cwd: directory } as ExtensionToolContext,
     );
 
     const first = updates[0];
@@ -118,7 +118,7 @@ describe("createApplyPatchTool", () => {
       (update) => {
         updates.push(update.details);
       },
-      { cwd: directory } as ExtensionContext,
+      { cwd: directory } as ExtensionToolContext,
     );
 
     expect(updates).toHaveLength(3);
@@ -134,7 +134,7 @@ describe("createApplyPatchTool", () => {
 
     const result = await tool.execute("apply-patch-success-test", { input: UPDATE_PATCH }, undefined, undefined, {
       cwd: directory,
-    } as ExtensionContext);
+    } as ExtensionToolContext);
 
     expect(result.content.find((block) => block.type === "text")?.text).toBe("update: sample.txt");
     expect(result.details?.result?.appliedFiles).toEqual(["sample.txt"]);
@@ -160,7 +160,7 @@ describe("createApplyPatchTool", () => {
 
     const result = await tool.execute("apply-patch-test", { input: patch }, undefined, undefined, {
       cwd: directory,
-    } as ExtensionContext);
+    } as ExtensionToolContext);
 
     const text = result.content.find((block) => block.type === "text")?.text ?? "";
     expect(text).toContain("apply_patch partially failed.");
@@ -176,7 +176,7 @@ describe("createApplyPatchTool", () => {
 
     const result = await tool.execute("apply-patch-enoent-test", { input: UPDATE_PATCH }, undefined, undefined, {
       cwd: directory,
-    } as ExtensionContext);
+    } as ExtensionToolContext);
 
     const text = result.content.find((block) => block.type === "text")?.text ?? "";
     expect(text).toContain("apply_patch failed.");
@@ -195,7 +195,7 @@ describe("createApplyPatchTool", () => {
     await expect(
       tool.execute("apply-patch-empty-test", { input: patch }, undefined, undefined, {
         cwd: directory,
-      } as ExtensionContext),
+      } as ExtensionToolContext),
     ).rejects.toThrow("empty patch");
   });
 });

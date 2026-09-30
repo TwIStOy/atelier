@@ -1,6 +1,8 @@
 import type { Api, ModelsStoreEntry, RefreshModelsContext } from "@earendil-works/pi-ai";
 import type { ProviderModelConfig } from "@earendil-works/pi-coding-agent";
 
+type ChatModelConfig = Extract<ProviderModelConfig, { type?: "chat" }>;
+
 export const ENV_VAR = "INFERENCE_V2_TWISTOY_API_KEY";
 const GATEWAY_V1_BASE_URL = "https://toori.twistoy.cn/api/v1";
 const GATEWAY_ROOT_BASE_URL = "https://toori.twistoy.cn/api";
@@ -43,7 +45,7 @@ type GatewayModelsResponse = {
 
 const API_PREFERENCE: readonly Api[] = ["openai-responses", "openai-completions", "anthropic-messages"];
 
-const GPT_56_THINKING_LEVEL_MAP: NonNullable<ProviderModelConfig["thinkingLevelMap"]> = {
+const GPT_56_THINKING_LEVEL_MAP: NonNullable<ChatModelConfig["thinkingLevelMap"]> = {
   off: "none",
   minimal: null,
   low: "low",
@@ -53,7 +55,7 @@ const GPT_56_THINKING_LEVEL_MAP: NonNullable<ProviderModelConfig["thinkingLevelM
   max: "max",
 };
 
-const ZAI_COMPAT: NonNullable<ProviderModelConfig["compat"]> = {
+const ZAI_COMPAT: NonNullable<ChatModelConfig["compat"]> = {
   supportsStore: false,
   supportsDeveloperRole: false,
   supportsReasoningEffort: false,
@@ -62,14 +64,14 @@ const ZAI_COMPAT: NonNullable<ProviderModelConfig["compat"]> = {
   zaiToolStream: true,
 };
 
-const ZAI_COMPAT_REASONING_EFFORT: NonNullable<ProviderModelConfig["compat"]> = {
+const ZAI_COMPAT_REASONING_EFFORT: NonNullable<ChatModelConfig["compat"]> = {
   ...ZAI_COMPAT,
   supportsReasoningEffort: true,
 };
 
 const GLM_REASONING_EFFORT_IDS = new Set(["glm-5.2", "glm-5.3"]);
 
-const GLM_REASONING_EFFORT_MAP: NonNullable<ProviderModelConfig["thinkingLevelMap"]> = {
+const GLM_REASONING_EFFORT_MAP: NonNullable<ChatModelConfig["thinkingLevelMap"]> = {
   minimal: null,
   low: "high",
   medium: "high",
@@ -77,7 +79,7 @@ const GLM_REASONING_EFFORT_MAP: NonNullable<ProviderModelConfig["thinkingLevelMa
   max: "max",
 };
 
-const DEEPSEEK_COMPAT: NonNullable<ProviderModelConfig["compat"]> = {
+const DEEPSEEK_COMPAT: NonNullable<ChatModelConfig["compat"]> = {
   supportsStore: false,
   supportsDeveloperRole: false,
   requiresReasoningContentOnAssistantMessages: true,
@@ -86,7 +88,7 @@ const DEEPSEEK_COMPAT: NonNullable<ProviderModelConfig["compat"]> = {
 
 const DEEPSEEK_MAX_TOKENS = 65536;
 
-const DEEPSEEK_THINKING_LEVEL_MAP: NonNullable<ProviderModelConfig["thinkingLevelMap"]> = {
+const DEEPSEEK_THINKING_LEVEL_MAP: NonNullable<ChatModelConfig["thinkingLevelMap"]> = {
   minimal: null,
   low: null,
   medium: null,
@@ -94,7 +96,7 @@ const DEEPSEEK_THINKING_LEVEL_MAP: NonNullable<ProviderModelConfig["thinkingLeve
   max: "max",
 };
 
-const MOONSHOT_COMPAT: NonNullable<ProviderModelConfig["compat"]> = {
+const MOONSHOT_COMPAT: NonNullable<ChatModelConfig["compat"]> = {
   supportsStore: false,
   supportsDeveloperRole: false,
   supportsReasoningEffort: false,
@@ -103,12 +105,12 @@ const MOONSHOT_COMPAT: NonNullable<ProviderModelConfig["compat"]> = {
   thinkingFormat: "deepseek",
 };
 
-const KIMI_K3_COMPAT: NonNullable<ProviderModelConfig["compat"]> = {
+const KIMI_K3_COMPAT: NonNullable<ChatModelConfig["compat"]> = {
   allowEmptySignature: true,
   forceAdaptiveThinking: true,
 };
 
-const KIMI_K3_THINKING_LEVEL_MAP: NonNullable<ProviderModelConfig["thinkingLevelMap"]> = {
+const KIMI_K3_THINKING_LEVEL_MAP: NonNullable<ChatModelConfig["thinkingLevelMap"]> = {
   off: null,
   minimal: null,
   low: "low",
@@ -118,23 +120,23 @@ const KIMI_K3_THINKING_LEVEL_MAP: NonNullable<ProviderModelConfig["thinkingLevel
   max: "max",
 };
 
-const QWEN_COMPAT: NonNullable<ProviderModelConfig["compat"]> = {
+const QWEN_COMPAT: NonNullable<ChatModelConfig["compat"]> = {
   supportsStore: false,
   supportsDeveloperRole: false,
   thinkingFormat: "qwen",
 };
 
-const MIMO_COMPAT: NonNullable<ProviderModelConfig["compat"]> = {
+const MIMO_COMPAT: NonNullable<ChatModelConfig["compat"]> = {
   requiresReasoningContentOnAssistantMessages: true,
   thinkingFormat: "deepseek",
 };
 
-const HY3_COMPAT: NonNullable<ProviderModelConfig["compat"]> = {
+const HY3_COMPAT: NonNullable<ChatModelConfig["compat"]> = {
   supportsStore: false,
   supportsDeveloperRole: false,
 };
 
-const GROK_45_THINKING_LEVEL_MAP: NonNullable<ProviderModelConfig["thinkingLevelMap"]> = {
+const GROK_45_THINKING_LEVEL_MAP: NonNullable<ChatModelConfig["thinkingLevelMap"]> = {
   off: null,
   minimal: null,
 };
@@ -153,7 +155,7 @@ function pickApi(entry: GatewayModelObject): Api {
   return "openai-completions";
 }
 
-function applyFamilyOverrides(config: ProviderModelConfig, api: Api): void {
+function applyFamilyOverrides(config: ChatModelConfig, api: Api): void {
   const id = config.id;
   if (id.startsWith("gpt-5.6-")) {
     config.thinkingLevelMap = GPT_56_THINKING_LEVEL_MAP;
@@ -264,7 +266,19 @@ function toModelConfig(entry: GatewayModelObject): ProviderModelConfig {
     cacheWrite: 0,
   };
 
-  const config: ProviderModelConfig = {
+  if (entry.supported_formats?.some((format) => format === "typesafe-systemone" || format === "typesafe-system-one")) {
+    return {
+      type: "classifier",
+      id: entry.id,
+      name: guessDisplayName(entry.id),
+      api: "typesafe-system-one",
+      input,
+      cost,
+      contextWindow: entry.context_window ?? DEFAULT_CONTEXT_WINDOW,
+    };
+  }
+
+  const config: ChatModelConfig = {
     id: entry.id,
     name: guessDisplayName(entry.id),
     api,

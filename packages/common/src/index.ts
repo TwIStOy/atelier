@@ -163,6 +163,8 @@ export {
   extractMessageText,
   userMessageText,
 } from "./message-text.ts";
+export type { ComplexityTier } from "./model-complexity.ts";
+export { COMPLEXITY_TIERS, createComplexityAssessment, isComplexityTier } from "./model-complexity.ts";
 export type { ResolvableModel } from "./model-resolve.ts";
 export { resolveModel } from "./model-resolve.ts";
 export type { SessionCache } from "./session-cache.ts";

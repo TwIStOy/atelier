@@ -63,9 +63,9 @@ describe("patched ModelRuntime", () => {
   });
 
   function fakeRuntime(): ModelRuntime {
-    const runtime = Object.create(ModelRuntime.prototype) as ModelRuntime & { snapshot: { available: Model<Api>[] } };
+    const runtime = Object.create(ModelRuntime.prototype) as { snapshot: { available: Model<Api>[] } };
     runtime.snapshot = { available: [...MODELS] };
-    return runtime;
+    return runtime as unknown as ModelRuntime;
   }
 
   function facade(runtime: ModelRuntime): ModelRegistry {

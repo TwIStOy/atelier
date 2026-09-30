@@ -25,9 +25,11 @@ function parseGlmToolCallBody(body: string): Omit<Candidate, "range" | "stripOnl
   const nameEnd = keys.length === 0 ? body.length : body.search(/<arg_key>/i);
   const name = body.slice(0, nameEnd).trim().split(/\s+/)[0];
   if (!name || !/^[A-Za-z_][\w.-]*$/.test(name)) return undefined;
-  const args: Record<string, unknown> = {};
+  const args: JsonObject = {};
   keys.forEach((key, i) => {
     args[key] = maybeParseJsonValue(values[i] ?? "");
   });
   return { name, arguments: args, grammar: "glm" };
 }
+
+import type { JsonObject } from "@earendil-works/pi-ai";

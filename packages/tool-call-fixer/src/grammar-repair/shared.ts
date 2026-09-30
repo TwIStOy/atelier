@@ -1,13 +1,13 @@
-import type { ToolCall } from "@earendil-works/pi-ai";
+import type { JsonObject, JsonValue, ToolCall } from "@earendil-works/pi-ai";
 import type { AssistantContent, Candidate, GrammarRepairConfig, Range } from "./types.ts";
 
 export const TOOL_CALL_WRAPPER_RE = /<(tool_call|tools)>[\s\S]*?<\/\1>/giu;
 
-function isObject(value: unknown): value is Record<string, unknown> {
+function isObject(value: JsonValue | undefined): value is JsonObject {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-export function parseJsonValue(json: string): unknown {
+export function parseJsonValue(json: string): JsonValue | undefined {
   try {
     return JSON.parse(json);
   } catch {
@@ -15,12 +15,12 @@ export function parseJsonValue(json: string): unknown {
   }
 }
 
-function parseJsonValueOrString(value: string): unknown {
+function parseJsonValueOrString(value: string): JsonValue {
   const parsed = parseJsonValue(value);
   return parsed === undefined ? value : parsed;
 }
 
-export function maybeParseJsonValue(value: string): unknown {
+export function maybeParseJsonValue(value: string): JsonValue {
   if (value === "") return "";
   if (/^(?:true|false|null|-?\d|[[{]|")/.test(value)) {
     return parseJsonValueOrString(value);
@@ -28,12 +28,12 @@ export function maybeParseJsonValue(value: string): unknown {
   return value;
 }
 
-export function parseJsonObject(json: string): Record<string, unknown> | undefined {
+export function parseJsonObject(json: string): JsonObject | undefined {
   const parsed = parseJsonValue(json);
   return isObject(parsed) ? parsed : undefined;
 }
 
-function normalizeArgumentsObject(value: unknown): Record<string, unknown> | undefined {
+function normalizeArgumentsObject(value: JsonValue | undefined): JsonObject | undefined {
   if (typeof value === "string") {
     return normalizeArgumentsObject(parseJsonValue(value));
   }
@@ -48,17 +48,15 @@ function normalizeArgumentsObject(value: unknown): Record<string, unknown> | und
   return undefined;
 }
 
-function callFromJsonObject(
-  value: Record<string, unknown>,
-): { name: string; arguments: Record<string, unknown> } | undefined {
+function callFromJsonObject(value: JsonObject): { name: string; arguments: JsonObject } | undefined {
   const name = value.name ?? value.function_name ?? (isObject(value.function) ? value.function.name : undefined);
   if (typeof name !== "string" || !name.trim()) return undefined;
-  let args: unknown = value.arguments ?? value.args ?? value.parameters;
+  let args: JsonValue | undefined = value.arguments ?? value.args ?? value.parameters;
   if (args === undefined && isObject(value.function)) args = value.function.arguments;
   return { name: name.trim(), arguments: normalizeArgumentsObject(args) ?? {} };
 }
 
-export function callsFromJsonValue(value: unknown): Array<{ name: string; arguments: Record<string, unknown> }> {
+export function callsFromJsonValue(value: JsonValue | undefined): Array<{ name: string; arguments: JsonObject }> {
   if (Array.isArray(value)) {
     return value.flatMap((item) => (isObject(item) ? callsFromJsonValue(item) : []));
   }

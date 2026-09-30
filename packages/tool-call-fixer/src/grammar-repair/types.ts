@@ -1,10 +1,10 @@
-import type { AssistantMessage } from "@earendil-works/pi-ai";
+import type { AssistantMessage, JsonObject } from "@earendil-works/pi-ai";
 
 export type GrammarRepairMode = "recover" | "strip";
 
 export interface RecoveredToolCall {
   name: string;
-  arguments: Record<string, unknown>;
+  arguments: JsonObject;
   grammar: string;
 }
 
