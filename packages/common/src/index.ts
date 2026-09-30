@@ -54,6 +54,12 @@ export {
   recordChildSessionStarted,
 } from "./agents/session-links.ts";
 export { shutdownChildSession } from "./agents/session-shutdown.ts";
+export type { SubagentModelConfig, SubagentModelTier } from "./agents/subagent-models.ts";
+export {
+  loadSubagentModelConfig,
+  resolveSubagentModelPattern,
+  SUBAGENT_MODEL_TIERS,
+} from "./agents/subagent-models.ts";
 export type { AggregateRule } from "./aggregate-rules.ts";
 export {
   AGGREGATE_RULE_READY_EVENT,

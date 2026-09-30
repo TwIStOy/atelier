@@ -108,7 +108,7 @@ export async function runParallelBatchSubagent(
           ctx,
           {
             task: item.task,
-            model: item.model ?? globalModel ?? file.model ?? defs.model,
+            model: item.model ?? globalModel,
             thinking: item.thinking ?? globalThinking ?? file.thinking ?? defs.thinking,
             inherit_context: item.inherit_context ?? globalInherit ?? file.inherit_context ?? false,
             isolated: item.isolated ?? globalIsolated ?? file.isolated ?? true,

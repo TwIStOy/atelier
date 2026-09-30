@@ -31,6 +31,7 @@ import { resolveChildToolNames } from "./child-tools.ts";
 import { type PersonaTypeDefaults, personaDefaultsForType, readPersonaDefaultsByType } from "./persona-defaults.ts";
 import { recordChildSessionFinished, recordChildSessionStarted } from "./session-links.ts";
 import { shutdownChildSession } from "./session-shutdown.ts";
+import { loadSubagentModelConfig, resolveSubagentModelPattern } from "./subagent-models.ts";
 
 export const STRUCTURED_OUTPUT_TOOL_NAME = "structured_output";
 
@@ -134,9 +135,10 @@ export function resolveEffectiveChildOptions(
   input: Pick<RunChildAgentInput, "model" | "thinking" | "inherit_context" | "isolated" | "max_turns">,
   fileOptions: AgentPersonaFileOptions,
   personaDefaults: PersonaTypeDefaults,
+  configuredModel?: string,
 ): EffectiveChildOptions {
   return {
-    model: input.model ?? fileOptions.model ?? personaDefaults.model,
+    model: input.model ?? configuredModel ?? fileOptions.model ?? personaDefaults.model,
     thinking: input.thinking ?? fileOptions.thinking ?? personaDefaults.thinking,
     inherit_context: input.inherit_context ?? fileOptions.inherit_context ?? false,
     isolated: input.isolated ?? fileOptions.isolated ?? true,
@@ -284,10 +286,12 @@ export async function runChildAgent(
     const agentCatalog = input.catalog ?? buildAgentPersonaCatalog(cwd);
     const agentType = resolvePersonaId(input.agent_type, agentCatalog);
     const fileOptions = agentCatalog.agents.get(agentType)?.fileOptions ?? {};
+    const modelConfig = loadSubagentModelConfig();
     const opts = resolveEffectiveChildOptions(
       input,
       fileOptions,
       personaDefaultsForType(readPersonaDefaultsByType(), agentType),
+      modelConfig.agentModels[agentType],
     );
 
     if (opts.inherit_context) {
@@ -309,7 +313,7 @@ export async function runChildAgent(
 
     const agentDir = getAgentDir();
     const settingsManager = SettingsManager.create(cwd, agentDir);
-    const model = resolveModelForChild(opts.model, ctx);
+    const model = resolveModelForChild(resolveSubagentModelPattern(opts.model, modelConfig.modelTiers), ctx);
     const thinkingLevel = parseThinking(opts.thinking);
 
     fs.mkdirSync(input.sessionDir, { recursive: true });

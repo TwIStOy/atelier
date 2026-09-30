@@ -15,7 +15,10 @@ describe("shared personas layer", () => {
       expect(catalog.agents.has(id)).toBe(true);
     }
     const explore = catalog.agents.get("explore");
-    expect(explore?.fileOptions.model).toBe("toori/deepseek-v4-flash");
+    expect(explore?.fileOptions.model).toBe("cheap");
+    expect(catalog.agents.get("scout")?.fileOptions.model).toBe("middle");
+    expect(catalog.agents.get("plan")?.fileOptions.model).toBe("flagship");
+    expect(catalog.agents.get("general-purpose")?.fileOptions.model).toBeUndefined();
     expect(explore?.sourcePath).toContain(sharedPersonasDir());
   });
 });

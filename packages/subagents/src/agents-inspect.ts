@@ -1,15 +1,26 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { resolveChildToolNames, resolveModel } from "@htwang-contrib/common";
+import {
+  loadSubagentModelConfig,
+  resolveChildToolNames,
+  resolveModel,
+  resolveSubagentModelPattern,
+  type SubagentModelConfig,
+} from "@htwang-contrib/common";
 import { buildSubagentAgentCatalog, type SubagentAgentCatalog } from "./agent-catalog.ts";
 import { defaultsForAgentType, readSubagentSettings, type SubagentSettings } from "./settings.ts";
 
-function formatResolvedModel(rawPattern: string | undefined, ctx: ExtensionContext): string {
-  const pattern = rawPattern?.trim();
+function formatResolvedModel(
+  rawPattern: string | undefined,
+  tiers: SubagentModelConfig["modelTiers"],
+  ctx: ExtensionContext,
+): string {
+  const pattern = resolveSubagentModelPattern(rawPattern, tiers);
   if (!pattern) {
     const m = ctx.model;
     if (!m) return "(parent session has no model)";
     const prov = m.provider ?? "?";
-    return `${m.name} (${prov}/${m.id}) — parent session model`;
+    const reason = rawPattern?.trim() ? `tier "${rawPattern.trim()}" is unset; ` : "";
+    return `${m.name} (${prov}/${m.id}) — ${reason}parent session model`;
   }
   const found = resolveModel(ctx.modelRegistry.getAvailable(), pattern);
   if (found) {
@@ -31,7 +42,8 @@ export function formatSubagentAgentInspect(
   const entry = catalog.agents.get(agentId);
   const file = entry?.fileOptions ?? {};
   const defs = defaultsForAgentType(settings, agentId);
-  const rawModel = file.model ?? defs.model;
+  const modelConfig = loadSubagentModelConfig();
+  const rawModel = modelConfig.agentModels[agentId] ?? file.model ?? defs.model;
   const rawThinking = file.thinking ?? defs.thinking;
   const isolated = file.isolated ?? true;
   const inherit = file.inherit_context ?? false;
@@ -51,9 +63,9 @@ export function formatSubagentAgentInspect(
     `frontmatter description (truncated in catalog to 72 chars): ${desc || "(none)"}`,
     `frontmatter whenToUse (truncated in catalog to 2000 chars): ${whenToUse || "(none)"}`,
     "",
-    "Effective defaults when the subagent tool omits model, thinking, inherit_context, isolated, and max_turns (persona frontmatter, then defaults_by_agent_type in ~/.agent/subagents/settings.json, then fallbacks):",
-    `  model pattern before resolve: ${rawModel ?? "(omit → parent session model)"}`,
-    `  resolved model: ${formatResolvedModel(rawModel, ctx)}`,
+    "Effective defaults when the subagent tool omits model, thinking, inherit_context, isolated, and max_turns (model: /config agentModels override, then persona frontmatter, then defaults_by_agent_type in ~/.agent/subagents/settings.json, then parent session; other fields use persona frontmatter then defaults):",
+    `  model or tier before resolve: ${rawModel || "(current session model)"}`,
+    `  resolved model: ${formatResolvedModel(rawModel, modelConfig.modelTiers, ctx)}`,
     `  thinking: ${rawThinking ?? "(omit → Pi child session default)"}`,
     `  isolated: ${isolated}`,
     `  inherit_context: ${inherit}`,
@@ -64,7 +76,7 @@ export function formatSubagentAgentInspect(
     "",
     "Child session: DefaultResourceLoader uses noExtensions: true, noSkills, noPromptTemplates, noThemes, noContextFiles; extensionFactories come from the shared child-extension registry (extensions loaded in the main session self-register via registerChildExtensionFactory).",
     "",
-    "Batch mode: per-task tool fields override the same keys for that row only (task > batch tool args > persona > defaults_by_agent_type).",
+    "Batch mode: per-task tool fields override the same keys for that row only (model: task > batch tool args > /config agentModels > persona > defaults_by_agent_type).",
   ];
   return lines.join("\n");
 }

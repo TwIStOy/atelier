@@ -20,7 +20,7 @@ const taskItem = Type.Object({
   ),
   model: Type.Optional(
     Type.String({
-      description: "Model for this task.",
+      description: "Model id or tier (cheap, middle, flagship) for this task. Empty uses the current session model.",
     }),
   ),
   thinking: Type.Optional(
@@ -85,7 +85,8 @@ export const subagentParams = Type.Object(
     ),
     model: Type.Optional(
       Type.String({
-        description: "Model for the run or batch default per task.",
+        description:
+          "Model id or tier (cheap, middle, flagship) for the run or batch default. Omit for persona defaults; empty uses the current session model.",
       }),
     ),
     thinking: Type.Optional(

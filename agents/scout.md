@@ -4,7 +4,7 @@ description: Read-only agent for external docs and dependency research.
 whenToUse: Investigate external code or documentation that is NOT part of the current workspace. Use when you need to understand a dependency's source, read its README/changelog/API, compare local code against an upstream implementation, or clone a library repository into a managed cache to grep and read it. Do NOT use for searching the current project (use the explore agent), for code review, for open-ended design analysis, or for any task that requires modifying the workspace.
 inherit_context: false
 isolated: true
-model: toori/deepseek-v4-flash
+model: middle
 tools:
   - read
   - grep

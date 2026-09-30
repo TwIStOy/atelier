@@ -50,7 +50,6 @@ export async function runSingleSubagent(
   const singleAgentType = dispatch.ok ? dispatch.id : resolveSubagentAgentId(globalAgentType, catalog);
   const file = catalog.agents.get(singleAgentType)?.fileOptions ?? {};
   const defs = defaultsForAgentType(subagentSettings, singleAgentType);
-  const effectiveModel = globalModel ?? file.model ?? defs.model;
   const effectiveThinking = globalThinking ?? file.thinking ?? defs.thinking;
   const effectiveInherit = globalInherit ?? file.inherit_context ?? false;
   const effectiveIsolated = globalIsolated ?? file.isolated ?? true;
@@ -98,7 +97,7 @@ export async function runSingleSubagent(
       ctx,
       {
         task,
-        model: effectiveModel,
+        model: globalModel,
         thinking: effectiveThinking,
         inherit_context: effectiveInherit,
         isolated: effectiveIsolated,

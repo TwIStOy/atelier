@@ -18,6 +18,16 @@ describe("resolveEffectiveChildOptions", () => {
     expect(resolveEffectiveChildOptions({}, {}, {}).model).toBeUndefined();
   });
 
+  it("applies configured persona models between call arguments and file defaults", () => {
+    const file = { model: "cheap", thinking: "medium" };
+    const defaults = { model: "default-model" };
+    expect(resolveEffectiveChildOptions({}, file, defaults, "middle").model).toBe("middle");
+    expect(resolveEffectiveChildOptions({ model: "call-model" }, file, defaults, "middle").model).toBe("call-model");
+    expect(resolveEffectiveChildOptions({}, file, defaults, "").model).toBe("");
+    expect(resolveEffectiveChildOptions({ model: "" }, file, defaults, "middle").model).toBe("");
+    expect(resolveEffectiveChildOptions({}, file, defaults, "middle").thinking).toBe("medium");
+  });
+
   it("defaults isolated to true and inherit_context to false, honoring frontmatter", () => {
     const base = resolveEffectiveChildOptions({}, {}, {});
     expect(base.isolated).toBe(true);
