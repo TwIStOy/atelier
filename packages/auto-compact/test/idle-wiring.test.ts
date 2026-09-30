@@ -1,4 +1,6 @@
 import type { ExtensionAPI, ExtensionContext, SessionEntry } from "@earendil-works/pi-coding-agent";
+import type * as Common from "@htwang-contrib/common";
+import { setVirtualModelStatus } from "@htwang-contrib/common";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import autoCompact from "../src/index.ts";
 import { compactionEntry, messageEntry } from "./helpers.ts";
@@ -13,7 +15,8 @@ const mockConfig = vi.hoisted(() => ({
   } as Record<string, unknown>,
 }));
 
-vi.mock("@htwang-contrib/common", () => ({
+vi.mock("@htwang-contrib/common", async (importOriginal) => ({
+  ...(await importOriginal<typeof Common>()),
   isExtensionDisabled: () => false,
   readConfig: () => mockConfig.current,
   registerConfigItems: vi.fn(),
@@ -90,6 +93,48 @@ beforeEach(() => {
 });
 
 describe("idle compaction wiring", () => {
+  it("uses the routed window when native usage still refers to the previous response", () => {
+    const mock = createMockPi();
+    autoCompact(mock.pi);
+    const mockCtx = createMockCtx(190_000, 200_000);
+    const physicalModel = { ...mockCtx.ctx.model!, contextWindow: 400_000 };
+    mockCtx.ctx.model = { ...physicalModel, api: "pi-virtual", provider: "virtual", id: "auto", contextWindow: 0 };
+    mockCtx.ctx.sessionManager.getSessionId = () => "auto-compact-routing";
+    setVirtualModelStatus("auto-compact-routing", {
+      provider: "virtual",
+      modelId: "auto",
+      tier: "middle",
+      physicalModel,
+      thinkingLevel: "off",
+    });
+    try {
+      fireTurnStart(mock, mockCtx);
+      expect(mockCtx.compact).not.toHaveBeenCalled();
+      setVirtualModelStatus("auto-compact-routing", {
+        provider: "virtual",
+        modelId: "auto",
+        tier: "flagship",
+        physicalModel: { ...physicalModel, contextWindow: 100_000 },
+        thinkingLevel: "off",
+      });
+      fireTurnStart(mock, mockCtx);
+      expect(mockCtx.compact).toHaveBeenCalledOnce();
+    } finally {
+      setVirtualModelStatus("auto-compact-routing", undefined);
+    }
+  });
+
+  it("does not compact against an unknown zero-sized virtual window", async () => {
+    const mock = createMockPi();
+    autoCompact(mock.pi);
+    const mockCtx = createMockCtx(null, 0);
+    fireTurnStart(mock, mockCtx);
+    const messages = [messageEntry("user", 1).message, messageEntry("assistant", 2).message];
+    const result = await mock.handlers.get("context")!({ messages }, mockCtx.ctx);
+    await flush();
+    expect(result).toBeUndefined();
+    expect(mockCtx.compact).not.toHaveBeenCalled();
+  });
   it("turn_start triggers idle compaction after the idle threshold and sends a follow-up", async () => {
     const mock = createMockPi();
     autoCompact(mock.pi);

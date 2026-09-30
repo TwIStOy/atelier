@@ -82,10 +82,34 @@ Changing the physical model assigned to a tier changes that tier's target withou
 changing its rank; keep assignments in increasing capability order.
 
 Pi keeps `virtual/auto` selected while assistant messages record the physical
-model that answered. Virtual limits are initially unknown; Pi uses physical
-response limits afterward and checks the routed model before dispatch, compacting
-when necessary. A persisted promotion remains in force if the physical request
-subsequently fails.
+model that answered. A persisted promotion remains in force if the physical
+request subsequently fails.
+
+## Current model and context window
+
+The statusline's editor border shows the active route, for example
+`Auto · middle → toori/your-model`. `/context` shows the physical model and its
+effective thinking level in the detailed usage view. Message complexity
+percentages are independent annotations, not the tier actually selected.
+
+Before the first route, Auto advertises the configured Flash model's context and
+output limits. After a conversation route selects a model, those limits and the
+statusline update immediately, before the response arrives. Resumed sessions use
+their saved tier and its configured model. Configuration changes are synchronized
+on model selection and before the next agent run. Unconfigured models leave usage
+unknown until configuration is valid.
+
+The window is the current target's limit, not the minimum across all three tiers.
+A stronger tier can have a smaller window. Pi checks the physical target before
+dispatch and compacts when auto-compaction is enabled. The custom auto-compact
+extension, statusline, and `/context` share the effective target window; they
+retain Pi's token estimate and recompute percentages against that window.
+Unknown usage after compaction remains unknown.
+
+Pi's native context-usage API still uses the last successful physical response's
+window, which may lag a newly chosen route. The shared effective-window helpers
+correct this for the extension surfaces above. Direct requests such as compaction
+summaries do not overwrite the displayed conversation route.
 
 The extension is included in the root bundle. It can also be loaded directly with
 `pi -e ./packages/virtual-model/src/index.ts`. The standard extension disable flag

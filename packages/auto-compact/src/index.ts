@@ -3,6 +3,8 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import { estimateTokens } from "@earendil-works/pi-coding-agent";
 import {
   type ExtensionConfigSchema,
+  getEffectiveContextUsage,
+  getEffectiveContextWindow,
   isExtensionDisabled,
   readConfig,
   registerConfigItems,
@@ -259,13 +261,8 @@ export default function autoCompact(pi: ExtensionAPI): void {
 
   const getTokenUsage = (ctx: ExtensionContext): number => {
     const config = loadConfig();
-    const usage = ctx.getContextUsage();
-    if (usage?.contextWindow) {
-      updateCachedLimits(config, usage.contextWindow);
-    } else {
-      const cw = ctx.model?.contextWindow ?? 200000;
-      updateCachedLimits(config, cw);
-    }
+    const usage = getEffectiveContextUsage(ctx);
+    updateCachedLimits(config, getEffectiveContextWindow(ctx));
     if (usage && usage.tokens !== null) {
       return usage.tokens;
     }
@@ -332,7 +329,7 @@ export default function autoCompact(pi: ExtensionAPI): void {
   pi.on("turn_start", async (event, ctx) => {
     truncationAppliedThisTurn = false;
     const tokens = getTokenUsage(ctx);
-    if (tokens >= cachedAutoCompactLimit) {
+    if (cachedAutoCompactLimit > 0 && tokens >= cachedAutoCompactLimit) {
       triggerAutoCompact(ctx, "pre-turn", "Focus on preserving task context and recent work.");
       return;
     }
@@ -344,10 +341,10 @@ export default function autoCompact(pi: ExtensionAPI): void {
     const messages = event.messages;
     const estimatedTokens = estimateTotalTokens(messages);
     lastEstimatedTokens = estimatedTokens;
-    const cw = ctx.model?.contextWindow ?? 200000;
+    const cw = getEffectiveContextWindow(ctx);
     updateCachedLimits(config, cw);
 
-    if (estimatedTokens > cachedAutoCompactLimit && !pendingCompaction) {
+    if (cachedAutoCompactLimit > 0 && estimatedTokens > cachedAutoCompactLimit && !pendingCompaction) {
       const newMessages = applyTruncationStrategy(messages, cachedKeepRecentTokens, config.strategy);
       if (newMessages) {
         truncationAppliedThisTurn = true;
@@ -373,7 +370,7 @@ export default function autoCompact(pi: ExtensionAPI): void {
     if (!hasToolCalls) return;
 
     const tokens = getTokenUsage(ctx);
-    if (tokens >= cachedAutoCompactLimit && !pendingCompaction) {
+    if (cachedAutoCompactLimit > 0 && tokens >= cachedAutoCompactLimit && !pendingCompaction) {
       triggerAutoCompact(ctx, "mid-turn", "Mid-turn compaction: preserve current task context and tool call results.");
     }
   });
@@ -382,15 +379,18 @@ export default function autoCompact(pi: ExtensionAPI): void {
     pendingCompaction = false;
     truncationAppliedThisTurn = false;
     lastEstimatedTokens = 0;
+    cachedContextWindow = 0;
+    cachedAutoCompactLimit = 0;
+    cachedKeepRecentTokens = 0;
 
     if (event.reason === "resume" || event.reason === "fork") {
       const config = loadConfig();
-      const usage = ctx.getContextUsage();
+      const usage = getEffectiveContextUsage(ctx);
       if (usage && usage.tokens !== null) {
         lastEstimatedTokens = usage.tokens;
-        const cw = ctx.model?.contextWindow ?? 200000;
+        const cw = getEffectiveContextWindow(ctx);
         updateCachedLimits(config, cw);
-        if (usage.tokens >= cachedAutoCompactLimit) {
+        if (cachedAutoCompactLimit > 0 && usage.tokens >= cachedAutoCompactLimit) {
           triggerAutoCompact(ctx, "session-resume");
         } else {
           maybeIdleCompact(ctx, usage.tokens, Date.now(), { followUp: false });
@@ -399,9 +399,9 @@ export default function autoCompact(pi: ExtensionAPI): void {
     }
   });
 
-  pi.on("model_select", async (event) => {
+  pi.on("model_select", async (_event, ctx) => {
     const config = loadConfig();
-    const cw = event.model?.contextWindow ?? 200000;
+    const cw = getEffectiveContextWindow(ctx);
     updateCachedLimits(config, cw);
   });
 
@@ -409,10 +409,10 @@ export default function autoCompact(pi: ExtensionAPI): void {
     description: "Show auto-compaction status",
     handler: async (_args, ctx) => {
       const config = loadConfig();
-      const cw = ctx.model?.contextWindow ?? 200000;
+      const cw = getEffectiveContextWindow(ctx);
       updateCachedLimits(config, cw);
 
-      const usage = ctx.getContextUsage();
+      const usage = getEffectiveContextUsage(ctx);
       const tokens = usage?.tokens ?? lastEstimatedTokens;
       const percent = usage?.percent ?? (cachedAutoCompactLimit > 0 ? (tokens / cachedAutoCompactLimit) * 100 : 0);
       const strategyLabel = STRATEGY_OPTIONS.find((o) => o.value === config.strategy)?.label ?? config.strategy;

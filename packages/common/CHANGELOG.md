@@ -12,6 +12,7 @@
 
 ### Added
 
+- Shared session-scoped virtual model status and effective context-usage helpers keep statusline, `/context`, and auto-compaction aligned with the current routed physical model while retaining Pi's token estimate.
 - Shared subagent model-tier configuration and resolution (`loadSubagentModelConfig`, `resolveSubagentModelPattern`, `SUBAGENT_MODEL_TIERS`). `runChildAgent` applies per-persona model overrides before persona frontmatter and resolves tier references for all child-agent callers while preserving current-session fallback.
 - Shared `createComplexityAssessment`, `ComplexityTier`, and tier validation for transcript annotations and virtual model routing, preserving complete conversation text and image type markers.
 - Public `resolveConfigValue(value, env?)` and `getConfigEnvVar(value)` helpers resolve string configuration values from `$VAR` / `{env:VAR}` references without service-specific fallback rules. Exported from the main entry and the Pi-independent `@htwang-contrib/common/config` subpath. System One now uses these helpers while retaining its credential precedence and validation.

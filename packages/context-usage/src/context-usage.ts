@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { isAbsolute } from "node:path";
 import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import { getEffectiveContextUsage, getEffectiveContextWindow, getVirtualModelStatus } from "@htwang-contrib/common";
 
 type ContextUsageColor = "accent" | "success" | "warning" | "error" | "muted" | "dim" | "borderMuted" | "text";
 
@@ -433,11 +434,12 @@ export function buildContextUsageDetails(
   ctx: ExtensionContext,
   promptOptions: unknown,
 ): ContextUsageMessageDetails | undefined {
-  const usage = ctx.getContextUsage?.() as { contextWindow?: unknown; percent?: unknown; tokens?: unknown } | undefined;
+  const usage = getEffectiveContextUsage(ctx);
   const tokens = Number(usage?.tokens);
   if (!Number.isFinite(tokens) || tokens <= 0) return undefined;
-  const model = (ctx as any).model ?? {};
-  const contextWindow = Number(usage?.contextWindow ?? model.contextWindow);
+  const route = getVirtualModelStatus(ctx);
+  const model = route?.physicalModel ?? (ctx as any).model ?? {};
+  const contextWindow = getEffectiveContextWindow(ctx);
   const safeContextWindow = Number.isFinite(contextWindow) && contextWindow > 0 ? contextWindow : undefined;
   const percent = Number(usage?.percent);
   const systemPrompt = ctx.getSystemPrompt?.() ?? "";
@@ -531,7 +533,9 @@ export function buildContextUsageDetails(
   const modelProvider = typeof model.provider === "string" ? model.provider : "unknown";
   const modelId = typeof model.id === "string" ? model.id : typeof model.model === "string" ? model.model : "unknown";
   const modelName = typeof model.name === "string" ? model.name : modelId;
-  const thinking = typeof (pi as any).getThinkingLevel === "function" ? (pi as any).getThinkingLevel() : undefined;
+  const thinking =
+    route?.thinkingLevel ??
+    (typeof (pi as any).getThinkingLevel === "function" ? (pi as any).getThinkingLevel() : undefined);
   return {
     builtinTools,
     categories,
@@ -545,7 +549,7 @@ export function buildContextUsageDetails(
     model: {
       contextWindow: safeContextWindow,
       id: modelId,
-      label: modelName,
+      label: route ? `Auto · ${route.tier} → ${modelName}` : modelName,
       provider: modelProvider,
       thinking: typeof thinking === "string" && thinking !== "off" ? thinking : undefined,
     },

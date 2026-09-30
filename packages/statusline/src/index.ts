@@ -7,6 +7,7 @@ import {
   type TelemetryModelRef,
   type TelemetryUsage,
   TurnTelemetryTracker,
+  VIRTUAL_MODEL_STATUS_EVENT,
 } from "@htwang-contrib/common";
 import { loadConfig, registerStatuslineConfigItems } from "./config.ts";
 import { MyEditor } from "./editor.ts";
@@ -44,6 +45,7 @@ export default function (pi: ExtensionAPI) {
   let activeCtx: ExtensionContext | undefined;
   let activeEditor: MyEditor | undefined;
   let unsubscribeHint: (() => void) | undefined;
+  let unsubscribeModelStatus: (() => void) | undefined;
   const telemetry = new TurnTelemetryTracker();
 
   registerStatuslineConfigItems();
@@ -74,6 +76,8 @@ export default function (pi: ExtensionAPI) {
     activeEditor = undefined;
     unsubscribeHint?.();
     unsubscribeHint = undefined;
+    unsubscribeModelStatus?.();
+    unsubscribeModelStatus = undefined;
 
     ctx.ui.setEditorComponent((tui, theme, keybindings) => {
       const editor = new MyEditor(tui, theme, keybindings, () => activeCtx ?? ctx, pi);
@@ -85,6 +89,10 @@ export default function (pi: ExtensionAPI) {
       activeEditor?.applyHint(data as EditorHintPayload);
     });
 
+    unsubscribeModelStatus = pi.events.on(VIRTUAL_MODEL_STATUS_EVENT, (sessionId: unknown) => {
+      if (sessionId === activeCtx?.sessionManager.getSessionId()) activeEditor?.refreshModelStatus();
+    });
+
     ctx.ui.setFooter(makeFooter(ctx, pi));
   });
 
@@ -93,5 +101,7 @@ export default function (pi: ExtensionAPI) {
     activeEditor = undefined;
     unsubscribeHint?.();
     unsubscribeHint = undefined;
+    unsubscribeModelStatus?.();
+    unsubscribeModelStatus = undefined;
   });
 }

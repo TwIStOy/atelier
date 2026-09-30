@@ -18,15 +18,24 @@ import {
   type AgentSession,
   createAgentSession,
   DefaultResourceLoader,
+  type ExtensionContext,
   ModelRuntime,
   SessionManager,
   SettingsManager,
 } from "@earendil-works/pi-coding-agent";
-import { clearConfigItems, getConfigItems, setConfigKey, writeConfig } from "@htwang-contrib/common";
+import {
+  clearConfigItems,
+  getConfigItems,
+  getEffectiveContextUsage,
+  getVirtualModelStatus,
+  setConfigKey,
+  setVirtualModelStatus,
+  writeConfig,
+} from "@htwang-contrib/common";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import virtualModel, { TIER_ENTRY } from "../src/index.ts";
 
-const models: Model<Api>[] = ["flash", "middle", "flagship", "judge"].map((id) => ({
+const models: Model<Api>[] = ["flash", "middle", "flagship", "judge"].map((id, index) => ({
   id,
   name: id,
   provider: "test-router",
@@ -35,7 +44,7 @@ const models: Model<Api>[] = ["flash", "middle", "flagship", "judge"].map((id) =
   reasoning: false,
   input: ["text", "image"],
   cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-  contextWindow: 200_000,
+  contextWindow: [200_000, 400_000, 100_000, 200_000][index],
   maxTokens: 8192,
 }));
 
@@ -87,13 +96,17 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  for (const session of sessions) session.dispose();
+  for (const session of sessions) {
+    setVirtualModelStatus(session.sessionManager.getSessionId(), undefined);
+    session.dispose();
+  }
   clearConfigItems("virtual-model");
   vi.unstubAllEnvs();
   rmSync(directory, { recursive: true, force: true });
 });
 
 async function setup(manager = SessionManager.inMemory(directory)) {
+  let context: ExtensionContext | undefined;
   const classify = vi.fn<ProviderClassifier["classify"]>().mockResolvedValue(decision("middle"));
   const reply = vi.fn((model: Model<Api>): AssistantMessage => answer(model, model.id === "judge" ? "middle" : "Done"));
   const stream: ProviderStreams["streamSimple"] = (model) => {
@@ -151,7 +164,14 @@ async function setup(manager = SessionManager.inMemory(directory)) {
     noThemes: true,
     noContextFiles: true,
     systemPrompt: "Follow the project rules",
-    extensionFactories: [virtualModel],
+    extensionFactories: [
+      virtualModel,
+      (pi) => {
+        pi.on("session_start", (_event, ctx) => {
+          context = ctx;
+        });
+      },
+    ],
   });
   await loader.reload();
   expect(loader.getExtensions().errors).toEqual([]);
@@ -184,10 +204,77 @@ async function setup(manager = SessionManager.inMemory(directory)) {
   await session.setModel(virtual);
   await runtime.refresh({ allowNetwork: false });
   expect(runtime.hasConfiguredAuth("test-router"), runtime.getError()).toBe(true);
-  return { session, manager, runtime, virtual, classify, reply };
+  if (!context) throw new Error("Missing extension context");
+  return { session, manager, runtime, virtual, classify, reply, context };
 }
 
 describe("virtual model routing through Pi", () => {
+  test("starts with flash limits and publishes a new route before its physical response", async () => {
+    const { session, context, classify, reply } = await setup();
+    expect(session.model?.contextWindow).toBe(200_000);
+    expect(getVirtualModelStatus(context)).toMatchObject({ tier: "flash", physicalModel: { id: "flash" } });
+    expect(context.getContextUsage()?.contextWindow).toBe(200_000);
+    reply.mockImplementationOnce((model) => {
+      expect(session.model?.contextWindow).toBe(400_000);
+      expect(getVirtualModelStatus(context)).toMatchObject({ tier: "middle", physicalModel: { id: "middle" } });
+      return answer(model);
+    });
+    await session.prompt("Implement");
+    classify.mockResolvedValue(decision("flagship"));
+    reply.mockImplementationOnce((model) => {
+      expect(session.model?.contextWindow).toBe(100_000);
+      expect(context.getContextUsage()?.contextWindow).toBe(400_000);
+      const usage = getEffectiveContextUsage(context);
+      expect(usage?.contextWindow).toBe(100_000);
+      expect(usage?.percent).toBe((usage!.tokens! / 100_000) * 100);
+      expect(getVirtualModelStatus(context)).toMatchObject({ tier: "flagship", physicalModel: { id: "flagship" } });
+      return { ...answer(model), stopReason: "error", errorMessage: "upstream failed" };
+    });
+    await session.prompt("Hard debugging");
+    expect(getEffectiveContextUsage(context)?.contextWindow).toBe(100_000);
+    expect(getVirtualModelStatus(context)?.tier).toBe("flagship");
+  });
+
+  test("switching away hides the route, and switching back restores its limits", async () => {
+    const { session, virtual, context } = await setup();
+    await session.prompt("Implement");
+    await session.setModel(models[2]);
+    expect(getVirtualModelStatus(context)).toBeUndefined();
+    expect(getEffectiveContextUsage(context)?.contextWindow).toBe(100_000);
+    await session.setModel(virtual);
+    expect(session.model?.contextWindow).toBe(400_000);
+    expect(getVirtualModelStatus(context)?.tier).toBe("middle");
+  });
+
+  test("direct summary requests do not overwrite the published conversation route", async () => {
+    const { session, context, runtime, virtual } = await setup();
+    await session.prompt("Implement");
+    setConfigKey("virtual-model", "middleModel", "test-router/flagship");
+    const route = await runtime.resolveModel(virtual, [], { reason: "direct", thinkingLevel: "off" });
+    expect(route.model.id).toBe("flagship");
+    expect(getVirtualModelStatus(context)?.physicalModel.id).toBe("middle");
+    expect(session.model?.contextWindow).toBe(400_000);
+  });
+
+  test("Pi compacts for a smaller physical window before sending the routed request", async () => {
+    const { session, classify, reply, manager, context } = await setup();
+    session.setAutoCompactionEnabled(true);
+    classify.mockResolvedValueOnce(decision("flash")).mockResolvedValueOnce(decision("flagship"));
+    reply.mockImplementationOnce((model) => {
+      const result = answer(model, "Earlier findings and implementation details\n".repeat(6000));
+      result.usage.input = 30_000;
+      result.usage.output = 60_000;
+      result.usage.totalTokens = 90_000;
+      return result;
+    });
+    await session.prompt("Inspect");
+    expect(manager.getEntries().some((entry) => entry.type === "compaction")).toBe(false);
+    await session.prompt("Difficult follow-up");
+    expect(manager.getEntries().some((entry) => entry.type === "compaction")).toBe(true);
+    expect(reply.mock.calls.map(([model]) => model.id)).toEqual(["flash", "flagship", "flagship"]);
+    expect(session.messages.at(-1)).toMatchObject({ role: "assistant", model: "flagship", stopReason: "stop" });
+    expect(getEffectiveContextUsage(context)?.contextWindow).toBe(100_000);
+  });
   test("raises tiers, never lowers them, and stops judging at flagship", async () => {
     const { session, classify, reply, manager } = await setup();
     classify
@@ -237,6 +324,8 @@ describe("virtual model routing through Pi", () => {
     restored.branch(earlier.id);
     restored.appendCompaction("Previous investigation", earlier.id, 5000);
     const next = await setup(restored);
+    expect(next.session.model?.contextWindow).toBe(400_000);
+    expect(getVirtualModelStatus(next.context)?.tier).toBe("middle");
     next.classify.mockResolvedValue(decision("flash"));
     await next.session.prompt("Simple lookup");
     expect(next.reply.mock.calls.map(([model]) => model.id)).toEqual(["middle"]);

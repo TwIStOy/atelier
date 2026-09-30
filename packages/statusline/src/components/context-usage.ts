@@ -1,12 +1,17 @@
 import type { ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
-import { formatProgressBar, formatTokens, usagePercentStressLevel } from "@htwang-contrib/common";
+import {
+  formatProgressBar,
+  formatTokens,
+  getEffectiveContextUsage,
+  usagePercentStressLevel,
+} from "@htwang-contrib/common";
 import type { StatusLineComponent } from "./base.ts";
 
 export class ContextUsageComponent implements StatusLineComponent {
   constructor(private ctx: ExtensionContext) {}
 
   render(_width: number, theme: Theme): string[] {
-    const usage = this.ctx.getContextUsage();
+    const usage = getEffectiveContextUsage(this.ctx);
     if (!usage || usage.percent === null) return [];
 
     const pct = Math.round(usage.percent);

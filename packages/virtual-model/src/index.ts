@@ -1,5 +1,19 @@
-import type { ExtensionAPI, ModelRegistry, SessionEntry } from "@earendil-works/pi-coding-agent";
-import { COMPLEXITY_TIERS, type ComplexityTier, isComplexityTier, isExtensionDisabled } from "@htwang-contrib/common";
+import { type Api, clampThinkingLevel, type Model, type ModelThinkingLevel } from "@earendil-works/pi-ai";
+import type {
+  ExtensionAPI,
+  ExtensionContext,
+  ExtensionVirtualModel,
+  ModelRegistry,
+  SessionEntry,
+} from "@earendil-works/pi-coding-agent";
+import {
+  COMPLEXITY_TIERS,
+  type ComplexityTier,
+  isComplexityTier,
+  isExtensionDisabled,
+  setVirtualModelStatus,
+  VIRTUAL_MODEL_STATUS_EVENT,
+} from "@htwang-contrib/common";
 import { CONFIG_ID, loadConfig, registerSettings, resolvePhysicalModel } from "./config.ts";
 import { judgeComplexity } from "./judge.ts";
 
@@ -28,19 +42,42 @@ export default function virtualModel(pi: ExtensionAPI): void {
 
   let registry: ModelRegistry | undefined;
   let lifetime = new AbortController();
+  let sessionId: string | undefined;
   registerSettings(() => registry);
 
-  pi.on("session_start", (_event, ctx) => {
-    lifetime.abort();
-    lifetime = new AbortController();
-    registry = ctx.modelRegistry;
-  });
-  pi.on("session_shutdown", () => {
-    lifetime.abort();
-    registry = undefined;
-  });
+  function publish(ctx: ExtensionContext, tier: ComplexityTier, model: Model<Api>, level: ModelThinkingLevel): void {
+    setVirtualModelStatus(ctx.sessionManager.getSessionId(), {
+      provider: VIRTUAL_PROVIDER,
+      modelId: VIRTUAL_MODEL_ID,
+      tier,
+      physicalModel: model,
+      thinkingLevel: clampThinkingLevel(model, level),
+    });
+    const selected =
+      ctx.model?.provider === VIRTUAL_PROVIDER && ctx.model.id === VIRTUAL_MODEL_ID ? ctx.model : undefined;
+    if (
+      definition.contextWindow !== model.contextWindow ||
+      definition.maxTokens !== model.maxTokens ||
+      (selected && (selected.contextWindow !== model.contextWindow || selected.maxTokens !== model.maxTokens))
+    ) {
+      definition = { ...definition, contextWindow: model.contextWindow, maxTokens: model.maxTokens };
+      pi.registerVirtualModel(definition);
+    }
+    pi.events.emit(VIRTUAL_MODEL_STATUS_EVENT, ctx.sessionManager.getSessionId());
+  }
 
-  pi.registerVirtualModel<TierState>({
+  function sync(ctx: ExtensionContext): void {
+    try {
+      const tier = highestTier(ctx.sessionManager.getEntries());
+      const model = resolvePhysicalModel(ctx.modelRegistry, loadConfig()[`${tier}Model`]);
+      publish(ctx, tier, model, pi.getThinkingLevel());
+    } catch {
+      setVirtualModelStatus(ctx.sessionManager.getSessionId(), undefined);
+      pi.events.emit(VIRTUAL_MODEL_STATUS_EVENT, ctx.sessionManager.getSessionId());
+    }
+  }
+
+  let definition: ExtensionVirtualModel<TierState> = {
     provider: VIRTUAL_PROVIDER,
     id: VIRTUAL_MODEL_ID,
     name: "Auto (Flash / Middle / Flagship)",
@@ -70,11 +107,32 @@ export default function virtualModel(pi: ExtensionAPI): void {
       if (COMPLEXITY_TIERS.indexOf(tier) > COMPLEXITY_TIERS.indexOf(highestTier(ctx.sessionManager.getEntries()))) {
         pi.appendEntry(TIER_ENTRY, { tier });
       }
+      if (request.reason !== "direct") publish(ctx, tier, models[tier], request.thinkingLevel);
       return {
         model: models[tier],
         thinkingLevel: request.thinkingLevel,
         state: request.state?.tier === tier ? request.state : { tier },
       };
     },
+  };
+  pi.registerVirtualModel(definition);
+
+  pi.on("session_start", (_event, ctx) => {
+    lifetime.abort();
+    lifetime = new AbortController();
+    if (sessionId) setVirtualModelStatus(sessionId, undefined);
+    sessionId = ctx.sessionManager.getSessionId();
+    registry = ctx.modelRegistry;
+    sync(ctx);
+  });
+  pi.on("model_select", (_event, ctx) => sync(ctx));
+  pi.on("thinking_level_select", (_event, ctx) => sync(ctx));
+  pi.on("before_agent_start", (_event, ctx) => sync(ctx));
+  pi.on("session_tree", (_event, ctx) => sync(ctx));
+  pi.on("session_shutdown", () => {
+    lifetime.abort();
+    registry = undefined;
+    if (sessionId) setVirtualModelStatus(sessionId, undefined);
+    sessionId = undefined;
   });
 }

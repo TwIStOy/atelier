@@ -298,3 +298,11 @@ export type {
   CodingPlanUsageWindowRaw,
   CodingPlanWindowDetail,
 } from "./usage.ts";
+export type { VirtualModelStatus } from "./virtual-model-status.ts";
+export {
+  getEffectiveContextUsage,
+  getEffectiveContextWindow,
+  getVirtualModelStatus,
+  setVirtualModelStatus,
+  VIRTUAL_MODEL_STATUS_EVENT,
+} from "./virtual-model-status.ts";
