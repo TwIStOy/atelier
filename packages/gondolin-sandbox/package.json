@@ -9,7 +9,7 @@
     "@earendil-works/gondolin": "^0.12.0"
   },
   "devDependencies": {
-    "@earendil-works/pi-coding-agent": "^0.99.1",
+    "@earendil-works/pi-coding-agent": "^1.0.0",
     "@htwang-contrib/common": "*",
     "@types/node": "^26.1.2",
     "typescript": "^7.0.2"
