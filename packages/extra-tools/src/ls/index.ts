@@ -55,6 +55,7 @@ export function registerLsTool(pi: ExtensionAPI) {
     description: lsToolDescription,
     promptSnippet: "List directory contents",
     parameters: lsParams,
+    annotations: { readOnlyHint: true },
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
       if (signal?.aborted) {
         throw new Error("Operation aborted");

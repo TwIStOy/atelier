@@ -128,6 +128,7 @@ export function registerGlobTool(pi: ExtensionAPI) {
     description: globToolDescription,
     promptSnippet: "List files by glob pattern (ripgrep); paths sorted by mtime; optional root directory",
     parameters: globParams,
+    annotations: { readOnlyHint: true },
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
       const pattern = params.pattern?.trim();
       if (!pattern) {

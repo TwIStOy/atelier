@@ -152,6 +152,7 @@ export function registerGrepTool(pi: ExtensionAPI) {
     description: grepToolDescription,
     promptSnippet: "Search file contents with regex (ripgrep); optional include glob; results sorted by file mtime",
     parameters: grepParams,
+    annotations: { readOnlyHint: true },
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
       const pattern = params.pattern?.trim();
       if (!pattern) {

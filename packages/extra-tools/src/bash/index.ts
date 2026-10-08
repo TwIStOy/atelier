@@ -52,6 +52,7 @@ export function registerBashTool(pi: ExtensionAPI) {
     promptGuidelines: inner.promptGuidelines ? [...inner.promptGuidelines] : undefined,
     constrainedSampling: inner.constrainedSampling,
     parameters: bashParams,
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     execute: (toolCallId, params, signal, onUpdate, ctx) =>
       inner.execute(toolCallId, { command: params.command, timeout: params.timeout }, signal, onUpdate, ctx),
     renderCall: inner.renderCall,
