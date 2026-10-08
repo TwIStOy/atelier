@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- All seven sandboxed tool registrations declare MCP-style annotations (`read`/`grep`/`find`/`ls` read-only; `write`/`edit`/`bash` mutating and destructive).
+
 ## [0.6.1] - 2026-09-01
 
 ### Added

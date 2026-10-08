@@ -233,6 +233,7 @@ export default function (pi: ExtensionAPI) {
 
   pi.registerTool({
     ...localRead,
+    annotations: { readOnlyHint: true },
     async execute(id, params, signal, onUpdate, ctx) {
       const h = await ensureVm(ctx);
       if (!h) return localRead.execute(id, params, signal, onUpdate);
@@ -245,6 +246,7 @@ export default function (pi: ExtensionAPI) {
 
   pi.registerTool({
     ...localWrite,
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
     async execute(id, params, signal, onUpdate, ctx) {
       const h = await ensureVm(ctx);
       if (!h) return localWrite.execute(id, params, signal, onUpdate);
@@ -257,6 +259,7 @@ export default function (pi: ExtensionAPI) {
 
   pi.registerTool({
     ...localEdit,
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
     async execute(id, params, signal, onUpdate, ctx) {
       const h = await ensureVm(ctx);
       if (!h) return localEdit.execute(id, params, signal, onUpdate);
@@ -269,6 +272,7 @@ export default function (pi: ExtensionAPI) {
 
   pi.registerTool({
     ...localBash,
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
     async execute(id, params, signal, onUpdate, ctx) {
       const h = await ensureVm(ctx);
       if (!h) return localBash.execute(id, params, signal, onUpdate);
@@ -281,6 +285,7 @@ export default function (pi: ExtensionAPI) {
 
   pi.registerTool({
     ...localGrep,
+    annotations: { readOnlyHint: true },
     async execute(id, params, signal, onUpdate, ctx) {
       const h = await ensureVm(ctx);
       if (!h) return localGrep.execute(id, params, signal, onUpdate);
@@ -293,6 +298,7 @@ export default function (pi: ExtensionAPI) {
 
   pi.registerTool({
     ...localFind,
+    annotations: { readOnlyHint: true },
     async execute(id, params, signal, onUpdate, ctx) {
       const h = await ensureVm(ctx);
       if (!h) return localFind.execute(id, params, signal, onUpdate);
@@ -305,6 +311,7 @@ export default function (pi: ExtensionAPI) {
 
   pi.registerTool({
     ...localLs,
+    annotations: { readOnlyHint: true },
     async execute(id, params, signal, onUpdate, ctx) {
       const h = await ensureVm(ctx);
       if (!h) return localLs.execute(id, params, signal, onUpdate);
