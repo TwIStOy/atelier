@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- The `workflow` tool declares MCP-style annotations (mutating, destructive, open-world).
+
 ### Changed
 
 - Child sessions no longer hardcode `protect-secrets` / `extra-tools` / `web-tools` / `toori` (`WORKFLOW_CHILD_FACTORIES` removed, along with those package dependencies); children load the shared child-extension registry (`registerChildExtensionFactory` in `@htwang-contrib/common`), the same sourcing as `subagent` children. Those packages self-register when loaded in the parent session, so children see exactly the child-enabled extensions the parent loaded.

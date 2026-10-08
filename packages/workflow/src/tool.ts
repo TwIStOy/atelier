@@ -44,6 +44,7 @@ export function registerWorkflowTool(pi: ExtensionAPI) {
     promptSnippet: WORKFLOW_PROMPT_SNIPPET,
     promptGuidelines: WORKFLOW_PROMPT_GUIDELINES,
     parameters: workflowParams,
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     async execute(_toolCallId, params, signal, onUpdate, ctx) {
       const result = await executeWorkflowRun(ctx, {
         script: params.script,
