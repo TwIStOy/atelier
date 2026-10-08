@@ -7,7 +7,7 @@ import { backgroundJobStatusPayload, createBackgroundJob, subagentStatusToolDeta
 import { subagentDetails } from "./details.ts";
 import { type ParallelTaskRow, runParallelBatchSubagent } from "./orchestrate-batch.ts";
 import { runSingleSubagent } from "./orchestrate-single.ts";
-import { subagentParams, subagentStatusParams } from "./schemas.ts";
+import { subagentParams, subagentStatusOutputSchema, subagentStatusParams } from "./schemas.ts";
 import { readSubagentSettings, type SubagentSettings } from "./settings.ts";
 import { drainBackgroundUsage, mergeUsage } from "./usage-report.ts";
 import { validateTaskShape } from "./validate.ts";
@@ -32,6 +32,8 @@ export function registerSubagentStatusTool(pi: ExtensionAPI) {
     label: "Subagent status",
     description: "Read status for a background subagent job.",
     parameters: subagentStatusParams,
+    annotations: { readOnlyHint: true },
+    outputSchema: subagentStatusOutputSchema,
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       const id = params.id.trim();
       const payload = backgroundJobStatusPayload(id);
@@ -44,6 +46,7 @@ export function registerSubagentStatusTool(pi: ExtensionAPI) {
           },
         ],
         details: subagentStatusToolDetails(id, payload),
+        structuredContent: payload,
         ...(usage ? { usage } : {}),
       };
     },
@@ -56,6 +59,7 @@ export function registerSubagentTool(pi: ExtensionAPI) {
     label: "Subagent",
     description: "Run a child agent in-process; returns its reply or starts a background job.",
     parameters: subagentParams,
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     async execute(_toolCallId, params, signal, onUpdate, ctx) {
       const parentSessionId = ctx.sessionManager.getHeader()?.id ?? "unknown";
       const parentSessionFile = ctx.sessionManager.getSessionFile() ?? "";

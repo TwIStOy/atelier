@@ -61,7 +61,22 @@ export function getBackgroundJob(id: string): BackgroundJobSnapshot | undefined 
   return jobs.get(id);
 }
 
-export function backgroundJobStatusPayload(id: string): unknown {
+export type SubagentStatusPayload = {
+  status: string;
+  id: string;
+  message?: string;
+  mode?: "single" | "batch";
+  label?: string;
+  created_at?: number;
+  updated_at?: number;
+  ok?: boolean;
+  error?: string;
+  summary?: string;
+  tool_calls?: number;
+  batch_counts?: { ok: number; err: number };
+};
+
+export function backgroundJobStatusPayload(id: string): SubagentStatusPayload {
   const j = jobs.get(id);
   if (!j) {
     return {

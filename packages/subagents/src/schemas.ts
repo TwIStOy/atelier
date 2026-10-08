@@ -157,3 +157,18 @@ export const subagentStatusParams = Type.Object({
     description: "Background job id from subagent.",
   }),
 });
+
+export const subagentStatusOutputSchema = Type.Object({
+  status: Type.String({ description: '"unknown" | "running" | terminal status' }),
+  id: Type.String(),
+  message: Type.Optional(Type.String()),
+  mode: Type.Optional(Type.Union([Type.Literal("single"), Type.Literal("batch")])),
+  label: Type.Optional(Type.String()),
+  created_at: Type.Optional(Type.Number()),
+  updated_at: Type.Optional(Type.Number()),
+  ok: Type.Optional(Type.Boolean()),
+  error: Type.Optional(Type.String()),
+  summary: Type.Optional(Type.String()),
+  tool_calls: Type.Optional(Type.Number()),
+  batch_counts: Type.Optional(Type.Object({ ok: Type.Number(), err: Type.Number() })),
+});

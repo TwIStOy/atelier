@@ -1,6 +1,6 @@
 import type { ExtensionAPI, ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it } from "vitest";
-import { registerSubagentTool } from "../src/tool.ts";
+import { registerSubagentStatusTool, registerSubagentTool } from "../src/tool.ts";
 
 function captureTool(): ToolDefinition {
   let captured: ToolDefinition | undefined;
@@ -38,5 +38,25 @@ describe("subagent input validation", () => {
         context,
       ),
     ).rejects.toThrow("subagent: pass either `task` or `tasks`, not both.");
+  });
+});
+
+describe("subagent_status structured content", () => {
+  it("mirrors the status payload for programmatic callers", async () => {
+    let captured: ToolDefinition | undefined;
+    const pi = {
+      registerTool(definition: ToolDefinition) {
+        captured = definition;
+      },
+    } as unknown as ExtensionAPI;
+    registerSubagentStatusTool(pi);
+    if (!captured) throw new Error("status tool was not registered");
+
+    const result = await captured.execute("call_status", { id: "nope" }, undefined, undefined, context);
+    expect(result.structuredContent).toEqual({
+      status: "unknown",
+      id: "nope",
+      message: "No background subagent with this id (wrong id or pruned after many newer jobs).",
+    });
   });
 });

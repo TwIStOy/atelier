@@ -5,6 +5,7 @@
 ### Added
 
 - Configurable `cheap`, `middle`, and `flagship` model tiers and per-persona model selection in `/config` → Subagents (`modelTiers` / `agentModels` in `extensions.json`). The shared child runner applies them to single, batch, background, and workflow calls; explicit call models take precedence, and unset tiers or an empty model selection inherit the current session model. See `docs/subagents/MODELS.md`.
+- `subagent`, `subagent_status`, and `git_clone` declare MCP-style annotations (`subagent_status` read-only; `subagent`/`git_clone` open-world). `subagent_status` declares an `outputSchema` and returns its status payload as `structuredContent` for programmatic callers; the payload type is now exported as `SubagentStatusPayload`.
 
 ### Fixed
 

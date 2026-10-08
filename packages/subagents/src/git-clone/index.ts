@@ -137,6 +137,7 @@ export function registerGitCloneTool(pi: ExtensionAPI) {
     description: gitCloneToolDescription,
     promptSnippet: "Clone a remote git repo into a managed cache for read-only inspection",
     parameters: gitCloneParams,
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     async execute(_toolCallId, params, signal, _onUpdate, _ctx) {
       if (signal?.aborted) {
         throw new Error("Operation aborted");
