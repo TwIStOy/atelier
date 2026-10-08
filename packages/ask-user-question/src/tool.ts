@@ -61,6 +61,7 @@ export function registerAskUserQuestionTool(pi: ExtensionAPI): void {
     promptGuidelines: DEFAULT_PROMPT_GUIDELINES,
     parameters: QuestionParamsSchema,
     constrainedSampling: { type: "json_schema", strict: "prefer" },
+    annotations: { readOnlyHint: true },
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       const typed = sanitizeQuestionnaire(params as QuestionParams);
       if (!ctx.hasUI) {
