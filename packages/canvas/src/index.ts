@@ -128,6 +128,7 @@ export default function (pi: ExtensionAPI): void {
         }),
         html: Type.String({ description: "Full HTML document for the page." }),
       }),
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
       async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
         if (!isValidPageName(params.name)) {
           return {
@@ -158,6 +159,7 @@ export default function (pi: ExtensionAPI): void {
       parameters: Type.Object({
         name: Type.String({ description: "Page slug to delete." }),
       }),
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
       async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
         if (!store) {
           return {
@@ -185,6 +187,7 @@ export default function (pi: ExtensionAPI): void {
       label: "Canvas List",
       description: "List pages published on the canvas server, with URLs.",
       parameters: Type.Object({}),
+      annotations: { readOnlyHint: true },
       async execute(_toolCallId, _params, _signal, _onUpdate, ctx) {
         let running: { store: PageStore; server: CanvasServer };
         try {

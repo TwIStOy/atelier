@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- `canvas_publish` / `canvas_delete` / `canvas_list` declare MCP-style annotations (`canvas_list` read-only; publish/delete destructive and idempotent).
+
 ### Changed
 
 - The `canvas_publish` display adapter follows the tool-display rail layout migration ([#144](https://github.com/TwIStOy/pi-extensions/issues/144)): expanded content lines no longer carry the four-space indent (they are rail body rows now), width budgets are computed against the adapter body width, and the empty-html marker renders as `└ empty`.
