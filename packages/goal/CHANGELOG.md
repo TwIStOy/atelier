@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- `create_goal` / `update_goal` / `get_goal` declare MCP-style annotations (`get_goal` read-only; `update_goal` idempotent).
+
 ### Changed
 
 - The goal verifier's child session now reads the shared child-extension registry (`getChildExtensionFactories` from `@htwang-contrib/common`) instead of hardcoding `protect-secrets` + `extra-tools`. The verifier tool allowlist (`read` / `bash` / `grep` / `glob` / `ls`) still gates which tools exist; extension event handlers (e.g. `protect-secrets`' `tool_call` guard) now match whatever the parent session loaded.

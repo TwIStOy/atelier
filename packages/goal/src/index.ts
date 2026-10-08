@@ -373,6 +373,7 @@ export default function initGoal(pi: ExtensionAPI): void {
         }),
       ),
     }),
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       const ref = getStoreRef(ctx);
       const objective = validateObjective(params.objective);
@@ -418,6 +419,7 @@ export default function initGoal(pi: ExtensionAPI): void {
         description: 'Mark the goal as complete. Must be "complete".',
       }),
     }),
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
       const ref = getStoreRef(ctx);
       const existing = readGoal(ref);
@@ -495,6 +497,7 @@ ${verification.reasoning}`,
     label: "Get Goal",
     description: "Retrieve the current goal for this session, if any.",
     parameters: Type.Object({}),
+    annotations: { readOnlyHint: true },
     async execute(_toolCallId, _params, _signal, _onUpdate, ctx) {
       const ref = getStoreRef(ctx);
       const goal = readGoal(ref);
