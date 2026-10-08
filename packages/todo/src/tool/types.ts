@@ -127,6 +127,27 @@ export const DeleteTodoSchema = Type.Object({
 
 export const ClearTodoSchema = Type.Object({});
 
+export const TaskSchema = Type.Object({
+  id: Type.Number(),
+  subject: Type.String(),
+  description: Type.Optional(Type.String()),
+  activeForm: Type.Optional(Type.String()),
+  status: Type.Union(taskStatusLiterals),
+  blockedBy: Type.Optional(Type.Array(Type.Number())),
+  owner: Type.Optional(Type.String()),
+  metadata: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
+});
+
+export const ListTodoOutputSchema = Type.Object({
+  tasks: Type.Array(TaskSchema),
+  nextId: Type.Number(),
+});
+
+export const GetTodoOutputSchema = Type.Object({
+  task: TaskSchema,
+  blocks: Type.Array(Type.Number()),
+});
+
 export type CreateTodoParams = Static<typeof CreateTodoSchema>;
 export type UpdateTodoParams = Static<typeof UpdateTodoSchema>;
 export type ListTodoParams = Static<typeof ListTodoSchema>;

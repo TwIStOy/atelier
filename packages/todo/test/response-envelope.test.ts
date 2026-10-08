@@ -166,4 +166,31 @@ describe("buildToolResult", () => {
     expect(env.details.error).toBe("subject required for create");
     expect(env.content[0].text).toBe("Error: subject required for create");
   });
+
+  it("list — structuredContent carries the filtered view and nextId", () => {
+    const state = stateWith(
+      t({ id: 1, subject: "a" }),
+      t({ id: 2, subject: "b", status: "completed" }),
+      t({ id: 3, subject: "c", status: "deleted" }),
+    );
+    const env = buildToolResult("list", {}, state, { kind: "list", includeDeleted: false });
+    expect(env.structuredContent).toEqual({ tasks: [state.tasks[0], state.tasks[1]], nextId: state.nextId });
+  });
+
+  it("get — structuredContent carries the task and its reverse blocks", () => {
+    const state = stateWith(t({ id: 1, subject: "ship", blockedBy: [2] }), t({ id: 2, subject: "test" }));
+    const env = buildToolResult("get", { id: 2 }, state, { kind: "get", task: state.tasks[1]! });
+    expect(env.structuredContent).toEqual({ task: state.tasks[1], blocks: [1] });
+  });
+
+  it("mutations and errors carry no structuredContent", () => {
+    const state = stateWith(t({ id: 1, subject: "alpha" }));
+    const created = buildToolResult("create", { subject: "alpha" }, state, { kind: "create", taskId: 1 });
+    expect(created.structuredContent).toBeUndefined();
+    const errored = buildToolResult("create", { subject: "" }, stateWith(), {
+      kind: "error",
+      message: "subject required for create",
+    });
+    expect(errored.structuredContent).toBeUndefined();
+  });
 });

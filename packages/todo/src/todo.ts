@@ -1,4 +1,4 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ToolAnnotations } from "@earendil-works/pi-coding-agent";
 import type { TObject } from "@sinclair/typebox";
 import { loadConfig } from "./config.ts";
 import { selectTasksByStatus, selectTodoCounts, selectVisibleTasks } from "./state/selectors.ts";
@@ -11,7 +11,9 @@ import {
   CreateTodoSchema,
   DeleteTodoSchema,
   ERR_REQUIRES_INTERACTIVE,
+  GetTodoOutputSchema,
   GetTodoSchema,
+  ListTodoOutputSchema,
   ListTodoSchema,
   MSG_NO_TODOS,
   type TaskAction,
@@ -38,6 +40,8 @@ interface TodoToolSpec {
   snippet: string;
   guidelines: string[];
   parameters: TObject;
+  outputSchema?: TObject;
+  annotations: ToolAnnotations;
 }
 
 const TODO_TOOL_SPECS: TodoToolSpec[] = [
@@ -52,6 +56,7 @@ const TODO_TOOL_SPECS: TodoToolSpec[] = [
       "Subject must be short and imperative (e.g. 'Research existing tool'); description is for long-form detail; activeForm is a present-continuous label shown while in_progress.",
     ],
     parameters: CreateTodoSchema,
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
   },
   {
     action: "update",
@@ -67,6 +72,7 @@ const TODO_TOOL_SPECS: TodoToolSpec[] = [
       "Express dependencies with addBlockedBy / removeBlockedBy (additive merge — do not resend the full array). Self-blocks and cycles are rejected.",
     ],
     parameters: UpdateTodoSchema,
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
   },
   {
     action: "list",
@@ -78,6 +84,8 @@ const TODO_TOOL_SPECS: TodoToolSpec[] = [
       "list hides tombstoned (deleted) tasks by default; pass includeDeleted:true to see them, and status to filter to a single status.",
     ],
     parameters: ListTodoSchema,
+    outputSchema: ListTodoOutputSchema,
+    annotations: { readOnlyHint: true },
   },
   {
     action: "get",
@@ -87,6 +95,8 @@ const TODO_TOOL_SPECS: TodoToolSpec[] = [
     snippet: "Get details of a single task",
     guidelines: [],
     parameters: GetTodoSchema,
+    outputSchema: GetTodoOutputSchema,
+    annotations: { readOnlyHint: true },
   },
   {
     action: "delete",
@@ -96,6 +106,7 @@ const TODO_TOOL_SPECS: TodoToolSpec[] = [
     snippet: "Soft-delete a task",
     guidelines: [],
     parameters: DeleteTodoSchema,
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
   },
   {
     action: "clear",
@@ -105,6 +116,7 @@ const TODO_TOOL_SPECS: TodoToolSpec[] = [
     snippet: "Clear all tasks and reset the list",
     guidelines: [],
     parameters: ClearTodoSchema,
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
   },
 ];
 
@@ -118,6 +130,8 @@ export function registerTodoTools(pi: ExtensionAPI): void {
       promptSnippet: guidance?.promptSnippet ?? spec.snippet,
       promptGuidelines: guidance?.promptGuidelines ?? spec.guidelines,
       parameters: spec.parameters,
+      ...(spec.outputSchema ? { outputSchema: spec.outputSchema } : {}),
+      annotations: spec.annotations,
       async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
         const result = applyTaskMutation(getState(), spec.action, params as TaskMutationParams);
         commitState(result.state);

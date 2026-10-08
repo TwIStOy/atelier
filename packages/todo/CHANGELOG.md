@@ -5,6 +5,7 @@
 ### Added
 
 - Aggregate rules for all six `todo_*` tools, so consecutive todo tool calls collapse into one verb-group summary line (e.g. `Created 5 tasks, Updated 1 task`) in tool-display instead of one block per call.
+- All six `todo_*` tools declare MCP-style annotations (`todo_list`/`todo_get` read-only; `todo_update`/`todo_delete`/`todo_clear` destructive and idempotent). `todo_list` and `todo_get` declare an `outputSchema` and return `structuredContent` (`{ tasks, nextId }` and `{ task, blocks }`), so codemode scripts receive typed task data instead of text.
 
 ## [0.6.1] - 2026-09-01
 

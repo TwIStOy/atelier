@@ -1,8 +1,23 @@
+import type { JsonValue } from "@earendil-works/pi-ai";
 import type { TaskState } from "../state/state.ts";
 import type { Op } from "../state/state-reducer.ts";
 import { deriveBlocks } from "../state/task-graph.ts";
 import { formatTaskListLine } from "../view/format.ts";
-import type { Task, TaskAction, TaskDetails, TaskMutationParams } from "./types.ts";
+import type { Task, TaskAction, TaskDetails, TaskMutationParams, TaskStatus } from "./types.ts";
+
+type StructuredTask = {
+  id: number;
+  subject: string;
+  description?: string;
+  activeForm?: string;
+  status: TaskStatus;
+  blockedBy?: number[];
+  owner?: string;
+  metadata?: Record<string, JsonValue>;
+};
+
+type TodoListStructured = { tasks: StructuredTask[]; nextId: number };
+type TodoGetStructured = { task: StructuredTask; blocks: number[] };
 
 function formatGetLines(task: Task, state: TaskState): string {
   const blocks = deriveBlocks(state.tasks).get(task.id) ?? [];
@@ -17,6 +32,21 @@ function formatGetLines(task: Task, state: TaskState): string {
   }
   if (task.owner) lines.push(`  owner: ${task.owner}`);
   return lines.join("\n");
+}
+
+function listView(op: Extract<Op, { kind: "list" }>, state: TaskState): Task[] {
+  let view = state.tasks;
+  if (!op.includeDeleted) view = view.filter((t) => t.status !== "deleted");
+  if (op.statusFilter) view = view.filter((t) => t.status === op.statusFilter);
+  return view;
+}
+
+function structuredContentFor(op: Op, state: TaskState): TodoListStructured | TodoGetStructured | undefined {
+  if (op.kind === "list") return { tasks: listView(op, state) as StructuredTask[], nextId: state.nextId };
+  if (op.kind === "get") {
+    return { task: op.task as StructuredTask, blocks: deriveBlocks(state.tasks).get(op.task.id) ?? [] };
+  }
+  return undefined;
 }
 
 export function formatContent(op: Op, state: TaskState): string {
@@ -35,9 +65,7 @@ export function formatContent(op: Op, state: TaskState): string {
     case "clear":
       return `Cleared ${op.count} tasks`;
     case "list": {
-      let view = state.tasks;
-      if (!op.includeDeleted) view = view.filter((t) => t.status !== "deleted");
-      if (op.statusFilter) view = view.filter((t) => t.status === op.statusFilter);
+      const view = listView(op, state);
       return view.length === 0 ? "No tasks" : view.map(formatTaskListLine).join("\n");
     }
     case "get":
@@ -52,7 +80,11 @@ export function buildToolResult(
   params: TaskMutationParams,
   state: TaskState,
   op: Op,
-): { content: Array<{ type: "text"; text: string }>; details: TaskDetails } {
+): {
+  content: Array<{ type: "text"; text: string }>;
+  details: TaskDetails;
+  structuredContent?: TodoListStructured | TodoGetStructured;
+} {
   const text = formatContent(op, state);
   const details: TaskDetails = {
     action,
@@ -61,5 +93,10 @@ export function buildToolResult(
     nextId: state.nextId,
     ...(op.kind === "error" ? { error: op.message } : {}),
   };
-  return { content: [{ type: "text", text }], details };
+  const structuredContent = structuredContentFor(op, state);
+  return {
+    content: [{ type: "text", text }],
+    details,
+    ...(structuredContent !== undefined ? { structuredContent } : {}),
+  };
 }
