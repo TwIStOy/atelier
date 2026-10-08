@@ -106,6 +106,65 @@ async function makeMcpComponent(toolName: string, label: string): Promise<Patche
   ) as unknown as PatchedComponent;
 }
 
+describe("patched render for builtin MCP tools", () => {
+  it("renders mcp__<server>__<tool> via the generic rail pattern", async () => {
+    activateExtension();
+    const component = await makeMcpComponent("mcp__radius__search", "radius/search");
+    component.updateResult({ content: [{ type: "text", text: "line one\nline two" }], details: {} }, false);
+
+    const text = component.render(80).join("\n");
+    expect(text).not.toContain("mcp-adapter-header");
+    expect(text).toContain("McpRadiusSearch");
+    expect(text).toContain("2 lines");
+  });
+
+  it("renders an errored builtin MCP result as a reason line", async () => {
+    activateExtension();
+    const component = await makeMcpComponent("mcp__radius__search", "radius/search");
+    component.updateResult(
+      {
+        content: [{ type: "text", text: "server disconnected" }],
+        details: { server: "radius", tool: "search" },
+        isError: true,
+      },
+      false,
+    );
+
+    const text = component.render(80).join("\n");
+    expect(text).toContain("server disconnected");
+  });
+
+  it("toggles expanded on left click", async () => {
+    activateExtension();
+    const component = await makeMcpComponent("mcp__radius__search", "radius/search");
+    component.updateResult({ content: [{ type: "text", text: "done" }], details: {} }, false);
+
+    const event = {
+      type: "click",
+      button: "left",
+      x: 2,
+      y: 1,
+      screenX: 2,
+      screenY: 5,
+      width: 80,
+      height: 3,
+    };
+    expect(component.handleMouse(event)).toEqual({ handled: true });
+    expect(component.expanded).toBe(true);
+  });
+
+  it("leaves rendering to the stock renderers when mcpToolCalls is disabled", async () => {
+    writeConfig({ mcpToolCalls: false });
+    activateExtension();
+    const component = await makeMcpComponent("mcp__radius__search", "radius/search");
+    component.updateResult({ content: [{ type: "text", text: "line one" }], details: {} }, false);
+
+    const text = component.render(80).join("\n");
+    expect(text).toContain("mcp-adapter-header");
+    expect(text).not.toContain("McpRadiusSearch");
+  });
+});
+
 describe("mcpDisplayName", () => {
   it("uses the label suffix for direct tools", () => {
     expect(mcpDisplayName("chrome_devtools_take_screenshot", "MCP: take_screenshot")).toBe("McpTakeScreenshot");

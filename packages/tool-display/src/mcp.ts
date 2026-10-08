@@ -9,6 +9,10 @@ const MCP_DISPLAY_PREFIX = "Mcp";
 
 const mcpToolNames = new Set<string>();
 
+// Built-in MCP tools are named `mcp__<server>__<tool>`; pi's own renderer resolver matches the
+// same pattern, which also covers tools of resumed sessions whose server has not connected yet.
+const BUILTIN_MCP_NAME = /^mcp__.+?__.+$/;
+
 export function refreshMcpTools(pi: ExtensionAPI): void {
   mcpToolNames.clear();
   const getAllTools = (pi as Partial<ExtensionAPI>).getAllTools;
@@ -22,6 +26,7 @@ export function refreshMcpTools(pi: ExtensionAPI): void {
 
 export function isMcpTool(toolName: string, label?: string): boolean {
   if (mcpToolNames.has(toolName)) return true;
+  if (BUILTIN_MCP_NAME.test(toolName)) return true;
   return label === MCP_LABEL_PREFIX || label?.startsWith(`${MCP_LABEL_PREFIX}: `) === true;
 }
 
