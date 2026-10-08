@@ -11,11 +11,11 @@
     "@htwang-contrib/common": "*"
   },
   "peerDependencies": {
-    "@earendil-works/pi-coding-agent": ">=0.99.1"
+    "@earendil-works/pi-coding-agent": "^1.0.0"
   },
   "devDependencies": {
-    "@earendil-works/pi-ai": "^0.99.1",
-    "@earendil-works/pi-coding-agent": "^0.99.1",
+    "@earendil-works/pi-ai": "^1.0.0",
+    "@earendil-works/pi-coding-agent": "^1.0.0",
     "@types/node": "^26.1.2",
     "typescript": "^7.0.2",
     "vitest": "^5.0.0"
