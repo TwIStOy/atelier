@@ -5,6 +5,7 @@ import { jsonError, jsonResult } from "../tool-result.js";
 export const memoryList = {
   name: "memory-list",
   label: "Memory list",
+  annotations: { readOnlyHint: true },
   description: "List all memory nodes as a tree structure. Optionally filter by domain.",
   parameters: Type.Object({
     domain: Type.Optional(

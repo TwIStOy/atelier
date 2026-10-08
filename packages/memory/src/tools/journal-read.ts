@@ -5,6 +5,7 @@ import { jsonError, jsonResult } from "../tool-result.js";
 export const journalRead = {
   name: "journal-read",
   label: "Journal read",
+  annotations: { readOnlyHint: true },
   description: "Read a specific journal entry by its timestamp ID.",
   parameters: Type.Object({
     id: Type.String({

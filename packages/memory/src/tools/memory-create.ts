@@ -5,6 +5,7 @@ import { jsonError, jsonResult } from "../tool-result.js";
 export const memoryCreate = {
   name: "memory-create",
   label: "Memory create",
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
   description: "Create a new child memory node under a parent URI. URI format: domain://path (e.g. 'core://agent').",
   parameters: Type.Object({
     parent_uri: Type.String({

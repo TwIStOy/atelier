@@ -5,6 +5,7 @@ import { jsonError, jsonResult } from "../tool-result.js";
 export const journalWrite = (getCwd: () => string) => ({
   name: "journal-write",
   label: "Journal write",
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
   description:
     "Write a new journal entry (append-only). Journal entries are permanent records of discoveries, decisions, and insights.",
   parameters: Type.Object({

@@ -5,6 +5,7 @@ import { jsonError, jsonResult } from "../tool-result.js";
 export const memoryRead = {
   name: "memory-read",
   label: "Memory read",
+  annotations: { readOnlyHint: true },
   description:
     "Read a memory node by URI. Supports regular URIs (e.g. 'core://agent/identity') and system URIs (e.g. 'system://boot', 'system://index', 'system://glossary').",
   parameters: Type.Object({

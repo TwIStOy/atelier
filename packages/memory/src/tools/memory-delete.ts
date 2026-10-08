@@ -5,6 +5,7 @@ import { jsonError, jsonResult } from "../tool-result.js";
 export const memoryDelete = {
   name: "memory-delete",
   label: "Memory delete",
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
   description: "Delete a memory node. Removes the file but does not remove aliases pointing to it.",
   parameters: Type.Object({
     uri: Type.String({

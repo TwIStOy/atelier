@@ -5,6 +5,7 @@ import { jsonError, jsonResult } from "../tool-result.js";
 export const memoryAlias = {
   name: "memory-alias",
   label: "Memory alias",
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
   description:
     "Create or remove an alias (virtual path) pointing to an existing node. Not a copy — same content, independent priority and disclosure.",
   parameters: Type.Object({

@@ -6,6 +6,7 @@ import { jsonError, jsonResult } from "../tool-result.js";
 export const memoryUpdate = {
   name: "memory-update",
   label: "Memory update",
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
   description:
     "Update a memory node's content (patch or append) and/or metadata. Patch mode (old_string/new_string) and append mode are mutually exclusive.",
   parameters: Type.Object({

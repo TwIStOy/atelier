@@ -5,6 +5,7 @@ import { jsonError, jsonResult } from "../tool-result.js";
 export const memoryTriggers = {
   name: "memory-triggers",
   label: "Memory triggers",
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
   description:
     "Manage glossary trigger keywords for a node. When a keyword appears in any memory's content, the system auto-links to the target node.",
   parameters: Type.Object({

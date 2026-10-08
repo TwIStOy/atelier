@@ -14,6 +14,7 @@ function parseListResult(result: unknown): Record<string, unknown>[] {
 export const memoryHistory = {
   name: "memory-history",
   label: "Memory history",
+  annotations: { readOnlyHint: true },
   description:
     "View version history for a specific memory node. Returns snapshots of past content with timestamps and action types.",
   parameters: Type.Object({

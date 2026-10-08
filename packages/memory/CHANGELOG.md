@@ -5,6 +5,7 @@
 ### Added
 
 - Aggregate rules for the read-only `memory-*` and `journal-*` tools (`memory-read`, `memory-search`, `memory-list`, `memory-history`, `memory-domains`, `journal-read`, `journal-search`), so consecutive calls collapse into one verb-group summary line (e.g. `Read 2 memories, Searched 1 memory`) in tool-display. Write operations (`memory-create`, `memory-update`, …) stay unregistered, matching the built-in edit/write boundary.
+- All memory and journal tools declare MCP-style annotations: read tools are read-only; `memory-update` / `memory-delete` / `memory-alias` / `memory-triggers` are destructive and idempotent; `memory-create` / `journal-write` only add data.
 
 ## [0.6.0] - 2026-08-19
 

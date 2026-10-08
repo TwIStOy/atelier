@@ -14,6 +14,7 @@ function parseListResult(result: unknown): Record<string, unknown>[] {
 export const journalSearch = {
   name: "journal-search",
   label: "Journal search",
+  annotations: { readOnlyHint: true },
   description: "Search journal entries by text content or tags with pagination. Returns summaries sorted by recency.",
   parameters: Type.Object({
     text: Type.Optional(
