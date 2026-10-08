@@ -13,6 +13,18 @@ const MIN_SEARCH_RESULTS = 1;
 const MAX_SEARCH_RESULTS = 10;
 const DEFAULT_SEARCH_RESULTS = 5;
 
+const searchOutputSchema = Type.Object({
+  query: Type.String(),
+  backend: Type.String(),
+  results: Type.Array(
+    Type.Object({
+      title: Type.String(),
+      url: Type.String(),
+      snippet: Type.String(),
+    }),
+  ),
+});
+
 function clampSearchResultCount(requested: number | undefined): number {
   const value = requested ?? DEFAULT_SEARCH_RESULTS;
   return Math.min(Math.max(value, MIN_SEARCH_RESULTS), MAX_SEARCH_RESULTS);
@@ -47,6 +59,8 @@ export function registerWebSearchTool(pi: ExtensionAPI): void {
     description: searchToolDescription,
     promptSnippet: "Search the web for up-to-date information",
     parameters: searchParams,
+    annotations: { readOnlyHint: true, openWorldHint: true },
+    outputSchema: searchOutputSchema,
 
     async execute(_toolCallId, params, signal, onUpdate, _ctx) {
       const maxResults = clampSearchResultCount(params.max_results);
@@ -84,6 +98,7 @@ export function registerWebSearchTool(pi: ExtensionAPI): void {
                 backend: providerName,
                 resultCount: 0,
               },
+              structuredContent: { query: params.query, backend: providerName, results: [] },
             };
           }
 
@@ -95,6 +110,7 @@ export function registerWebSearchTool(pi: ExtensionAPI): void {
               resultCount: response.results.length,
               results: response.results,
             },
+            structuredContent: { query: params.query, backend: providerName, results: response.results },
           };
         } catch (err: unknown) {
           lastError = err instanceof Error ? err : new Error(String(err));

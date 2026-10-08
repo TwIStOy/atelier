@@ -74,6 +74,7 @@ export function registerWebFetchTool(pi: ExtensionAPI): void {
     description: fetchToolDescription,
     promptSnippet: "Fetch and read content from a specific URL",
     parameters: fetchParams,
+    annotations: { readOnlyHint: true, openWorldHint: true },
 
     async execute(_toolCallId, params, signal, onUpdate, _ctx) {
       const { url, raw = false } = params;

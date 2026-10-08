@@ -1,8 +1,8 @@
-export interface SearchResult {
+export type SearchResult = {
   title: string;
   url: string;
   snippet: string;
-}
+};
 
 export interface SearchResponse {
   query: string;
