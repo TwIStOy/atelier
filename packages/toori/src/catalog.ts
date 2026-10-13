@@ -25,6 +25,7 @@ type GatewayCapabilities = {
   supports_reasoning?: boolean;
   supports_json_output?: boolean;
   supports_system_prompt?: boolean;
+  supports_developer_role?: boolean;
 };
 
 type GatewayModelObject = {
@@ -57,7 +58,6 @@ const GPT_56_THINKING_LEVEL_MAP: NonNullable<ChatModelConfig["thinkingLevelMap"]
 
 const ZAI_COMPAT: NonNullable<ChatModelConfig["compat"]> = {
   supportsStore: false,
-  supportsDeveloperRole: false,
   supportsReasoningEffort: false,
   maxTokensField: "max_tokens",
   thinkingFormat: "zai",
@@ -81,7 +81,6 @@ const GLM_REASONING_EFFORT_MAP: NonNullable<ChatModelConfig["thinkingLevelMap"]>
 
 const DEEPSEEK_COMPAT: NonNullable<ChatModelConfig["compat"]> = {
   supportsStore: false,
-  supportsDeveloperRole: false,
   requiresReasoningContentOnAssistantMessages: true,
   thinkingFormat: "deepseek",
 };
@@ -98,7 +97,6 @@ const DEEPSEEK_THINKING_LEVEL_MAP: NonNullable<ChatModelConfig["thinkingLevelMap
 
 const MOONSHOT_COMPAT: NonNullable<ChatModelConfig["compat"]> = {
   supportsStore: false,
-  supportsDeveloperRole: false,
   supportsReasoningEffort: false,
   maxTokensField: "max_tokens",
   supportsStrictMode: false,
@@ -122,7 +120,6 @@ const KIMI_K3_THINKING_LEVEL_MAP: NonNullable<ChatModelConfig["thinkingLevelMap"
 
 const QWEN_COMPAT: NonNullable<ChatModelConfig["compat"]> = {
   supportsStore: false,
-  supportsDeveloperRole: false,
   thinkingFormat: "qwen",
 };
 
@@ -133,7 +130,6 @@ const MIMO_COMPAT: NonNullable<ChatModelConfig["compat"]> = {
 
 const HY3_COMPAT: NonNullable<ChatModelConfig["compat"]> = {
   supportsStore: false,
-  supportsDeveloperRole: false,
 };
 
 const GROK_45_THINKING_LEVEL_MAP: NonNullable<ChatModelConfig["thinkingLevelMap"]> = {
@@ -294,6 +290,8 @@ function toModelConfig(entry: GatewayModelObject): ProviderModelConfig {
   }
 
   applyFamilyOverrides(config, api);
+
+  config.compat = { ...config.compat, supportsDeveloperRole: capabilities?.supports_developer_role ?? true };
 
   return config;
 }

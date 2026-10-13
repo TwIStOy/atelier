@@ -67,6 +67,44 @@ describe("fetchCatalog", () => {
     expect(runtime.getModel("test-gateway", "jev-latest")).toBeUndefined();
   });
 
+  test("maps gateway supports_developer_role into compat", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({
+          data: [
+            {
+              id: "glm-5.3",
+              supported_formats: ["openai-completions"],
+              capabilities: { supports_developer_role: false },
+            },
+            {
+              id: "group:cn-models",
+              supported_formats: ["openai-completions"],
+              capabilities: { supports_developer_role: false },
+            },
+            {
+              id: "gpt-5.6-sol",
+              supported_formats: ["openai-responses"],
+              capabilities: { supports_reasoning: true },
+            },
+          ],
+        }),
+      ),
+    );
+
+    const models = await fetchCatalog({
+      allowNetwork: true,
+      publish: async () => true,
+      signal: new AbortController().signal,
+    });
+    const byId = new Map(models.map((m) => [m.id, m]));
+
+    expect(byId.get("glm-5.3")?.compat).toMatchObject({ supportsDeveloperRole: false, thinkingFormat: "zai" });
+    expect(byId.get("group:cn-models")?.compat).toMatchObject({ supportsDeveloperRole: false });
+    expect(byId.get("gpt-5.6-sol")?.compat).toMatchObject({ supportsDeveloperRole: true });
+  });
+
   test("exposes all supported GPT-5.6 thinking levels", async () => {
     vi.stubGlobal(
       "fetch",
