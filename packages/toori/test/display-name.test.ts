@@ -32,4 +32,13 @@ describe("guessDisplayName", () => {
   test("empty input returns empty string", () => {
     expect(guessDisplayName("")).toBe("");
   });
+
+  test("group ids drop the prefix and gain a [Group] suffix", () => {
+    expect(guessDisplayName("group:cn-flagship")).toBe("CN Flagship [Group]");
+  });
+
+  test("two-letter country codes are uppercased", () => {
+    expect(guessDisplayName("us-flagship")).toBe("US Flagship");
+    expect(guessDisplayName("uk-flash")).toBe("UK Flash");
+  });
 });

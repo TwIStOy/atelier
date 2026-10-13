@@ -224,11 +224,20 @@ const BRAND_DISPLAY_NAMES: Record<string, string> = {
 function formatNameSegment(segment: string): string {
   const brand = BRAND_DISPLAY_NAMES[segment.toLowerCase()];
   if (brand) return brand;
+  if (/^[a-z]{2}$/.test(segment)) return segment.toUpperCase();
   if (/^[\d.]+$/.test(segment)) return segment;
   return segment.charAt(0).toUpperCase() + segment.slice(1);
 }
 
+const GROUP_ID_PREFIX = "group:";
+
 export function guessDisplayName(id: string): string {
+  if (id.startsWith(GROUP_ID_PREFIX)) {
+    const rest = id.slice(GROUP_ID_PREFIX.length);
+    if (rest.length === 0) return id;
+    return `${guessDisplayName(rest)} [Group]`;
+  }
+
   const segments = id.split("-").filter((s) => s.length > 0);
   if (segments.length === 0) return id;
 
