@@ -1,4 +1,9 @@
-import { InMemoryCredentialStore, InMemoryModelsStore, type RefreshModelsContext } from "@earendil-works/pi-ai";
+import {
+  getSupportedThinkingLevels,
+  InMemoryCredentialStore,
+  InMemoryModelsStore,
+  type RefreshModelsContext,
+} from "@earendil-works/pi-ai";
 import * as systemOne from "@earendil-works/pi-ai/api/typesafe-system-one";
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { afterEach, describe, expect, test, vi } from "vitest";
@@ -103,6 +108,40 @@ describe("fetchCatalog", () => {
     expect(byId.get("glm-5.3")?.compat).toMatchObject({ supportsDeveloperRole: false, thinkingFormat: "zai" });
     expect(byId.get("group:cn-models")?.compat).toMatchObject({ supportsDeveloperRole: false });
     expect(byId.get("gpt-5.6-sol")?.compat).toMatchObject({ supportsDeveloperRole: true });
+  });
+
+  test("derives group model thinking levels from available_thinking_levels", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({
+          data: [
+            {
+              id: "group:cn-models",
+              supported_formats: ["openai-completions"],
+              capabilities: { supports_developer_role: false, available_thinking_levels: ["high", "max"] },
+            },
+          ],
+        }),
+      ),
+    );
+
+    const [model] = await fetchCatalog({
+      allowNetwork: true,
+      publish: async () => true,
+      signal: new AbortController().signal,
+    });
+    if (model.type === "classifier" || model.type === "image") throw new Error("Expected a chat model");
+
+    expect(model.thinkingLevelMap).toEqual({
+      minimal: null,
+      low: null,
+      medium: null,
+      high: "high",
+      xhigh: null,
+      max: "max",
+    });
+    expect(getSupportedThinkingLevels(model)).toEqual(["off", "high", "max"]);
   });
 
   test("exposes all supported GPT-5.6 thinking levels", async () => {

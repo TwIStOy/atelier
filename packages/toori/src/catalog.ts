@@ -26,6 +26,7 @@ type GatewayCapabilities = {
   supports_json_output?: boolean;
   supports_system_prompt?: boolean;
   supports_developer_role?: boolean;
+  available_thinking_levels?: string[];
 };
 
 type GatewayModelObject = {
@@ -292,6 +293,18 @@ function toModelConfig(entry: GatewayModelObject): ProviderModelConfig {
   applyFamilyOverrides(config, api);
 
   config.compat = { ...config.compat, supportsDeveloperRole: capabilities?.supports_developer_role ?? true };
+
+  if (config.id.startsWith("group:") && capabilities?.available_thinking_levels) {
+    const levels = new Set(capabilities.available_thinking_levels);
+    config.thinkingLevelMap = {
+      minimal: levels.has("minimal") ? "minimal" : null,
+      low: levels.has("low") ? "low" : null,
+      medium: levels.has("medium") ? "medium" : null,
+      high: levels.has("high") ? "high" : null,
+      xhigh: levels.has("xhigh") ? "xhigh" : null,
+      max: levels.has("max") ? "max" : null,
+    };
+  }
 
   return config;
 }

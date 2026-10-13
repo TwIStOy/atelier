@@ -11,6 +11,7 @@
 
 - Narrow chat-family overrides to Pi 0.99.1's chat model configuration type while preserving classifier entries in the shared catalog.
 - `compat.supportsDeveloperRole` is now sourced from the gateway catalog's `capabilities.supports_developer_role` (missing field defaults to `true`), replacing the hardcoded `false` in the GLM/DeepSeek/Moonshot/Qwen/HY3 family constants. Models without a family override (e.g. `group:cn-models`) now honor the gateway-declared value.
+- `group:` models now derive their `thinkingLevelMap` from the gateway's `capabilities.available_thinking_levels`: levels present in the list are exposed as-is, absent levels are hidden (`null`), and `off` keeps Pi's default behavior.
 
 ## [0.6.1] - 2026-09-01
 
