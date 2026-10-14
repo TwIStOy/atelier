@@ -27,6 +27,10 @@ export class ToolDisplayRegistry {
   }
 }
 
+// Points at the live registry; set by registry.ts so adapters (e.g. codemode,
+// formatting nested calls) can resolve sibling adapters without an import cycle.
+export const activeRegistryRef: { current?: ToolDisplayRegistry } = {};
+
 export function formatToolArgs(args: Record<string, unknown>): string {
   const entries = Object.entries(args);
   if (entries.length === 0) return "";

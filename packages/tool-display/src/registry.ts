@@ -35,9 +35,10 @@ import { webFetchAdapter } from "./adapters/web-fetch.ts";
 import { webSearchAdapter } from "./adapters/web-search.ts";
 import { workflowAdapter } from "./adapters/workflow.ts";
 import { writeAdapter } from "./adapters/write.ts";
-import { ToolDisplayRegistry } from "./tool-call-display.ts";
+import { activeRegistryRef, ToolDisplayRegistry } from "./tool-call-display.ts";
 
 export const globalToolDisplayRegistry = new ToolDisplayRegistry();
+activeRegistryRef.current = globalToolDisplayRegistry;
 globalToolDisplayRegistry.register("ask_user_question", askUserQuestionAdapter);
 globalToolDisplayRegistry.register("read", readAdapter);
 globalToolDisplayRegistry.register("grep", grepAdapter);

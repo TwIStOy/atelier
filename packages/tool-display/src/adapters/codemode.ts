@@ -2,6 +2,7 @@ import { keyText, type Theme } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { truncateDisplay } from "@htwang-contrib/common";
 import { formatDuration, spinnerGlyph } from "../format.ts";
+import { activeRegistryRef } from "../tool-call-display.ts";
 import type { ToolDisplayAdapter } from "../types.ts";
 import { formatExpandedToolOutputLines, renderContentWithLineNumbers } from "./shared.ts";
 
@@ -76,19 +77,68 @@ function callGlyph(theme: Theme, status: string | undefined, isPartial: boolean,
   }
 }
 
+// Renders a nested call like its tool's own collapsed header (`Read a.ts`) when an
+// adapter is registered and the args preview still parses; falls back to the raw
+// name + args preview for unknown tools or truncated JSON.
+function nestedCallHeader(call: CodemodeCall, theme: Theme, width: number): string | undefined {
+  const name = call.name;
+  if (!name) return undefined;
+  const adapter = activeRegistryRef.current?.get(name);
+  if (!adapter) return undefined;
+  let args: unknown;
+  try {
+    args = JSON.parse(call.args ?? "");
+  } catch {
+    return undefined;
+  }
+  if (!args || typeof args !== "object" || Array.isArray(args)) return undefined;
+  try {
+    return adapter.formatCallHeader(
+      args as Record<string, unknown>,
+      theme,
+      undefined,
+      call.status === "running",
+      false,
+      width,
+    );
+  } catch {
+    return undefined;
+  }
+}
+
 function formatCallRow(
   theme: Theme,
   call: CodemodeCall,
   isPartial: boolean,
   spinAt: number,
   expanded: boolean,
+  width: number,
 ): string {
-  const parts: string[] = [theme.fg("toolTitle", call.name ?? "tool")];
-  const argsText = expanded ? (call.args ?? "") : truncateDisplay(call.args ?? "", COLLAPSED_ARGS_CHARS, "...");
-  if (argsText) parts.push(theme.fg("muted", argsText));
-  if (typeof call.durationMs === "number") parts.push(theme.fg("dim", formatDuration(call.durationMs)));
-  if (call.cost) parts.push(theme.fg("dim", formatCost(call.cost)));
-  let row = `${callGlyph(theme, call.status, isPartial, spinAt)} ${parts.join(" ")}`;
+  const glyph = callGlyph(theme, call.status, isPartial, spinAt);
+  let suffix = "";
+  if (typeof call.durationMs === "number") suffix += ` ${theme.fg("dim", formatDuration(call.durationMs))}`;
+  if (call.cost) suffix += ` ${theme.fg("dim", formatCost(call.cost))}`;
+
+  const header = nestedCallHeader(call, theme, Math.max(1, width - 2));
+  let row: string;
+  if (header !== undefined) {
+    const headerLines = header.split("\n");
+    if (headerLines.length === 1 && visibleWidth(headerLines[0]) + visibleWidth(suffix) <= width - 2) {
+      headerLines[0] += suffix;
+    }
+    row = `${glyph} ${headerLines[0]}`;
+    if (headerLines.length > 1) {
+      row += `\n${headerLines
+        .slice(1)
+        .map((line) => `  ${line}`)
+        .join("\n")}`;
+    }
+  } else {
+    const parts: string[] = [theme.fg("toolTitle", call.name ?? "tool")];
+    const argsText = expanded ? (call.args ?? "") : truncateDisplay(call.args ?? "", COLLAPSED_ARGS_CHARS, "...");
+    if (argsText) parts.push(theme.fg("muted", argsText));
+    row = `${glyph} ${parts.join(" ")}${suffix}`;
+  }
   if (expanded && call.error?.trim()) {
     row += `\n    ${theme.fg("error", call.error.split("\n").join("\n    "))}`;
   }
@@ -128,7 +178,7 @@ function callRows(
     );
   }
   for (const call of shown) {
-    rows.push(formatCallRow(theme, call, isPartial, spinAt, expanded));
+    rows.push(formatCallRow(theme, call, isPartial, spinAt, expanded, width));
   }
   const priced = calls.filter((call) => call.cost);
   if (priced.length > 1) {

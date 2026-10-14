@@ -1,3 +1,4 @@
+import "../src/registry.ts";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it } from "vitest";
 import { codemodeAdapter } from "../src/adapters/codemode.ts";
@@ -60,9 +61,25 @@ describe("codemodeAdapter.formatCollapsedContent", () => {
   it("shows live call rows while running", () => {
     const lines = codemodeAdapter.formatCollapsedContent({ code: CODE }, "", theme, 100, detailsWithCalls(), true, 0);
     expect(lines).toHaveLength(3);
-    expect(lines[0]).toContain("✓ glob");
-    expect(lines[1]).toContain("read");
-    expect(lines[2]).toContain("✗ read");
+    expect(lines[0]).toContain('✓ Glob "src/**/*.ts"');
+    expect(lines[0]).toContain("12 ms");
+    expect(lines[1]).toContain("Reading a.ts");
+    expect(lines[2]).toContain("✗ Read b.ts");
+  });
+
+  it("falls back to raw name and args for unknown tools", () => {
+    const details = { calls: [{ name: "mcp__docs__search", args: '{"query":"x"}', status: "ok", durationMs: 5 }] };
+    const lines = codemodeAdapter.formatCollapsedContent({ code: CODE }, "", theme, 100, details, false, 0);
+    expect(lines[0]).toContain("✓ mcp__docs__search");
+    expect(lines[0]).toContain('{"query":"x"}');
+    expect(lines[0]).toContain("5 ms");
+  });
+
+  it("falls back to raw name and args when the args preview no longer parses", () => {
+    const details = { calls: [{ name: "read", args: '{"path":"a-very-long-truncat', status: "ok" }] };
+    const lines = codemodeAdapter.formatCollapsedContent({ code: CODE }, "", theme, 100, details, false, 0);
+    expect(lines[0]).toContain("read");
+    expect(lines[0]).toContain('{"path":"a-very-long-truncat');
   });
 
   it("keeps the script output out of the collapsed view once finished", () => {
