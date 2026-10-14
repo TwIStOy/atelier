@@ -1,6 +1,7 @@
 export { applyPatchAdapter } from "./adapters/apply-patch.ts";
 export { askUserQuestionAdapter } from "./adapters/ask-user-question.ts";
 export { bashAdapter } from "./adapters/bash.ts";
+export { codemodeAdapter } from "./adapters/codemode.ts";
 export { editAdapter } from "./adapters/edit.ts";
 export { globAdapter } from "./adapters/glob.ts";
 export {

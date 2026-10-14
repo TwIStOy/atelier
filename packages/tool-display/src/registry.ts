@@ -1,6 +1,7 @@
 import { applyPatchAdapter } from "./adapters/apply-patch.ts";
 import { askUserQuestionAdapter } from "./adapters/ask-user-question.ts";
 import { bashAdapter } from "./adapters/bash.ts";
+import { codemodeAdapter } from "./adapters/codemode.ts";
 import { editAdapter } from "./adapters/edit.ts";
 import { globAdapter } from "./adapters/glob.ts";
 import { createGoalAdapter, getGoalAdapter, updateGoalAdapter } from "./adapters/goal.ts";
@@ -46,6 +47,7 @@ globalToolDisplayRegistry.register("write", writeAdapter);
 globalToolDisplayRegistry.register("edit", editAdapter);
 globalToolDisplayRegistry.register("apply_patch", applyPatchAdapter);
 globalToolDisplayRegistry.register("bash", bashAdapter);
+globalToolDisplayRegistry.register("codemode", codemodeAdapter);
 globalToolDisplayRegistry.register("subagent", subagentAdapter);
 globalToolDisplayRegistry.register("subagent_status", subagentStatusAdapter);
 globalToolDisplayRegistry.register("todo_create", todoCreateAdapter);

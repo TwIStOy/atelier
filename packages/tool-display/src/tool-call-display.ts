@@ -260,9 +260,12 @@ export function renderToolCall(
           globCollapsedPartial ||
           lsCollapsedPartial ||
           (opts.toolName === "subagent" && !opts.expanded) ||
-          (opts.toolName === "workflow" && !opts.expanded));
+          (opts.toolName === "workflow" && !opts.expanded) ||
+          (opts.toolName === "codemode" && !opts.expanded));
 
-      const erroredReason = opts.isError && !opts.isPartial && out.trim().length > 0;
+      // A failed codemode script returns its output plus a "Script error:" section as
+      // text; the adapter splits and styles those instead of the squashed one-liner.
+      const erroredReason = opts.isError && !opts.isPartial && out.trim().length > 0 && opts.toolName !== "codemode";
 
       if (erroredReason) {
         const reason = out.replace(/\n+/g, " ").trim();
