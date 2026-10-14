@@ -65,16 +65,16 @@ describe("codemodeAdapter.formatCollapsedContent", () => {
     expect(lines[2]).toContain("✗ read");
   });
 
-  it("strips the script header and previews the output once finished", () => {
+  it("keeps the script output out of the collapsed view once finished", () => {
     const lines = codemodeAdapter.formatCollapsedContent({ code: CODE }, OUTPUT_OK, theme, 100, undefined, false);
-    expect(lines.some((l) => l.includes("42"))).toBe(true);
+    expect(lines.some((l) => l.includes("42"))).toBe(false);
     expect(lines.join("")).not.toContain("Script completed");
     expect(lines.join("")).not.toContain("Wall time");
   });
 
   it("shows the script error excerpt on failure", () => {
     const lines = codemodeAdapter.formatCollapsedContent({ code: CODE }, OUTPUT_FAILED, theme, 100, undefined, false);
-    expect(lines.some((l) => l.includes("partial result"))).toBe(true);
+    expect(lines.some((l) => l.includes("partial result"))).toBe(false);
     expect(lines.some((l) => l.includes("ReferenceError: nope is not defined"))).toBe(true);
     expect(lines.join("")).not.toContain("Script error:");
   });

@@ -2,7 +2,6 @@ import { keyText, type Theme } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { truncateDisplay } from "@htwang-contrib/common";
 import { formatDuration, spinnerGlyph } from "../format.ts";
-import { defaultCollapsedRenderer } from "../tool-call-display.ts";
 import type { ToolDisplayAdapter } from "../types.ts";
 import { formatExpandedToolOutputLines, renderContentWithLineNumbers } from "./shared.ts";
 
@@ -169,10 +168,7 @@ export const codemodeAdapter: ToolDisplayAdapter<CodemodeArgs> = {
     }
     const rows = callRows(asDetails(details), theme, width, false, spinAt, false);
     const { body } = stripScriptHeader(output ?? "");
-    const { output: main, error } = splitScriptError(body);
-    if (main.trim()) {
-      rows.push(...defaultCollapsedRenderer(main, theme, width));
-    }
+    const { error } = splitScriptError(body);
     if (error) {
       rows.push(...collapsedErrorLines(error, theme, width));
     }
