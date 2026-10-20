@@ -82,6 +82,54 @@ export function memoizedGroupRole<T>(component: object, width: number, compute: 
   return role;
 }
 
+interface RegionRolesCacheEntry {
+  epoch: number;
+  mutation: number;
+  configVersion: number;
+  regions: Map<string, Map<number, unknown>>;
+}
+
+const regionRolesCache = new WeakMap<object, RegionRolesCacheEntry>();
+
+// All components in one hard-break-bounded region share a single grouping
+// computation per frame, instead of each component re-scanning the region.
+export function memoizedRegionRoles<T>(
+  children: object,
+  lo: number,
+  hi: number,
+  width: number,
+  compute: () => Map<number, T>,
+): Map<number, T> {
+  const epoch = frameEpoch;
+  const mutation = roleMutationVersion;
+  const configVersion = getConfigFileVersion();
+  let entry = regionRolesCache.get(children);
+  if (!entry || entry.epoch !== epoch || entry.mutation !== mutation || entry.configVersion !== configVersion) {
+    entry = { epoch, mutation, configVersion, regions: new Map() };
+    regionRolesCache.set(children, entry);
+  }
+  const key = `${lo}:${hi}:${width}`;
+  const hit = entry.regions.get(key);
+  if (hit) return hit as Map<number, T>;
+  const roles = compute();
+  entry.regions.set(key, roles);
+  return roles;
+}
+
+const frameLineCounts = new WeakMap<object, { epoch: number; count: number }>();
+
+// Parent containers render children top-down, so when a component probes its
+// preceding siblings for visibility, those siblings have already rendered this
+// frame and their line counts are known without re-invoking their render.
+export function recordFrameLineCount(component: object, count: number): void {
+  frameLineCounts.set(component, { epoch: frameEpoch, count });
+}
+
+export function frameLineCount(component: object): number | undefined {
+  const hit = frameLineCounts.get(component);
+  return hit && hit.epoch === frameEpoch ? hit.count : undefined;
+}
+
 export interface RenderLinesKey {
   width: number;
   probed: boolean;

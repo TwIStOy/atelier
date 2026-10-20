@@ -102,10 +102,13 @@ import {
   componentStateVersion,
   currentProbeDepth,
   currentRenderEnvVersion,
+  frameLineCount,
   getCachedRenderLines,
   memoizedGroupRole,
+  memoizedRegionRoles,
   patchTuiFrameEpoch,
   type RenderLinesKey,
+  recordFrameLineCount,
   setCachedRenderLines,
 } from "./render-cache.ts";
 import { formatGenericToolHeader, renderToolCall, type ToolDisplayRegistry, toolBullet } from "./tool-call-display.ts";
@@ -198,6 +201,14 @@ function findPreviousVisibleSibling(root: unknown, target: object, width: number
   const { siblings, index } = context;
   for (let i = index - 1; i >= 0; i--) {
     const candidate = siblings[i];
+    // Siblings ahead of the target have already rendered this frame (parents
+    // render top-down), so their recorded line counts answer the probe without
+    // re-invoking their render.
+    const known = candidate && typeof candidate === "object" ? frameLineCount(candidate) : undefined;
+    if (known !== undefined) {
+      if (known > 0) return candidate;
+      continue;
+    }
     if (componentRendersLines(candidate, width)) return candidate;
   }
   return null;
@@ -220,26 +231,14 @@ type GroupRole =
   | { role: "truncation-leader"; hidden: ToolExecutionPatchThis[] }
   | { role: "claimed"; groupExpanded: boolean };
 
-// Grouping is recomputed from the chat sibling list on every render, so leader
-// election stays idempotent across streaming appends and session replay. The
-// scan covers the hard-break-bounded region around the component: verb-group
-// claims rule-registered tools and eligible ThoughtMembers first, then the
-// truncation layer folds what remains of over-long dense tool runs.
-function resolveGroupRole(component: ToolExecutionPatchThis, width: number): GroupRole | undefined {
-  const context = findComponentContext((component as { ui?: unknown }).ui, component);
-  if (!context) return undefined;
-  const { siblings, index } = context;
+// Grouping is computed once per hard-break-bounded region per frame and shared
+// by every component in the region (memoizedRegionRoles). The scan covers the
+// region around the component: verb-group claims rule-registered tools and
+// eligible ThoughtMembers first, then the truncation layer folds what remains
+// of over-long dense tool runs.
+function computeRegionRoles(siblings: unknown[], lo: number, hi: number): Map<number, GroupRole> {
   const { groupToolVerbs, groupMaxVisible } = loadConfig();
-
-  const isHardBreak = (sibling: unknown): boolean => {
-    if (asToolExecution(sibling)) return false;
-    if (isThoughtMember(sibling) || isThoughtTransparent(sibling)) return false;
-    return componentRendersLines(sibling, width);
-  };
-  let lo = index;
-  while (lo > 0 && !isHardBreak(siblings[lo - 1])) lo--;
-  let hi = index;
-  while (hi < siblings.length - 1 && !isHardBreak(siblings[hi + 1])) hi++;
+  const roles = new Map<number, GroupRole>();
 
   type VerbClass = "member" | "thought" | "transparent" | "break";
   const verbClasses = new Map<number, VerbClass>();
@@ -323,14 +322,14 @@ function resolveGroupRole(component: ToolExecutionPatchThis, width: number): Gro
   }
 
   for (const span of spans) {
-    if (index === span.leader) {
-      return {
-        role: "verb-leader",
-        members: span.members.map((m) => asToolExecution(siblings[m]) as ToolExecutionPatchThis),
-        groupExpanded: span.groupExpanded,
-      };
+    roles.set(span.leader, {
+      role: "verb-leader",
+      members: span.members.map((m) => asToolExecution(siblings[m]) as ToolExecutionPatchThis),
+      groupExpanded: span.groupExpanded,
+    });
+    for (const m of span.members) {
+      if (m !== span.leader) roles.set(m, { role: "claimed", groupExpanded: span.groupExpanded });
     }
-    if (span.members.includes(index)) return { role: "claimed", groupExpanded: span.groupExpanded };
   }
 
   if (groupMaxVisible > 0) {
@@ -369,17 +368,36 @@ function resolveGroupRole(component: ToolExecutionPatchThis, width: number): Gro
     for (const run of runs) {
       if (run.length <= groupMaxVisible + 1) continue;
       const hidden = run.slice(0, run.length - groupMaxVisible);
-      if (index === hidden[0]) {
-        return {
-          role: "truncation-leader",
-          hidden: hidden.map((m) => asToolExecution(siblings[m]) as ToolExecutionPatchThis),
-        };
+      roles.set(hidden[0] as number, {
+        role: "truncation-leader",
+        hidden: hidden.map((m) => asToolExecution(siblings[m]) as ToolExecutionPatchThis),
+      });
+      for (const m of hidden) {
+        if (m !== hidden[0]) roles.set(m, { role: "claimed", groupExpanded: false });
       }
-      if (hidden.includes(index)) return { role: "claimed", groupExpanded: false };
     }
   }
 
-  return undefined;
+  return roles;
+}
+
+function resolveGroupRole(component: ToolExecutionPatchThis, width: number): GroupRole | undefined {
+  const context = findComponentContext((component as { ui?: unknown }).ui, component);
+  if (!context) return undefined;
+  const { siblings, index } = context;
+
+  const isHardBreak = (sibling: unknown): boolean => {
+    if (asToolExecution(sibling)) return false;
+    if (isThoughtMember(sibling) || isThoughtTransparent(sibling)) return false;
+    return componentRendersLines(sibling, width);
+  };
+  let lo = index;
+  while (lo > 0 && !isHardBreak(siblings[lo - 1])) lo--;
+  let hi = index;
+  while (hi < siblings.length - 1 && !isHardBreak(siblings[hi + 1])) hi++;
+
+  const roles = memoizedRegionRoles(siblings, lo, hi, width, () => computeRegionRoles(siblings, lo, hi));
+  return roles.get(index);
 }
 
 function aggregateMemberStates(members: ToolExecutionPatchThis[]) {
@@ -563,7 +581,10 @@ function patchToolExecutionRender(
 
   const originalRender = proto.render;
   proto.render = function (this: ToolExecutionPatchThis, width: number): string[] {
-    if (this.hideComponent) return [];
+    if (this.hideComponent) {
+      recordFrameLineCount(this, 0);
+      return [];
+    }
     const theme = proto.__tdGetTheme?.() ?? FALLBACK_THEME;
     const headerAnnotation = this.toolName === "bash" ? proto.__tdGetHeaderAnnotation?.(this.toolCallId) : undefined;
     const groupRole = memoizedGroupRole<GroupRole | undefined>(this, width, () => resolveGroupRole(this, width));
@@ -607,9 +628,13 @@ function patchToolExecutionRender(
       configVersion: getConfigFileVersion(),
     };
     const cached = getCachedRenderLines(this, key);
-    if (cached) return cached;
+    if (cached) {
+      recordFrameLineCount(this, cached.length);
+      return cached;
+    }
     const lines = renderToolExecutionUncached(this, width, theme, headerAnnotation, groupRole, previous);
     setCachedRenderLines(this, key, lines);
+    recordFrameLineCount(this, lines.length);
     return lines;
   };
 
