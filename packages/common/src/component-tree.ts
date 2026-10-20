@@ -20,6 +20,10 @@ export function findComponentContext(root: unknown, target: object): ComponentSi
   return undefined;
 }
 
+export function componentRenderProbeDepth(): number {
+  return getGlobalState(COMPONENT_RENDERS_LINES_PROBE_KEY, () => ({ depth: 0 })).depth;
+}
+
 export function componentRendersLines(component: unknown, width: number): boolean {
   if (typeof width !== "number" || width <= 0) return true;
   if (!component || typeof component !== "object") return false;

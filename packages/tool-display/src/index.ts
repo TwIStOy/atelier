@@ -73,6 +73,7 @@ import {
   componentRendersLines,
   createLogger,
   findComponentContext,
+  getConfigFileVersion,
   isExtensionDisabled,
   isThoughtMember,
   isThoughtMemberClaimed,
@@ -91,8 +92,22 @@ import {
 } from "./aggregate.ts";
 import { assessBashCommand, type BashAssessment, formatBashAssessment } from "./bash-assessment.ts";
 import { loadConfig, registerToolDisplayConfigItems } from "./config.ts";
+import { formatDuration, TIMER_MIN_ELAPSED_MS } from "./format.ts";
 import { isMcpTool, MCP_STATUS_EVENT, mcpDisplayName, refreshMcpTools } from "./mcp.ts";
 import { globalToolDisplayRegistry } from "./registry.ts";
+import {
+  bumpComponentState,
+  bumpRoleMutation,
+  cachedTextOutput,
+  componentStateVersion,
+  currentProbeDepth,
+  currentRenderEnvVersion,
+  getCachedRenderLines,
+  memoizedGroupRole,
+  patchTuiFrameEpoch,
+  type RenderLinesKey,
+  setCachedRenderLines,
+} from "./render-cache.ts";
 import { formatGenericToolHeader, renderToolCall, type ToolDisplayRegistry, toolBullet } from "./tool-call-display.ts";
 import type { ToolDisplayAdapter } from "./types.ts";
 
@@ -106,6 +121,7 @@ type ToolExecutionPatchThis = {
   expanded: boolean;
   isPartial: boolean;
   result?: { details?: unknown; isError?: boolean; content?: unknown[] };
+  showImages?: boolean;
   toolDefinition?: {
     label?: string;
     description?: string;
@@ -442,23 +458,38 @@ function patchToolExecutionRender(
     this.invalidate();
   };
 
-  const originalRender = proto.render;
-  proto.render = function (this: ToolExecutionPatchThis, width: number): string[] {
-    if (this.hideComponent) return [];
-    const headerAnnotation = this.toolName === "bash" ? proto.__tdGetHeaderAnnotation?.(this.toolCallId) : undefined;
+  const originalUpdateDisplay = proto.updateDisplay as ((this: ToolExecutionPatchThis) => void) | undefined;
+  if (typeof originalUpdateDisplay === "function") {
+    proto.updateDisplay = function (this: ToolExecutionPatchThis) {
+      bumpComponentState(this);
+      originalUpdateDisplay.call(this);
+    };
+  }
 
-    const groupRole = resolveGroupRole(this, width);
-    if (groupRole?.role === "claimed") {
-      if (!this.expanded) {
-        if (!groupRole.groupExpanded) return [];
-        const theme = proto.__tdGetTheme?.() ?? FALLBACK_THEME;
-        return [renderAggregateMemberSubrow(this, theme, width, proto.__tdRegistry, headerAnnotation)];
-      }
+  function groupRoleSummary(role: GroupRole | undefined): string {
+    if (!role) return "none";
+    const sig = (members: ToolExecutionPatchThis[]) =>
+      members.map((m) => `${m.toolName}${m.isPartial ? "p" : ""}${m.result?.isError === true ? "e" : ""}`).join(",");
+    if (role.role === "claimed") return role.groupExpanded ? "claimed:open" : "claimed:shut";
+    if (role.role === "truncation-leader") return `trunc:${sig(role.hidden)}`;
+    return `lead:${role.groupExpanded ? "open" : "shut"}:${sig(role.members)}`;
+  }
+
+  function renderToolExecutionUncached(
+    component: ToolExecutionPatchThis,
+    width: number,
+    theme: Theme,
+    headerAnnotation: string | undefined,
+    groupRole: GroupRole | undefined,
+    previous: unknown,
+  ): string[] {
+    if (groupRole?.role === "claimed" && !component.expanded) {
+      if (!groupRole.groupExpanded) return [];
+      return [renderAggregateMemberSubrow(component, theme, width, proto.__tdRegistry, headerAnnotation)];
     }
 
     let aggregatePrefix: string[] = [];
     if (groupRole?.role === "verb-leader") {
-      const theme = proto.__tdGetTheme?.() ?? FALLBACK_THEME;
       const lines = renderAggregateLine(
         aggregateMemberStates(groupRole.members),
         theme,
@@ -466,73 +497,120 @@ function patchToolExecutionRender(
         Date.now(),
         groupRole.groupExpanded,
       );
-      const previous = findPreviousVisibleOf(this, width);
       // Click routing must match the layout the TUI routed the event against, so the
       // separator state is captured at render time instead of being recomputed from the
       // mouse event's width.
-      this.__tdAggregateLeadingBlank =
+      component.__tdAggregateLeadingBlank =
         !(previous instanceof ToolExecutionComponent) && readRailTailSpacing(previous) === undefined;
       if (!groupRole.groupExpanded) {
         return applyGroupSpacing(lines, previous, true);
       }
-      if (!this.expanded) {
-        lines.push(renderAggregateMemberSubrow(this, theme, width, proto.__tdRegistry, headerAnnotation));
+      if (!component.expanded) {
+        lines.push(renderAggregateMemberSubrow(component, theme, width, proto.__tdRegistry, headerAnnotation));
         return applyGroupSpacing(lines, previous, true);
       }
       aggregatePrefix = lines;
     }
     if (groupRole?.role === "truncation-leader") {
-      const theme = proto.__tdGetTheme?.() ?? FALLBACK_THEME;
       const lines = renderTruncationLine(
         aggregateMemberStates(groupRole.hidden),
         loadConfig().groupToolVerbs,
         theme,
         width,
       );
-      return applyGroupSpacing(lines, findPreviousVisibleOf(this, width), true);
+      return applyGroupSpacing(lines, previous, true);
     }
 
     const reg = proto.__tdRegistry;
-    const adapter = reg.get(this.toolName);
-    const callR = this.getCallRenderer?.();
-    const resultR = this.result ? this.getResultRenderer?.() : undefined;
-    const mcpOwned = !adapter && isMcpTool(this.toolName, this.toolDefinition?.label) && loadConfig().mcpToolCalls;
+    const adapter = reg.get(component.toolName);
+    const callR = component.getCallRenderer?.();
+    const resultR = component.result ? component.getResultRenderer?.() : undefined;
+    const mcpOwned =
+      !adapter && isMcpTool(component.toolName, component.toolDefinition?.label) && loadConfig().mcpToolCalls;
     if (!adapter && (callR != null || resultR != null) && !mcpOwned) {
-      const lines = originalRender.call(this, width) as string[];
-      return applyGroupSpacing(lines, findPreviousVisibleOf(this, width), false);
+      const lines = originalRender.call(component, width) as string[];
+      return applyGroupSpacing(lines, previous, false);
     }
 
-    const getTextOutput = this.getTextOutput?.bind(this);
-    const output = this.result ? getTextOutput?.() : undefined;
+    const getTextOutput = component.getTextOutput?.bind(component);
+    const output = component.result
+      ? cachedTextOutput(component.result, component.showImages === true, () => getTextOutput?.())
+      : undefined;
 
-    const timing = timings.get(this) ?? {};
-    if (timing.startedAtMs === undefined) timing.startedAtMs = Date.now();
-    if (!this.isPartial && this.result && timing.endedAtMs === undefined) {
-      timing.endedAtMs = Date.now();
-    }
-    timings.set(this, timing);
+    const timing = timings.get(component) ?? {};
 
     const opts = {
-      toolName: this.toolName,
-      args: this.args,
+      toolName: component.toolName,
+      args: component.args,
       output,
-      details: this.result?.details,
-      expanded: this.expanded,
-      isPartial: this.isPartial,
-      isError: this.result?.isError ?? false,
+      details: component.result?.details,
+      expanded: component.expanded,
+      isPartial: component.isPartial,
+      isError: component.result?.isError ?? false,
       registry: reg,
       startedAtMs: timing.startedAtMs,
       endedAtMs: timing.endedAtMs,
-      hoverAffordance: this.__tdHovered === true && !this.expanded,
-      displayName: mcpOwned ? mcpDisplayName(this.toolName, this.toolDefinition?.label) : undefined,
+      hoverAffordance: component.__tdHovered === true && !component.expanded,
+      displayName: mcpOwned ? mcpDisplayName(component.toolName, component.toolDefinition?.label) : undefined,
       headerAnnotation,
     };
 
-    const theme = proto.__tdGetTheme?.() ?? FALLBACK_THEME;
     const rendered = renderToolCall(opts, theme);
     const lines = rendered.render(width);
 
-    return applyGroupSpacing([...aggregatePrefix, ...lines], findPreviousVisibleOf(this, width), true);
+    return applyGroupSpacing([...aggregatePrefix, ...lines], previous, true);
+  }
+
+  const originalRender = proto.render;
+  proto.render = function (this: ToolExecutionPatchThis, width: number): string[] {
+    if (this.hideComponent) return [];
+    const theme = proto.__tdGetTheme?.() ?? FALLBACK_THEME;
+    const headerAnnotation = this.toolName === "bash" ? proto.__tdGetHeaderAnnotation?.(this.toolCallId) : undefined;
+    const groupRole = memoizedGroupRole<GroupRole | undefined>(this, width, () => resolveGroupRole(this, width));
+
+    // Claimed members render either nothing or a bare subrow; neither applies
+    // group spacing, so the backward visibility probe is skipped for them.
+    const skipPrev = groupRole?.role === "claimed" && !this.expanded;
+    const previous = skipPrev ? undefined : findPreviousVisibleOf(this, width);
+
+    const now = Date.now();
+    const timing = timings.get(this) ?? {};
+    if (timing.startedAtMs === undefined) timing.startedAtMs = now;
+    if (!this.isPartial && this.result && timing.endedAtMs === undefined) {
+      timing.endedAtMs = now;
+    }
+    timings.set(this, timing);
+
+    const spinMembers =
+      groupRole?.role === "verb-leader"
+        ? groupRole.members
+        : groupRole?.role === "truncation-leader"
+          ? groupRole.hidden
+          : undefined;
+    const spins = this.isPartial || spinMembers?.some((member) => member.isPartial) === true;
+    const elapsedMs = (timing.endedAtMs ?? now) - (timing.startedAtMs ?? now);
+    const timerLabel = elapsedMs >= TIMER_MIN_ELAPSED_MS ? formatDuration(elapsedMs) : undefined;
+
+    const key: RenderLinesKey = {
+      width,
+      probed: currentProbeDepth() > 0,
+      stateVersion: componentStateVersion(this),
+      hovered: this.__tdHovered === true,
+      headerAnnotation,
+      roleSummary: groupRoleSummary(groupRole),
+      prevIsTool: previous instanceof ToolExecutionComponent,
+      prevHasRailTail: readRailTailSpacing(previous) !== undefined,
+      spinTick: spins ? Math.floor(now / 80) : 0,
+      timerLabel,
+      theme,
+      envVersion: currentRenderEnvVersion(),
+      configVersion: getConfigFileVersion(),
+    };
+    const cached = getCachedRenderLines(this, key);
+    if (cached) return cached;
+    const lines = renderToolExecutionUncached(this, width, theme, headerAnnotation, groupRole, previous);
+    setCachedRenderLines(this, key, lines);
+    return lines;
   };
 
   const originalHandleMouse = proto.handleMouse as
@@ -545,9 +623,11 @@ function patchToolExecutionRender(
       for (const member of members) {
         if (member.expanded) member.setExpanded(false);
       }
+      bumpRoleMutation();
       return;
     }
     aggregateGroupState.set(leader, { expanded: true });
+    bumpRoleMutation();
   }
 
   function handleAggregateClick(
@@ -575,7 +655,9 @@ function patchToolExecutionRender(
 
   proto.handleMouse = function (this: ToolExecutionPatchThis, event: PatchedMouseEvent) {
     if (event.type === "click") {
-      const groupRole = resolveGroupRole(this, event.width ?? 0);
+      const groupRole = memoizedGroupRole<GroupRole | undefined>(this, event.width ?? 0, () =>
+        resolveGroupRole(this, event.width ?? 0),
+      );
       if (groupRole) {
         if (event.button !== "left") return undefined;
         if (groupRole.role === "truncation-leader") return undefined;
@@ -641,6 +723,7 @@ export default function (pi: ExtensionAPI) {
   pi.events.on(AGGREGATE_RULE_REGISTER_EVENT, (data) => {
     const { toolName, rule } = data as { toolName: string; rule: AggregateRule };
     registerAggregateRule(toolName, rule);
+    bumpRoleMutation();
   });
 
   pi.events.on(MCP_STATUS_EVENT, () => {
@@ -658,6 +741,7 @@ export default function (pi: ExtensionAPI) {
     registerSystemOneConfigItems();
     ctx.ui.setWidget?.("tool-display:render-handle", (ui) => {
       tui = ui;
+      patchTuiFrameEpoch(ui);
       return { render: () => [], invalidate() {} };
     });
     if (ctx.ui?.theme) {

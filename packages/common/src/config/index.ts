@@ -25,6 +25,7 @@ export type { ExtensionConfigSchema } from "./extension-config.ts";
 export {
   deleteConfigKey,
   deleteConfigSection,
+  getConfigFileVersion,
   readConfig,
   readRawConfig,
   setConfigKey,

@@ -70,7 +70,7 @@ export {
 } from "./aggregate-rules.ts";
 export { AsyncAnnotations } from "./async-annotations.ts";
 export type { ComponentSiblingContext } from "./component-tree.ts";
-export { componentRendersLines, findComponentContext } from "./component-tree.ts";
+export { componentRenderProbeDepth, componentRendersLines, findComponentContext } from "./component-tree.ts";
 export { mapConcurrent } from "./concurrency.ts";
 export type {
   BooleanConfigItem,
@@ -96,6 +96,7 @@ export {
   deleteConfigKey,
   deleteConfigSection,
   getConfigEnvVar,
+  getConfigFileVersion,
   getConfigItems,
   readConfig,
   readRawConfig,

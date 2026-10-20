@@ -1,4 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { bumpRenderEnv } from "./render-cache.ts";
 import { snakeToCamelCase } from "./tool-call-display.ts";
 
 export const MCP_STATUS_EVENT = "pi-mcp-adapter/status/v1";
@@ -14,14 +15,18 @@ const mcpToolNames = new Set<string>();
 const BUILTIN_MCP_NAME = /^mcp__.+?__.+$/;
 
 export function refreshMcpTools(pi: ExtensionAPI): void {
-  mcpToolNames.clear();
   const getAllTools = (pi as Partial<ExtensionAPI>).getAllTools;
   if (typeof getAllTools !== "function") return;
+  const next = new Set<string>();
   for (const tool of getAllTools.call(pi)) {
     if (tool.sourceInfo?.path?.includes(MCP_ADAPTER_PATH_MARKER)) {
-      mcpToolNames.add(tool.name);
+      next.add(tool.name);
     }
   }
+  if (next.size === mcpToolNames.size && [...next].every((name) => mcpToolNames.has(name))) return;
+  mcpToolNames.clear();
+  for (const name of next) mcpToolNames.add(name);
+  bumpRenderEnv();
 }
 
 export function isMcpTool(toolName: string, label?: string): boolean {

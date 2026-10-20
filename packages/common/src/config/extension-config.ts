@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -14,11 +14,43 @@ function configPath(): string {
   return join(base, "extensions.json");
 }
 
+let configFileVersion = 0;
+let configFileCache: { path: string; mtimeMs: number; size: number; data: ConfigFile } | undefined;
+
+// Bumped on every in-process write and whenever an on-disk change is observed,
+// so render paths can key caches on config state without re-reading the file.
+export function getConfigFileVersion(): number {
+  return configFileVersion;
+}
+
 function readConfigFile(): ConfigFile {
   const path = configPath();
+  let mtimeMs = 0;
+  let size = -1;
   try {
-    if (!existsSync(path)) return {};
-    return JSON.parse(readFileSync(path, "utf8"));
+    const st = statSync(path);
+    mtimeMs = st.mtimeMs;
+    size = st.size;
+  } catch {
+    if (configFileCache) {
+      configFileCache = undefined;
+      configFileVersion++;
+    }
+    return {};
+  }
+  if (
+    configFileCache &&
+    configFileCache.path === path &&
+    configFileCache.mtimeMs === mtimeMs &&
+    configFileCache.size === size
+  ) {
+    return configFileCache.data;
+  }
+  try {
+    const data = JSON.parse(readFileSync(path, "utf8")) as ConfigFile;
+    configFileCache = { path, mtimeMs, size, data };
+    configFileVersion++;
+    return data;
   } catch {
     return {};
   }
@@ -37,6 +69,13 @@ function writeConfigFile(data: ConfigFile): void {
   const tmp = `${path}.tmp.${process.pid}.${Date.now()}`;
   writeFileSync(tmp, `${JSON.stringify(data, null, 2)}\n`, "utf8");
   renameSync(tmp, path);
+  try {
+    const st = statSync(path);
+    configFileCache = { path, mtimeMs: st.mtimeMs, size: st.size, data };
+  } catch {
+    configFileCache = undefined;
+  }
+  configFileVersion++;
 }
 
 export function readConfig<T>(extensionId: string, schema: ExtensionConfigSchema<T>): T {
