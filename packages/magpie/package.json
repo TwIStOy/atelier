@@ -1,0 +1,16 @@
+{
+  "name": "@htwang-contrib/magpie",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "dependencies": {
+    "@htwang-contrib/common": "*"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-ai": "^1.0.0",
+    "@earendil-works/pi-coding-agent": "^1.0.0",
+    "@types/node": "^26.1.2",
+    "typescript": "^7.0.2"
+  }
+}

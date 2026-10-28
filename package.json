@@ -14,6 +14,7 @@
       "packages/tool-timeout",
       "packages/zai-coding-plan",
       "packages/toori",
+      "packages/magpie",
       "packages/statusline",
       "packages/user-input-history",
       "packages/user-message",

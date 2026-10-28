@@ -52,6 +52,7 @@ goal
 gondolin-sandbox
 herdr
 htw-producer
+magpie
 memory
 message-queue
 moshi-hooks-extra
