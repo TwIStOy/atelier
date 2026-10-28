@@ -304,8 +304,14 @@ function computeRegionRoles(siblings: unknown[], lo: number, hi: number): Map<nu
     i = j;
   }
 
+  // A group of one carries no aggregate information (it would just hide the
+  // path behind "Read 1 file"), so singleton spans render as ordinary tools.
+  // They neither claim their adjacent thoughts nor count as span-covered for
+  // the truncation layer.
+  const groupSpans = spans.filter((span) => span.members.length >= 2);
+
   const claimedThoughts = new Set<number>();
-  for (const span of spans) {
+  for (const span of groupSpans) {
     if (span.groupExpanded) continue;
     for (const t of span.thoughts) claimedThoughts.add(t);
   }
@@ -316,12 +322,12 @@ function computeRegionRoles(siblings: unknown[], lo: number, hi: number): Map<nu
   }
 
   const spanCovered = new Set<number>();
-  for (const span of spans) {
+  for (const span of groupSpans) {
     for (const m of span.members) spanCovered.add(m);
     for (const t of span.thoughts) spanCovered.add(t);
   }
 
-  for (const span of spans) {
+  for (const span of groupSpans) {
     roles.set(span.leader, {
       role: "verb-leader",
       members: span.members.map((m) => asToolExecution(siblings[m]) as ToolExecutionPatchThis),

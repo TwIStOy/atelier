@@ -168,7 +168,7 @@ describe("thought member folding", () => {
 
     asPatched(read1).render(80);
     expect(isThoughtMemberClaimed(thought)).toBe(false);
-    expect(asPatched(read2).render(80)).toEqual(["", "  ❙  ◈ Read 1 file"]);
+    expect(asPatched(read2).render(80)).toEqual(["", "  ┃  ◆ Read ...", "  ┃    └ 1 line"]);
   });
 
   it("folds across a streaming or user-expanded thinking block without claiming it", () => {
@@ -230,9 +230,11 @@ describe("aggregate rule registration", () => {
     sessionStart?.(undefined, { mode: "tui", ui: { theme: PLAIN_THEME } });
     const root: FakeRoot = { children: [] };
     const probe1 = withResult(makeComponent("my_probe", root));
-    root.children.push(probe1);
+    const probe2 = withResult(makeComponent("my_probe", root));
+    root.children.push(probe1, probe2);
 
-    expect(asPatched(probe1).render(80)).toEqual(["", "  ❙  ◈ Probed 1 t"]);
+    expect(asPatched(probe1).render(80)).toEqual(["", "  ❙  ◈ Probed 2 ts"]);
+    expect(asPatched(probe2).render(80)).toEqual([]);
   });
 });
 
