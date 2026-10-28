@@ -6,10 +6,10 @@
   "main": "src/index.ts",
   "types": "src/index.ts",
   "dependencies": {
-    "@earendil-works/gondolin": "^0.12.0"
+    "@earendil-works/gondolin": "^0.14.0"
   },
   "devDependencies": {
-    "@earendil-works/pi-coding-agent": "^1.0.0",
+    "@earendil-works/pi-coding-agent": "^1.4.0",
     "@htwang-contrib/common": "*",
     "@types/node": "^26.1.2",
     "typescript": "^7.0.2"
