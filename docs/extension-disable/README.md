@@ -42,6 +42,7 @@ The id is the extension's **package directory name** (the short, unscoped name).
 agents-mirror
 ask-user-question
 auto-compact
+better-editor
 btw
 committer
 context-usage
@@ -62,7 +63,6 @@ tool-call-fixer
 tool-display
 toori
 truncate-outputs
-user-input-history
 user-message
 voice-input
 web-tools
