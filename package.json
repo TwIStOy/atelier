@@ -15,7 +15,7 @@
       "packages/toori",
       "packages/magpie",
       "packages/statusline",
-      "packages/user-input-history",
+      "extensions/better-editor",
       "packages/user-message",
       "packages/tool-display",
       "packages/subagents",
