@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Moved the extension to `extensions/working-indicator/`.
+
+### Fixed
+
+- Pointed the Pi extension manifest at the existing `src/index.ts` entry point.
+
 ## [0.4.0] - 2026-07-31
 
 ### Changed

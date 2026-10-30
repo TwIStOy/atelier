@@ -24,7 +24,7 @@
     { "path": "packages/todo" },
     { "path": "packages/voice-input" },
     { "path": "packages/read-tracker" },
-    { "path": "packages/working-indicator" },
+    { "path": "extensions/working-indicator" },
     { "path": "packages/moshi-hooks-extra" },
     { "path": "packages/heap-probe" },
     { "path": "packages/apply-patch" }

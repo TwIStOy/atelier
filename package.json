@@ -32,7 +32,7 @@
       "packages/message-queue",
       "packages/auto-compact",
       "packages/read-tracker",
-      "packages/working-indicator",
+      "extensions/working-indicator",
       "packages/compact-thinking",
       "packages/todo",
       "packages/moshi-hooks-extra",

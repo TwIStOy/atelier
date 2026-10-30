@@ -2,7 +2,7 @@
 
 How engineering prompts and skills should consume this repo's domain documentation when exploring the codebase.
 
-This is a **multi-context** monorepo — a collection of independent `pi` extensions under `packages/*`. Each package (extension) is its own context, with shared conventions and shared infrastructure (`packages/common`). The domain docs reflect that: a root map plus per-context `CONTEXT.md` files.
+This is a **multi-context** monorepo — a collection of independent `pi` extensions under `extensions/*` and `packages/*`. New extensions belong in `extensions/*`; existing packages remain in `packages/*` until migrated. Each package (extension) is its own context, with shared conventions and shared infrastructure (`packages/common`). The domain docs reflect that: a root map plus per-context `CONTEXT.md` files.
 
 ## Before exploring, read these
 
@@ -14,7 +14,7 @@ If any of these files don't exist, **proceed silently**. Don't flag their absenc
 
 ## File structure
 
-Multi-context layout (this repo). All docs live under the repo-root `docs/` directory, organized by topic — this repo's existing convention. Do **not** create per-package `docs/` directories under `packages/`.
+Multi-context layout (this repo). All docs live under the repo-root `docs/` directory, organized by topic — this repo's existing convention. Do **not** create per-package `docs/` directories under `packages/` or `extensions/`.
 
 ```
 /
@@ -27,8 +27,11 @@ Multi-context layout (this repo). All docs live under the repo-root `docs/` dire
 │   └── herdr/
 │       ├── CONTEXT.md
 │       └── adr/
+├── extensions/
+│   └── working-indicator/             ← new and migrated extension code
 └── packages/
-    └── goal/                          ← code lives here, docs do not
+    ├── common/                        ← shared infrastructure
+    └── goal/                          ← existing extension code
 ```
 
 `CONTEXT-MAP.md` at the root lists each context and links to its `docs/<context>/CONTEXT.md`. A `CONTEXT.md` holds that context's ubiquitous language (glossary) and may link out to its `adr/`.

@@ -325,7 +325,7 @@ export function applyRunCatIndicator(ctx, config, state, speed = null, force = f
 
 本仓库**已经有**一个 working-indicator 系统，但它和 pi-speeed 是两种不同范式：
 
-| 维度 | 本仓库 `packages/working-indicator` + `common/spinner.ts` | pi-speeed RunCat |
+| 维度 | 本仓库 `extensions/working-indicator` + `common/spinner.ts` | pi-speeed RunCat |
 | ---- | -------------------------------------------------------- | ---------------- |
 | 帧率 | **固定**（每个 style 写死 `intervalMs`） | **速度自适应**（`intervalMs = 6000/tokS`） |
 | 帧来源 | 标准 Unicode 符号（Braille dots、emoji、几何符号等，共 ~60 种） | 自带 ttf 的 PUA 码位（5 帧跑步猫） |

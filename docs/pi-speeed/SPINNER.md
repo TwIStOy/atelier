@@ -112,8 +112,8 @@ Whiskers engaged...  Brain cat running...  Serving kibble...
 - [ ] 引擎：直接移植 `TokenSpeedEngine`（纯类，无依赖，已带测试）
 - [ ] 帧数组：用 PUA 码位 + 自带 ttf，或换成 Unicode 既有符号（如 `⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏` Braille —— 本仓库 `common/spinner.ts` 里已经有 ~60 种现成的）
 - [ ] 帧率映射：照搬 `runcatInterval`，按自己动画的舒适区间调 scale/min/max。**本仓库 `SpinnerStyle.intervalMs` 目前是写死的数字，要支持速度自适应需要加一个函数字段**
-- [ ] 渲染：本仓库 `packages/working-indicator/index.ts` 已有 `ctx.ui.setWorkingIndicator` 调用，但只在 `session_start` 调一次；要动态调需要在 `message_update` 里按速度重设
+- [ ] 渲染：本仓库 `extensions/working-indicator/src/index.ts` 已有 `ctx.ui.setWorkingIndicator` 调用，但只在 `session_start` 调一次；要动态调需要在 `message_update` 里按速度重设
 - [ ] 字体安装：参考 `scripts/install-font.mjs`（macOS + Linux 双平台 + fc-cache）
 - [ ] 去抖：interval 变化 <10ms 不重设 `setWorkingIndicator`
 
-> 本仓库与 pi-speeed 的关键差异：`packages/working-indicator` + `common/spinner.ts` 是**固定帧率** spinner，没有速度感知；pi-speeed 的核心增量就是「tok/s → 帧率」的反比映射。详见 `ANALYSIS.md` §3.0。
+> 本仓库与 pi-speeed 的关键差异：`extensions/working-indicator` + `common/spinner.ts` 是**固定帧率** spinner，没有速度感知；pi-speeed 的核心增量就是「tok/s → 帧率」的反比映射。详见 `ANALYSIS.md` §3.0。

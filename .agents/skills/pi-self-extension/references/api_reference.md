@@ -404,7 +404,7 @@ registerConfigItems("my-ext", [
 ]);
 ```
 
-Item types: `string`, `number`, `boolean`, `select`, `multiselect`, `reorderable`, `color`. `value` may be a getter `() => T`. Optional `preview?: ConfigItemPreview` on select items renders a live (animatable) preview of the **highlighted** option in the select page — see `packages/working-indicator/preview.ts` for a timer-driven example. Call `registerConfigItems(...)` once at extension init.
+Item types: `string`, `number`, `boolean`, `select`, `multiselect`, `reorderable`, `color`. `value` may be a getter `() => T`. Optional `preview?: ConfigItemPreview` on select items renders a live (animatable) preview of the **highlighted** option in the select page — see `extensions/working-indicator/src/preview.ts` for a timer-driven example. Call `registerConfigItems(...)` once at extension init.
 
 ## Output Truncation
 

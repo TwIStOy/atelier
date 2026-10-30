@@ -20,7 +20,7 @@
 - Check node_modules for external API types; don't guess.
 - **No inline imports** (`await import()`, `import("pkg").Type`, dynamic type imports). Top-level imports only.
 - Never remove or downgrade code to fix type errors from outdated deps; upgrade the dep instead.
-- Use only erasable TypeScript syntax (Node strip-only mode) in code checked by the root config (`packages/*/src`, `packages/*/test`, `packages/coding-agent/examples`): no parameter properties, `enum`, `namespace`/`module`, `import =`, `export =`, or other constructs needing JS emit. Use explicit fields with constructor assignments.
+- Use only erasable TypeScript syntax (Node strip-only mode) in code checked by the root config (`packages/*/src`, `packages/*/test`, `extensions/*/src`, `extensions/*/test`, `packages/coding-agent/examples`): no parameter properties, `enum`, `namespace`/`module`, `import =`, `export =`, or other constructs needing JS emit. Use explicit fields with constructor assignments.
 - Always ask before removing functionality or code that appears intentional.
 - Do not preserve backward compatibility unless the user asks for it.
 - Never hardcode key checks (e.g. `matchesKey(keyData, "ctrl+x")`). Add defaults to `DEFAULT_EDITOR_KEYBINDINGS` or `DEFAULT_APP_KEYBINDINGS` so they stay configurable.
@@ -36,10 +36,17 @@
 - Use `snake_case` for tool names (the identifier used in code and API calls).
 - Use `CamelCase` for display names (shown in terminal UI, logs, and user-facing output).
 
+## Extension Layout
+
+- Create all new extensions under the repo-root `extensions/<name>/` directory.
+- Use the existing workspace structure: `src/`, `test/`, `package.json`, `tsconfig.json`, and `CHANGELOG.md`.
+- Register each extension in the root `package.json` Pi manifest and the root `tsconfig.json` project references. Point its package-level `pi.extensions` entry at `./src/index.ts`.
+- Existing extensions in `packages/` may remain there until explicitly migrated. Shared code stays in `packages/common/`.
+
 ## Documentation
 
 - All documentation lives under the repo-root `docs/` directory, organized as `docs/<topic>/...` (typically `<topic>` matches the package name, e.g. `docs/goal/`, `docs/herdr/`).
-- Do **not** create per-package `docs/` directories (`packages/*/docs/`). Keep docs out of `packages/`.
+- Do **not** create per-package `docs/` directories (`packages/*/docs/` or `extensions/*/docs/`). Keep docs out of `packages/` and `extensions/`.
 
 When migrating or adapting an extension from another project (for example `rpiv-ask-user-question` under `docs/ask-user-question/`):
 
@@ -79,7 +86,7 @@ If rebase conflicts occur:
 
 ## Changelog
 
-Location: `packages/*/CHANGELOG.md` (one per package).
+Location: `packages/*/CHANGELOG.md` and `extensions/*/CHANGELOG.md` (one per package).
 
 Sections under `## [Unreleased]`: `### Breaking Changes` (API changes requiring migration), `### Added`, `### Changed`, `### Fixed`, `### Removed`.
 

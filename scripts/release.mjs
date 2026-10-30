@@ -5,7 +5,7 @@
 //
 // Given a target version, this script:
 //   1. Bumps the "version" field in the root package.json and every
-//      packages/*/package.json to the target version.
+//      packages/*/package.json and extensions/*/package.json to the target version.
 //   2. Updates changelogs: turns the current "## [Unreleased]" section into a
 //      dated "## [<version>] - <date>" section and opens a fresh empty
 //      "## [Unreleased]" above it. Packages whose "## [Unreleased]" section is
@@ -49,7 +49,7 @@
 // <version>.
 //
 // Versioning model: single global release version per cut. Only packages that
-// changed since the previous release tag (git diff under packages/<name>/) OR
+// changed since the previous release tag (under packages/<name>/ or extensions/<name>/) OR
 // that have a non-empty "## [Unreleased]" changelog section adopt the new
 // version; unchanged packages keep their current version. The root package.json
 // and the single v<version> tag always advance to the new version.
@@ -60,6 +60,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+const PACKAGE_ROOTS = ["packages", "extensions"];
 const SEMVER = /^(\d+)\.(\d+)\.(\d+)$/;
 
 function parseSemver(v) {
@@ -185,20 +186,21 @@ try {
 }
 let changedFiles = null;
 if (prevTag !== null) {
-  const out = git("diff", "--name-only", prevTag, "--", "packages/");
+  const out = git("diff", "--name-only", prevTag, "--", ...PACKAGE_ROOTS);
   changedFiles = out === "" ? [] : out.split("\n");
 }
 
-function pkgChangedByGit(name) {
+function pkgChangedByGit(path) {
   if (changedFiles === null) return true;
-  const prefix = `packages/${name}/`;
+  const prefix = `${path}/`;
   return changedFiles.some((f) => f.startsWith(prefix));
 }
 
-const pkgNames = readdirSync(join(ROOT, "packages"), { withFileTypes: true })
-  .filter((e) => e.isDirectory())
-  .map((e) => e.name)
-  .sort();
+const pkgPaths = PACKAGE_ROOTS.flatMap((root) =>
+  readdirSync(join(ROOT, root), { withFileTypes: true })
+    .filter((e) => e.isDirectory())
+    .map((e) => `${root}/${e.name}`),
+).sort();
 
 function readPkg(dir) {
   return JSON.parse(readFileSync(join(dir, "package.json"), "utf8"));
@@ -211,12 +213,12 @@ const changelogCreated = [];
 const changelogSkipped = [];
 const notBumped = [];
 
-for (const name of pkgNames) {
-  const dir = join(ROOT, "packages", name);
+for (const path of pkgPaths) {
+  const dir = join(ROOT, path);
   const pkg = readPkg(dir);
   const cl = join(dir, "CHANGELOG.md");
 
-  const gitChanged = pkgChangedByGit(name);
+  const gitChanged = pkgChangedByGit(path);
   let changelogChanged = false;
   const hasChangelog = existsSync(cl);
   if (hasChangelog) {
@@ -320,7 +322,7 @@ const flags = [
 ].filter(Boolean);
 const tagSuffix = flags.length ? ` (${flags.join(", ")})` : "";
 console.log(
-  `Releasing ${toBump.length - 1} of ${pkgNames.length} packages${tagSuffix}: ${version} (${today})`,
+  `Releasing ${toBump.length - 1} of ${pkgPaths.length} packages${tagSuffix}: ${version} (${today})`,
 );
 
 for (const { dir, name, prev } of toBump) {
