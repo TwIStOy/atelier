@@ -43,4 +43,19 @@ describe("continuation prompt marker", () => {
     const prompt = buildContinuationPrompt(makeGoal());
     expect(prompt).toContain("independent verification agent");
   });
+
+  it("instructs the agent to run autonomously without ask_user_question", () => {
+    const prompt = buildContinuationPrompt(makeGoal());
+    expect(prompt).toContain("running autonomously");
+    expect(prompt).toContain("Do not call ask_user_question");
+    expect(prompt).toContain("do not wait for human input");
+    expect(prompt).toContain("reasonable default");
+  });
+
+  it("instructs the budget-limited prompt not to call ask_user_question", () => {
+    const prompt = buildBudgetLimitedPrompt(makeGoal({ status: "budgetLimited", tokenBudget: 1000, tokensUsed: 1200 }));
+    expect(prompt).toContain("running autonomously");
+    expect(prompt).toContain("Do not call ask_user_question");
+    expect(prompt).toContain("do not wait for human input");
+  });
 });

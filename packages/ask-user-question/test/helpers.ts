@@ -25,6 +25,7 @@ export function createMockPi(): {
       emit(event: string, payload: unknown) {
         eventsEmits.push({ event, payload });
       },
+      on: () => {},
     },
   } as unknown as ExtensionAPI;
   return { tools, eventsEmits, pi };

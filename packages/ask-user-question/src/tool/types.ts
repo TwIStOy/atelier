@@ -118,6 +118,7 @@ export interface QuestionAnswer {
 
 export type QuestionnaireError =
   | "no_ui"
+  | "goal_mode"
   | "no_questions"
   | "empty_options"
   | "too_many_questions"

@@ -7,6 +7,7 @@
 - Ctrl+U (`tui.editor.deleteToLineStart`) now clears the entire custom-answer draft — all of its lines, regardless of cursor position — without cancelling the questionnaire, replacing the single-line delete-to-line-start behavior. ([#99](https://github.com/TwIStOy/pi-extensions/issues/99))
 - The controls hint advertises `Shift+Enter for newline · Ctrl+U to clear` while the custom-answer row is focused. The parts sit after the cancel hint so narrow terminals clip them before the core hints. ([#99](https://github.com/TwIStOy/pi-extensions/issues/99))
 - The `ask_user_question` tool declares a read-only MCP-style annotation.
+- Goal-mode guard: while a goal with status `active` exists (AFK autonomous run), the tool refuses without opening its modal and immediately returns a non-error directive telling the agent not to retry, to make reasonable default decisions itself, and to stop and report — or pause the goal first — when a decision genuinely needs a human. Result details carry `{ answers: [], cancelled: true, error: "goal_mode" }`. Detection subscribes to `GOAL_UPDATE_EVENT` from `@htwang-contrib/common`; without the `goal` extension the tool behaves exactly as before. ([#6](https://github.com/TwIStOy/pi-extensions/issues/6))
 
 ### Changed
 

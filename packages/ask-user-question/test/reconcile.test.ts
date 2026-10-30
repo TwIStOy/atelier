@@ -46,7 +46,7 @@ function buildPi(initialActive: string[] = []): MockState {
     on(event: string, handler: Handler) {
       handlers.set(event, handler);
     },
-    events: { emit: () => {} },
+    events: { emit: () => {}, on: () => {} },
   };
   return { pi: pi as unknown as ExtensionAPI, activeTools, registeredTools, handlers };
 }
