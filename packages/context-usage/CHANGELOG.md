@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-30
+
 ### Changed
 
 - `/context` reads the current model, thinking level, and context usage directly from Pi after removal of the `virtual-model` extension.

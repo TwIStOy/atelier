@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-30
+
 ### Added
 
 - The extension now self-registers into the shared child-extension registry (`registerChildExtensionFactory` from `@htwang-contrib/common`), so `subagent` / `workflow` child sessions get `web_search` / `web_fetch` whenever web-tools is loaded in the parent session (previously hardcoded into the `subagents` child factory list).

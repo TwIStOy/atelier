@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-30
+
 ### Added
 
 - Configurable `cheap`, `middle`, and `flagship` model tiers and per-persona model selection in `/config` → Subagents (`modelTiers` / `agentModels` in `extensions.json`). The shared child runner applies them to single, batch, background, and workflow calls; explicit call models take precedence, and unset tiers or an empty model selection inherit the current session model. See `docs/subagents/MODELS.md`.

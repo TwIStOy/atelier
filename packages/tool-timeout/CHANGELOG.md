@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-30
+
 ### Added
 
 - Exempt rules: new `exemptRules` config (JSON array of `{ "tool", "pattern" }`, e.g. `[{ "tool": "bash", "pattern": "ocr review" }]`, edited directly in `extensions.json`). When the tool name matches and any string argument contains the pattern (for bash: the command), the call runs with no timeout at all — the cap is not applied and a model-requested `timeout` is removed. Useful for commands where an interruption wastes the whole run (long review/rebuild passes). Malformed entries are ignored; rules apply even when `maxTimeoutSeconds` is `0`. Not surfaced in `/config` (the UI cannot edit arrays).

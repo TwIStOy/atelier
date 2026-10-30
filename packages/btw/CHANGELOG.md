@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-30
+
 ### Changed
 
 - `/btw` is now registered only when pi runs in TUI mode (via `registerTuiCommands` from `@htwang-contrib/common`). Its overlay is a `ctx.ui.custom` component, which resolves `undefined` in RPC mode and left the command hanging forever on the overlay controller promise.

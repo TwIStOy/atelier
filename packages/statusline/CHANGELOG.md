@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-30
+
 ### Breaking Changes
 
 - Move the custom input editor, editor hints, and `borderColor` configuration to `extensions/better-editor`. Statusline now manages only the footer and turn telemetry; configure the editor under `/config` -> BetterEditor.

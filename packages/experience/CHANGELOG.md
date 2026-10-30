@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-30
+
 ### Breaking Changes
 
 - Move double-Escape abort handling and its configuration to `extensions/better-editor`. Configure `doubleEscapeEnabled` and `doubleEscapeDebounceMs` under `/config` -> BetterEditor; Experience now manages model visibility only.

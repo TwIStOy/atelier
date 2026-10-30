@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-30
+
 ### Added
 
 - `/canvas-open [name]` opens the index or an existing page in a new Rex pane on the right while keeping focus in Pi. Uses a dedicated terminal-browser profile and daemon, Kitty animation rendering, and a 30 FPS limit. The executable is configurable through `/config`.

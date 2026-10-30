@@ -4,6 +4,8 @@ Releases before this consolidation describe the former `user-input-history` pack
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-30
+
 ### Breaking Changes
 
 - Replace `@htwang-contrib/user-input-history` with `@htwang-contrib/better-editor` under `extensions/better-editor`. The disable flag is now `better-editor`.

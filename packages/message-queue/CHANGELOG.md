@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-30
+
 ### Changed
 
 - `/queue` is now registered only when pi runs in TUI mode (via `registerTuiCommands` from `@htwang-contrib/common`). The queue panel is a `ctx.ui.custom` component, which resolves `undefined` in RPC mode, so the command was a silent no-op there.

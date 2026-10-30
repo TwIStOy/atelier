@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-30
+
 ### Changed
 
 - Grammar-repair parsers carry Pi's `JsonValue` and `JsonObject` types from JSON parsing through recovered tool calls, matching the Pi 0.99.1 tool argument contract.

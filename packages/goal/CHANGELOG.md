@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-30
+
 ### Added
 
 - `goal:update` is now emitted once on `session_start` with the stored goal (rebased when active), or `null` when none exists, so consumers resuming or switching sessions sync goal mode without having observed the original transitions. The widget refresh rides the same emission. ([#6](https://github.com/TwIStOy/pi-extensions/issues/6))

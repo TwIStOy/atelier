@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-30
+
 ### Changed
 
 - Models whose `native_endpoints` omit `/v1/chat/completions` are registered on the first native API Pi can speak (`/v1/responses`, then `/v1/messages`, then Gemini `generateContent`). Entries that list chat, or omit the field, stay on Chat Completions.

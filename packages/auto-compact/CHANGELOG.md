@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-30
+
 ### Fixed
 
 - An unknown zero-sized context window no longer triggers immediate compaction or emergency truncation.

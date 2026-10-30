@@ -1,6 +1,6 @@
 {
   "name": "@htwang-contrib/apply-patch",
-  "version": "0.1.0",
+  "version": "0.7.0",
   "description": "Pi extension. Codex-style apply_patch freeform tool for OpenAI GPT models, ported from code-yeongyu/pi-apply-patch.",
   "keywords": [
     "pi-package",

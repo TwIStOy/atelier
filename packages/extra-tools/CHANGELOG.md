@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-30
+
 ### Added
 
 - The extension now self-registers into the shared child-extension registry (`registerChildExtensionFactory` from `@htwang-contrib/common`), so `subagent` / `workflow` child sessions get `bash` / `grep` / `glob` / `ls` whenever the extension is loaded in the parent session. Previously children received it through a hardcoded list inside the `subagents` package; disabling `extra-tools` on the parent now also removes these tools from children.

@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-30
+
 ### Added
 
 - ThoughtMember / Transparent layout classification for tool-display's verb-group ([#157](https://github.com/TwIStOy/pi-extensions/issues/157)): on every content rebuild a finished, collapsed, text-free assistant block marks itself as an eligible ThoughtMember (`setThoughtMember` from `@htwang-contrib/common`), and a streaming or user-expanded text-free thinking block marks itself Transparent. The block keeps building its normal heading row either way; only when tool-display's verb-group claims an eligible member (`setThoughtMemberClaimed`) does the patched render return zero lines, so a standalone finished thinking block keeps its `◆ Thought for Xs — summary` row while one folded between tool-call batches disappears without breaking the group. Claims are cleared on every content rebuild, so a stale fold never survives a message change, and expanding a run during streaming keeps the block visible (Transparent) after the run finishes.

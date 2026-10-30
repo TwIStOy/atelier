@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-30
+
 ### Added
 
 - Ctrl+U (`tui.editor.deleteToLineStart`) now clears the entire custom-answer draft — all of its lines, regardless of cursor position — without cancelling the questionnaire, replacing the single-line delete-to-line-start behavior. ([#99](https://github.com/TwIStOy/pi-extensions/issues/99))

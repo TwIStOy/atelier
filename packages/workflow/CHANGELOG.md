@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-30
+
 ### Added
 
 - The `workflow` tool declares MCP-style annotations (mutating, destructive, open-world).

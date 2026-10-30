@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-30
+
 ### Changed
 
 - Settings search and option filters now support case-insensitive fuzzy matching, abbreviations, and space- or slash-separated tokens. Settings and ordinary options rank by match quality; reorderable options preserve their configured order.

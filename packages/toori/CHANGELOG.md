@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-30
+
 ### Added
 
 - Catalog entries advertising `typesafe-systemone` are registered as native Pi classifiers, so Jev can be selected as the virtual model judge and uses the gateway's `/api/v1/systemone` endpoint.

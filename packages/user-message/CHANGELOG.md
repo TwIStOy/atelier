@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-30
+
 ### Added
 
 - Fullscreen transcripts pin the current turn's user prompt as its original block reaches the viewport top, without a partially clipped transition. The pinned block follows the viewed turn, reuses its rendered styling, and shows up to three lines with an ellipsis for longer prompts. It starts on the first viewport row and aligns with the original prompt's left edge; a clickable `▲` centered in the separator below jumps to the complete original user block. The pin yields to an approaching user block, dialogs, and text selection and is removed on session shutdown or reload.

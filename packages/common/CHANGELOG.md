@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-30
+
 ### Fixed
 
 - Aggregate Rule registrations from other extensions (`registerAggregateRule` in memory / web-tools / todo) never reached tool-display in a real session: pi loads each extension through a separate jiti module graph (`moduleCache: false`), so the module-level `Map` gave every extension its own registry copy and only the built-in four rules ever grouped. The registry now lives in Symbol.for-keyed global state (same pattern as the system-prompt contribution registry), and built-ins seed inside the `getGlobalState` init callback instead of at module evaluation — every extension re-evaluates this module, so a top-level reseed would wipe registrations made by earlier-loaded extensions. Verified against a live headless pi session: cross-extension rules are visible to readers after the fix.

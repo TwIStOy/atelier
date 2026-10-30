@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-30
+
 ### Changed
 
 - Upgrade the Pi packages from 0.85.1 to 0.99.1, including native virtual model and classifier APIs.

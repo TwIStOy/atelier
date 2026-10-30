@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-30
+
 ### Fixed
 
 - `/commit` grouped mode now includes deleted source paths when Git detects renames, so committing a replacement no longer leaves the original file's deletion uncommitted. Changed-file paths are read without Git quoting to handle non-ASCII characters, quotes, and newlines correctly.
