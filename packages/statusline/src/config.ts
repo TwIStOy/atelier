@@ -1,16 +1,12 @@
 import type { ExtensionConfigSchema } from "@htwang-contrib/common";
 import { readConfig, registerConfigItems } from "@htwang-contrib/common";
 
-/** Fixed theme color for the editor border, or pi's thinking-level colors. */
-export type BorderColorMode = "dim" | "border" | "thinkingLevel";
-
 export interface StatuslineConfig {
   showGitBranch: boolean;
   /** Master switch for the post-run telemetry notification (TPS/TTFT/stalls). */
   telemetry: boolean;
   /** Render extension statuses set via ctx.ui.setStatus() in the footer. */
   showExtensionStatus: boolean;
-  borderColor: BorderColorMode;
 }
 
 const CONFIG_NAME = "statusline";
@@ -20,7 +16,6 @@ const CONFIG_SCHEMA: ExtensionConfigSchema<StatuslineConfig> = {
     showGitBranch: true,
     telemetry: true,
     showExtensionStatus: true,
-    borderColor: "dim",
   },
 };
 
@@ -58,21 +53,6 @@ export function registerStatuslineConfigItems(): void {
         "Render values set by extensions via ctx.ui.setStatus() (e.g. agents-mirror injection count) in the footer.",
       extensionLabel: "Statusline",
       order: 2,
-    },
-    {
-      key: "borderColor",
-      type: "select",
-      label: "Editor Border Color",
-      value: () => loadConfig().borderColor,
-      options: [
-        { label: "Fixed dim", value: "dim" },
-        { label: "Fixed border color", value: "border" },
-        { label: "Follow thinking level", value: "thinkingLevel" },
-      ],
-      description:
-        "Editor border color: a fixed theme color, or the thinking-level colors pi reapplies on every level change.",
-      extensionLabel: "Statusline",
-      order: 3,
     },
   ]);
 }

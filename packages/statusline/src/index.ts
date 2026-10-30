@@ -1,7 +1,5 @@
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import {
-  EDITOR_HINT_EVENT,
-  type EditorHintPayload,
   formatTurnTelemetry,
   isExtensionDisabled,
   type TelemetryModelRef,
@@ -9,7 +7,6 @@ import {
   TurnTelemetryTracker,
 } from "@htwang-contrib/common";
 import { loadConfig, registerStatuslineConfigItems } from "./config.ts";
-import { MyEditor } from "./editor.ts";
 import { makeFooter } from "./footer.ts";
 
 function modelRefOf(message: { role: string; provider?: string; model?: string }): TelemetryModelRef | null {
@@ -41,9 +38,6 @@ function usageOf(message: {
 
 export default function (pi: ExtensionAPI) {
   if (isExtensionDisabled("statusline")) return;
-  let activeCtx: ExtensionContext | undefined;
-  let activeEditor: MyEditor | undefined;
-  let unsubscribeHint: (() => void) | undefined;
   const telemetry = new TurnTelemetryTracker();
 
   registerStatuslineConfigItems();
@@ -68,30 +62,8 @@ export default function (pi: ExtensionAPI) {
     if (line) ctx.ui.notify(line, "info");
   });
 
-  pi.on("session_start", async (_event, ctx) => {
+  pi.on("session_start", (_event, ctx) => {
     if (!ctx.hasUI) return;
-    activeCtx = ctx;
-    activeEditor = undefined;
-    unsubscribeHint?.();
-    unsubscribeHint = undefined;
-
-    ctx.ui.setEditorComponent((tui, theme, keybindings) => {
-      const editor = new MyEditor(tui, theme, keybindings, () => activeCtx ?? ctx, pi);
-      activeEditor = editor;
-      return editor;
-    });
-
-    unsubscribeHint = pi.events.on(EDITOR_HINT_EVENT, (data: unknown) => {
-      activeEditor?.applyHint(data as EditorHintPayload);
-    });
-
     ctx.ui.setFooter(makeFooter(ctx));
-  });
-
-  pi.on("session_shutdown", () => {
-    activeCtx = undefined;
-    activeEditor = undefined;
-    unsubscribeHint?.();
-    unsubscribeHint = undefined;
   });
 }
