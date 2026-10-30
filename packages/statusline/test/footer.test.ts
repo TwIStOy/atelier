@@ -1,9 +1,4 @@
-import type {
-  ExtensionAPI,
-  ExtensionContext,
-  ReadonlyFooterDataProvider,
-  Theme,
-} from "@earendil-works/pi-coding-agent";
+import type { ExtensionContext, ReadonlyFooterDataProvider, Theme } from "@earendil-works/pi-coding-agent";
 import type { TUI } from "@earendil-works/pi-tui";
 import { visibleWidth } from "@earendil-works/pi-tui";
 import { afterEach, describe, expect, test, vi } from "vitest";
@@ -51,12 +46,6 @@ function fakeCtx(): ExtensionContext {
   } as unknown as ExtensionContext;
 }
 
-function fakePi(): ExtensionAPI {
-  return {
-    events: { on: () => () => {} },
-  } as unknown as ExtensionAPI;
-}
-
 function fakeFooterData(statuses: Map<string, string> = new Map()): ReadonlyFooterDataProvider {
   return {
     getGitBranch: () => null,
@@ -79,7 +68,7 @@ afterEach(() => {
 describe("makeFooter git branch toggle", () => {
   test("creates the git component when enabled", () => {
     showGitBranch = true;
-    const factory = makeFooter(fakeCtx(), fakePi());
+    const factory = makeFooter(fakeCtx());
     const comp = factory(fakeTui(), fakeTheme(), fakeFooterData());
     expect(gitInstances).toBe(1);
     const lines = comp.render(80);
@@ -89,7 +78,7 @@ describe("makeFooter git branch toggle", () => {
 
   test("does not create the git component when disabled", () => {
     showGitBranch = false;
-    const factory = makeFooter(fakeCtx(), fakePi());
+    const factory = makeFooter(fakeCtx());
     const comp = factory(fakeTui(), fakeTheme(), fakeFooterData());
     expect(gitInstances).toBe(0);
     const lines = comp.render(80);
@@ -104,7 +93,7 @@ describe("makeFooter git branch toggle", () => {
 describe("makeFooter extension status", () => {
   test("renders ctx.ui.setStatus values from footerData.ln()", () => {
     showGitBranch = false;
-    const factory = makeFooter(fakeCtx(), fakePi());
+    const factory = makeFooter(fakeCtx());
     const statuses = new Map([["ext:agents-mirror:status", "\u25C6 2"]]);
     const comp = factory(fakeTui(), fakeTheme(), fakeFooterData(statuses));
     const lines = comp.render(80);
@@ -114,7 +103,7 @@ describe("makeFooter extension status", () => {
 
   test("renders nothing extra when no extension has set a status", () => {
     showGitBranch = true;
-    const factory = makeFooter(fakeCtx(), fakePi());
+    const factory = makeFooter(fakeCtx());
     const comp = factory(fakeTui(), fakeTheme(), fakeFooterData(new Map()));
     const lines = comp.render(80);
     expect(stripAnsi(lines.join(" "))).toContain("\u2713");
@@ -124,7 +113,7 @@ describe("makeFooter extension status", () => {
   test("can be disabled via config", () => {
     showGitBranch = false;
     showExtensionStatus = false;
-    const factory = makeFooter(fakeCtx(), fakePi());
+    const factory = makeFooter(fakeCtx());
     const statuses = new Map([["ext:agents-mirror:status", "\u25C6 2"]]);
     const comp = factory(fakeTui(), fakeTheme(), fakeFooterData(statuses));
     const lines = comp.render(80);

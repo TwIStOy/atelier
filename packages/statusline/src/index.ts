@@ -85,7 +85,7 @@ export default function (pi: ExtensionAPI) {
       activeEditor?.applyHint(data as EditorHintPayload);
     });
 
-    ctx.ui.setFooter(makeFooter(ctx, pi));
+    ctx.ui.setFooter(makeFooter(ctx));
   });
 
   pi.on("session_shutdown", () => {

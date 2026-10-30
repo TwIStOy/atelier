@@ -463,17 +463,9 @@ This is the recommended pattern for cross-extension communication (e.g., goal ex
 When package A produces structured data that package B consumes, put the event-name const + payload types in `packages/common` and re-export **both** values and types from its index:
 
 ```typescript
-// packages/common/events.ts
-export const ZAI_CODING_PLAN_EVENTS = {
-  USAGE_UPDATE: "pi-extensions:zai-coding-plan:usage-update",
-  RAW_USAGE_UPDATE: "pi-extensions:zai-coding-plan:raw-usage-update",
-} as const;
-// packages/common/usage.ts
-export interface CodingPlanRawUsage {
-  level?: string;
-  windows: CodingPlanUsageWindowRaw[];
-  modelTotals?: CodingPlanModelTotals;
-  toolTotals?: CodingPlanToolTotals;
+export const ASK_USER_BLOCKED_EVENT = "ask_user_question:blocked" as const;
+export interface AskUserBlockedPayload {
+  active: boolean;
 }
 ```
 
@@ -481,18 +473,18 @@ Producer emits a typed payload; consumer narrows `unknown`:
 
 ```typescript
 import {
-  ZAI_CODING_PLAN_EVENTS,
-  type CodingPlanRawUsage,
+  ASK_USER_BLOCKED_EVENT,
+  type AskUserBlockedPayload,
 } from "@htwang-contrib/common";
 
-// Producer
-pi.events.emit(ZAI_CODING_PLAN_EVENTS.RAW_USAGE_UPDATE, { usage });
+const payload: AskUserBlockedPayload = { active: true };
+pi.events.emit(ASK_USER_BLOCKED_EVENT, payload);
 
-// Consumer
-pi.events.on(ZAI_CODING_PLAN_EVENTS.RAW_USAGE_UPDATE, (data: unknown) => {
-  const usage = (data as { usage?: CodingPlanRawUsage } | undefined)?.usage;
-  if (!usage) return;
-  // ...
+let waitingForAnswer = false;
+pi.events.on(ASK_USER_BLOCKED_EVENT, (data: unknown) => {
+  const payload = data as AskUserBlockedPayload | undefined;
+  if (typeof payload?.active !== "boolean") return;
+  waitingForAnswer = payload.active;
 });
 ```
 

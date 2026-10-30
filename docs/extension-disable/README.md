@@ -67,7 +67,6 @@ user-message
 voice-input
 web-tools
 working-indicator
-zai-coding-plan
 ```
 
 ## Applying a change

@@ -33,6 +33,7 @@
 ### Removed
 
 - Session-title generation, virtual-model status and context overrides, and routing-tier exports used by the removed `herdr`, `htw-producer`, and `virtual-model` extensions.
+- Z.AI Coding Plan usage event constants and quota types after removal of the extension and its consumers.
 
 ## [0.6.1] - 2026-09-01
 

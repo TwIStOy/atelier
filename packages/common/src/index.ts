@@ -123,7 +123,6 @@ export {
   ASK_USER_PROMPT_EVENT,
   EDITOR_HINT_EVENT,
   MODAL_ACTIVE_EVENT,
-  ZAI_CODING_PLAN_EVENTS,
 } from "./events.ts";
 export { findExecutable } from "./executable.ts";
 export type { DisableConfigPaths } from "./extension-disable.ts";
@@ -275,17 +274,3 @@ export {
   toolRailBodyWidth,
 } from "./tool-rail.ts";
 export { registerTuiCommands } from "./tui-commands.ts";
-export type {
-  CodingPlanLimitKind,
-  CodingPlanLimitPeriod,
-  CodingPlanModelSummary,
-  CodingPlanModelTotals,
-  CodingPlanRawUsage,
-  CodingPlanToolSummary,
-  CodingPlanToolTotals,
-  CodingPlanUsage,
-  CodingPlanUsageLimit,
-  CodingPlanUsageWindow,
-  CodingPlanUsageWindowRaw,
-  CodingPlanWindowDetail,
-} from "./usage.ts";

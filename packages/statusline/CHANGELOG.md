@@ -12,6 +12,10 @@
 - Model labels and context usage now read Pi's session APIs directly after removal of the `virtual-model` extension.
 - The editor border no longer follows the thinking level by default. Pi reapplies thinking-level colors on every level change, which overrode the constant border color `MyEditor` set at construction; the configured color is now re-asserted on every render. Bash mode keeps its dedicated border color.
 
+### Removed
+
+- Z.AI Coding Plan quota segment and its event subscription after removal of the `zai-coding-plan` extension.
+
 ## [0.4.0] - 2026-07-31
 
 ### Added

@@ -2,13 +2,10 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import {
   ASK_USER_PROMPT_EVENT,
   type AskUserPromptPayload,
-  type CodingPlanRawUsage,
-  type CodingPlanUsage,
   createLogger,
   isExtensionDisabled,
   MODAL_ACTIVE_EVENT,
   registerConfigItems,
-  ZAI_CODING_PLAN_EVENTS,
 } from "@htwang-contrib/common";
 import {
   ActivityTracker,
@@ -19,7 +16,6 @@ import {
 } from "./activity.ts";
 import { previewContent } from "./envelope.ts";
 import { isMoshiHookAvailable, resolveTransportMode, sendEnvelope, snapshotCtx } from "./moshi-client.ts";
-import { type MoshiCredentials, readMoshiSecrets } from "./moshi-secrets.ts";
 import { sessionIdFromCtx } from "./session-id.ts";
 import {
   lastAssistantMessage,
@@ -28,10 +24,8 @@ import {
   SUMMARY_TITLE_FALLBACK,
   summarizeAgentTurn,
 } from "./summarizer.ts";
-import { buildZaiRawSnapshot, buildZaiSnapshot, pushUsageSnapshot } from "./usage-publisher.ts";
 
 const IDLE_TITLE_FALLBACK = "Thinking next step...";
-const USAGE_PUSH_MIN_INTERVAL_MS = 60_000;
 
 const logger = createLogger("moshi-hooks-extra");
 
@@ -83,17 +77,12 @@ export default function moshiHooksExtra(pi: ExtensionAPI): void {
   const activity = new ActivityTracker();
   const pendingQuestion = new Map<string, AskUserQuestionSummary>();
   let cachedSessionId = "";
-  let cachedCredentials: MoshiCredentials | null = null;
-  let lastUsagePushAt = 0;
-  let usagePushInFlight = false;
-  let lastRawUsage: CodingPlanRawUsage | null = null;
 
   pi.on("session_start", (_event, ctx) => {
     cachedSessionId = sessionIdFromCtx(ctx);
     activity.reset();
     pendingQuestion.clear();
-    cachedCredentials = readMoshiSecrets();
-    logger.debug(`session started usageCredentials=${cachedCredentials ? "available" : "missing"}`);
+    logger.debug("session started");
     const models = ctx.modelRegistry.getAvailable();
     cachedModels = models.map((m) => ({
       label: `${m.provider}/${m.id}`,
@@ -204,71 +193,6 @@ export default function moshiHooksExtra(pi: ExtensionAPI): void {
     const summary = summarizeAskUserQuestion(payload);
     const cwd = process.cwd();
     pendingQuestion.set(sessionKeyFor(cachedSessionId, cwd), summary);
-  });
-
-  pi.events.on(ZAI_CODING_PLAN_EVENTS.RAW_USAGE_UPDATE, (data: unknown) => {
-    const credentials = cachedCredentials ?? readMoshiSecrets();
-    if (!credentials) {
-      logger.debug("usage push skipped source=raw reason=credentials-missing");
-      return;
-    }
-    const payload = data as { usage?: CodingPlanRawUsage } | undefined;
-    const usage = payload?.usage;
-    if (!usage?.windows.some((window) => window.kind === "tokens")) {
-      logger.debug("usage push skipped source=raw reason=no-token-windows");
-      return;
-    }
-    lastRawUsage = usage;
-    const now = Date.now();
-    if (usagePushInFlight) {
-      logger.debug("usage push skipped source=raw reason=request-in-flight");
-      return;
-    }
-    if (now - lastUsagePushAt < USAGE_PUSH_MIN_INTERVAL_MS) {
-      logger.debug("usage push skipped source=raw reason=throttled");
-      return;
-    }
-    usagePushInFlight = true;
-    lastUsagePushAt = now;
-    const snapshot = buildZaiRawSnapshot(usage, credentials);
-    logger.debug(`usage push started source=raw windows=${snapshot.windows.length}`);
-    void pushUsageSnapshot(snapshot, credentials, { logger }).finally(() => {
-      usagePushInFlight = false;
-    });
-  });
-
-  pi.events.on(ZAI_CODING_PLAN_EVENTS.USAGE_UPDATE, (data: unknown) => {
-    // The raw event (fired alongside this one) carries the full window set
-    // including tool-call windows; only fall back to the legacy payload when
-    // it is the sole source.
-    if (lastRawUsage) return;
-    const credentials = cachedCredentials ?? readMoshiSecrets();
-    if (!credentials) {
-      logger.debug("usage push skipped source=legacy reason=credentials-missing");
-      return;
-    }
-    const payload = data as { usage?: CodingPlanUsage } | undefined;
-    const usage = payload?.usage;
-    if (!usage || usage.limits.length === 0) {
-      logger.debug("usage push skipped source=legacy reason=no-windows");
-      return;
-    }
-    const now = Date.now();
-    if (usagePushInFlight) {
-      logger.debug("usage push skipped source=legacy reason=request-in-flight");
-      return;
-    }
-    if (now - lastUsagePushAt < USAGE_PUSH_MIN_INTERVAL_MS) {
-      logger.debug("usage push skipped source=legacy reason=throttled");
-      return;
-    }
-    usagePushInFlight = true;
-    lastUsagePushAt = now;
-    const snapshot = buildZaiSnapshot(usage, credentials);
-    logger.debug(`usage push started source=legacy windows=${snapshot.windows.length}`);
-    void pushUsageSnapshot(snapshot, credentials, { logger }).finally(() => {
-      usagePushInFlight = false;
-    });
   });
 
   pi.events.on(MODAL_ACTIVE_EVENT, (active: unknown) => {

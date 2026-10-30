@@ -14,6 +14,7 @@
 ### Removed
 
 - `herdr`, `gondolin-sandbox`, `permission-system`, `virtual-model`, and `htw-producer` extensions, including their workspace dependencies and extension-specific support code.
+- `zai-coding-plan` and `loop-guard` extensions, including Z.AI quota display, Moshi quota forwarding, and shared quota contracts.
 
 ## [0.6.1] - 2026-09-01
 

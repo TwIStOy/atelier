@@ -190,9 +190,9 @@ import type { AssistantMessage } from "@earendil-works/pi-ai";
 
 ```typescript
 // Current model
-ctx.model?.id           // "glm-5.1"
-ctx.model?.name         // "GLM 5.1" (display name)
-ctx.model?.provider     // "zai-coding-plan"
+ctx.model?.id           // "claude-sonnet-4-6"
+ctx.model?.name         // "Claude Sonnet 4.6" (display name)
+ctx.model?.provider     // "anthropic"
 ctx.model?.reasoning    // true/false
 
 // Thinking level

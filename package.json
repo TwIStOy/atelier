@@ -12,7 +12,6 @@
       "packages/common/src/log-warning.ts",
       "packages/tool-call-fixer",
       "packages/tool-timeout",
-      "packages/zai-coding-plan",
       "packages/toori",
       "packages/magpie",
       "packages/statusline",

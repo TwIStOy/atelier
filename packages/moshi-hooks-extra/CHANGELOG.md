@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Removed
+
+- Z.AI quota forwarding, its usage publisher, and the file/Keychain credential readers used only by that integration.
+
 ## [0.6.1] - 2026-09-01
 
 ### Added

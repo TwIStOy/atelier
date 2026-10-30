@@ -1,11 +1,5 @@
 import type { ThemeColor } from "@earendil-works/pi-coding-agent";
 
-export const ZAI_CODING_PLAN_EVENTS = {
-  USAGE_UPDATE: "pi-extensions:zai-coding-plan:usage-update",
-  RAW_USAGE_UPDATE: "pi-extensions:zai-coding-plan:raw-usage-update",
-  REQUEST_USAGE: "pi-extensions:zai-coding-plan:request-usage",
-} as const;
-
 /**
  * Cross-extension channel for editor-occupying modals.
  *
