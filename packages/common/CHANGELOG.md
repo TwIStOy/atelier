@@ -12,6 +12,7 @@
 
 ### Added
 
+- Shared `findExecutable`, `getLocalRexContext` and `openRexPane` helpers resolve executable paths, verify a local Rex session, and launch an explicitly anchored pane without changing focus or interpolating a shell command.
 - Shared session-scoped virtual model status and effective context-usage helpers keep statusline, `/context`, and auto-compaction aligned with the current routed physical model while retaining Pi's token estimate.
 - Shared subagent model-tier configuration and resolution (`loadSubagentModelConfig`, `resolveSubagentModelPattern`, `SUBAGENT_MODEL_TIERS`). `runChildAgent` applies per-persona model overrides before persona frontmatter and resolves tier references for all child-agent callers while preserving current-session fallback.
 - Shared `createComplexityAssessment`, `ComplexityTier`, and tier validation for transcript annotations and virtual model routing, preserving complete conversation text and image type markers.

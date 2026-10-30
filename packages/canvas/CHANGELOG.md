@@ -4,7 +4,12 @@
 
 ### Added
 
+- `/canvas-open [name]` opens the index or an existing page in a new Rex pane on the right while keeping focus in Pi. Uses a dedicated terminal-browser profile and daemon, Kitty animation rendering, and a 30 FPS limit. The executable is configurable through `/config`.
 - `canvas_publish` / `canvas_delete` / `canvas_list` declare MCP-style annotations (`canvas_list` read-only; publish/delete destructive and idempotent).
+
+### Fixed
+
+- Concurrent Canvas commands wait for the same HTTP server startup; failed starts can be retried instead of returning an unready server.
 
 ### Changed
 

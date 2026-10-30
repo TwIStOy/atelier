@@ -125,6 +125,7 @@ export {
   MODAL_ACTIVE_EVENT,
   ZAI_CODING_PLAN_EVENTS,
 } from "./events.ts";
+export { findExecutable } from "./executable.ts";
 export type { DisableConfigPaths } from "./extension-disable.ts";
 export {
   defaultDisablePaths,
@@ -168,6 +169,8 @@ export type { ComplexityTier } from "./model-complexity.ts";
 export { COMPLEXITY_TIERS, createComplexityAssessment, isComplexityTier } from "./model-complexity.ts";
 export type { ResolvableModel } from "./model-resolve.ts";
 export { resolveModel } from "./model-resolve.ts";
+export type { RexContext, RexPaneOptions } from "./rex.ts";
+export { getLocalRexContext, openRexPane } from "./rex.ts";
 export type { SessionCache } from "./session-cache.ts";
 export {
   branchToMessages,

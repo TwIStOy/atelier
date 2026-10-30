@@ -6,12 +6,14 @@ import type { ExtensionAPI, ExtensionContext, MessageRenderer } from "@earendil-
 import { Text } from "@earendil-works/pi-tui";
 import {
   type ExtensionConfigSchema,
+  getLocalRexContext,
   isExtensionDisabled,
   readConfig,
   registerConfigItems,
 } from "@htwang-contrib/common";
 import { Type } from "@sinclair/typebox";
 import { canvasPublishAdapter } from "./display.ts";
+import { openCanvasPreview } from "./preview.ts";
 import { CanvasServer, externalIPv4Addresses } from "./server.ts";
 import { isValidPageName, PageStore } from "./store.ts";
 
@@ -21,12 +23,14 @@ const GUIDANCE_MESSAGE_TYPE = "canvas:guidance";
 interface CanvasConfig {
   port: number;
   pagesDir: string;
+  terminalBrowser: string;
 }
 
 const CONFIG_SCHEMA: ExtensionConfigSchema<CanvasConfig> = {
   defaults: {
     port: 7700,
     pagesDir: join(homedir(), ".pi", "agent", "canvas"),
+    terminalBrowser: "terminal-browser",
   },
 };
 
@@ -58,6 +62,15 @@ function registerConfig(): void {
       extensionLabel: "Canvas",
       order: 10,
     },
+    {
+      key: "terminalBrowser",
+      type: "string",
+      label: "Terminal Browser",
+      value: () => loadConfig().terminalBrowser,
+      description: "Executable name or absolute path used by /canvas-open to open a preview inside Rex.",
+      extensionLabel: "Canvas",
+      order: 20,
+    },
   ]);
 }
 
@@ -84,6 +97,7 @@ export default function (pi: ExtensionAPI): void {
 
   let store: PageStore | null = null;
   let server: CanvasServer | null = null;
+  let serverStart: Promise<number> | null = null;
   let activated = false;
 
   async function ensureRunning(ctx: ExtensionContext): Promise<{ store: PageStore; server: CanvasServer }> {
@@ -93,8 +107,12 @@ export default function (pi: ExtensionAPI): void {
     }
     if (!server) {
       server = new CanvasServer({ store, preferredPort: loadConfig().port });
-      await server.start();
     }
+    serverStart ??= server.start().catch((error: unknown) => {
+      serverStart = null;
+      throw error;
+    });
+    await serverStart;
     return { store, server };
   }
 
@@ -252,9 +270,42 @@ export default function (pi: ExtensionAPI): void {
     },
   });
 
+  pi.registerCommand("canvas-open", {
+    description: "Open the Canvas index or a named page in a new Rex pane on the right. Usage: /canvas-open [name]",
+    getArgumentCompletions: (prefix) => {
+      const matches = (store?.list() ?? [])
+        .filter((page) => page.name.startsWith(prefix))
+        .map((page) => ({ value: page.name, label: page.name }));
+      return matches.length ? matches : null;
+    },
+    handler: async (args, ctx) => {
+      const name = args.trim();
+      if (name && !isValidPageName(name)) {
+        ctx.ui.notify(`Invalid page name "${name}". ${NAME_RULES}. Usage: /canvas-open [name]`, "error");
+        return;
+      }
+      try {
+        const rex = await getLocalRexContext(pi.exec);
+        const running = await ensureRunning(ctx);
+        if (name && !running.store.get(name)) {
+          ctx.ui.notify(`No page named "${name}". Use /canvas-open to browse the page index.`, "error");
+          return;
+        }
+        const url = `http://127.0.0.1:${running.server.port}${name ? `/p/${name}` : "/"}`;
+        await openCanvasPreview(pi.exec, rex, { url, cwd: ctx.cwd, terminalBrowser: loadConfig().terminalBrowser });
+        activateCanvas();
+        ctx.ui.notify(`Canvas opened on the right: ${url}\nClose the preview with Ctrl+Q.`, "info");
+      } catch (error) {
+        ctx.ui.notify(`Could not open Canvas: ${error instanceof Error ? error.message : String(error)}`, "error");
+      }
+    },
+  });
+
   pi.on("session_shutdown", async () => {
+    await serverStart?.catch(() => {});
     await server?.stop();
     server = null;
+    serverStart = null;
     store = null;
     activated = false;
   });
