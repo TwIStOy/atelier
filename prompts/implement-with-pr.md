@@ -15,7 +15,7 @@ Implement the work described above (or already present in conversation context),
 
 ## Unattended rules
 
-You may run unattended in a background tmux/herdr pane: nobody can answer an interactive prompt. Keep every commit and push non-interactive so a failure fails fast instead of hanging; if a command genuinely needs interaction, stop and report.
+You may run unattended in a background Rex/tmux/herdr pane: nobody can answer an interactive prompt. Keep every commit and push non-interactive so a failure fails fast instead of hanging; if a command genuinely needs interaction, stop and report.
 
 Do not ask the user questions (no ask_user_question, no pausing on decisions): the ticket/spec is already a scope you can implement independently. Resolve every open question from the issue text and the repo's existing conventions, and note non-obvious choices in the PR body. Stop and report only when no reasonable interpretation lets you proceed safely.
 

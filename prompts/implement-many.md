@@ -1,5 +1,5 @@
 ---
-description: Fan out N implement targets into parallel git worktrees — one pi agent per pane, in a single new tmux window or one herdr workspace per target opened by herdr worktree; each pane is seeded with /implement-with-pr, which implements unattended, opens a PR, and stops
+description: Fan out N implement targets into parallel git worktrees — one pi agent pane per target, in a dedicated Rex tab in the current session, a shared new tmux window, or a herdr workspace; each agent runs /implement-with-pr, opens a PR, and stops
 argument-hint: "<#issue | spec-path | description> ..."
 ---
 
@@ -13,11 +13,12 @@ Each whitespace-separated token above is one implement target (an issue ref like
 
 ## Goal
 
-Run `/implement-with-pr <target>` in parallel: one isolated git worktree + git branch per target, one pi agent per pane — in tmux all panes share a single **new** window; in herdr `herdr worktree create` opens one workspace per target. You only set up worktrees, panes, and seeds, then verify they started — you do **not** implement anything yourself. Each pane's agent owns its own work.
+Run `/implement-with-pr <target>` in parallel: one isolated git worktree + git branch per target, one pi agent pane per target. In Rex, each worktree gets a **new dedicated tab in the current session**, then its agent starts in a **new pane inside that tab**, beside the worktree's shell pane. In tmux all agent panes share a single **new** window; in herdr `herdr worktree create` opens one workspace per target. You only set up worktrees, panes, and seeds, then verify they started — you do **not** implement anything yourself. Each pane's agent owns its own work.
 
 ## Preconditions
 
-- You know which pane environment you are in: herdr (`$HERDR_ENV` is set) or tmux (`$TMUX` is set); if both are set, treat it as herdr. If neither, stop and tell the user this needs a herdr or tmux session. Steps 3–4 differ per environment (herdr: `herdr worktree create` per target; tmux: `git worktree add` plus a window of splits); the pane steps (5–7) each have a tmux path and a herdr path — follow the one for your environment consistently.
+- Select the pane environment once: Rex when both `$REX_SESSION` and `$REX_BLOCK` are nonempty; otherwise herdr when `$HERDR_ENV` is set; otherwise tmux when `$TMUX` is set. Rex takes precedence over inherited herdr/tmux variables. If none matches, stop and report that this needs a Rex, herdr, or tmux session. Follow the selected path consistently through steps 3–7.
+- In Rex, require `rex` and `jq`, save `REX_SOURCE_SESSION="$REX_SESSION"`, and verify the source block with `rex block inspect -s "$REX_SOURCE_SESSION" "$REX_BLOCK" --json | jq -e '.block'`. If it fails, stop and report the stale or unreachable context. `REX_SERVER` alone is not session detection: it may be configured globally. Keep the current server endpoint and pass `-s "$REX_SOURCE_SESSION"` on every Rex operation; never create a new session for the fan-out. Resolve `REX_LOGIN_SHELL` to the absolute path of the user's login shell (for example, `command -v fish` for a fish setup). Use that shell for both the worktree shell and the agent so login-profile PATH entries are available.
 - In herdr, load the `herdr` skill before touching panes: it owns the `herdr` CLI reference — command syntax, ID handling, safety rules — that the herdr paths below rely on.
 - The current directory is the repo root whose default branch the worktrees fan out from.
 
@@ -59,9 +60,9 @@ Stop and ask the user if any slug collides with an existing branch/worktree, or 
 
 ### 3. Create the worktrees
 
-Fetch the base once, then one worktree per target at `$WORKTREE` (`~/Projects/worktree/<repo>/agent-sessions/<slug>`) in both environments:
+Fetch the base once, then one worktree per target at `$WORKTREE` (`~/Projects/worktree/<repo>/agent-sessions/<slug>`) in every environment:
 
-**tmux** — plain git, create parents first:
+**Rex or tmux** — plain git, create parents first:
 
 ```
 git fetch origin "$BASE"
@@ -78,9 +79,26 @@ herdr worktree create --cwd "$PWD" --branch "$BRANCH" --base "$BASE" --path "$WO
 
 For herdr this also completes step 4: every target already has its workspace, tab, and one ready pane at the worktree.
 
-### 4. New window + one pane per worktree (tmux only)
+### 4. Create the worktree tabs or window
 
-In herdr this step does not exist — step 3's `herdr worktree create` already opened one workspace per target with its tab and root pane. In tmux, create one new window — never reuse the current one — with exactly one pane per target. The first pane is the window itself, each further target is a split:
+**Rex** — create one new tab per worktree in the saved current session. Rex calls a tab a `window` in its CLI/API. Start a login shell in the worktree, parse the returned `.window_id` and `.block_ids[0]`, then label the tab with the slug:
+
+```bash
+REX_TAB_JSON=$(rex run -s "$REX_SOURCE_SESSION" --cwd "$WORKTREE" \
+  --shell=none --label "$SLUG-shell" --focus=false --json \
+  -- "$REX_LOGIN_SHELL" -l) || exit 1
+REX_WINDOW_ID=$(printf '%s\n' "$REX_TAB_JSON" | jq -er '.window_id') || exit 1
+REX_ROOT_BLOCK_ID=$(printf '%s\n' "$REX_TAB_JSON" | jq -er '.block_ids[0]') || exit 1
+jq -n --arg window "$REX_WINDOW_ID" --arg label "$SLUG" \
+  '{window_id: $window, label: $label}' \
+  | rex api call -s "$REX_SOURCE_SESSION" session.set_window_label - || exit 1
+```
+
+Save `(target, WORKTREE, REX_WINDOW_ID, REX_ROOT_BLOCK_ID)` for each result. Step 5 creates a separate agent pane beside that target's root block. Never split the orchestrator's `$REX_BLOCK`, reuse another worktree's tab, or select the split destination by focus. If setup fails partway through, retain and report the returned IDs before retrying so the same target does not get duplicate tabs or agents.
+
+**herdr** — step 3's `herdr worktree create` already opened one workspace per target with its tab and root pane; proceed to step 5.
+
+**tmux** — create one new window — never reuse the current one — with exactly one pane per target. The first pane is the window itself, each further target is a split:
 
 ```
 SESSION=$(tmux display-message -p '#S')
@@ -98,6 +116,24 @@ Panes come back in index order from `tmux list-panes -t "$SESSION:$WIN" -F '#{pa
 
 `/implement-with-pr` carries the whole unattended contract itself: implement from the issue without asking questions, then commit, push, and open a PR. So the seed is just the template invocation — no contract file, no `--append-system-prompt`. The template expands server-side, so do not paste an expanded brief, and pass `<target>` as the single message arg (a second CLI message arg is dropped; trailing prose gets swallowed into the template's `$@`, i.e. its "Work to implement" section):
 
+**Rex** — for each target, use its saved root block ID to create a new agent pane in that worktree's tab. Pass the command as arguments; Rex loads the specified shell's login environment before running `pi`:
+
+```bash
+REX_AGENT_JSON=$(rex split -s "$REX_SOURCE_SESSION" -b "$REX_ROOT_BLOCK_ID" \
+  --cwd "$WORKTREE" --shell "$REX_LOGIN_SHELL" --label "$SLUG-pi" \
+  --focus=false --keep-open --json -- pi '/implement-with-pr <target>') || exit 1
+REX_AGENT_BLOCK_ID=$(printf '%s\n' "$REX_AGENT_JSON" | jq -er '.block_ids[0]') || exit 1
+```
+
+Store `REX_AGENT_BLOCK_ID` alongside that target's session, window, and root block IDs. Use the agent block ID for every capture and keypress below. `--keep-open` preserves the pane's output if the command exits. Before continuing, verify `.block.window_id` matches `REX_WINDOW_ID`, and the foreground process's cwd matches `WORKTREE`:
+
+```bash
+rex block inspect -s "$REX_SOURCE_SESSION" "$REX_AGENT_BLOCK_ID" --json | jq -e '.block'
+rex block call -s "$REX_SOURCE_SESSION" -b "$REX_AGENT_BLOCK_ID" process
+```
+
+**tmux**:
+
 ```
 # per pane (tmux):
 tmux send-keys -t "$SESSION:$WIN.<pane>" "pi '/implement-with-pr <target>'" Enter
@@ -111,39 +147,42 @@ herdr pane run "<pane id>" "pi '/implement-with-pr <target>'"
 
 `<target>` is the **original token from section 0** (e.g. `#77`), not the slug. Quote it so the shell passes it as one arg.
 
-### 6. Accept the "Trust project folder?" dialog on every pane
+### 6. Handle the "Trust project folder?" dialog when shown
 
-A worktree dir pi has never opened triggers pi's **Trust project folder?** dialog, which blocks the template from expanding (the pane sits blank/stalled). ~5s after seeding, each pane shows it with the cursor already on **Trust**. Accept on every pane:
+A new worktree may trigger pi's **Trust project folder?** dialog, which blocks the template from expanding. Inspect each agent pane using step 7's capture command. Only when that pane visibly shows the trust dialog with **Trust** selected, send Enter to accept:
 
 ```
+Rex:   rex send-key -s "$REX_SOURCE_SESSION" -b "$REX_AGENT_BLOCK_ID" enter
 tmux:  tmux send-keys -t "$SESSION:$WIN.<pane>" Enter
 herdr: herdr pane run "<pane id>" ""   # run = text + Enter atomically; empty text = a bare Enter
 ```
 
-This persists trust for that worktree dir; the dialog does not recur for trusted dirs.
+This persists trust for that worktree dir; the dialog does not recur for trusted dirs. Do not send Enter just because time has passed or a pane looks blank; inspect it again and report startup errors instead of typing into a running agent.
 
 ### 7. Verify every seed expanded
 
 ~15–20s after accepting, capture each pane and confirm the `/implement-with-pr` body is showing (steps 1–5, "Discipline") and the agent has begun booting (`memory read system://boot`, fetching the issue) — **not** the bare string `/implement-with-pr #N` and **not** a stalled blank pane:
 
 ```
+Rex:   rex capture -s "$REX_SOURCE_SESSION" -b "$REX_AGENT_BLOCK_ID" --trim --unwrap
 tmux:  tmux capture-pane -t "$SESSION:$WIN.<pane>" -p | tail -25
 herdr: herdr pane read "<pane id>" --source recent-unwrapped --lines 25
 ```
 
-If a pane is still blank or still on the trust dialog, accept again and re-verify.
+If a pane is still on the trust dialog, follow step 6 and re-verify. If it remains blank or shows an error, inspect the process and startup output; do not seed a second agent into the same pane.
 
 ## Report back
 
 Give the user a table:
 
-| Pane | Target | Branch | Worktree |
+| Tab / workspace / window | Agent pane | Target | Branch | Worktree |
+| --- | --- | --- | --- | --- |
 
-Plus how to switch to the fan-out (tmux: `<prefix> <win-index>`; herdr: each target's own workspace, labeled with its slug — see `herdr workspace list`), and a note that each agent runs `/implement-with-pr` independently (load → TDD → review → commit → push → PR) and then stops; the user takes the PR from there — agents never babysit, merge, or enable auto-merge. Commits and pushes are non-interactive because the panes run unattended.
+For Rex, include the saved session ID and each target's window ID, tab label, and agent block ID. Explain that the user can select the slug-labeled tab in the same session, with its worktree shell and Pi agent in separate panes. For tmux, give `<prefix> <win-index>`; for herdr, point to each target's own workspace, labeled with its slug — see `herdr workspace list`. Note that each agent runs `/implement-with-pr` independently (load → TDD → review → commit → push → PR) and then stops; the user takes the PR from there — agents never babysit, merge, or enable auto-merge. Commits and pushes are non-interactive because the panes run unattended.
 
 ## Discipline
 
-- One worktree + one branch + one pane per target (herdr: one workspace per target). Never share a worktree or branch across targets.
+- One worktree + one branch + one Pi agent pane per target. Rex: one dedicated tab per worktree in the source session, with a worktree shell and a separate new agent pane; herdr: one workspace per target. Never share a worktree or branch across targets.
 - You set up and verify only; each pane's agent owns its implementation.
 - Branch off the repo default branch. Each agent commits, pushes, and opens a PR for its own branch; the user merges — agents never merge and never enable auto-merge.
 - Blocked issues are caught by the step-1 precheck and the user decides; do not discover blockers only after a pane is already running. If a blocked target is nonetheless fanned out (user override), its `/implement-with-pr` agent stops and reports when it cannot continue.

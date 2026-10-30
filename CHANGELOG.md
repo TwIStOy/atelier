@@ -9,6 +9,7 @@
 
 ### Added
 
+- `/implement-many`: support Rex sessions with one dedicated tab per worktree and a separate Pi agent pane inside each tab, using explicit session and block IDs for startup and verification.
 - `virtual-model` extension with configurable three-tier complexity routing and a persistent session-wide minimum tier. See `docs/virtual-model/README.md`.
 
 ## [0.6.1] - 2026-09-01
