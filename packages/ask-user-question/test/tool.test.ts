@@ -1,5 +1,10 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { ASK_USER_BLOCKED_EVENT, ASK_USER_PROMPT_EVENT, MODAL_ACTIVE_EVENT } from "@htwang-contrib/common";
+import {
+  ASK_USER_BLOCKED_EVENT,
+  ASK_USER_PROMPT_EVENT,
+  GOAL_UPDATE_EVENT,
+  MODAL_ACTIVE_EVENT,
+} from "@htwang-contrib/common";
 import { describe, expect, test, vi } from "vitest";
 import type { QuestionnaireResult, QuestionParams } from "../src/tool/types.ts";
 import { registerAskUserQuestionTool } from "../src/tool.ts";
@@ -21,12 +26,17 @@ interface RegisteredTool {
 
 function harness() {
   const emitted: EmittedEvent[] = [];
+  const subscribers = new Map<string, Array<(data: unknown) => void>>();
   const pi = {
     events: {
       emit: (name: string, payload?: unknown) => {
         emitted.push({ name, payload });
       },
-      on: () => {},
+      on: (name: string, handler: (data: unknown) => void) => {
+        const list = subscribers.get(name) ?? [];
+        list.push(handler);
+        subscribers.set(name, list);
+      },
     },
     registerTool: (def: RegisteredTool) => {
       captured = def;
@@ -35,7 +45,10 @@ function harness() {
   let captured: RegisteredTool | undefined;
   registerAskUserQuestionTool(pi);
   if (!captured) throw new Error("tool was not registered");
-  return { pi, emitted, tool: captured };
+  const dispatchGoalUpdate = (payload: unknown) => {
+    for (const handler of subscribers.get(GOAL_UPDATE_EVENT) ?? []) handler(payload);
+  };
+  return { pi, emitted, tool: captured, dispatchGoalUpdate };
 }
 
 function mockCtx(customImpl: () => Promise<QuestionnaireResult | null>): ExtensionContext {
@@ -173,5 +186,65 @@ describe("ask_user_question: blocked state event", () => {
     await tool.execute("call-1", VALID_PARAMS, undefined, undefined, ctx);
 
     expect(blockedPayloads(emitted)).toEqual([{ active: true }, { active: false }]);
+  });
+});
+
+describe("ask_user_question: goal mode guard", () => {
+  test("refuses without opening the modal while the goal is active", async () => {
+    const { emitted, tool, dispatchGoalUpdate } = harness();
+    dispatchGoalUpdate({ status: "active" });
+    const custom = vi.fn(async () => ({ answers: [], cancelled: true }) as QuestionnaireResult);
+    const ctx = { hasUI: true, ui: { custom } } as unknown as ExtensionContext;
+
+    const result = (await tool.execute("call-1", VALID_PARAMS, undefined, undefined, ctx)) as {
+      content: { type: string; text: string }[];
+      details: { answers: unknown[]; cancelled: boolean; error?: string };
+      isError?: boolean;
+    };
+
+    expect(custom).not.toHaveBeenCalled();
+    expect(result.isError).toBeUndefined();
+    expect(result.details).toEqual({ answers: [], cancelled: true, error: "goal_mode" });
+    const text = result.content[0].text;
+    expect(text).toContain("Do not retry");
+    expect(text).toContain("reasonable default decision");
+    expect(text).toContain("pause the goal");
+    expect(namesOf(emitted)).toEqual([]);
+  });
+
+  test.each(["paused", "budgetLimited", "complete", null] as const)(
+    "opens the modal normally when the goal is %s",
+    async (payload) => {
+      const { emitted, tool, dispatchGoalUpdate } = harness();
+      dispatchGoalUpdate(payload === null ? null : { status: payload });
+      const ctx = mockCtx(async () => ({ answers: [], cancelled: true }));
+
+      await tool.execute("call-1", VALID_PARAMS, undefined, undefined, ctx);
+
+      expect(ctx.ui.custom).toHaveBeenCalled();
+      expect(namesOf(emitted)).toContain(MODAL_ACTIVE_EVENT);
+    },
+  );
+
+  test("behaves as today when no goal event was ever received", async () => {
+    const { emitted, tool } = harness();
+    const ctx = mockCtx(async () => ({ answers: [], cancelled: true }));
+
+    await tool.execute("call-1", VALID_PARAMS, undefined, undefined, ctx);
+
+    expect(ctx.ui.custom).toHaveBeenCalled();
+    expect(namesOf(emitted)).toContain(ASK_USER_PROMPT_EVENT);
+  });
+
+  test("an active goal followed by a non-active update re-enables the modal", async () => {
+    const { emitted, tool, dispatchGoalUpdate } = harness();
+    dispatchGoalUpdate({ status: "active" });
+    dispatchGoalUpdate({ status: "paused" });
+    const ctx = mockCtx(async () => ({ answers: [], cancelled: true }));
+
+    await tool.execute("call-1", VALID_PARAMS, undefined, undefined, ctx);
+
+    expect(ctx.ui.custom).toHaveBeenCalled();
+    expect(namesOf(emitted)).toContain(ASK_USER_PROMPT_EVENT);
   });
 });

@@ -4,10 +4,13 @@
 
 ### Added
 
+- `goal:update` is now emitted once on `session_start` with the stored goal (rebased when active), or `null` when none exists, so consumers resuming or switching sessions sync goal mode without having observed the original transitions. The widget refresh rides the same emission. ([#6](https://github.com/TwIStOy/pi-extensions/issues/6))
+- Continuation and budget-limited prompts now state that the agent is running autonomously with no user present: do not call `ask_user_question`, do not wait for human input, make reasonable default decisions (continuation) or record open questions in the wrap-up summary (budget-limited). ([#6](https://github.com/TwIStOy/pi-extensions/issues/6))
 - `create_goal` / `update_goal` / `get_goal` declare MCP-style annotations (`get_goal` read-only; `update_goal` idempotent).
 
 ### Changed
 
+- `emitGoalUpdate` emits through the shared `GOAL_UPDATE_EVENT` constant from `@htwang-contrib/common` instead of a local magic string; the channel name and the payload's `status` field are now a documented cross-extension contract. ([#6](https://github.com/TwIStOy/pi-extensions/issues/6))
 - The goal verifier's child session now reads the shared child-extension registry (`getChildExtensionFactories` from `@htwang-contrib/common`) instead of hardcoding `protect-secrets` + `extra-tools`. The verifier tool allowlist (`read` / `bash` / `grep` / `glob` / `ls`) still gates which tools exist; extension event handlers (e.g. `protect-secrets`' `tool_call` guard) now match whatever the parent session loaded.
 
 ## [0.4.0] - 2026-07-31

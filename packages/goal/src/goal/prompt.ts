@@ -28,6 +28,15 @@ const COMPLETION_AUDIT_LINES = [
   "- Treat anything uncertain as not achieved; do more verification or keep working.",
 ];
 
+const AUTONOMY_PROHIBITION = "Do not call ask_user_question and do not wait for human input.";
+
+const CONTINUATION_AUTONOMY_LINES = [
+  `You are running autonomously under this goal: the user is not present. ${AUTONOMY_PROHIBITION}`,
+  "When a decision is needed, make a reasonable default choice yourself and keep going. If a decision genuinely requires human judgment, stop and report it instead of blocking.",
+];
+
+const BUDGET_AUTONOMY_LINE = `You are running autonomously: the user is not present. ${AUTONOMY_PROHIBITION} Record any open questions or needed decisions in your wrap-up summary instead.`;
+
 export function buildContinuationPrompt(goal: Goal): string {
   return [
     CONTINUATION_MARKER_OPEN(goal.id),
@@ -42,6 +51,8 @@ export function buildContinuationPrompt(goal: Goal): string {
     budgetSection(goal),
     "",
     "Avoid repeating work that is already done. Choose the next concrete low-risk action toward the objective.",
+    "",
+    ...CONTINUATION_AUTONOMY_LINES,
     "",
     ...COMPLETION_AUDIT_LINES,
     "",
@@ -65,6 +76,8 @@ export function buildBudgetLimitedPrompt(goal: Goal): string {
     `Time used: ${formatElapsedSeconds(goal.timeUsedSeconds)}`,
     "",
     "The system has marked the goal as budget_limited, so do not start new substantive work. Wrap up this turn: summarize useful progress, identify remaining work or blockers, and leave a clear next step.",
+    "",
+    BUDGET_AUTONOMY_LINE,
     "",
     "Do not call update_goal unless the objective is actually and fully satisfied.",
     CONTINUATION_MARKER_CLOSE,

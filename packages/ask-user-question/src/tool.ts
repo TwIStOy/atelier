@@ -1,6 +1,11 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { SettingsManager } from "@earendil-works/pi-coding-agent";
-import { ASK_USER_BLOCKED_EVENT, MODAL_ACTIVE_EVENT } from "@htwang-contrib/common";
+import {
+  ASK_USER_BLOCKED_EVENT,
+  GOAL_UPDATE_EVENT,
+  type GoalUpdatePayload,
+  MODAL_ACTIVE_EVENT,
+} from "@htwang-contrib/common";
 import { buildItemsForQuestion } from "./build-items.ts";
 import { emitAskUserPrompt } from "./events.ts";
 import { editWithExternalEditor } from "./state/external-editor.ts";
@@ -29,8 +34,25 @@ const DEFAULT_PROMPT_GUIDELINES: string[] = [
 
 export const ASK_USER_QUESTION_TOOL_NAME = "ask_user_question";
 
+// True while a goal with status "active" exists: the agent runs autonomously
+// (AFK) and no human is present to answer a modal. Synced from GOAL_UPDATE_EVENT;
+// a fresh registration has seen no goal event yet, and goal re-emits on every
+// session_start, so resetting here keeps the flag from leaking across reloads.
+let activeGoal = false;
+
+function trackGoalMode(pi: ExtensionAPI): void {
+  activeGoal = false;
+  pi.events.on(GOAL_UPDATE_EVENT, (data: unknown) => {
+    const goal = data as GoalUpdatePayload;
+    activeGoal = goal?.status === "active";
+  });
+}
+
 const ERROR_NO_UI =
   "Error: ask_user_question has no interactive UI in this session. Ask the user your question directly in your reply instead of calling this tool.";
+
+const ERROR_GOAL_MODE =
+  "ask_user_question is unavailable in goal mode: a goal is active, you are running autonomously, and no user is present to answer. Do not retry this tool and do not wait for human input. Make a reasonable default decision yourself and continue. If the decision genuinely requires human judgment, stop and report instead, or pause the goal first (/goal pause) and continue with work that does not need the answer.";
 
 const TOOL_DESCRIPTION = `Ask the user one or more structured questions during execution. Use when you need to:
 1. Gather user preferences or requirements
@@ -53,6 +75,7 @@ Use the optional \`preview\` field on options when presenting concrete artifacts
 Preview content is rendered as markdown in a monospace box. Multi-line text with newlines is supported. When any option has a preview, the UI switches to a side-by-side layout with a vertical option list on the left and preview on the right. Do not use previews for simple preference questions where labels and descriptions suffice. Note: previews are only supported on single-select questions (not multiSelect).`;
 
 export function registerAskUserQuestionTool(pi: ExtensionAPI): void {
+  trackGoalMode(pi);
   pi.registerTool({
     name: ASK_USER_QUESTION_TOOL_NAME,
     label: "Ask User Question",
@@ -69,6 +92,14 @@ export function registerAskUserQuestionTool(pi: ExtensionAPI): void {
           answers: [],
           cancelled: true,
           error: "no_ui",
+        });
+      }
+
+      if (activeGoal) {
+        return buildToolResult(ERROR_GOAL_MODE, {
+          answers: [],
+          cancelled: true,
+          error: "goal_mode",
         });
       }
 

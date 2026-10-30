@@ -1,7 +1,7 @@
 import { fileURLToPath } from "node:url";
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { isExtensionDisabled, isStaleCtxError } from "@htwang-contrib/common";
+import { GOAL_UPDATE_EVENT, isExtensionDisabled, isStaleCtxError } from "@htwang-contrib/common";
 import { Type } from "@sinclair/typebox";
 import { parseGoalCommand } from "./goal/command.ts";
 import { loadGoalConfig, registerGoalConfigItems, setCachedModelOptions } from "./goal/config.ts";
@@ -95,7 +95,7 @@ export default function initGoal(pi: ExtensionAPI): void {
   }
 
   function emitGoalUpdate(goal: Goal | null): void {
-    pi.events.emit("goal:update", goal);
+    pi.events.emit(GOAL_UPDATE_EVENT, goal);
     refreshGoalWidget(goal);
   }
 
@@ -161,21 +161,20 @@ export default function initGoal(pi: ExtensionAPI): void {
     try {
       const ref = getStoreRef(ctx);
       const goal = readGoal(ref);
-      if (!goal) return;
 
-      refreshGoalWidget(goal);
-
-      if (goal.status === "active") {
-        const rebased = reopenActiveInterval(ref);
-        const liveGoal = rebased ?? goal;
-
-        if (shouldQueueGoalContinuationWhenIdle(liveGoal, ctx.isIdle(), ctx.hasPendingMessages())) {
-          queueContinuation(liveGoal);
-        }
+      let liveGoal: Goal | null = goal;
+      if (goal?.status === "active") {
+        liveGoal = reopenActiveInterval(ref) ?? goal;
       }
 
-      if (event.reason === "resume" && goal.status === "paused" && ctx.hasUI) {
-        const choice = await ctx.ui.select(`Goal is paused: "${goal.objective}". Resume it?`, [
+      emitGoalUpdate(liveGoal);
+
+      if (liveGoal && shouldQueueGoalContinuationWhenIdle(liveGoal, ctx.isIdle(), ctx.hasPendingMessages())) {
+        queueContinuation(liveGoal);
+      }
+
+      if (event.reason === "resume" && liveGoal?.status === "paused" && ctx.hasUI) {
+        const choice = await ctx.ui.select(`Goal is paused: "${liveGoal.objective}". Resume it?`, [
           "Resume",
           "Keep paused",
         ]);

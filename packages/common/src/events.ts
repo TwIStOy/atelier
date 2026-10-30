@@ -72,6 +72,29 @@ export type AskUserBlockedPayload = {
 };
 
 /**
+ * Cross-extension channel emitted by `goal` whenever the session's goal
+ * changes (created, status transitioned, usage accounted, cleared) — and once
+ * on `session_start` when a goal is already stored, so consumers resuming a
+ * session can sync their view without having observed the original changes.
+ *
+ * Producers (currently `packages/goal`) emit the full goal object, or `null`
+ * when no goal exists. Consumers such as `ask_user_question` subscribe to
+ * detect goal mode (an active goal means the agent runs autonomously with no
+ * human present) and refuse to block on UI that nobody will answer.
+ *
+ * Payload: `GoalUpdatePayload` — structural, consumer-facing. Only `status`
+ * (when non-null) is contractual; other goal fields are owned by `goal` and
+ * may change without notice. The status literal union is written out by hand
+ * to mirror `goal`'s `GoalStatus` — `common` must not import the goal package.
+ */
+export const GOAL_UPDATE_EVENT = "goal:update" as const;
+
+export type GoalUpdatePayload = {
+  /** Current goal status. The only contractual field of the payload. */
+  status: "active" | "paused" | "budgetLimited" | "complete";
+} | null;
+
+/**
  * Cross-extension channel for transient hint messages rendered inside the
  * input editor's border (e.g. "esc again to abort").
  *

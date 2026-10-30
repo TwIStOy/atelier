@@ -117,11 +117,13 @@ export type {
   AskUserPromptPayload,
   AskUserPromptQuestion,
   EditorHintPayload,
+  GoalUpdatePayload,
 } from "./events.ts";
 export {
   ASK_USER_BLOCKED_EVENT,
   ASK_USER_PROMPT_EVENT,
   EDITOR_HINT_EVENT,
+  GOAL_UPDATE_EVENT,
   MODAL_ACTIVE_EVENT,
 } from "./events.ts";
 export { findExecutable } from "./executable.ts";
