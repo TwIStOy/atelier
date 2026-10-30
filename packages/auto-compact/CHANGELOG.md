@@ -4,7 +4,11 @@
 
 ### Fixed
 
-- Use the current virtual route's physical context window for compaction thresholds, retention budgets, and status output. An unknown zero-sized window no longer triggers immediate compaction or emergency truncation.
+- An unknown zero-sized context window no longer triggers immediate compaction or emergency truncation.
+
+### Changed
+
+- Compaction thresholds, retention budgets, and status output use Pi's context usage and model window directly after removal of the `virtual-model` extension.
 
 ### Added
 

@@ -3,8 +3,6 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import { estimateTokens } from "@earendil-works/pi-coding-agent";
 import {
   type ExtensionConfigSchema,
-  getEffectiveContextUsage,
-  getEffectiveContextWindow,
   isExtensionDisabled,
   readConfig,
   registerConfigItems,
@@ -261,8 +259,8 @@ export default function autoCompact(pi: ExtensionAPI): void {
 
   const getTokenUsage = (ctx: ExtensionContext): number => {
     const config = loadConfig();
-    const usage = getEffectiveContextUsage(ctx);
-    updateCachedLimits(config, getEffectiveContextWindow(ctx));
+    const usage = ctx.getContextUsage();
+    updateCachedLimits(config, usage?.contextWindow ?? ctx.model?.contextWindow ?? 0);
     if (usage && usage.tokens !== null) {
       return usage.tokens;
     }
@@ -341,7 +339,7 @@ export default function autoCompact(pi: ExtensionAPI): void {
     const messages = event.messages;
     const estimatedTokens = estimateTotalTokens(messages);
     lastEstimatedTokens = estimatedTokens;
-    const cw = getEffectiveContextWindow(ctx);
+    const cw = ctx.getContextUsage()?.contextWindow ?? ctx.model?.contextWindow ?? 0;
     updateCachedLimits(config, cw);
 
     if (cachedAutoCompactLimit > 0 && estimatedTokens > cachedAutoCompactLimit && !pendingCompaction) {
@@ -385,10 +383,10 @@ export default function autoCompact(pi: ExtensionAPI): void {
 
     if (event.reason === "resume" || event.reason === "fork") {
       const config = loadConfig();
-      const usage = getEffectiveContextUsage(ctx);
+      const usage = ctx.getContextUsage();
       if (usage && usage.tokens !== null) {
         lastEstimatedTokens = usage.tokens;
-        const cw = getEffectiveContextWindow(ctx);
+        const cw = usage.contextWindow;
         updateCachedLimits(config, cw);
         if (cachedAutoCompactLimit > 0 && usage.tokens >= cachedAutoCompactLimit) {
           triggerAutoCompact(ctx, "session-resume");
@@ -401,7 +399,7 @@ export default function autoCompact(pi: ExtensionAPI): void {
 
   pi.on("model_select", async (_event, ctx) => {
     const config = loadConfig();
-    const cw = getEffectiveContextWindow(ctx);
+    const cw = ctx.getContextUsage()?.contextWindow ?? ctx.model?.contextWindow ?? 0;
     updateCachedLimits(config, cw);
   });
 
@@ -409,10 +407,10 @@ export default function autoCompact(pi: ExtensionAPI): void {
     description: "Show auto-compaction status",
     handler: async (_args, ctx) => {
       const config = loadConfig();
-      const cw = getEffectiveContextWindow(ctx);
+      const usage = ctx.getContextUsage();
+      const cw = usage?.contextWindow ?? ctx.model?.contextWindow ?? 0;
       updateCachedLimits(config, cw);
 
-      const usage = getEffectiveContextUsage(ctx);
       const tokens = usage?.tokens ?? lastEstimatedTokens;
       const percent = usage?.percent ?? (cachedAutoCompactLimit > 0 ? (tokens / cachedAutoCompactLimit) * 100 : 0);
       const strategyLabel = STRATEGY_OPTIONS.find((o) => o.value === config.strategy)?.label ?? config.strategy;

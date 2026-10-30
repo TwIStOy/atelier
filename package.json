@@ -37,18 +37,15 @@
       "packages/compact-thinking",
       "packages/todo",
       "packages/moshi-hooks-extra",
-      "packages/herdr",
       "packages/truncate-outputs",
       "packages/experience",
-      "packages/htw-producer",
       "packages/agents-mirror",
       "packages/workflow",
       "packages/heap-probe",
       "packages/inject-prompt-by-model",
       "packages/canvas",
       "packages/apply-patch",
-      "packages/recap",
-      "packages/virtual-model"
+      "packages/recap"
     ],
     "skills": [
       "skills/code-philosophy",

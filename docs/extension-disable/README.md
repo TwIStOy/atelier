@@ -49,14 +49,10 @@ experience
 extension-config-ui
 extra-tools
 goal
-gondolin-sandbox
-herdr
-htw-producer
 magpie
 memory
 message-queue
 moshi-hooks-extra
-permission-system
 protect-secrets
 read-tracker
 statusline

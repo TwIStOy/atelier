@@ -32,7 +32,7 @@ The minimum idle timeout is 5 seconds; configured values below that are clamped.
 
 ## Model selection
 
-Follows the same pattern as `herdr`: the `/config` **Recap Model** item stores a `provider/model` pattern resolved with `resolveModel` from `@htwang-contrib/common`. Empty (default) falls back to the current session model. The side-call goes through `executeSideCall`, which handles API key resolution, aborts, and error mapping.
+The `/config` **Recap Model** item stores a `provider/model` pattern resolved with `resolveModel` from `@htwang-contrib/common`. Empty (default) falls back to the current session model. The side-call goes through `executeSideCall`, which handles API key resolution, aborts, and error mapping.
 
 ## Configuration (`/config` → Recap)
 

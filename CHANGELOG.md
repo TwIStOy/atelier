@@ -10,7 +10,10 @@
 ### Added
 
 - `/implement-many`: support Rex sessions with one dedicated tab per worktree and a separate Pi agent pane inside each tab, using explicit session and block IDs for startup and verification.
-- `virtual-model` extension with configurable three-tier complexity routing and a persistent session-wide minimum tier. See `docs/virtual-model/README.md`.
+
+### Removed
+
+- `herdr`, `gondolin-sandbox`, `permission-system`, `virtual-model`, and `htw-producer` extensions, including their workspace dependencies and extension-specific support code.
 
 ## [0.6.1] - 2026-09-01
 

@@ -165,8 +165,7 @@ export {
   extractMessageText,
   userMessageText,
 } from "./message-text.ts";
-export type { ComplexityTier } from "./model-complexity.ts";
-export { COMPLEXITY_TIERS, createComplexityAssessment, isComplexityTier } from "./model-complexity.ts";
+export { createComplexityAssessment } from "./model-complexity.ts";
 export type { ResolvableModel } from "./model-resolve.ts";
 export { resolveModel } from "./model-resolve.ts";
 export type { RexContext, RexPaneOptions } from "./rex.ts";
@@ -178,21 +177,6 @@ export {
   isStaleCtxError,
 } from "./session-cache.ts";
 export { SessionLifecycle } from "./session-lifecycle.ts";
-export type { SessionTitleConfig, TitleOutcome } from "./session-title.ts";
-export {
-  abortSessionTitle,
-  captureSessionFirstPrompt,
-  ensureSessionTitle,
-  firstUserPrompt,
-  getSessionTitle,
-  initSessionTitleService,
-  loadSessionTitleConfig,
-  onSessionTitle,
-  parseSessionTitle,
-  resetSessionTitle,
-  SESSION_TITLE_CONFIG_ID,
-  summarizeSessionTitle,
-} from "./session-title.ts";
 export type { SideCallResult } from "./side-call.ts";
 export { executeSideCall } from "./side-call.ts";
 export { getAvailableSkillNames } from "./skills.ts";
@@ -302,11 +286,3 @@ export type {
   CodingPlanUsageWindowRaw,
   CodingPlanWindowDetail,
 } from "./usage.ts";
-export type { VirtualModelStatus } from "./virtual-model-status.ts";
-export {
-  getEffectiveContextUsage,
-  getEffectiveContextWindow,
-  getVirtualModelStatus,
-  setVirtualModelStatus,
-  VIRTUAL_MODEL_STATUS_EVENT,
-} from "./virtual-model-status.ts";

@@ -7,12 +7,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import type { EditorTheme, TUI } from "@earendil-works/pi-tui";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
-import {
-  type EditorHintPayload,
-  getEffectiveContextUsage,
-  getEffectiveContextWindow,
-  getVirtualModelStatus,
-} from "@htwang-contrib/common";
+import type { EditorHintPayload } from "@htwang-contrib/common";
 import { loadConfig } from "./config.ts";
 
 const MIN_BODY_LINES = 1;
@@ -95,10 +90,6 @@ export class MyEditor extends CustomEditor {
     this.tui.requestRender();
   }
 
-  refreshModelStatus(): void {
-    this.tui.requestRender();
-  }
-
   private activeHint(): { text: string; color: ThemeColor } | null {
     let last: { text: string; color: ThemeColor } | null = null;
     for (const v of this.hints.values()) last = v;
@@ -152,9 +143,9 @@ export class MyEditor extends CustomEditor {
   }
 
   private getUsageLabel(): string {
-    const usage = getEffectiveContextUsage(this.ctx);
+    const usage = this.ctx.getContextUsage();
     const pct = usage?.percent == null ? "?" : `${Math.max(0, Math.floor(usage.percent))}%`;
-    const contextWindow = getEffectiveContextWindow(this.ctx) || null;
+    const contextWindow = (usage?.contextWindow ?? this.ctx.model?.contextWindow) || null;
     const parts = [` ${pct} of ${formatCount(contextWindow)}`];
 
     const cost = getSessionCost(this.ctx);
@@ -166,10 +157,9 @@ export class MyEditor extends CustomEditor {
   }
 
   private getModelLabel(maxWidth: number): string {
-    const route = getVirtualModelStatus(this.ctx);
-    const model = route?.physicalModel ?? this.ctx.model;
-    const name = route ? `Auto · ${route.tier} → ${model?.provider}/${model?.id}` : (model?.name ?? "model unknown");
-    const level = route?.thinkingLevel ?? this.pi.getThinkingLevel();
+    const model = this.ctx.model;
+    const name = model?.name ?? "model unknown";
+    const level = this.pi.getThinkingLevel();
     const reasoning = model?.reasoning && level !== "off";
     const parts = [name];
     if (reasoning) {

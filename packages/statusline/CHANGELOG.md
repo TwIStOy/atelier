@@ -4,12 +4,12 @@
 
 ### Added
 
-- Show Auto's tier and physical provider/model in the editor border immediately after routing, with context usage calculated against the current target's window.
 - Shell-style prompt in the editor body: the first line is prefixed with `❯ ` (accent color) and continuation lines get a matching 2-column hang indent, so wrapped text stays aligned under the first character. The gutter is drawn by `MyEditor` itself (inner editor uses `paddingX: 0`) because re-slicing the rendered line corrupts pi-tui's zero-width cursor marker downstream.
 - `borderColor` config option (`/config` -> Statusline -> "Editor Border Color"): `Fixed dim` (default), `Fixed border color` (theme border role), or `Follow thinking level` for pi's built-in thinking-level colors.
 
 ### Changed
 
+- Model labels and context usage now read Pi's session APIs directly after removal of the `virtual-model` extension.
 - The editor border no longer follows the thinking level by default. Pi reapplies thinking-level colors on every level change, which overrode the constant border color `MyEditor` set at construction; the configured color is now re-asserted on every render. Bash mode keeps its dedicated border color.
 
 ## [0.4.0] - 2026-07-31

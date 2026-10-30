@@ -2,8 +2,7 @@ import type { Api, Model } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { EditorTheme, TUI } from "@earendil-works/pi-tui";
 import { visibleWidth } from "@earendil-works/pi-tui";
-import { setVirtualModelStatus } from "@htwang-contrib/common";
-import { afterEach, describe, expect, test, vi } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import { MyEditor } from "../src/editor.ts";
 
 vi.mock("../src/config.ts", () => ({
@@ -41,8 +40,8 @@ function makeEditor(overrides: Partial<ExtensionContext> = {}): InstanceType<typ
   return new EditorCtor(tui, theme, {}, () => ctx, pi);
 }
 
-const physicalModel: Model<Api> = {
-  provider: "test-router",
+const model: Model<Api> = {
+  provider: "test",
   id: "middle",
   name: "Middle",
   api: "test-chat",
@@ -54,66 +53,34 @@ const physicalModel: Model<Api> = {
   maxTokens: 8192,
 };
 
-afterEach(() => setVirtualModelStatus("editor-route", undefined));
-
-describe("MyEditor virtual route", () => {
-  test("shows the tier, physical model and current limit with a recomputed percentage", () => {
-    setVirtualModelStatus("editor-route", {
-      provider: "virtual",
-      modelId: "auto",
-      tier: "middle",
-      physicalModel,
-      thinkingLevel: "off",
-    });
+describe("MyEditor model usage", () => {
+  test("uses Pi's reported context window and percentage", () => {
+    let usage = { tokens: 100_000, contextWindow: 200_000, percent: 50 };
     const editor = makeEditor({
-      model: {
-        ...physicalModel,
-        provider: "virtual",
-        id: "auto",
-        api: "pi-virtual",
-        name: "Auto",
-        contextWindow: 200_000,
-      },
-      sessionManager: {
-        getEntries: () => [],
-        getSessionId: () => "editor-route",
-      } as unknown as ExtensionContext["sessionManager"],
-      getContextUsage: () => ({ tokens: 100_000, contextWindow: 200_000, percent: 50 }),
+      model,
+      getContextUsage: () => usage,
     });
     let top = stripStyling(editor.render(120)[0]);
-    expect(top).toContain("25% of 400K");
-    expect(top).toContain("Auto · middle → test-router/middle");
-    setVirtualModelStatus("editor-route", {
-      provider: "virtual",
-      modelId: "auto",
-      tier: "flagship",
-      physicalModel: { ...physicalModel, id: "flagship", contextWindow: 100_000 },
-      thinkingLevel: "off",
-    });
+    expect(top).toContain("50% of 200K");
+    expect(top).toContain("Middle");
+    usage = { tokens: 100_000, contextWindow: 100_000, percent: 100 };
     top = stripStyling(editor.render(120)[0]);
     expect(top).toContain("100% of 100K");
-    expect(top).toContain("Auto · flagship → test-router/flagship");
     for (const width of [25, 46, 80]) {
       for (const line of editor.render(width)) expect(visibleWidth(line)).toBeLessThanOrEqual(width);
     }
   });
 
-  test("preserves unknown usage after compaction while showing the routed limit", () => {
-    setVirtualModelStatus("editor-route", {
-      provider: "virtual",
-      modelId: "auto",
-      tier: "middle",
-      physicalModel,
-      thinkingLevel: "off",
-    });
+  test("preserves unknown usage after compaction", () => {
     const editor = makeEditor({
-      model: { ...physicalModel, provider: "virtual", id: "auto", api: "pi-virtual" },
-      sessionManager: {
-        getEntries: () => [],
-        getSessionId: () => "editor-route",
-      } as unknown as ExtensionContext["sessionManager"],
+      model,
       getContextUsage: () => ({ tokens: null, contextWindow: 200_000, percent: null }),
     });
+    expect(stripStyling(editor.render(120)[0])).toContain("? of 200K");
+  });
+
+  test("falls back to the model window before usage is available", () => {
+    const editor = makeEditor({ model, getContextUsage: () => undefined });
     expect(stripStyling(editor.render(120)[0])).toContain("? of 400K");
   });
 });

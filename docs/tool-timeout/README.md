@@ -15,7 +15,7 @@ A `tool_call` event handler (the hook that runs before execution, whose `event.i
 | `timeout` at or below the cap | unchanged |
 | invalid `timeout` (0, negative, NaN) | the cap (instead of pi's argument error) |
 
-The rewritten value flows into whatever `bash` tool is actually registered — pi's built-in local bash or a re-registered one (e.g. gondolin-sandbox) — because the mutation happens on the call input, not on a wrapped tool. Pi's bash implementation kills the process group when the timeout expires, so the cap is real cancellation.
+The rewritten value flows into whatever `bash` tool is actually registered — pi's built-in local bash or a re-registered one — because the mutation happens on the call input, not on a wrapped tool. Pi's bash implementation kills the process group when the timeout expires, so the cap is real cancellation.
 
 ### Exempt rules
 

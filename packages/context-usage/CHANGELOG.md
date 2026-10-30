@@ -4,7 +4,7 @@
 
 ### Changed
 
-- `/context` reports Auto's active tier, physical model, effective thinking level, and current target window instead of the previous response's limits.
+- `/context` reads the current model, thinking level, and context usage directly from Pi after removal of the `virtual-model` extension.
 - `/context` is now registered only when pi runs in TUI mode (via `registerTuiCommands` from `@htwang-contrib/common`). The below-editor widget is registered as a component factory (ignored by the RPC widget bridge) and its Esc-clear relies on `onTerminalInput` (interactive-only), so the command was a silent no-op in RPC mode.
 
 ## [0.4.0] - 2026-07-31

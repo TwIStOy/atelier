@@ -1,6 +1,5 @@
 import type { ExtensionAPI, ExtensionContext, SessionEntry } from "@earendil-works/pi-coding-agent";
 import type * as Common from "@htwang-contrib/common";
-import { setVirtualModelStatus } from "@htwang-contrib/common";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import autoCompact from "../src/index.ts";
 import { compactionEntry, messageEntry } from "./helpers.ts";
@@ -93,38 +92,18 @@ beforeEach(() => {
 });
 
 describe("idle compaction wiring", () => {
-  it("uses the routed window when native usage still refers to the previous response", () => {
+  it("updates compaction thresholds when Pi reports a different context window", () => {
     const mock = createMockPi();
     autoCompact(mock.pi);
-    const mockCtx = createMockCtx(190_000, 200_000);
-    const physicalModel = { ...mockCtx.ctx.model!, contextWindow: 400_000 };
-    mockCtx.ctx.model = { ...physicalModel, api: "pi-virtual", provider: "virtual", id: "auto", contextWindow: 0 };
-    mockCtx.ctx.sessionManager.getSessionId = () => "auto-compact-routing";
-    setVirtualModelStatus("auto-compact-routing", {
-      provider: "virtual",
-      modelId: "auto",
-      tier: "middle",
-      physicalModel,
-      thinkingLevel: "off",
-    });
-    try {
-      fireTurnStart(mock, mockCtx);
-      expect(mockCtx.compact).not.toHaveBeenCalled();
-      setVirtualModelStatus("auto-compact-routing", {
-        provider: "virtual",
-        modelId: "auto",
-        tier: "flagship",
-        physicalModel: { ...physicalModel, contextWindow: 100_000 },
-        thinkingLevel: "off",
-      });
-      fireTurnStart(mock, mockCtx);
-      expect(mockCtx.compact).toHaveBeenCalledOnce();
-    } finally {
-      setVirtualModelStatus("auto-compact-routing", undefined);
-    }
+    const mockCtx = createMockCtx(190_000, 400_000);
+    fireTurnStart(mock, mockCtx);
+    expect(mockCtx.compact).not.toHaveBeenCalled();
+    mockCtx.ctx.getContextUsage = () => ({ tokens: 190_000, contextWindow: 200_000, percent: 95 });
+    fireTurnStart(mock, mockCtx);
+    expect(mockCtx.compact).toHaveBeenCalledOnce();
   });
 
-  it("does not compact against an unknown zero-sized virtual window", async () => {
+  it("does not compact against an unknown zero-sized context window", async () => {
     const mock = createMockPi();
     autoCompact(mock.pi);
     const mockCtx = createMockCtx(null, 0);

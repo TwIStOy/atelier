@@ -1,14 +1,6 @@
 import type { Context } from "@earendil-works/pi-ai";
 import { systemOneChoice } from "./systemone.ts";
 
-export const COMPLEXITY_TIERS = ["flash", "middle", "flagship"] as const;
-
-export type ComplexityTier = (typeof COMPLEXITY_TIERS)[number];
-
-export function isComplexityTier(value: unknown): value is ComplexityTier {
-  return value === "flash" || value === "middle" || value === "flagship";
-}
-
 export function createComplexityAssessment(message: string, context: Context) {
   return {
     state: {
