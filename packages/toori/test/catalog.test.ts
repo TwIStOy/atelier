@@ -104,10 +104,15 @@ describe("fetchCatalog", () => {
       signal: new AbortController().signal,
     });
     const byId = new Map(models.map((m) => [m.id, m]));
+    const chatCompat = (id: string) => {
+      const model = byId.get(id);
+      if (!model || model.type === "classifier" || model.type === "image") return undefined;
+      return model.compat;
+    };
 
-    expect(byId.get("glm-5.3")?.compat).toMatchObject({ supportsDeveloperRole: false, thinkingFormat: "zai" });
-    expect(byId.get("group:cn-models")?.compat).toMatchObject({ supportsDeveloperRole: false });
-    expect(byId.get("gpt-5.6-sol")?.compat).toMatchObject({ supportsDeveloperRole: true });
+    expect(chatCompat("glm-5.3")).toMatchObject({ supportsDeveloperRole: false, thinkingFormat: "zai" });
+    expect(chatCompat("group:cn-models")).toMatchObject({ supportsDeveloperRole: false });
+    expect(chatCompat("gpt-5.6-sol")).toMatchObject({ supportsDeveloperRole: true });
   });
 
   test("derives group model thinking levels from available_thinking_levels", async () => {
@@ -141,7 +146,14 @@ describe("fetchCatalog", () => {
       xhigh: null,
       max: "max",
     });
-    expect(getSupportedThinkingLevels(model)).toEqual(["off", "high", "max"]);
+    expect(
+      getSupportedThinkingLevels({
+        ...model,
+        api: model.api ?? "openai-completions",
+        provider: "toori",
+        baseUrl: "https://toori.twistoy.cn/api/v1",
+      }),
+    ).toEqual(["off", "high", "max"]);
   });
 
   test("exposes all supported GPT-5.6 thinking levels", async () => {
