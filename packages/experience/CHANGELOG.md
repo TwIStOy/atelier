@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Breaking Changes
+
+- Move double-Escape abort handling and its configuration to `extensions/better-editor`. Configure `doubleEscapeEnabled` and `doubleEscapeDebounceMs` under `/config` -> BetterEditor; Experience now manages model visibility only.
+
 ### Fixed
 
 - Keep the ModelRegistry private-runtime bridge and its test fixture compatible with Pi 0.99.1 declarations without intersecting conflicting private fields.
