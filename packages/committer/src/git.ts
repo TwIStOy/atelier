@@ -107,10 +107,10 @@ export async function getDiff(cwd: string, maxBytes = 1_000_000, signal?: AbortS
   const [stat, diff, names] = await Promise.all([
     git(cwd, ["diff", "--cached", "--stat"], { maxBuffer: maxBytes, signal }),
     git(cwd, ["diff", "--cached"], { maxBuffer: maxBytes, signal }),
-    git(cwd, ["diff", "--cached", "--name-only"], { signal }),
+    git(cwd, ["diff", "--cached", "--name-only", "--no-renames", "-z"], { signal }),
   ]);
 
-  return { stat, diff, files: names.split("\n").filter(Boolean) };
+  return { stat, diff, files: names.split("\0").filter(Boolean) };
 }
 
 export async function commit(cwd: string, message: string, signal?: AbortSignal): Promise<string> {

@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- `/commit` grouped mode now includes deleted source paths when Git detects renames, so committing a replacement no longer leaves the original file's deletion uncommitted. Changed-file paths are read without Git quoting to handle non-ASCII characters, quotes, and newlines correctly.
+
 ### Changed
 
 - `/commit` and `/commit-model` are now registered only when pi runs in TUI mode (via `registerTuiCommands` from `@htwang-contrib/common`). Both drive `ctx.ui.custom` overlays, which resolve `undefined` in RPC mode and left `/commit` hanging forever on the overlay controller promise.
