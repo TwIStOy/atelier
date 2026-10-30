@@ -24,6 +24,7 @@ import {
   type MessageComplexity,
   type MessageComplexityContext,
 } from "./complexity.ts";
+import { installStickyPrompt } from "./sticky-prompt.ts";
 
 const PREFIX_MARKER = "▌ ";
 
@@ -146,6 +147,7 @@ export default function (pi: ExtensionAPI) {
   let activeTheme: Theme | undefined;
   let activeThinkingLevel = "off";
   let tui: TUI | undefined;
+  let removeStickyPrompt: (() => void) | undefined;
   let isTui = false;
   const pendingMessages = new Map<string, UserMessage>();
   const messageKeys = new Map<string, string[]>();
@@ -192,6 +194,8 @@ export default function (pi: ExtensionAPI) {
   patchUserMessageRender(getTheme, getThinkingLevel, getComplexity);
 
   pi.on("session_start", (_event, ctx) => {
+    removeStickyPrompt?.();
+    removeStickyPrompt = undefined;
     annotations.reset();
     pendingMessages.clear();
     messageKeys.clear();
@@ -204,7 +208,10 @@ export default function (pi: ExtensionAPI) {
     activeThinkingLevel = pi.getThinkingLevel();
     ctx.ui.setWidget("user-message:render-handle", (ui) => {
       tui = ui;
-      return { render: () => [], invalidate() {} };
+      removeStickyPrompt?.();
+      const dispose = installStickyPrompt(ui);
+      removeStickyPrompt = dispose;
+      return { render: () => [], invalidate() {}, dispose };
     });
     patchUserMessageRender(getTheme, getThinkingLevel, getComplexity);
   });
@@ -252,6 +259,8 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.on("session_shutdown", () => {
+    removeStickyPrompt?.();
+    removeStickyPrompt = undefined;
     isTui = false;
     annotations.dispose();
     pendingMessages.clear();

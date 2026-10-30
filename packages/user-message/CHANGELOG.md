@@ -4,6 +4,7 @@
 
 ### Added
 
+- Fullscreen transcripts pin the current turn's user prompt as its original block reaches the viewport top, without a partially clipped transition. The pinned block follows the viewed turn, reuses its rendered styling, and shows up to three lines with an ellipsis for longer prompts. It starts on the first viewport row and aligns with the original prompt's left edge; a clickable `▲` centered in the separator below jumps to the complete original user block. The pin yields to an approaching user block, dialogs, and text selection and is removed on session shutdown or reload.
 - New TUI user messages are classified through System One into `flash`, `middle`, and `flagship` model tiers, with all three probabilities displayed in a muted row below the message. Classification runs in the background and does not switch models. Registers the shared System One configuration section, including its default model setting; requires a configured API key. Rendering and session replay do not trigger inference, and pending requests are cancelled on turn cancellation or session shutdown.
 
 ### Changed
