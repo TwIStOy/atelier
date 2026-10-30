@@ -2,9 +2,7 @@
  * Helpers for layering custom editor factories without clobbering each other.
  *
  * Pi exposes a single editor slot (`ctx.ui.setEditorComponent`). When multiple
- * extensions want to layer behavior onto the editor (e.g. `statusline` draws a
- * decorated border, `user-input-history` adds prompt history, `double-escape`
- * intercepts Escape), each must wrap the currently-registered factory and
+ * extensions want to layer behavior onto the editor, each must wrap the currently-registered factory and
  * delegate to it for the inner editor instance — otherwise the last writer
  * wins and earlier decorators silently disappear.
  *

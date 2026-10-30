@@ -75,9 +75,9 @@ export type AskUserBlockedPayload = {
  * Cross-extension channel for transient hint messages rendered inside the
  * input editor's border (e.g. "esc again to abort").
  *
- * Producers (e.g. `experience/double-escape`) emit via `pi.events.emit` with a
+ * Producers emit via `pi.events.emit` with a
  * payload describing the hint to show. The editor-owning extension (e.g.
- * `statusline`'s MyEditor) subscribes and renders the most recent active hint
+ * `better-editor`) subscribes and renders the most recent active hint
  * into its own border, so the hint composes with whatever custom editor is
  * active instead of being clobbered by or clobbering the editor.
  *
