@@ -1,27 +1,27 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { describe, expect, it } from "vitest";
+import { recordChildSessionStarted } from "@htwang-contrib/common";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { loadSubagentMessages, loadSubagentRuns } from "../../src/viewer/index.ts";
+import { writeChildSession } from "./fixtures.ts";
 
-function findSampleChildSession(): string | null {
-  const dir = path.join(os.homedir(), ".agent", "subagents", "session");
-  if (!fs.existsSync(dir)) return null;
-  const files = fs
-    .readdirSync(dir)
-    .filter((f) => f.endsWith(".jsonl"))
-    .map((f) => path.join(dir, f));
-  return files[0] ?? null;
-}
+const originalHome = process.env.HOME;
+let tmpHome: string;
+
+beforeEach(() => {
+  tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), "subagents-viewer-"));
+  process.env.HOME = tmpHome;
+});
+afterEach(() => {
+  process.env.HOME = originalHome;
+  fs.rmSync(tmpHome, { recursive: true, force: true });
+});
 
 describe("subagents viewer-index", () => {
-  it("loadSubagentMessages parses a real child session into messages", () => {
-    const sample = findSampleChildSession();
-    if (!sample) {
-      console.warn("no sample child session; skipping");
-      return;
-    }
-    const messages = loadSubagentMessages(sample);
+  it("loadSubagentMessages parses a child session into messages", () => {
+    const childFile = writeChildSession(path.join(tmpHome, "sessions"));
+    const messages = loadSubagentMessages(childFile);
     expect(messages.length).toBeGreaterThan(0);
     const roles = new Set(messages.map((m) => m.role));
     expect(roles.has("user")).toBe(true);
@@ -34,20 +34,12 @@ describe("subagents viewer-index", () => {
   });
 
   it("loadSubagentRuns returns runs for a known parent or empty for unknown", () => {
-    const runsUnknown = loadSubagentRuns("definitely-not-a-real-parent-id");
-    expect(runsUnknown).toEqual([]);
+    expect(loadSubagentRuns("definitely-not-a-real-parent-id")).toEqual([]);
 
-    const byParentDir = path.join(os.homedir(), ".agent", "subagents", "by-parent");
-    if (!fs.existsSync(byParentDir)) {
-      console.warn("no by-parent dir; skipping positive case");
-      return;
-    }
-    const files = fs.readdirSync(byParentDir).filter((f) => f.endsWith(".jsonl"));
-    if (files.length === 0) {
-      console.warn("no by-parent index files; skipping positive case");
-      return;
-    }
-    const parentSessionId = files[0]!.replace(/\.jsonl$/i, "");
+    const childFile = writeChildSession(path.join(tmpHome, "sessions"));
+    const parentSessionId = "parent-with-runs";
+    recordChildSessionStarted(parentSessionId, { parentSessionFile: "", childSessionFile: childFile });
+
     const runs = loadSubagentRuns(parentSessionId);
     expect(runs.length).toBeGreaterThan(0);
     const run = runs[0]!;

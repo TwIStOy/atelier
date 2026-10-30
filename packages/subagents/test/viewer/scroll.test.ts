@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { initTheme, type Theme } from "@earendil-works/pi-coding-agent";
 import type { TUI } from "@earendil-works/pi-tui";
 import { childSessionIndexPath, recordChildSessionStarted } from "@htwang-contrib/common";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SubagentRunSummary } from "../../src/viewer/index.ts";
 import { SubagentViewerOverlay } from "../../src/viewer/overlay.ts";
 
@@ -14,6 +14,18 @@ process.env.PI_PACKAGE_DIR = fileURLToPath(
   new URL("../../../../node_modules/@earendil-works/pi-coding-agent", import.meta.url),
 );
 initTheme(undefined, false);
+
+const originalHome = process.env.HOME;
+let tmpHome: string;
+
+beforeEach(() => {
+  tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), "subagents-scroll-"));
+  process.env.HOME = tmpHome;
+});
+afterEach(() => {
+  process.env.HOME = originalHome;
+  fs.rmSync(tmpHome, { recursive: true, force: true });
+});
 
 function appendMsg(file: string, prevId: string | null, msg: unknown): string {
   const id = crypto.randomBytes(4).toString("hex");

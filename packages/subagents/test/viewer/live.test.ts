@@ -5,13 +5,25 @@ import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { initTheme } from "@earendil-works/pi-coding-agent";
 import { childSessionIndexPath, recordChildSessionFinished, recordChildSessionStarted } from "@htwang-contrib/common";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { loadSubagentRuns, refreshRunRunning } from "../../src/viewer/index.ts";
 
 process.env.PI_PACKAGE_DIR = fileURLToPath(
   new URL("../../../../node_modules/@earendil-works/pi-coding-agent", import.meta.url),
 );
 initTheme(undefined, false);
+
+const originalHome = process.env.HOME;
+let tmpHome: string;
+
+beforeEach(() => {
+  tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), "subagents-live-"));
+  process.env.HOME = tmpHome;
+});
+afterEach(() => {
+  process.env.HOME = originalHome;
+  fs.rmSync(tmpHome, { recursive: true, force: true });
+});
 
 function makeHeader(id: string): string {
   return JSON.stringify({
