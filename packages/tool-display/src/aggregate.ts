@@ -1,13 +1,12 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { truncateToWidth } from "@earendil-works/pi-tui";
 import {
   aggregateRuleFor,
   RAIL_BULLET_AGGREGATE,
-  RAIL_MARK_GLYPH,
+  RAIL_SUBROW_INDENT,
   type RailSpec,
   type RailStatus,
   renderRailLines,
-  TOOL_RAIL_LAYOUT,
+  toolRailBodyWidth,
 } from "@htwang-contrib/common";
 import { spinnerGlyph } from "./format.ts";
 
@@ -118,11 +117,8 @@ export function renderTruncationLine(
   return renderHeaderLine(truncationSummary(hidden, groupToolVerbs), hidden, theme, width, spinAt);
 }
 
-const SUBROW_BULLET_COLUMN = TOOL_RAIL_LAYOUT.bulletColumn + 3;
-const SUBROW_PREFIX_WIDTH = SUBROW_BULLET_COLUMN + 2;
-
 export function aggregateSubrowBodyWidth(width: number): number {
-  return Math.max(0, width - SUBROW_PREFIX_WIDTH);
+  return toolRailBodyWidth(width, RAIL_SUBROW_INDENT);
 }
 
 export function renderAggregateSubrowLine(
@@ -132,11 +128,5 @@ export function renderAggregateSubrowLine(
   theme: Theme,
   width: number,
 ): string {
-  const railGlyph = RAIL_MARK_GLYPH.run;
-  const rail = status ? theme.fg(status, railGlyph) : railGlyph;
-  const styledBullet = status ? theme.fg(status, bullet) : bullet;
-  const lead = " ".repeat(TOOL_RAIL_LAYOUT.railColumn);
-  const gap = " ".repeat(SUBROW_BULLET_COLUMN - TOOL_RAIL_LAYOUT.railColumn - 1);
-  const line = `${lead}${rail}${gap}${styledBullet} ${header}`;
-  return truncateToWidth(line, width, "…");
+  return renderRailLines([header], { mark: "run", bullet, status, indent: RAIL_SUBROW_INDENT }, theme, width)[0] ?? "";
 }

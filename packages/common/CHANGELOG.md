@@ -11,6 +11,7 @@
 
 ### Added
 
+- Shared rail subrow indentation and render-time layout selection keep grouped tool and thinking bullets, body columns, and wrapping widths aligned. The thought-group expansion marker lets grouping consumers update thinking layout without rebuilding its content.
 - Shared `findExecutable`, `getLocalRexContext` and `openRexPane` helpers resolve executable paths, verify a local Rex session, and launch an explicitly anchored pane without changing focus or interpolating a shell command.
 - Shared subagent model-tier configuration and resolution (`loadSubagentModelConfig`, `resolveSubagentModelPattern`, `SUBAGENT_MODEL_TIERS`). `runChildAgent` applies per-persona model overrides before persona frontmatter and resolves tier references for all child-agent callers while preserving current-session fallback.
 - Shared `createComplexityAssessment` for transcript annotations, preserving complete conversation text and image type markers.

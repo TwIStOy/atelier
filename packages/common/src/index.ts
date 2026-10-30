@@ -255,15 +255,18 @@ export type {
 } from "./tool-rail.ts";
 export {
   clearRailTailSpacing,
+  isThoughtGroupExpanded,
   isThoughtMember,
   isThoughtMemberClaimed,
   isThoughtTransparent,
   RAIL_BULLET_AGGREGATE,
   RAIL_BULLET_SINGLE,
   RAIL_MARK_GLYPH,
+  RAIL_SUBROW_INDENT,
   readRailTailSpacing,
   renderRailLines,
   setRailTailSpacing,
+  setThoughtGroupExpanded,
   setThoughtMember,
   setThoughtMemberClaimed,
   setThoughtTransparent,

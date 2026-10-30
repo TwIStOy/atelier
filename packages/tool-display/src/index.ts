@@ -82,6 +82,7 @@ import {
   readRailTailSpacing,
   registerAggregateRule,
   registerSystemOneConfigItems,
+  setThoughtGroupExpanded,
   setThoughtMemberClaimed,
 } from "@htwang-contrib/common";
 import {
@@ -311,13 +312,23 @@ function computeRegionRoles(siblings: unknown[], lo: number, hi: number): Map<nu
   const groupSpans = spans.filter((span) => span.members.length >= 2);
 
   const claimedThoughts = new Set<number>();
+  const expandedThoughts = new Set<number>();
   for (const span of groupSpans) {
-    if (span.groupExpanded) continue;
+    if (span.groupExpanded) {
+      const lastMember = span.members[span.members.length - 1] ?? span.leader;
+      for (let k = span.leader + 1; k < lastMember; k++) {
+        if (isThoughtMember(siblings[k]) || isThoughtTransparent(siblings[k])) expandedThoughts.add(k);
+      }
+      continue;
+    }
     for (const t of span.thoughts) claimedThoughts.add(t);
   }
   for (let k = lo; k <= hi; k++) {
     if (verbClasses.get(k) === "thought") {
       setThoughtMemberClaimed(siblings[k] as object, claimedThoughts.has(k));
+    }
+    if (isThoughtMember(siblings[k]) || isThoughtTransparent(siblings[k])) {
+      setThoughtGroupExpanded(siblings[k] as object, expandedThoughts.has(k));
     }
   }
 

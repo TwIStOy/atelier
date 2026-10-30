@@ -6,6 +6,13 @@ import type * as Common from "@htwang-contrib/common";
 import { componentRendersLines, setRailTailSpacing } from "@htwang-contrib/common";
 import { Type } from "@sinclair/typebox";
 import { describe, expect, it, vi } from "vitest";
+import {
+  activateExtension as activateThinkingExtension,
+  click,
+  emitAssistantUpdate,
+  makeMessage,
+  makeComponent as makeThinkingComponent,
+} from "../../compact-thinking/test/harness.ts";
 import extension from "../src/index.ts";
 
 vi.mock("@htwang-contrib/common", async (importOriginal) => {
@@ -13,6 +20,7 @@ vi.mock("@htwang-contrib/common", async (importOriginal) => {
   return {
     ...actual,
     isExtensionDisabled: () => false,
+    readConfig: (_name: string, schema: { defaults: Record<string, unknown> }) => ({ ...schema.defaults }),
     registerConfigItems: vi.fn(),
   };
 });
@@ -359,6 +367,106 @@ describe("read-only tool aggregation", () => {
     expect(member.handleMouse({ type: "click", button: "left", width: 80, y: 2 })).toEqual({ handled: true });
     expect(member.expanded).toBe(false);
     expect(member.render(80)).toEqual(["  ┃     ◆ Read packages/b.ts"]);
+  });
+
+  it("aligns thinking with tool subrows when its group expands", () => {
+    activateExtension();
+    const root: FakeRoot = { children: [] };
+    const session = activateThinkingExtension({ tuiRoot: root });
+    try {
+      const read1 = withResult(makeComponent("read", root, { file_path: "packages/a.ts" }));
+      const thinking = makeThinkingComponent(makeMessage([{ type: "thinking", thinking: "reasoning" }]));
+      const read2 = withResult(makeComponent("read", root, { file_path: "packages/b.ts" }));
+      root.children.push(read1, thinking, read2);
+
+      const leader = asPatched(read1);
+      leader.render(80);
+      expect(thinking.render(80)).toEqual([]);
+      leader.handleMouse({ type: "click", button: "left", width: 80, y: 1 });
+      leader.render(80);
+
+      expect(thinking.render(80).map((line) => stripTerminalSequences(line).trimEnd())).toEqual([
+        "  ┃     ◆ Thinking...",
+      ]);
+
+      leader.handleMouse({ type: "click", button: "left", width: 80, y: 1 });
+      expect(leader.render(80)).toEqual(["", "  ❙  ◈ Read 2 files"]);
+      expect(thinking.render(80)).toEqual([]);
+      expect(asPatched(read2).render(80)).toEqual([]);
+    } finally {
+      session.shutdown();
+    }
+  });
+
+  it("keeps expanded thinking text aligned and complete when the group resizes", () => {
+    activateExtension();
+    const root: FakeRoot = { children: [] };
+    const session = activateThinkingExtension({ tuiRoot: root });
+    try {
+      const read1 = withResult(makeComponent("read", root));
+      const reasoning = "abcdefghijklmnopqrstuvwxyz中文内容";
+      const thinking = makeThinkingComponent(makeMessage([{ type: "thinking", thinking: reasoning }]));
+      const read2 = withResult(makeComponent("read", root));
+      root.children.push(read1, thinking, read2);
+
+      const leader = asPatched(read1);
+      leader.render(80);
+      leader.handleMouse({ type: "click", button: "left", width: 80, y: 1 });
+      leader.render(80);
+      expect(click(thinking, 0, thinking.render(80).length)).toMatchObject({ handled: true });
+
+      for (const width of [12, 22, 40, 80]) {
+        leader.render(width);
+        const lines = thinking.render(width).map((line) => stripTerminalSequences(line).trimEnd());
+        expect(lines[0].indexOf("◆")).toBe(8);
+        expect(lines.every((line) => line.startsWith("  ┃"))).toBe(true);
+        expect(lines.every((line) => visibleWidth(line) <= width)).toBe(true);
+        const body = lines.slice(lines.indexOf("  ┃") + 1);
+        expect(body.map((line) => line.slice(10)).join("")).toBe(reasoning);
+      }
+      for (const width of [0, 1, 7, 10]) {
+        leader.render(width);
+        expect(thinking.render(width).every((line) => visibleWidth(line) <= width)).toBe(true);
+      }
+
+      leader.render(80);
+      leader.handleMouse({ type: "click", button: "left", width: 80, y: 1 });
+      leader.render(80);
+      const standalone = thinking.render(80).map((line) => stripTerminalSequences(line).trimEnd());
+      expect(standalone[0].indexOf("◆")).toBe(5);
+      expect(standalone.at(-1)).toBe(`  ┃    ${reasoning}`);
+    } finally {
+      session.shutdown();
+    }
+  });
+
+  it("indents streaming thinking only while the surrounding group is expanded", () => {
+    activateExtension();
+    const root: FakeRoot = { children: [] };
+    const session = activateThinkingExtension({ tuiRoot: root });
+    try {
+      const read1 = withResult(makeComponent("read", root));
+      const message = makeMessage([{ type: "thinking", thinking: "reasoning" }]);
+      emitAssistantUpdate(session, message, { type: "thinking_start", contentIndex: 0 });
+      const thinking = makeThinkingComponent(message);
+      const read2 = withResult(makeComponent("read", root));
+      root.children.push(read1, thinking, read2);
+
+      const leader = asPatched(read1);
+      leader.render(80);
+      expect(stripTerminalSequences(thinking.render(80)[0]).indexOf("◆")).toBe(5);
+      leader.handleMouse({ type: "click", button: "left", width: 80, y: 1 });
+      leader.render(80);
+      const expanded = thinking.render(80).map((line) => stripTerminalSequences(line).trimEnd());
+      expect(expanded[0].indexOf("◆")).toBe(8);
+      expect(expanded.at(-1)).toBe("  ┃       reasoning");
+
+      leader.handleMouse({ type: "click", button: "left", width: 80, y: 1 });
+      leader.render(80);
+      expect(stripTerminalSequences(thinking.render(80)[0]).indexOf("◆")).toBe(5);
+    } finally {
+      session.shutdown();
+    }
   });
 
   it("expands the leader's own call through its subrow below the summary", () => {

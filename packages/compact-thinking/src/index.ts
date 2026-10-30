@@ -14,14 +14,17 @@ import {
   findComponentContext,
   isExtensionDisabled,
   isStaleCtxError,
+  isThoughtGroupExpanded,
   isThoughtMember,
   isThoughtMemberClaimed,
   RAIL_BULLET_SINGLE,
+  RAIL_SUBROW_INDENT,
   type RailBar,
   type RailSpec,
   readRailTailSpacing,
   resolveModel,
   setRailTailSpacing,
+  setThoughtGroupExpanded,
   setThoughtMember,
   setThoughtMemberClaimed,
   setThoughtTransparent,
@@ -230,6 +233,7 @@ export default function compactThinking(pi: ExtensionAPI) {
     if (!self.hideThinkingBlock) {
       leadingBlankDropped.delete(component);
       clearRailTailSpacing(component);
+      setThoughtGroupExpanded(component, false);
       setThoughtMember(component, false);
       setThoughtMemberClaimed(component, false);
       setThoughtTransparent(component, false);
@@ -262,12 +266,11 @@ export default function compactThinking(pi: ExtensionAPI) {
     const hasNotice =
       message.stopReason === "length" || message.stopReason === "aborted" || message.stopReason === "error";
     const eligible = !streaming && !hasExpandedRun && !hasTextItem && !hasNotice && items.length > 0;
+    const transparent = !eligible && (streaming || hasExpandedRun) && !hasTextItem && !hasNotice && items.length > 0;
     setThoughtMember(component, eligible);
     setThoughtMemberClaimed(component, false);
-    setThoughtTransparent(
-      component,
-      !eligible && (streaming || hasExpandedRun) && !hasTextItem && !hasNotice && items.length > 0,
-    );
+    setThoughtTransparent(component, transparent);
+    if (!eligible && !transparent) setThoughtGroupExpanded(component, false);
 
     const droppedLeadingBlank = items.length > 0 && items[0].kind === "thinking" && spacing === 0;
     if (droppedLeadingBlank) leadingBlankDropped.add(component);
@@ -341,7 +344,11 @@ export default function compactThinking(pi: ExtensionAPI) {
         : active && config.previewLines > 0 && previewText
           ? new ActiveThinkingPreview(heading, previewText, config.previewLines, thinkingStyle)
           : new SingleLineText(heading);
-      const rail = new ToolRailComponent(block, spec, activeTheme ?? PASSTHROUGH_THEME);
+      const rail = new ToolRailComponent(
+        block,
+        () => (isThoughtGroupExpanded(component) ? { ...spec, mark: "run", indent: RAIL_SUBROW_INDENT } : spec),
+        activeTheme ?? PASSTHROUGH_THEME,
+      );
       self.contentContainer.addChild(
         new MouseRegion(rail, (event) => {
           if (event.type !== "click" || event.button !== "left") return undefined;

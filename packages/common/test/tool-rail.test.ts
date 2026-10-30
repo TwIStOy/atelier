@@ -4,6 +4,7 @@ import { describe, expect, test } from "vitest";
 import {
   RAIL_BULLET_AGGREGATE,
   RAIL_BULLET_SINGLE,
+  RAIL_SUBROW_INDENT,
   renderRailLines,
   TOOL_RAIL_LAYOUT,
   ToolRailComponent,
@@ -292,6 +293,30 @@ describe("ToolRailComponent", () => {
     const second = component.render(40);
     expect(first[0]).toContain("\x1b[38;2;0;0;0m");
     expect(second[0]).toContain("\x1b[38;2;5;0;0m");
+  });
+
+  test("updates subrow columns and wrapping width from the current layout", () => {
+    let expanded = false;
+    const widths: number[] = [];
+    const inner: Component = {
+      render(width: number) {
+        widths.push(width);
+        return ["thinking", "continued"];
+      },
+      invalidate() {},
+    };
+    const component = new ToolRailComponent(
+      inner,
+      () => ({ mark: "run", bullet: RAIL_BULLET_SINGLE, indent: expanded ? RAIL_SUBROW_INDENT : 0 }),
+      PLAIN_THEME,
+    );
+
+    expect(component.render(30)).toEqual(["  ┃  ◆ thinking", "  ┃    continued"]);
+    expanded = true;
+    expect(component.render(30)).toEqual(["  ┃     ◆ thinking", "  ┃       continued"]);
+    expanded = false;
+    expect(component.render(30)).toEqual(["  ┃  ◆ thinking", "  ┃    continued"]);
+    expect(widths).toEqual([23, 20, 23]);
   });
 });
 
