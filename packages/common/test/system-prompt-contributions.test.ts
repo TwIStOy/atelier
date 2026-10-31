@@ -23,6 +23,7 @@ afterEach(() => {
 function fakeEvent(systemPrompt = "BASE"): BeforeAgentStartEvent {
   return {
     type: "before_agent_start",
+    messageType: "user",
     prompt: "hi",
     systemPrompt,
     systemPromptOptions: {} as BeforeAgentStartEvent["systemPromptOptions"],
