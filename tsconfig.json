@@ -23,7 +23,6 @@
     { "path": "packages/message-queue" },
     { "path": "packages/auto-compact" },
     { "path": "packages/todo" },
-    { "path": "packages/voice-input" },
     { "path": "packages/read-tracker" },
     { "path": "extensions/working-indicator" },
     { "path": "packages/moshi-hooks-extra" },

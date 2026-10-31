@@ -20,8 +20,8 @@ Each file is a map from extension id to a boolean. An extension is disabled when
 ```json
 {
   "committer": true,
-  "voice-input": true,
-  "subagents": true
+  "subagents": true,
+  "web-tools": true
 }
 ```
 
@@ -64,7 +64,6 @@ tool-display
 toori
 truncate-outputs
 user-message
-voice-input
 web-tools
 working-indicator
 ```
