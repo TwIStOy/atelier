@@ -21,7 +21,7 @@
     "@sinclair/typebox": "^0.34.52"
   },
   "devDependencies": {
-    "@earendil-works/pi-coding-agent": "^1.0.0",
+    "@earendil-works/pi-coding-agent": "^1.4.0",
     "@earendil-works/pi-tui": "^1.0.0",
     "@types/node": "^26.1.2",
     "echarts": "^6.1.0",
