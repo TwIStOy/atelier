@@ -83,7 +83,7 @@
     "@earendil-works/pi-coding-agent": "^1.4.0",
     "@earendil-works/pi-tui": "^1.0.0",
     "@types/node": "^26.1.2",
-    "fallow": "^3.22.0",
+    "fallow": "^3.37.0",
     "prettier": "^3.9.6",
     "typescript": "^7.0.2",
     "vitest": "^5.0.0"
