@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- The `before_agent_start` handler now reads the user prompt only on `messageType: "user"` events, adapting to the `BeforeAgentStartUserEvent | BeforeAgentStartCustomEvent` union introduced in `@earendil-works/pi-coding-agent` 1.4. Behavior for custom-triggered runs is unchanged (no prompt is remembered, so `agent_end` still skips them).
+
 ## [0.7.0] - 2026-10-30
 
 ### Removed

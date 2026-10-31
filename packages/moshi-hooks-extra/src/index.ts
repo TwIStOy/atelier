@@ -93,7 +93,9 @@ export default function moshiHooksExtra(pi: ExtensionAPI): void {
   pi.on("before_agent_start", (event, ctx) => {
     const cwd = ctx.cwd ?? "";
     const key = sessionKeyFor(sessionIdFromCtx(ctx), cwd);
-    activity.rememberUserPrompt(key, event.prompt ?? "");
+    if (event.messageType === "user") {
+      activity.rememberUserPrompt(key, event.prompt);
+    }
     return;
   });
 
