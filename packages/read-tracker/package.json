@@ -8,7 +8,7 @@
     "@htwang-contrib/common": "*"
   },
   "devDependencies": {
-    "@earendil-works/pi-coding-agent": "^1.0.0",
+    "@earendil-works/pi-coding-agent": "^1.4.0",
     "@types/node": "^26.1.2",
     "cli-table3": "^0.6.5",
     "typescript": "^7.0.2",
