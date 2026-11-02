@@ -53,7 +53,6 @@ goal
 magpie
 memory
 message-queue
-moshi-hooks-extra
 protect-secrets
 read-tracker
 statusline

@@ -24,10 +24,9 @@ export const MODAL_ACTIVE_EVENT = "pi-extensions:ui:modal-active" as const;
  *
  * Producers (currently `packages/ask-user-question`) emit via
  * `emitAskUserPrompt`. Consumers that want richer context than the bare
- * `MODAL_ACTIVE_EVENT` boolean — e.g. `moshi-hooks-extra` forwarding a
- * "needs input" notification with the actual question text — subscribe on
- * this channel to capture the questions, then react to `MODAL_ACTIVE_EVENT`
- * for the open/close edge.
+ * `MODAL_ACTIVE_EVENT` boolean — for example a "needs input" notification
+ * carrying the actual question text — subscribe on this channel to capture
+ * the questions, then react to `MODAL_ACTIVE_EVENT` for the open/close edge.
  *
  * Payload: `AskUserPromptPayload` (structural — read-only consumer view).
  */
@@ -48,27 +47,6 @@ export type AskUserPromptQuestion = {
 
 export type AskUserPromptPayload = {
   questions: ReadonlyArray<AskUserPromptQuestion>;
-};
-
-/**
- * Cross-extension channel emitted by `ask_user_question` to signal that the
- * agent is blocked waiting for the user to answer a questionnaire.
- *
- * Producers (currently `packages/ask-user-question`) emit `{ active: true }`
- * right before the editor-occupying modal mounts and `{ active: false }` once
- * it has closed — including cancel and UI-throw paths, guaranteed via the same
- * try/finally that brackets `ctx.ui.custom`. External state listeners (e.g.
- * `moshi-hooks-extra`) subscribe on this channel to flip a session status from
- * "working" to "blocked", distinct from the generic `MODAL_ACTIVE_EVENT`
- * boolean (which fires for any editor-occupying modal, not just
- * `ask_user_question`).
- *
- * Payload: `AskUserBlockedPayload` (`{ active: boolean }`).
- */
-export const ASK_USER_BLOCKED_EVENT = "ask_user_question:blocked" as const;
-
-export type AskUserBlockedPayload = {
-  active: boolean;
 };
 
 /**

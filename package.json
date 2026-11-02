@@ -35,7 +35,6 @@
       "extensions/working-indicator",
       "packages/compact-thinking",
       "packages/todo",
-      "packages/moshi-hooks-extra",
       "packages/truncate-outputs",
       "packages/experience",
       "packages/agents-mirror",

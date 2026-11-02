@@ -1,11 +1,6 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { SettingsManager } from "@earendil-works/pi-coding-agent";
-import {
-  ASK_USER_BLOCKED_EVENT,
-  GOAL_UPDATE_EVENT,
-  type GoalUpdatePayload,
-  MODAL_ACTIVE_EVENT,
-} from "@htwang-contrib/common";
+import { GOAL_UPDATE_EVENT, type GoalUpdatePayload, MODAL_ACTIVE_EVENT } from "@htwang-contrib/common";
 import { buildItemsForQuestion } from "./build-items.ts";
 import { emitAskUserPrompt } from "./events.ts";
 import { editWithExternalEditor } from "./state/external-editor.ts";
@@ -112,7 +107,6 @@ export function registerAskUserQuestionTool(pi: ExtensionAPI): void {
 
       emitAskUserPrompt(pi, typed);
 
-      pi.events.emit(ASK_USER_BLOCKED_EVENT, { active: true });
       pi.events.emit(MODAL_ACTIVE_EVENT, true);
       try {
         const result =
@@ -120,7 +114,6 @@ export function registerAskUserQuestionTool(pi: ExtensionAPI): void {
         return buildQuestionnaireResponse(result, typed);
       } finally {
         pi.events.emit(MODAL_ACTIVE_EVENT, false);
-        pi.events.emit(ASK_USER_BLOCKED_EVENT, { active: false });
       }
     },
   });

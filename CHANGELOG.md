@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Removed
+
+- `moshi-hooks-extra` extension, including its Moshi client, session payload, and summarizer code, plus the `ask_user_question:blocked` event contract in `@htwang-contrib/common` that only it consumed.
+
 ## [0.7.0] - 2026-10-30
 
 ### Changed

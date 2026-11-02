@@ -25,7 +25,6 @@
     { "path": "packages/todo" },
     { "path": "packages/read-tracker" },
     { "path": "extensions/working-indicator" },
-    { "path": "packages/moshi-hooks-extra" },
     { "path": "packages/heap-probe" },
     { "path": "packages/apply-patch" }
   ]

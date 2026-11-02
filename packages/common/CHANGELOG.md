@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Removed
+
+- `ASK_USER_BLOCKED_EVENT` (`"ask_user_question:blocked"`) and `AskUserBlockedPayload`, whose only consumer was the removed `moshi-hooks-extra` extension. `MODAL_ACTIVE_EVENT` and `ASK_USER_PROMPT_EVENT` are unchanged.
+
 ## [0.7.0] - 2026-10-30
 
 ### Fixed

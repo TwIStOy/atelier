@@ -112,7 +112,6 @@ export {
   getEditorFactoryParent,
 } from "./editor-chain.ts";
 export type {
-  AskUserBlockedPayload,
   AskUserPromptOption,
   AskUserPromptPayload,
   AskUserPromptQuestion,
@@ -120,7 +119,6 @@ export type {
   GoalUpdatePayload,
 } from "./events.ts";
 export {
-  ASK_USER_BLOCKED_EVENT,
   ASK_USER_PROMPT_EVENT,
   EDITOR_HINT_EVENT,
   GOAL_UPDATE_EVENT,

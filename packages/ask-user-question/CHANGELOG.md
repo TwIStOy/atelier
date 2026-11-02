@@ -6,6 +6,10 @@
 
 - Trimmed the `ask_user_question` prompt guidelines to the two invocation-policy bullets (ask when underspecified; do not stack back-to-back calls). The removed bullets restated the options format and multiSelect/preview mechanics that the tool description and parameter schema descriptions already carry verbatim in the API tools field.
 
+### Removed
+
+- The paired `ask_user_question:blocked` emit around the questionnaire, after removal of its only consumer, the `moshi-hooks-extra` extension. The modal is still bracketed by `MODAL_ACTIVE_EVENT` with `true`/`false`, including cancel and UI-throw paths.
+
 ## [0.7.0] - 2026-10-30
 
 ### Added
