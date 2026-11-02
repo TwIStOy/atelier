@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Trimmed the `ask_user_question` prompt guidelines to the two invocation-policy bullets (ask when underspecified; do not stack back-to-back calls). The removed bullets restated the options format and multiSelect/preview mechanics that the tool description and parameter schema descriptions already carry verbatim in the API tools field.
+
 ## [0.7.0] - 2026-10-30
 
 ### Added

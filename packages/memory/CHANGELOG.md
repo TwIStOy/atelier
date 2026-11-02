@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Split the memory instructions injected into the system prompt: the always-on `<memory_instructions>` block now carries only policy (initialization sequence, recall triggers, write triggers and self-checks, pre-flight invariants, priority caps summary) at ~5.9k characters, down from ~19.7k. The mechanics (three-layer architecture, tool catalog, URI grammar, create/update decision tables, behavior-anchor record format, priority slotting and cap-cascade flow, disclosure and alias rules, merge/dedup/split rules, audit procedures) moved to `src/prompts/memory-reference.md`, injected by absolute-path pointer and read on demand before the first write of a session, structural operations, and audits.
+
 ## [0.7.0] - 2026-10-30
 
 ### Added

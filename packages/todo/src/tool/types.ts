@@ -95,7 +95,9 @@ export const UpdateTodoSchema = Type.Object({
     }),
   ),
   addBlockedBy: Type.Optional(
-    Type.Array(Type.Number(), { description: "Task ids to add to blockedBy (additive merge)" }),
+    Type.Array(Type.Number(), {
+      description: "Task ids to add to blockedBy (additive merge; self-blocks and cycles are rejected)",
+    }),
   ),
   removeBlockedBy: Type.Optional(
     Type.Array(Type.Number(), { description: "Task ids to remove from blockedBy (additive merge)" }),

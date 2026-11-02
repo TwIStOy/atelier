@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Split the `workflow` prompt guidelines: the system prompt keeps only the invocation policy (explicit opt-in, when to prefer `workflow` over `subagent`) plus a pointer to the new `workflow-dsl` skill; the script DSL mechanics (meta literal format, injected globals and host-access rejection, `agent()` call shape, `parallel`/`pipeline`/`phase` semantics, `null` failure handling, concurrency caps, resume, and `save_as`) moved into `skills/workflow-dsl/SKILL.md`, loaded on demand via the skill catalog. Guidelines shrink from 3.8k to 0.9k characters; net system-prompt saving is ~2.5k characters per session after the new skill catalog entry.
+
 ## [0.7.0] - 2026-10-30
 
 ### Added

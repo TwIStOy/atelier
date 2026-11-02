@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Trimmed `todo_update` and `todo_list` prompt guidelines to behavior policy only: the explicit-status-defaults, addBlockedBy additive-merge, and includeDeleted/tombstone mechanics duplicated the tool and parameter schema descriptions, which already carry them in the API tools field. The self-block/cycle rejection clause moved into the `addBlockedBy` parameter description.
+
 ## [0.7.0] - 2026-10-30
 
 ### Added

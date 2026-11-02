@@ -68,8 +68,6 @@ const TODO_TOOL_SPECS: TodoToolSpec[] = [
     guidelines: [
       "Mark a task in_progress BEFORE beginning work and completed IMMEDIATELY when done — never batch completions. Keep exactly one task in_progress at a time.",
       "Never mark a task completed if tests are failing, the implementation is partial, or you hit unresolved errors — keep it in_progress and create a task for the blocker instead.",
-      "Prefer sending status explicitly. A bare todo_update with only an id (no other field) defaults to in_progress; explicit fields always take precedence.",
-      "Express dependencies with addBlockedBy / removeBlockedBy (additive merge — do not resend the full array). Self-blocks and cycles are rejected.",
     ],
     parameters: UpdateTodoSchema,
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
@@ -80,9 +78,7 @@ const TODO_TOOL_SPECS: TodoToolSpec[] = [
     label: "Todo List",
     description: "List all tasks, optionally filtered by a single status. Hides deleted (tombstoned) tasks by default.",
     snippet: "List tasks, optionally filtered by status",
-    guidelines: [
-      "list hides tombstoned (deleted) tasks by default; pass includeDeleted:true to see them, and status to filter to a single status.",
-    ],
+    guidelines: [],
     parameters: ListTodoSchema,
     outputSchema: ListTodoOutputSchema,
     annotations: { readOnlyHint: true },

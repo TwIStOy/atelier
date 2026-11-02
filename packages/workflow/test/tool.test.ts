@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it } from "vitest";
 import { registerWorkflowTool } from "../src/tool.ts";
@@ -45,18 +46,23 @@ describe("registerWorkflowTool", () => {
     expect(guidelines).toContain("adaptive delegation");
   });
 
-  it("documents the runtime's JavaScript, barrier, pipeline, and failure semantics", () => {
+  it("keeps only invocation policy in the prompt and moves DSL mechanics into the workflow-dsl skill", () => {
     const guidelines = registeredWorkflowTool().promptGuidelines.join("\n");
+    const skill = readFileSync(new URL("../../../skills/workflow-dsl/SKILL.md", import.meta.url), "utf8");
 
-    expect(guidelines).toContain("JavaScript, not TypeScript");
-    expect(guidelines).toContain("literal values only");
-    expect(guidelines).toContain("`parallel([...])` is a barrier");
-    expect(guidelines).toContain("returns results in input order");
-    expect(guidelines).toContain("runs stages sequentially");
-    expect(guidelines).toContain("pipeline inside each parallel branch");
-    expect(guidelines).toContain("resolves to `null`");
-    expect(guidelines).toContain("sampling, top-N cutoffs, skipped items");
-    expect(guidelines).toContain("4 concurrent, 32 total per workflow");
+    expect(guidelines).toContain("workflow-dsl");
+    expect(guidelines).not.toContain("JavaScript, not TypeScript");
+    expect(guidelines).not.toContain("`parallel([...])` is a barrier");
+
+    expect(skill).toContain("JavaScript, not TypeScript");
+    expect(skill).toContain("literal values only");
+    expect(skill).toContain("`parallel([...])` is a barrier");
+    expect(skill).toContain("returns results in input order");
+    expect(skill).toContain("runs stages sequentially");
+    expect(skill).toContain("pipeline inside each parallel branch");
+    expect(skill).toContain("resolves to `null`");
+    expect(skill).toContain("sampling, top-N cutoffs, skipped items");
+    expect(skill).toContain("4 concurrent and 32 total");
   });
 
   it("describes structured args, resume, and save parameters", () => {

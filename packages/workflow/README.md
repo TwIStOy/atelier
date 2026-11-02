@@ -4,7 +4,7 @@ Dynamic multi-agent workflows for Pi. Inspired by [Michaelliv/pi-dynamic-workflo
 
 ## Tool: `workflow`
 
-The model writes a small **JavaScript orchestration script**; the runtime parses it, validates it statically, and executes it in a `node:vm` sandbox, fanning work out to isolated in-process child agents. One tool call replaces many sequential `subagent` calls when the orchestration shape is known up front.
+The model writes a small **JavaScript orchestration script**; the runtime parses it, validates it statically, and executes it in a `node:vm` sandbox, fanning work out to isolated in-process child agents. One tool call replaces many sequential `subagent` calls when the orchestration shape is known up front. In this repo, the system prompt carries only the invocation policy; the full DSL reference lives in the `workflow-dsl` skill (`skills/workflow-dsl/SKILL.md`) and is loaded on demand.
 
 ```
 workflow({ script: "...", args?: <any JSON> })
