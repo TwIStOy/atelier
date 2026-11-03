@@ -40,6 +40,7 @@ describe("Rex pane launches", () => {
         session_id: context.sessionId,
         block_id: context.blockId,
       }),
+      truncated: false,
     });
   });
 
@@ -74,13 +75,25 @@ describe("Rex pane launches", () => {
     { session_id: "session:source", block_id: "block:other", endpoint: "unix:///run/rex/server.sock" },
     { session_id: "session:source", block_id: "block:source", endpoint: "https://remote.example" },
   ])("rejects mismatched or remote contexts", async (identity) => {
-    exec.mockResolvedValueOnce({ code: 0, killed: false, stderr: "", stdout: JSON.stringify(identity) });
+    exec.mockResolvedValueOnce({
+      code: 0,
+      killed: false,
+      stderr: "",
+      stdout: JSON.stringify(identity),
+      truncated: false,
+    });
     await expect(getLocalRexContext(exec, env)).rejects.toThrow();
     expect(exec).toHaveBeenCalledTimes(1);
   });
 
   it("anchors the new pane to the originating block and preserves literal argv and focus", async () => {
-    exec.mockResolvedValueOnce({ code: 0, killed: false, stderr: "", stdout: '{"block_ids":["block:new"]}' });
+    exec.mockResolvedValueOnce({
+      code: 0,
+      killed: false,
+      stderr: "",
+      stdout: '{"block_ids":["block:new"]}',
+      truncated: false,
+    });
     const command: [string, ...string[]] = ["/path with spaces/browser", "open", "http://127.0.0.1:7700/?x=$(touch)"];
     expect(await openRexPane(exec, context, { cwd: "/work tree", label: "Canvas", direction: "right", command })).toBe(
       "block:new",
@@ -110,10 +123,10 @@ describe("Rex pane launches", () => {
   });
 
   it.each([
-    { code: 1, killed: false, stderr: "anchor not found", stdout: "" },
-    { code: 0, killed: true, stderr: "", stdout: "" },
-    { code: 0, killed: false, stderr: "", stdout: "null" },
-    { code: 0, killed: false, stderr: "", stdout: '{"block_ids":[]}' },
+    { code: 1, killed: false, stderr: "anchor not found", stdout: "", truncated: false },
+    { code: 0, killed: true, stderr: "", stdout: "", truncated: false },
+    { code: 0, killed: false, stderr: "", stdout: "null", truncated: false },
+    { code: 0, killed: false, stderr: "", stdout: '{"block_ids":[]}', truncated: false },
   ])("reports failed or malformed launches without retrying", async (result) => {
     exec.mockResolvedValueOnce(result);
     await expect(
