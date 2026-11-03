@@ -40,7 +40,7 @@
 
 - Create all new extensions under the repo-root `extensions/<name>/` directory.
 - Use the existing workspace structure: `src/`, `test/`, `package.json`, `tsconfig.json`, and `CHANGELOG.md`.
-- Register each extension in the root `package.json` Pi manifest and the root `tsconfig.json` project references. Point its package-level `pi.extensions` entry at `./src/index.ts`.
+- Register each extension in the root `package.json` Pi manifest and the root `tsconfig.json` project references. Point its package-level `pi.extensions` entry at `./index.ts`, a one-line `export { default } from "./src/index.ts";` re-export. Pi labels extensions in its startup list from the entry file path: it strips a trailing `index.ts`, then takes the shortest path suffix that is unique across all loaded extensions, so an entry at `src/index.ts` renders every label as `<name>/src` while a root `index.ts` renders the bare package name.
 - Existing extensions in `packages/` may remain there until explicitly migrated. Shared code stays in `packages/common/`.
 
 ## Documentation

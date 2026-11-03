@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Every extension package now declares `pi.extensions: ["./index.ts"]` pointing at a one-line `export { default } from "./src/index.ts";` re-export, so Pi's startup extension list shows the bare package name instead of `<name>/src`. Pi derives that label from the entry file path: it strips a trailing `index.ts` and then takes the shortest path suffix unique across all loaded extensions, and `src` was never unique.
+
 ### Removed
 
 - `moshi-hooks-extra` extension, including its Moshi client, session payload, and summarizer code, plus the `ask_user_question:blocked` event contract in `@htwang-contrib/common` that only it consumed.

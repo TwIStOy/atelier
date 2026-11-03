@@ -12,6 +12,11 @@
   "type": "module",
   "main": "src/index.ts",
   "types": "src/index.ts",
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
   "license": "MIT",
   "files": [
     "src"

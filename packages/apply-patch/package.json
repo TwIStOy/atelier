@@ -11,6 +11,11 @@
   "type": "module",
   "main": "src/index.ts",
   "types": "src/index.ts",
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
   "exports": {
     ".": "./src/index.ts",
     "./patch": "./src/patch.ts",
