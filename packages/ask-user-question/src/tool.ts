@@ -121,29 +121,38 @@ export function registerAskUserQuestionTool(pi: ExtensionAPI): void {
 
 async function runTuiQuestionnaire(ctx: ExtensionContext, params: QuestionParams): Promise<QuestionnaireResult> {
   const itemsByTab = params.questions.map((q) => buildItemsForQuestion(q));
-  return ctx.ui.custom<QuestionnaireResult>((tui, theme, keybindings, done) => {
-    const session = new QuestionnaireSession({
-      tui,
-      theme,
-      params,
-      itemsByTab,
-      keybindings,
-      editInput: async (value) => {
-        try {
-          const editorCommand = SettingsManager.create(ctx.cwd, undefined, {
-            projectTrusted: ctx.isProjectTrusted(),
-          }).getExternalEditorCommand();
-          return await editWithExternalEditor(tui, editorCommand, value);
-        } catch (error) {
-          // Launch failure, non-zero exit, or no editor configured: keep the
-          // existing draft and let the user keep editing inline.
-          const message = error instanceof Error ? error.message : String(error);
-          ctx.ui.notify(`External editor failed: ${message}`, "error");
-          return undefined;
-        }
+  return ctx.ui.custom<QuestionnaireResult>(
+    (tui, theme, keybindings, done) => {
+      const session = new QuestionnaireSession({
+        tui,
+        theme,
+        params,
+        itemsByTab,
+        keybindings,
+        editInput: async (value) => {
+          try {
+            const editorCommand = SettingsManager.create(ctx.cwd, undefined, {
+              projectTrusted: ctx.isProjectTrusted(),
+            }).getExternalEditorCommand();
+            return await editWithExternalEditor(tui, editorCommand, value);
+          } catch (error) {
+            // Launch failure, non-zero exit, or no editor configured: keep the
+            // existing draft and let the user keep editing inline.
+            const message = error instanceof Error ? error.message : String(error);
+            ctx.ui.notify(`External editor failed: ${message}`, "error");
+            return undefined;
+          }
+        },
+        done,
+      });
+      return session.component;
+    },
+    {
+      blocked: {
+        kind: "question",
+        message:
+          params.questions.length === 1 ? params.questions[0].header : `Answer ${params.questions.length} questions`,
       },
-      done,
-    });
-    return session.component;
-  });
+    },
+  );
 }

@@ -5,6 +5,7 @@
 ### Changed
 
 - Trimmed the `ask_user_question` prompt guidelines to the two invocation-policy bullets (ask when underspecified; do not stack back-to-back calls). The removed bullets restated the options format and multiSelect/preview mechanics that the tool description and parameter schema descriptions already carry verbatim in the API tools field.
+- The questionnaire modal now passes `blocked: { kind: "question", message }` to its editor-slot `ctx.ui.custom()`, so terminals supporting pi's OSC 7501 program status show the session as waiting for input (message: the question header for a single question, `Answer N questions` otherwise). Requires pi 1.5.0; earlier versions ignore the option.
 
 ### Removed
 

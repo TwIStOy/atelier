@@ -101,6 +101,17 @@ describe("ask_user_question: modal-active event", () => {
     expect(modalPayloads(emitted)).toEqual([true, false]);
   });
 
+  test("TUI modal reports pi as blocked on the question", async () => {
+    const { tool } = harness();
+    const ctx = mockCtx(async () => ({ answers: [], cancelled: true }));
+
+    await tool.execute("call-1", VALID_PARAMS, undefined, undefined, ctx);
+
+    expect(ctx.ui.custom).toHaveBeenCalledWith(expect.any(Function), {
+      blocked: { kind: "question", message: "Choice" },
+    });
+  });
+
   test("cancel path still emits paired modal events in finally", async () => {
     const { emitted, tool } = harness();
     const ctx = mockCtx(async () => ({ answers: [], cancelled: true }));
