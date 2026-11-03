@@ -140,6 +140,186 @@ function formatConsoleArg(value: unknown): string {
   }
 }
 
+type AgentOutcome = {
+  ok: boolean;
+  value?: unknown;
+  text?: string;
+  error?: string;
+};
+
+type AgentContext = {
+  options: RunWorkflowOptions;
+  snapshot: WorkflowSnapshot;
+  semaphore: Semaphore;
+  emit: () => void;
+  pushLog: (level: string, values: unknown[]) => void;
+  isAborted: () => boolean;
+  currentPhase: () => string | null;
+};
+
+function assertAgentObject(call: WorkflowAgentCall): void {
+  if (!call || typeof call !== "object") {
+    throw new Error("agent() expects a single options object");
+  }
+}
+
+function assertAgentLabel(call: WorkflowAgentCall): void {
+  if (typeof call.label !== "string" || !call.label.trim()) {
+    throw new Error("agent() requires a non-empty string `label`");
+  }
+}
+
+function assertAgentTask(call: WorkflowAgentCall): void {
+  if (typeof call.task !== "string" || !call.task.trim()) {
+    throw new Error(`agent("${call.label}") requires a non-empty string \`task\``);
+  }
+}
+
+function isPlainSchemaObject(schema: unknown): boolean {
+  return typeof schema === "object" && schema !== null && !Array.isArray(schema);
+}
+
+function assertAgentSchema(call: WorkflowAgentCall): void {
+  if (call.schema === undefined) return;
+  if (!isPlainSchemaObject(call.schema)) {
+    throw new Error(`agent("${call.label}"): schema must be a JSON Schema object`);
+  }
+  if (call.schema.type !== "object") {
+    throw new Error(`agent("${call.label}"): schema must have type: "object" at the top level`);
+  }
+}
+
+function validateAgentCall(call: WorkflowAgentCall): void {
+  assertAgentObject(call);
+  assertAgentLabel(call);
+  assertAgentTask(call);
+  assertAgentSchema(call);
+}
+
+function agentReturnValue(value: unknown, text: string | undefined): unknown {
+  return value !== undefined ? value : (text ?? null);
+}
+
+function findCachedAgent(call: WorkflowAgentCall, seq: number, resume: ResumeState): ResumeAgentRecord | null {
+  if (seq >= resume.cutoff) return null;
+  const cached = resume.agents.find((r) => r.seq === seq);
+  if (cached?.ok && JSON.stringify(cached.call) === JSON.stringify(call)) return cached;
+  return null;
+}
+
+function recordCachedAgent(
+  ctx: AgentContext,
+  seq: number,
+  call: WorkflowAgentCall,
+  cached: ResumeAgentRecord,
+): unknown {
+  const entry: WorkflowAgentSnapshot = {
+    id: seq,
+    label: call.label.trim(),
+    phase: ctx.currentPhase(),
+    status: "done",
+    toolCalls: 0,
+    cached: true,
+    startedAt: Date.now(),
+    endedAt: Date.now(),
+  };
+  ctx.snapshot.agents.push(entry);
+  ctx.emit();
+  ctx.options.onAgentSettled?.({
+    seq,
+    call,
+    ok: true,
+    value: cached.value,
+    text: cached.text,
+    endedAt: entry.endedAt!,
+  });
+  return agentReturnValue(cached.value, cached.text);
+}
+
+type AgentAttemptState = { outcome?: AgentOutcome };
+
+function settleAborted(entry: WorkflowAgentSnapshot, state: AgentAttemptState): null {
+  entry.status = "aborted";
+  entry.endedAt = Date.now();
+  state.outcome = { ok: false, error: "aborted" };
+  return null;
+}
+
+function settleResult(
+  ctx: AgentContext,
+  entry: WorkflowAgentSnapshot,
+  result: WorkflowAgentRunResult,
+  state: AgentAttemptState,
+): unknown {
+  if (result.ok) {
+    entry.status = "done";
+    state.outcome = { ok: true, value: result.value, text: result.text };
+    return agentReturnValue(result.value, result.text);
+  }
+  entry.status = ctx.isAborted() ? "aborted" : "error";
+  entry.detail = result.error;
+  state.outcome = { ok: false, error: result.error };
+  ctx.pushLog("error", [`agent("${entry.label}") failed: ${result.error ?? "unknown error"}`]);
+  return null;
+}
+
+function settleThrow(ctx: AgentContext, entry: WorkflowAgentSnapshot, e: unknown, state: AgentAttemptState): null {
+  entry.status = ctx.isAborted() ? "aborted" : "error";
+  const detail = e instanceof Error ? e.message : String(e);
+  entry.detail = detail;
+  state.outcome = { ok: false, error: detail };
+  ctx.pushLog("error", [`agent("${entry.label}") threw: ${detail}`]);
+  return null;
+}
+
+async function attemptAgent(
+  ctx: AgentContext,
+  entry: WorkflowAgentSnapshot,
+  call: WorkflowAgentCall,
+  state: AgentAttemptState,
+): Promise<unknown> {
+  if (ctx.isAborted()) {
+    return settleAborted(entry, state);
+  }
+  try {
+    entry.status = "running";
+    ctx.emit();
+    const result = await ctx.options.runAgent(call, {
+      signal: ctx.options.signal,
+      onProgress: (toolCalls) => {
+        entry.toolCalls = toolCalls;
+        ctx.emit();
+      },
+    });
+    return settleResult(ctx, entry, result, state);
+  } catch (e) {
+    return settleThrow(ctx, entry, e, state);
+  }
+}
+
+async function runLiveAgent(ctx: AgentContext, seq: number, call: WorkflowAgentCall): Promise<unknown> {
+  const entry: WorkflowAgentSnapshot = {
+    id: seq,
+    label: call.label.trim(),
+    phase: ctx.currentPhase(),
+    status: "queued",
+    toolCalls: 0,
+    startedAt: Date.now(),
+  };
+  ctx.snapshot.agents.push(entry);
+  ctx.emit();
+  await ctx.semaphore.acquire();
+  const state: AgentAttemptState = {};
+  try {
+    return await attemptAgent(ctx, entry, call, state);
+  } finally {
+    entry.endedAt = Date.now();
+    ctx.semaphore.release();
+    ctx.options.onAgentSettled?.({ seq, call, ...state.outcome!, endedAt: entry.endedAt });
+    ctx.emit();
+  }
+}
+
 export async function runWorkflow(rawScript: string, options: RunWorkflowOptions): Promise<WorkflowRunResult> {
   const parsed = parseWorkflowScript(rawScript);
   if (!parsed.ok) {
@@ -188,108 +368,27 @@ export async function runWorkflow(rawScript: string, options: RunWorkflowOptions
     emit();
   };
 
+  const agentCtx: AgentContext = {
+    options,
+    snapshot,
+    semaphore,
+    emit,
+    pushLog,
+    isAborted: () => aborted,
+    currentPhase: () => currentPhase,
+  };
+
   const agent = async (call: WorkflowAgentCall): Promise<unknown> => {
-    if (!call || typeof call !== "object") {
-      throw new Error("agent() expects a single options object");
-    }
-    if (typeof call.label !== "string" || !call.label.trim()) {
-      throw new Error("agent() requires a non-empty string `label`");
-    }
-    if (typeof call.task !== "string" || !call.task.trim()) {
-      throw new Error(`agent("${call.label}") requires a non-empty string \`task\``);
-    }
-    if (call.schema !== undefined) {
-      if (typeof call.schema !== "object" || call.schema === null || Array.isArray(call.schema)) {
-        throw new Error(`agent("${call.label}"): schema must be a JSON Schema object`);
-      }
-      if (call.schema.type !== "object") {
-        throw new Error(`agent("${call.label}"): schema must have type: "object" at the top level`);
-      }
-    }
+    validateAgentCall(call);
     agentSeq += 1;
     if (agentSeq > maxAgents) {
       throw new Error(`workflow agent limit exceeded: more than ${maxAgents} agent() calls`);
     }
-
-    const label = call.label.trim();
-    if (options.resume && agentSeq < options.resume.cutoff) {
-      const cached = options.resume.agents.find((r) => r.seq === agentSeq);
-      if (cached?.ok && JSON.stringify(cached.call) === JSON.stringify(call)) {
-        const entry: WorkflowAgentSnapshot = {
-          id: agentSeq,
-          label,
-          phase: currentPhase,
-          status: "done",
-          toolCalls: 0,
-          cached: true,
-          startedAt: Date.now(),
-          endedAt: Date.now(),
-        };
-        snapshot.agents.push(entry);
-        emit();
-        options.onAgentSettled?.({
-          seq: agentSeq,
-          call,
-          ok: true,
-          value: cached.value,
-          text: cached.text,
-          endedAt: entry.endedAt!,
-        });
-        return cached.value !== undefined ? cached.value : (cached.text ?? null);
-      }
+    const cached = options.resume ? findCachedAgent(call, agentSeq, options.resume) : null;
+    if (cached) {
+      return recordCachedAgent(agentCtx, agentSeq, call, cached);
     }
-
-    const entry: WorkflowAgentSnapshot = {
-      id: agentSeq,
-      label,
-      phase: currentPhase,
-      status: "queued",
-      toolCalls: 0,
-      startedAt: Date.now(),
-    };
-    snapshot.agents.push(entry);
-    emit();
-
-    await semaphore.acquire();
-    let outcome: { ok: boolean; value?: unknown; text?: string; error?: string };
-    try {
-      if (aborted) {
-        entry.status = "aborted";
-        entry.endedAt = Date.now();
-        outcome = { ok: false, error: "aborted" };
-        return null;
-      }
-      entry.status = "running";
-      emit();
-      const result = await options.runAgent(call, {
-        signal,
-        onProgress: (toolCalls) => {
-          entry.toolCalls = toolCalls;
-          emit();
-        },
-      });
-      if (result.ok) {
-        entry.status = "done";
-        outcome = { ok: true, value: result.value, text: result.text };
-        return result.value !== undefined ? result.value : (result.text ?? null);
-      }
-      entry.status = aborted ? "aborted" : "error";
-      entry.detail = result.error;
-      outcome = { ok: false, error: result.error };
-      pushLog("error", [`agent("${entry.label}") failed: ${result.error ?? "unknown error"}`]);
-      return null;
-    } catch (e) {
-      entry.status = aborted ? "aborted" : "error";
-      entry.detail = e instanceof Error ? e.message : String(e);
-      outcome = { ok: false, error: entry.detail };
-      pushLog("error", [`agent("${entry.label}") threw: ${entry.detail}`]);
-      return null;
-    } finally {
-      entry.endedAt = Date.now();
-      semaphore.release();
-      options.onAgentSettled?.({ seq: agentSeq, call, ...outcome!, endedAt: entry.endedAt });
-      emit();
-    }
+    return runLiveAgent(agentCtx, agentSeq, call);
   };
 
   const parallel = async (fns: unknown): Promise<unknown[]> => {

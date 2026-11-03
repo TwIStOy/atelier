@@ -1,7 +1,8 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { type Component, Container, type Input, Spacer, Text, truncateToWidth } from "@earendil-works/pi-tui";
 import { formatAnswerScalar } from "../tool/format-answer.ts";
-import type { QuestionData } from "../tool/types.ts";
+import type { QuestionAnswer, QuestionData } from "../tool/types.ts";
+import type { MultiSelectView } from "./components/multi-select-view.ts";
 import type { PreviewPane, PreviewPaneProps } from "./components/preview/preview-pane.ts";
 import {
   type DialogState,
@@ -93,14 +94,16 @@ export class QuestionTabStrategy implements TabContentStrategy {
 
   constructor(private readonly config: QuestionTabStrategyConfig) {}
 
+  private headerBadgeRows(question: QuestionData | undefined): Component[] {
+    if (!question?.header || question.header.length === 0) return [];
+    return [new Text(this.config.theme.bg("selectedBg", ` ${question.header} `), 1, 0), new Spacer(1)];
+  }
+
   headingRows(state: DialogState): Component[] {
     const out: Component[] = [];
     const question = this.config.questions[state.currentTab];
     // In multi-question mode the tab bar already shows the header; suppress the inline badge.
-    if (!this.config.isMulti && question?.header && question.header.length > 0) {
-      out.push(new Text(this.config.theme.bg("selectedBg", ` ${question.header} `), 1, 0));
-      out.push(new Spacer(1));
-    }
+    if (!this.config.isMulti) out.push(...this.headerBadgeRows(question));
     if (question) {
       out.push(new Text(this.config.theme.bold(question.question), 1, 0));
       out.push(new Spacer(1));
@@ -108,10 +111,19 @@ export class QuestionTabStrategy implements TabContentStrategy {
     return out;
   }
 
-  bodyComponent(state: DialogState): Component {
+  private currentQuestionIsMultiSelect(state: DialogState): boolean {
     const question = this.config.questions[state.currentTab];
-    const mso = this.config.tabsByIndex[state.currentTab]?.multiSelect;
-    if (question?.multiSelect === true && mso) return mso;
+    return question?.multiSelect === true;
+  }
+
+  private multiSelectBody(state: DialogState): MultiSelectView | undefined {
+    if (!this.currentQuestionIsMultiSelect(state)) return undefined;
+    return this.config.tabsByIndex[state.currentTab]?.multiSelect;
+  }
+
+  bodyComponent(state: DialogState): Component {
+    const mso = this.multiSelectBody(state);
+    if (mso) return mso;
     return this.config.getPreviewPane();
   }
 
@@ -136,9 +148,8 @@ export class QuestionTabStrategy implements TabContentStrategy {
   }
 
   focusedItemRowRange(width: number, state: DialogState): [number, number] | undefined {
-    const question = this.config.questions[state.currentTab];
-    const mso = this.config.tabsByIndex[state.currentTab]?.multiSelect;
-    if (question?.multiSelect === true && mso) return mso.focusedItemRowRange(width);
+    const mso = this.multiSelectBody(state);
+    if (mso) return mso.focusedItemRowRange(width);
     return (this.config.getPreviewPane() as unknown as PreviewPane).focusedItemRowRange(width);
   }
 }
@@ -159,21 +170,27 @@ export class SubmitTabStrategy implements TabContentStrategy {
     return [new Text(this.config.theme.bold(this.config.theme.fg("accent", REVIEW_HEADING)), 1, 0), new Spacer(1)];
   }
 
+  private static rowLabel(q: QuestionData, i: number): string {
+    return q.header && q.header.length > 0 ? q.header : `Q${i + 1}`;
+  }
+
+  private addAnswerRow(c: Container, i: number, q: QuestionData, a: QuestionAnswer): void {
+    const label = SubmitTabStrategy.rowLabel(q, i);
+    const answerText = formatAnswerScalar(a);
+    c.addChild(new Text(this.config.theme.fg("muted", ` ● ${label}`), 1, 0));
+    c.addChild(new Text(`   ${this.config.theme.fg("muted", "→")} ${this.config.theme.fg("text", answerText)}`, 1, 0));
+    if (a.notes && a.notes.length > 0) {
+      c.addChild(new Text(this.config.theme.fg("dim", `     notes: ${a.notes}`), 1, 0));
+    }
+  }
+
   bodyComponent(state: DialogState): Component {
     const c = new Container();
     for (let i = 0; i < this.config.questions.length; i++) {
       const q = this.config.questions[i];
       const a = state.answers.get(i);
       if (!a) continue;
-      const label = q.header && q.header.length > 0 ? q.header : `Q${i + 1}`;
-      const answerText = formatAnswerScalar(a);
-      c.addChild(new Text(this.config.theme.fg("muted", ` ● ${label}`), 1, 0));
-      c.addChild(
-        new Text(`   ${this.config.theme.fg("muted", "→")} ${this.config.theme.fg("text", answerText)}`, 1, 0),
-      );
-      if (a.notes && a.notes.length > 0) {
-        c.addChild(new Text(this.config.theme.fg("dim", `     notes: ${a.notes}`), 1, 0));
-      }
+      this.addAnswerRow(c, i, q, a);
     }
     return c;
   }
@@ -186,27 +203,39 @@ export class SubmitTabStrategy implements TabContentStrategy {
     return [];
   }
 
-  footerRows(state: DialogState): Component[] {
+  private missingAnswerLabels(state: DialogState): string[] {
     const missing: string[] = [];
     for (let i = 0; i < this.config.questions.length; i++) {
       const q = this.config.questions[i];
-      if (!state.answers.has(i)) {
-        missing.push(q.header && q.header.length > 0 ? q.header : `Q${i + 1}`);
-      }
+      if (state.answers.has(i)) continue;
+      missing.push(SubmitTabStrategy.rowLabel(q, i));
     }
+    return missing;
+  }
+
+  private completionPrompt(missing: readonly string[]): Component {
     const promptText =
       missing.length === 0
         ? this.config.theme.fg("muted", READY_PROMPT)
         : this.config.theme.fg("warning", `${INCOMPLETE_WARNING_PREFIX} ${missing.join(", ")}`);
-    const out: Component[] = [new Spacer(1), new Text(promptText, 1, 0), new Spacer(1)];
+    return new Text(promptText, 1, 0);
+  }
+
+  private pickerOrPadding(): Component[] {
     if (this.config.submitPicker) {
-      out.push(this.config.submitPicker);
-    } else {
-      // Padding when the picker isn't wired — keeps rendered row count at footerRowCount=5.
-      out.push(new Spacer(1));
-      out.push(new Spacer(1));
+      return [this.config.submitPicker];
     }
-    return out;
+    // Padding when the picker isn't wired — keeps rendered row count at footerRowCount=5.
+    return [new Spacer(1), new Spacer(1)];
+  }
+
+  footerRows(state: DialogState): Component[] {
+    return [
+      new Spacer(1),
+      this.completionPrompt(this.missingAnswerLabels(state)),
+      new Spacer(1),
+      ...this.pickerOrPadding(),
+    ];
   }
 
   focusedItemRowRange(_width: number, _state: DialogState): [number, number] | undefined {
@@ -223,13 +252,21 @@ export class SubmitTabStrategy implements TabContentStrategy {
  * parts may be clipped by `OneLineClippedText` on narrow terminals, so the multiline
  * editing hints sit after the cancel part to keep the core hints visible.
  */
-export function buildHintText(question: QuestionData | undefined, isMulti: boolean, state: DialogState): string {
-  const parts: string[] = [HINT_PART_ENTER, HINT_PART_NAV];
+function pushModeHintParts(parts: string[], question: QuestionData | undefined, state: DialogState): void {
   if (state.inputMode) parts.push(HINT_PART_EDIT);
   if (question?.multiSelect === true) parts.push(HINT_PART_TOGGLE);
+}
+
+function pushNotesHintPart(parts: string[], state: DialogState): void {
   if (!state.inputMode && !state.notesVisible) {
     parts.push(HINT_PART_NOTES);
   }
+}
+
+export function buildHintText(question: QuestionData | undefined, isMulti: boolean, state: DialogState): string {
+  const parts: string[] = [HINT_PART_ENTER, HINT_PART_NAV];
+  pushModeHintParts(parts, question, state);
+  pushNotesHintPart(parts, state);
   if (isMulti) parts.push(HINT_PART_TAB);
   parts.push(HINT_PART_CANCEL);
   if (state.inputMode) {

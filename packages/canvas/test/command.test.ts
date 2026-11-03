@@ -56,6 +56,7 @@ describe("/canvas-open", () => {
     exec.mockImplementation(async (_command, args) => ({
       code: 0,
       killed: false,
+      truncated: false,
       stderr: "",
       stdout: args.includes("whoami")
         ? JSON.stringify({
@@ -159,6 +160,7 @@ describe("/canvas-open", () => {
     exec.mockImplementation(async (_command, args) => ({
       code: args.includes("config") ? 1 : 0,
       killed: false,
+      truncated: false,
       stderr: args.includes("config") ? "unsupported setting" : "",
       stdout: JSON.stringify({
         endpoint: "unix:///run/rex/server.sock",

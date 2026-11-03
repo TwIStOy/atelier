@@ -5,10 +5,23 @@
 export function parseListResult(result: unknown, ...keys: string[]): Record<string, unknown>[] {
   if (!result || typeof result !== "object") return [];
   if (Array.isArray(result)) return result as Record<string, unknown>[];
-  const r = result as Record<string, unknown>;
+  return listFromRecord(result as Record<string, unknown>, keys);
+}
+
+function listFromRecord(record: Record<string, unknown>, keys: string[]): Record<string, unknown>[] {
+  const keyed = keyedArray(record, keys);
+  return keyed ?? arrayField(record, "data") ?? [];
+}
+
+function keyedArray(record: Record<string, unknown>, keys: string[]): Record<string, unknown>[] | undefined {
   for (const key of keys) {
-    if (Array.isArray(r[key])) return r[key] as Record<string, unknown>[];
+    const list = arrayField(record, key);
+    if (list !== undefined) return list;
   }
-  if (Array.isArray(r.data)) return r.data as Record<string, unknown>[];
-  return [];
+  return undefined;
+}
+
+function arrayField(record: Record<string, unknown>, key: string): Record<string, unknown>[] | undefined {
+  const value = record[key];
+  return Array.isArray(value) ? (value as Record<string, unknown>[]) : undefined;
 }

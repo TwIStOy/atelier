@@ -4,7 +4,9 @@
 
 ### Changed
 
+- Split the popup key dispatcher (`handleInput`) into per-mode handlers (editing / selecting / browse) with extracted filter, navigation, choice, and reorder-move helpers; no behavior change.
 - Reorderable alt+up / alt+down moves go through one shared helper; unused exports removed (`DEFAULT_WIDTH_PERCENT`, `DEFAULT_MAX_HEIGHT`, `isValidColor`, `colorFg`, `formatSettingValue`, `renderInlineEditValue`, `GLYPHS`, `frameGlyphs`, `resolveOptions`).
+- Split complex renderers and input handlers (`renderSettingList`, `renderSelectPage`, `renderTabBar`, `handleInlineEditInput`, `parseSettingInput`, `formatSettingValue`, word-movement helpers, `stringifyValue`) into small per-branch helpers and dispatch tables; no behavior change.
 
 ## [0.7.0] - 2026-10-30
 

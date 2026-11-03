@@ -23,6 +23,75 @@ const globParams = Type.Object({
   ),
 });
 
+function requirePattern(pattern: string | undefined): string {
+  const trimmed = pattern?.trim();
+  if (!trimmed) {
+    throw new Error("pattern is required");
+  }
+  return trimmed;
+}
+
+async function resolveGlobDir(rawPath: string | undefined, cwd: string): Promise<string> {
+  const searchPath = resolveSearchPath(rawPath, cwd);
+  let st: Stats;
+  try {
+    st = await fsStat(searchPath);
+  } catch {
+    throw new Error(`Path not found: ${searchPath}`);
+  }
+  if (!st.isDirectory()) {
+    throw new Error(`glob path must be a directory: ${searchPath}`);
+  }
+  return searchPath;
+}
+
+async function listMatchingFiles(
+  pattern: string,
+  searchPath: string,
+  signal: AbortSignal | undefined,
+): Promise<string[]> {
+  return runRg(["--files", "--hidden", "--glob", pattern, "."], searchPath, signal, FILE_LIMIT + 1, (line) =>
+    path.resolve(searchPath, line.trim()),
+  );
+}
+
+function capFilePaths(relPaths: string[]): { paths: string[]; truncated: boolean } {
+  const truncated = relPaths.length > FILE_LIMIT;
+  return {
+    truncated,
+    paths: truncated ? relPaths.slice(0, FILE_LIMIT) : relPaths,
+  };
+}
+
+async function sortByMtimeDesc(paths: string[]): Promise<string[]> {
+  const withMtime = await Promise.all(
+    paths.map(async (p) => {
+      try {
+        const s = await fsStat(p);
+        return { path: p, mtime: s.mtimeMs };
+      } catch {
+        return { path: p, mtime: 0 };
+      }
+    }),
+  );
+  withMtime.sort((a, b) => b.mtime - a.mtime);
+  return withMtime.map((x) => x.path);
+}
+
+function globOutputLines(paths: string[], truncated: boolean): string[] {
+  if (paths.length === 0) {
+    return ["No files found"];
+  }
+  const lines = [...paths];
+  if (truncated) {
+    lines.push("");
+    lines.push(
+      `(Results are truncated: showing first ${FILE_LIMIT} results. Consider using a more specific path or pattern.)`,
+    );
+  }
+  return lines;
+}
+
 export function registerGlobTool(pi: ExtensionAPI) {
   pi.registerTool({
     name: "glob",
@@ -32,62 +101,13 @@ export function registerGlobTool(pi: ExtensionAPI) {
     parameters: globParams,
     annotations: { readOnlyHint: true },
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
-      const pattern = params.pattern?.trim();
-      if (!pattern) {
-        throw new Error("pattern is required");
-      }
-
-      const searchPath = resolveSearchPath(params.path, ctx.cwd);
-      let st: Stats;
-      try {
-        st = await fsStat(searchPath);
-      } catch {
-        throw new Error(`Path not found: ${searchPath}`);
-      }
-      if (!st.isDirectory()) {
-        throw new Error(`glob path must be a directory: ${searchPath}`);
-      }
-
-      const relPaths = await runRg(
-        ["--files", "--hidden", "--glob", pattern, "."],
-        searchPath,
-        signal,
-        FILE_LIMIT + 1,
-        (line) => path.resolve(searchPath, line.trim()),
-      );
-
-      const truncated = relPaths.length > FILE_LIMIT;
-      const capped = truncated ? relPaths.slice(0, FILE_LIMIT) : relPaths;
-
-      const withMtime = await Promise.all(
-        capped.map(async (p) => {
-          try {
-            const s = await fsStat(p);
-            return { path: p, mtime: s.mtimeMs };
-          } catch {
-            return { path: p, mtime: 0 };
-          }
-        }),
-      );
-
-      withMtime.sort((a, b) => b.mtime - a.mtime);
-
-      const paths = withMtime.map((x) => x.path);
+      const pattern = requirePattern(params.pattern);
+      const searchPath = await resolveGlobDir(params.path, ctx.cwd);
+      const relPaths = await listMatchingFiles(pattern, searchPath, signal);
+      const { paths: cappedPaths, truncated } = capFilePaths(relPaths);
+      const paths = await sortByMtimeDesc(cappedPaths);
       const count = paths.length;
-
-      const lines: string[] = [];
-      if (count === 0) {
-        lines.push("No files found");
-      } else {
-        lines.push(...paths);
-        if (truncated) {
-          lines.push("");
-          lines.push(
-            `(Results are truncated: showing first ${FILE_LIMIT} results. Consider using a more specific path or pattern.)`,
-          );
-        }
-      }
-
+      const lines = globOutputLines(paths, truncated);
       const output = truncateOutput(lines.join("\n"));
 
       return {

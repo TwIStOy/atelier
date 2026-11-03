@@ -29,27 +29,139 @@ const grepParams = Type.Object({
 });
 
 type MatchRow = { absPath: string; line: number; text: string };
+type EnrichedMatch = MatchRow & { mtime: number };
 
-function parseMatchEvent(execCwd: string, line: string): MatchRow | undefined {
-  let event: { type?: string; data?: Record<string, unknown> };
+function requirePattern(pattern: string | undefined): string {
+  const trimmed = pattern?.trim();
+  if (!trimmed) {
+    throw new Error("pattern is required");
+  }
+  return trimmed;
+}
+
+async function assertSearchablePath(searchPath: string): Promise<void> {
   try {
-    event = JSON.parse(line) as typeof event;
+    await fsStat(searchPath);
+  } catch {
+    throw new Error(`Path not found: ${searchPath}`);
+  }
+}
+
+function buildGrepArgs(pattern: string, include: string | undefined, searchPath: string): string[] {
+  const args = ["--json", "--line-number", "--color=never", "--hidden"];
+  const includeGlob = include?.trim();
+  if (includeGlob) {
+    args.push("--glob", includeGlob);
+  }
+  args.push("--", pattern, searchPath);
+  return args;
+}
+
+async function collectFileMtimes(files: string[]): Promise<Map<string, number>> {
+  const mtimes = new Map<string, number>();
+  await Promise.all(
+    files.map(async (file) => {
+      try {
+        const s = await fsStat(file);
+        if (!s.isFile()) return;
+        mtimes.set(file, s.mtimeMs);
+      } catch {
+        return;
+      }
+    }),
+  );
+  return mtimes;
+}
+
+function enrichMatches(rows: MatchRow[], mtimes: Map<string, number>): EnrichedMatch[] {
+  return rows.map((r) => ({ ...r, mtime: mtimes.get(r.absPath) ?? 0 })).filter((r) => mtimes.has(r.absPath));
+}
+
+function sortByMtime(enriched: EnrichedMatch[]): void {
+  enriched.sort((a, b) => {
+    const d = b.mtime - a.mtime;
+    if (d !== 0) return d;
+    const p = a.absPath.localeCompare(b.absPath);
+    if (p !== 0) return p;
+    return a.line - b.line;
+  });
+}
+
+function capMatches(matches: EnrichedMatch[]): { final: EnrichedMatch[]; total: number; truncated: boolean } {
+  const total = matches.length;
+  const truncated = total > MATCH_LIMIT;
+  return { total, truncated, final: truncated ? matches.slice(0, MATCH_LIMIT) : matches };
+}
+
+function formatMatchLine(match: EnrichedMatch): string {
+  const lineText = match.text.length > MAX_LINE_LENGTH ? `${match.text.slice(0, MAX_LINE_LENGTH)}...` : match.text;
+  return ` Line ${match.line}: ${lineText}`;
+}
+
+function appendMatchLines(outLines: string[], matches: EnrichedMatch[]): void {
+  let currentPath = "";
+  for (const match of matches) {
+    if (currentPath !== match.absPath) {
+      if (currentPath !== "") outLines.push("");
+      currentPath = match.absPath;
+      outLines.push(`${match.absPath}:`);
+    }
+    outLines.push(formatMatchLine(match));
+  }
+}
+
+function resultLines(final: EnrichedMatch[], total: number, truncated: boolean): string[] {
+  const outLines = [`Found ${total} matches${truncated ? ` (showing first ${MATCH_LIMIT})` : ""}`];
+  appendMatchLines(outLines, final);
+  if (truncated) {
+    outLines.push("");
+    outLines.push(
+      `(Results truncated: showing ${MATCH_LIMIT} of ${total} matches (${total - MATCH_LIMIT} hidden). Consider a more specific path or pattern.)`,
+    );
+  }
+  return outLines;
+}
+
+function parseRgEvent(line: string): { type?: string; data?: Record<string, unknown> } | undefined {
+  try {
+    return JSON.parse(line) as { type?: string; data?: Record<string, unknown> };
   } catch {
     return undefined;
   }
-  if (event.type !== "match") return undefined;
+}
+
+function hasMatchFields(d: Record<string, unknown> | undefined): d is Record<string, unknown> {
+  if (!d) return false;
+  const pathText = (d.path as { text?: string } | undefined)?.text;
+  return Boolean(pathText) && typeof d.line_number === "number";
+}
+
+function resolveMatchPath(execCwd: string, pathText: string): string {
+  return path.isAbsolute(pathText) ? path.normalize(pathText) : path.resolve(execCwd, pathText);
+}
+
+function matchText(lines: unknown): string {
+  const linesObj = lines as { text?: string } | undefined;
+  return typeof linesObj?.text === "string"
+    ? linesObj.text.replace(/\r\n/g, "\n").replace(/\r/g, "").replace(/\n$/, "")
+    : "";
+}
+
+function matchRow(execCwd: string, d: Record<string, unknown>): MatchRow {
+  const pathText = (d.path as { text?: string } | undefined)?.text;
+  return {
+    absPath: resolveMatchPath(execCwd, pathText as string),
+    line: d.line_number as number,
+    text: matchText(d.lines),
+  };
+}
+
+function parseMatchEvent(execCwd: string, line: string): MatchRow | undefined {
+  const event = parseRgEvent(line);
+  if (event?.type !== "match") return undefined;
   const d = event.data;
-  const pathObj = d?.path as { text?: string } | undefined;
-  const lineNum = d?.line_number;
-  const linesObj = d?.lines as { text?: string } | undefined;
-  const pathText = pathObj?.text;
-  if (!pathText || typeof lineNum !== "number") return undefined;
-  const absPath = path.isAbsolute(pathText) ? path.normalize(pathText) : path.resolve(execCwd, pathText);
-  const text =
-    typeof linesObj?.text === "string"
-      ? linesObj.text.replace(/\r\n/g, "\n").replace(/\r/g, "").replace(/\n$/, "")
-      : "";
-  return { absPath, line: lineNum, text };
+  if (!hasMatchFields(d)) return undefined;
+  return matchRow(execCwd, d);
 }
 
 export function registerGrepTool(pi: ExtensionAPI) {
@@ -61,23 +173,11 @@ export function registerGrepTool(pi: ExtensionAPI) {
     parameters: grepParams,
     annotations: { readOnlyHint: true },
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
-      const pattern = params.pattern?.trim();
-      if (!pattern) {
-        throw new Error("pattern is required");
-      }
-
+      const pattern = requirePattern(params.pattern);
       const searchPath = resolveSearchPath(params.path, ctx.cwd);
-      try {
-        await fsStat(searchPath);
-      } catch {
-        throw new Error(`Path not found: ${searchPath}`);
-      }
+      await assertSearchablePath(searchPath);
 
-      const args = ["--json", "--line-number", "--color=never", "--hidden"];
-      if (params.include?.trim()) {
-        args.push("--glob", params.include.trim());
-      }
-      args.push("--", pattern, searchPath);
+      const args = buildGrepArgs(pattern, params.include, searchPath);
 
       const rows = await runRg(args, ctx.cwd, signal, MATCH_LIMIT, (line) => parseMatchEvent(ctx.cwd, line));
 
@@ -89,22 +189,8 @@ export function registerGrepTool(pi: ExtensionAPI) {
       }
 
       const uniqueFiles = [...new Set(rows.map((r) => r.absPath))];
-      const mtimes = new Map<string, number>();
-      await Promise.all(
-        uniqueFiles.map(async (file) => {
-          try {
-            const s = await fsStat(file);
-            if (!s.isFile()) return;
-            mtimes.set(file, s.mtimeMs);
-          } catch {
-            return;
-          }
-        }),
-      );
-
-      const enriched = rows
-        .map((r) => ({ ...r, mtime: mtimes.get(r.absPath) ?? 0 }))
-        .filter((r) => mtimes.has(r.absPath));
+      const mtimes = await collectFileMtimes(uniqueFiles);
+      const enriched = enrichMatches(rows, mtimes);
 
       if (enriched.length === 0) {
         return {
@@ -113,38 +199,9 @@ export function registerGrepTool(pi: ExtensionAPI) {
         };
       }
 
-      enriched.sort((a, b) => {
-        const d = b.mtime - a.mtime;
-        if (d !== 0) return d;
-        const p = a.absPath.localeCompare(b.absPath);
-        if (p !== 0) return p;
-        return a.line - b.line;
-      });
-
-      const total = enriched.length;
-      const truncated = total > MATCH_LIMIT;
-      const final = truncated ? enriched.slice(0, MATCH_LIMIT) : enriched;
-
-      const outLines = [`Found ${total} matches${truncated ? ` (showing first ${MATCH_LIMIT})` : ""}`];
-
-      let currentPath = "";
-      for (const match of final) {
-        if (currentPath !== match.absPath) {
-          if (currentPath !== "") outLines.push("");
-          currentPath = match.absPath;
-          outLines.push(`${match.absPath}:`);
-        }
-        const lineText =
-          match.text.length > MAX_LINE_LENGTH ? `${match.text.slice(0, MAX_LINE_LENGTH)}...` : match.text;
-        outLines.push(` Line ${match.line}: ${lineText}`);
-      }
-
-      if (truncated) {
-        outLines.push("");
-        outLines.push(
-          `(Results truncated: showing ${MATCH_LIMIT} of ${total} matches (${total - MATCH_LIMIT} hidden). Consider a more specific path or pattern.)`,
-        );
-      }
+      sortByMtime(enriched);
+      const { final, total, truncated } = capMatches(enriched);
+      const outLines = resultLines(final, total, truncated);
 
       const output = truncateOutput(outLines.join("\n"));
 

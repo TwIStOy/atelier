@@ -17,19 +17,34 @@ export type ValidationResult = { ok: true } | { ok: false; error: QuestionnaireE
  * `reserved_label` MUST short-circuit before `duplicate_option_label`.
  */
 export function validateQuestionnaire(typed: QuestionParams): ValidationResult {
-  if (typed.questions.length === 0) {
+  const topLevelError = validateTopLevel(typed.questions);
+  if (topLevelError) return topLevelError;
+  return validateAllQuestionOptions(typed.questions);
+}
+
+function validateTopLevel(questions: QuestionParams["questions"]): ValidationResult | undefined {
+  const countError = validateQuestionCount(questions);
+  if (countError) return countError;
+  return validateUniqueQuestions(questions);
+}
+
+function validateQuestionCount(questions: QuestionParams["questions"]): ValidationResult | undefined {
+  if (questions.length === 0) {
     return { ok: false, error: "no_questions", message: ERROR_NO_QUESTIONS };
   }
-  if (typed.questions.length > MAX_QUESTIONS) {
+  if (questions.length > MAX_QUESTIONS) {
     return {
       ok: false,
       error: "too_many_questions",
       message: ERROR_TOO_MANY_QUESTIONS,
     };
   }
+  return undefined;
+}
 
+function validateUniqueQuestions(questions: QuestionParams["questions"]): ValidationResult | undefined {
   const seenQuestions = new Set<string>();
-  for (const q of typed.questions) {
+  for (const q of questions) {
     if (seenQuestions.has(q.question)) {
       return {
         ok: false,
@@ -39,34 +54,49 @@ export function validateQuestionnaire(typed: QuestionParams): ValidationResult {
     }
     seenQuestions.add(q.question);
   }
+  return undefined;
+}
 
-  for (const q of typed.questions) {
-    if (q.options.length < MIN_OPTIONS) {
-      return {
-        ok: false,
-        error: "empty_options",
-        message: ERROR_TOO_FEW_OPTIONS,
-      };
-    }
-    const seenLabels = new Set<string>();
-    for (const o of q.options) {
-      if (RESERVED_LABEL_SET.has(o.label)) {
-        return {
-          ok: false,
-          error: "reserved_label",
-          message: ERROR_RESERVED_LABEL,
-        };
-      }
-      if (seenLabels.has(o.label)) {
-        return {
-          ok: false,
-          error: "duplicate_option_label",
-          message: ERROR_DUPLICATE_OPTION_LABEL,
-        };
-      }
-      seenLabels.add(o.label);
-    }
+function validateAllQuestionOptions(questions: QuestionParams["questions"]): ValidationResult {
+  for (const q of questions) {
+    const optionError = validateQuestionOptions(q);
+    if (optionError) return optionError;
   }
 
   return { ok: true };
+}
+
+function validateQuestionOptions(q: QuestionParams["questions"][number]): ValidationResult | undefined {
+  if (q.options.length < MIN_OPTIONS) {
+    return {
+      ok: false,
+      error: "empty_options",
+      message: ERROR_TOO_FEW_OPTIONS,
+    };
+  }
+  return validateUniqueOptionLabels(q.options);
+}
+
+function validateUniqueOptionLabels(
+  options: QuestionParams["questions"][number]["options"],
+): ValidationResult | undefined {
+  const seenLabels = new Set<string>();
+  for (const o of options) {
+    if (RESERVED_LABEL_SET.has(o.label)) {
+      return {
+        ok: false,
+        error: "reserved_label",
+        message: ERROR_RESERVED_LABEL,
+      };
+    }
+    if (seenLabels.has(o.label)) {
+      return {
+        ok: false,
+        error: "duplicate_option_label",
+        message: ERROR_DUPLICATE_OPTION_LABEL,
+      };
+    }
+    seenLabels.add(o.label);
+  }
+  return undefined;
 }

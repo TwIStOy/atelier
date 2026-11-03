@@ -1,4 +1,5 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { AssistantMessage } from "@earendil-works/pi-ai";
+import type { ExtensionAPI, ExtensionContext, ToolCallEvent } from "@earendil-works/pi-coding-agent";
 import {
   type ExtensionConfigSchema,
   isExtensionDisabled,
@@ -76,6 +77,69 @@ function registerConfig(): void {
   ]);
 }
 
+function applyRootStringWrap(event: ToolCallEvent, config: ToolCallFixerConfig, notes: string[]): void {
+  if (config.enabled && typeof event.input === "string") {
+    const wrapped = wrapRootStringAsObject(event.input, event.toolName);
+    if (wrapped) {
+      (event as { input: unknown }).input = wrapped.value;
+      notes.push(`root-wrap: ${wrapped.note}`);
+    }
+  }
+}
+
+function notifyAdjusted(ctx: ExtensionContext, text: string): boolean {
+  try {
+    ctx.ui.notify(text, "info");
+    return true;
+  } catch (err) {
+    if (isStaleCtxError(err)) {
+      return false;
+    }
+    throw err;
+  }
+}
+
+function collectRepairNotes(
+  pi: ExtensionAPI,
+  message: AssistantMessage,
+  config: ToolCallFixerConfig,
+): { message: AssistantMessage; notes: string[] } {
+  const notes: string[] = [];
+  const phantom = normalizePhantomToolUse(message);
+  if (phantom.changed) {
+    message = phantom.message;
+    notes.push("normalized phantom tool_use");
+  }
+  if (config.grammarRepairEnabled) {
+    const repaired = repairAssistantMessageGrammarLeaks(
+      message,
+      {
+        enabled: true,
+        mode: config.grammarRepairMode,
+        requireKnownTool: config.grammarRepairRequireKnownTool,
+      },
+      new Set(pi.getActiveTools()),
+    );
+    if (repaired.changed) {
+      message = repaired.message;
+      notes.push(`grammar repair: ${repaired.recoveredCalls.length} recovered, ${repaired.strippedRanges} stripped`);
+    }
+  }
+  return { message, notes };
+}
+
+function notifyRepairNotes(
+  ctx: ExtensionContext,
+  config: ToolCallFixerConfig,
+  notes: string[],
+  message: AssistantMessage,
+): { message: AssistantMessage } | undefined {
+  if (config.notifyOnStrategy && !notifyAdjusted(ctx, `tool-call-fixer: ${notes.join("; ")}`)) {
+    return undefined;
+  }
+  return { message };
+}
+
 export default function (pi: ExtensionAPI) {
   if (isExtensionDisabled("tool-call-fixer")) return;
   registerConfig();
@@ -83,30 +147,14 @@ export default function (pi: ExtensionAPI) {
   pi.on("tool_call", async (event, ctx) => {
     const config = loadConfig();
     const notes: string[] = [];
-    if (config.enabled && typeof event.input === "string") {
-      const wrapped = wrapRootStringAsObject(event.input, event.toolName);
-      if (wrapped) {
-        (event as { input: unknown }).input = wrapped.value;
-        notes.push(`root-wrap: ${wrapped.note}`);
-      }
-    }
+    applyRootStringWrap(event, config, notes);
     const input = event.input as Record<string, unknown>;
     const outcome = applyStrategies(event.toolName, input, config, STRATEGIES);
     notes.push(...outcome.notes);
-    if (notes.length === 0) {
+    if (notes.length === 0 || !config.notifyOnStrategy) {
       return;
     }
-    if (!config.notifyOnStrategy) {
-      return;
-    }
-    try {
-      ctx.ui.notify(`tool-call-fixer: adjusted ${event.toolName} (${notes.join("; ")})`, "info");
-    } catch (err) {
-      if (isStaleCtxError(err)) {
-        return;
-      }
-      throw err;
-    }
+    notifyAdjusted(ctx, `tool-call-fixer: adjusted ${event.toolName} (${notes.join("; ")})`);
   });
 
   pi.on("message_end", async (event, ctx) => {
@@ -114,41 +162,10 @@ export default function (pi: ExtensionAPI) {
     if (!config.enabled || event.message.role !== "assistant") {
       return;
     }
-    let message = event.message;
-    const notes: string[] = [];
-    const phantom = normalizePhantomToolUse(message);
-    if (phantom.changed) {
-      message = phantom.message;
-      notes.push("normalized phantom tool_use");
-    }
-    if (config.grammarRepairEnabled) {
-      const repaired = repairAssistantMessageGrammarLeaks(
-        message,
-        {
-          enabled: true,
-          mode: config.grammarRepairMode,
-          requireKnownTool: config.grammarRepairRequireKnownTool,
-        },
-        new Set(pi.getActiveTools()),
-      );
-      if (repaired.changed) {
-        message = repaired.message;
-        notes.push(`grammar repair: ${repaired.recoveredCalls.length} recovered, ${repaired.strippedRanges} stripped`);
-      }
-    }
-    if (notes.length === 0) {
+    const repaired = collectRepairNotes(pi, event.message, config);
+    if (repaired.notes.length === 0) {
       return;
     }
-    if (config.notifyOnStrategy) {
-      try {
-        ctx.ui.notify(`tool-call-fixer: ${notes.join("; ")}`, "info");
-      } catch (err) {
-        if (isStaleCtxError(err)) {
-          return;
-        }
-        throw err;
-      }
-    }
-    return { message };
+    return notifyRepairNotes(ctx, config, repaired.notes, repaired.message);
   });
 }

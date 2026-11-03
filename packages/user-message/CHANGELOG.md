@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Split the sticky-prompt scan (`getPinnedPrompt`) into bracket-search, bounds-trim, and preview-line helpers, and the jump-marker mouse handler into accept/press/click helpers; no behavior change.
+
 ## [0.7.0] - 2026-10-30
 
 ### Added

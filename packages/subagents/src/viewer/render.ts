@@ -29,75 +29,137 @@ type ToolResultLike = {
   details?: unknown;
 };
 
+type AssistantMessage = Extract<AgentMessage, { role: "assistant" }>;
+type ToolResultMessage = Extract<AgentMessage, { role: "toolResult" }>;
+type UserMessage = Extract<AgentMessage, { role: "user" }>;
+
+type ToolCallPart = {
+  type: string;
+  id?: string;
+  name?: string;
+  arguments?: unknown;
+};
+
+type ResolvedToolCallPart = {
+  type: string;
+  id: string;
+  name: string;
+  arguments?: unknown;
+};
+
+type ConversationBuild = {
+  container: Container;
+  pending: Map<string, ToolExecutionComponent>;
+  opts: SubagentConversationRenderOptions;
+  markdownTheme: ReturnType<typeof getMarkdownTheme>;
+  tui: TUI;
+  cwd: string;
+};
+
+function addSpacer(build: ConversationBuild): void {
+  build.container.addChild(new Spacer(1));
+}
+
+function isActionableToolCall(part: ToolCallPart): part is ResolvedToolCallPart {
+  return part.type === "toolCall" && Boolean(part.id) && Boolean(part.name);
+}
+
+function abortedToolReason(message: AssistantMessage): string {
+  return message.stopReason === "aborted" ? "Operation aborted" : (message.errorMessage ?? "Error");
+}
+
+function settleToolCall(
+  build: ConversationBuild,
+  message: AssistantMessage,
+  toolCallId: string,
+  tool: ToolExecutionComponent,
+): void {
+  if (message.stopReason === "aborted" || message.stopReason === "error") {
+    tool.updateResult({
+      content: [{ type: "text", text: abortedToolReason(message) }],
+      isError: true,
+    });
+    return;
+  }
+  build.pending.set(toolCallId, tool);
+}
+
+function addToolCall(build: ConversationBuild, message: AssistantMessage, part: ToolCallPart): void {
+  if (!isActionableToolCall(part)) return;
+  const tool = new ToolExecutionComponent(
+    part.name,
+    part.id,
+    part.arguments ?? {},
+    { showImages: true },
+    undefined,
+    build.tui,
+    build.cwd,
+  );
+  tool.setExpanded(build.opts.expanded);
+  build.container.addChild(tool);
+  settleToolCall(build, message, part.id, tool);
+}
+
+function addAssistantMessage(build: ConversationBuild, message: AssistantMessage): void {
+  const assistant = new AssistantMessageComponent(message, build.opts.hideThinkingBlock, build.markdownTheme);
+  if (build.container.children.length > 0) addSpacer(build);
+  build.container.addChild(assistant);
+  for (const part of message.content as ToolCallPart[]) {
+    addToolCall(build, message, part);
+  }
+}
+
+function applyToolResult(build: ConversationBuild, message: ToolResultMessage): void {
+  const component = build.pending.get(message.toolCallId);
+  if (!component) return;
+  const result = message as unknown as ToolResultLike;
+  component.updateResult({
+    content: result.content,
+    isError: result.isError,
+    details: result.details,
+  });
+  build.pending.delete(message.toolCallId);
+}
+
+function addUserMessage(build: ConversationBuild, message: UserMessage): void {
+  const text = getUserText(message);
+  if (!text) return;
+  if (build.container.children.length > 0) addSpacer(build);
+  build.container.addChild(new UserMessageComponent(text, build.markdownTheme));
+}
+
+function addMessage(build: ConversationBuild, message: AgentMessage): void {
+  if (message.role === "assistant") {
+    addAssistantMessage(build, message);
+    return;
+  }
+  if (message.role === "toolResult") {
+    applyToolResult(build, message);
+    return;
+  }
+  if (message.role === "user") {
+    addUserMessage(build, message);
+  }
+}
+
 export function buildSubagentConversation(
   messages: AgentMessage[],
   opts: SubagentConversationRenderOptions,
   tui: TUI,
   cwd: string,
 ): Container {
-  const markdownTheme = getMarkdownTheme();
-  const container = new Container();
-  const pending = new Map<string, ToolExecutionComponent>();
-
-  const addSpacer = () => container.addChild(new Spacer(1));
-
+  const build: ConversationBuild = {
+    container: new Container(),
+    pending: new Map<string, ToolExecutionComponent>(),
+    opts,
+    markdownTheme: getMarkdownTheme(),
+    tui,
+    cwd,
+  };
   for (const message of messages) {
-    if (message.role === "assistant") {
-      const assistant = new AssistantMessageComponent(message, opts.hideThinkingBlock, markdownTheme);
-      if (container.children.length > 0) addSpacer();
-      container.addChild(assistant);
-
-      for (const part of message.content as {
-        type: string;
-        id?: string;
-        name?: string;
-        arguments?: unknown;
-      }[]) {
-        if (part.type !== "toolCall") continue;
-        if (!part.id || !part.name) continue;
-        const tool = new ToolExecutionComponent(
-          part.name,
-          part.id,
-          part.arguments ?? {},
-          { showImages: true },
-          undefined,
-          tui,
-          cwd,
-        );
-        tool.setExpanded(opts.expanded);
-        container.addChild(tool);
-
-        if (message.stopReason === "aborted" || message.stopReason === "error") {
-          const reason = message.stopReason === "aborted" ? "Operation aborted" : (message.errorMessage ?? "Error");
-          tool.updateResult({
-            content: [{ type: "text", text: reason }],
-            isError: true,
-          });
-        } else {
-          pending.set(part.id, tool);
-        }
-      }
-    } else if (message.role === "toolResult") {
-      const component = pending.get(message.toolCallId);
-      if (component) {
-        const result = message as unknown as ToolResultLike;
-        component.updateResult({
-          content: result.content,
-          isError: result.isError,
-          details: result.details,
-        });
-        pending.delete(message.toolCallId);
-      }
-    } else if (message.role === "user") {
-      const text = getUserText(message);
-      if (text) {
-        if (container.children.length > 0) addSpacer();
-        container.addChild(new UserMessageComponent(text, markdownTheme));
-      }
-    }
+    addMessage(build, message);
   }
-
-  return container;
+  return build.container;
 }
 
 class Spacer implements Component {

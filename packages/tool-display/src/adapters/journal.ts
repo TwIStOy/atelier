@@ -1,6 +1,11 @@
+import type { Theme } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth } from "@earendil-works/pi-tui";
 import type { ToolDisplayAdapter } from "../types.ts";
 import { formatDimPreviewLines, listLines } from "./shared.ts";
+
+function truncateText(text: string, max: number): string {
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+}
 
 interface JournalWriteArgs {
   title?: string;
@@ -44,7 +49,7 @@ export const journalReadAdapter: ToolDisplayAdapter<JournalReadArgs> = {
     const count = d?.content_lines ?? 0;
     if (count === 0) return [theme.fg("muted", "└ empty")];
     const preview = d?.content_preview?.split("\n")[0] ?? "";
-    const truncated = preview.length > 100 ? `${preview.slice(0, 99)}…` : preview;
+    const truncated = truncateText(preview, 100);
     const line = `└ ${theme.fg("success", `${count} line${count === 1 ? "" : "s"}`)} ${theme.fg("dim", truncated)}`;
     return [truncateToWidth(line, width, "…")];
   },
@@ -68,6 +73,16 @@ interface JournalSearchDetails {
   items?: Array<{ id: string; title: string }>;
 }
 
+function firstResultLabel(theme: Theme, d: JournalSearchDetails | undefined): string {
+  const first = d?.items?.[0];
+  if (!first) return "";
+  let label = ` ${theme.fg("dim", first.id)}`;
+  if (first.title) {
+    label += ` ${theme.fg("dim", truncateText(first.title, 80))}`;
+  }
+  return label;
+}
+
 export const journalSearchAdapter: ToolDisplayAdapter<JournalSearchArgs> = {
   formatCallHeader(args, theme) {
     const query = args?.text ?? (args?.tags?.length ? args.tags.join(",") : "");
@@ -80,18 +95,9 @@ export const journalSearchAdapter: ToolDisplayAdapter<JournalSearchArgs> = {
     if (total === 0) {
       return [theme.fg("muted", "└ no results")];
     }
-    const first = d?.items?.[0];
-    const parts: string[] = ["└ ", theme.fg("success", `${total} result${total === 1 ? "" : "s"}`)];
-    if (first) {
-      parts.push(" ");
-      parts.push(theme.fg("dim", first.id));
-      if (first.title) {
-        const snip = first.title.length > 80 ? `${first.title.slice(0, 79)}…` : first.title;
-        parts.push(` ${theme.fg("dim", snip)}`);
-      }
-    }
+    const count = theme.fg("success", `${total} result${total === 1 ? "" : "s"}`);
     const more = total > 1 ? theme.fg("dim", ` · ${total - 1} more`) : "";
-    return [truncateToWidth(parts.join("") + more, width, "…")];
+    return [truncateToWidth(`└ ${count}${firstResultLabel(theme, d)}${more}`, width, "…")];
   },
 
   formatExpandedContent(_args, _output, theme, _width, details) {

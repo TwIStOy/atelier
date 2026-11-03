@@ -42,15 +42,27 @@ export class SubmitPicker implements StatefulView<SubmitPickerProps> {
 
   invalidate(): void {}
 
+  private pickerRowLabel(i: number): string {
+    return i === 0 ? SUBMIT_LABEL : CANCEL_LABEL;
+  }
+
+  private styledPickerLabel(text: string, active: boolean): string {
+    return active ? this.theme.fg("accent", this.theme.bold(text)) : this.theme.fg("text", text);
+  }
+
+  private renderPickerRow(i: number, width: number): string {
+    const text = this.pickerRowLabel(i);
+    const active = this.props.rows[i]?.active ?? false;
+    const pointer = active ? ACTIVE_POINTER : INACTIVE_POINTER;
+    const number = `${i + 1}${NUMBER_SEPARATOR}`;
+    const label = this.styledPickerLabel(text, active);
+    return truncateToWidth(`${pointer}${number}${label}`, width, "");
+  }
+
   render(width: number): string[] {
     const lines: string[] = [];
     for (let i = 0; i < 2; i++) {
-      const text = i === 0 ? SUBMIT_LABEL : CANCEL_LABEL;
-      const active = this.props.rows[i]?.active ?? false;
-      const pointer = active ? ACTIVE_POINTER : INACTIVE_POINTER;
-      const number = `${i + 1}${NUMBER_SEPARATOR}`;
-      const label = active ? this.theme.fg("accent", this.theme.bold(text)) : this.theme.fg("text", text);
-      lines.push(truncateToWidth(`${pointer}${number}${label}`, width, ""));
+      lines.push(this.renderPickerRow(i, width));
     }
     return lines;
   }

@@ -5,6 +5,7 @@
 ### Changed
 
 - `glob` / `grep` / `ls` share `src/shared.ts` (path resolution, the ripgrep line-stream runner with abort/cap handling, and output truncation) instead of three copies of the same plumbing.
+- Split the `ls` / `grep` / `glob` tool handlers and the shared ripgrep stream runner into small single-purpose helpers (validation, collection, sorting, formatting phases) to clear all `fallow health` complexity findings; behavior and output are unchanged.
 
 ## [0.7.0] - 2026-10-30
 

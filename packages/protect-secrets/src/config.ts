@@ -55,22 +55,23 @@ export function loadProjectConfig(cwd: string): ProjectConfigResult {
   return result;
 }
 
-function parseConfig(path: string, projectRoot: string): ProjectConfigResult {
-  let parsed: unknown;
+function readRawConfig(path: string): { raw: unknown; issue: string | null } {
   try {
-    parsed = JSON.parse(readFileSync(path, "utf-8"));
+    return { raw: JSON.parse(readFileSync(path, "utf-8")), issue: null };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    return { paths: [], issues: [`Failed to parse config at '${path}': ${message}`] };
+    return { raw: undefined, issue: `Failed to parse config at '${path}': ${message}` };
   }
+}
+
+function configObjectIssue(parsed: unknown, path: string): string | null {
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-    return { paths: [], issues: [`Config at '${path}' must be a JSON object`] };
+    return `Config at '${path}' must be a JSON object`;
   }
-  const raw = (parsed as Record<string, unknown>).protectedPaths;
-  if (raw === undefined) return { paths: [], issues: [] };
-  if (!Array.isArray(raw)) {
-    return { paths: [], issues: [`Config at '${path}': 'protectedPaths' must be an array of strings`] };
-  }
+  return null;
+}
+
+function parseEntries(raw: unknown[], path: string, projectRoot: string): ProjectConfigResult {
   const paths: string[] = [];
   const issues: string[] = [];
   for (const entry of raw) {
@@ -81,6 +82,23 @@ function parseConfig(path: string, projectRoot: string): ProjectConfigResult {
     paths.push(normalizePath(entry.trim(), projectRoot));
   }
   return { paths, issues };
+}
+
+function protectedPathsResult(raw: unknown, path: string, projectRoot: string): ProjectConfigResult {
+  if (raw === undefined) return { paths: [], issues: [] };
+  if (!Array.isArray(raw)) {
+    return { paths: [], issues: [`Config at '${path}': 'protectedPaths' must be an array of strings`] };
+  }
+  return parseEntries(raw, path, projectRoot);
+}
+
+function parseConfig(path: string, projectRoot: string): ProjectConfigResult {
+  const read = readRawConfig(path);
+  if (read.issue) return { paths: [], issues: [read.issue] };
+  const objectIssue = configObjectIssue(read.raw, path);
+  if (objectIssue) return { paths: [], issues: [objectIssue] };
+  const raw = (read.raw as Record<string, unknown>).protectedPaths;
+  return protectedPathsResult(raw, path, projectRoot);
 }
 
 export function normalizePath(p: string, projectRoot: string): string {

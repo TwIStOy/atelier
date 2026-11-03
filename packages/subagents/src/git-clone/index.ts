@@ -5,7 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { DEFAULT_MAX_BYTES, formatSize, truncateHead } from "@earendil-works/pi-coding-agent";
-import { Type } from "typebox";
+import { type Static, Type } from "typebox";
 
 const toolDir = path.dirname(fileURLToPath(import.meta.url));
 const gitCloneToolDescription = readFileSync(path.join(toolDir, "git-clone.txt"), "utf-8").trim();
@@ -130,6 +130,113 @@ function dirIsNonEmpty(p: string): boolean {
   }
 }
 
+type GitCloneParams = Static<typeof gitCloneParams>;
+
+type GitResult = { code: number; stdout: string; stderr: string };
+
+function requireCloneUrl(params: GitCloneParams): string {
+  const url = (params.url ?? "").trim();
+  if (!url) {
+    throw new Error("url is required");
+  }
+  if (isForbiddenUrl(url)) {
+    throw new Error("Refusing to clone: file://, git+ssh://, and ssh:// URLs are not allowed. Use https:// or git://.");
+  }
+  return url;
+}
+
+function resolveCloneTarget(params: GitCloneParams): { url: string; cachePath: string } {
+  const url = requireCloneUrl(params);
+  const cacheName = deriveCacheName(url, params.repo_name);
+  if (!cacheName) {
+    throw new Error(`Could not derive a cache directory name from URL: ${url}. Pass repo_name explicitly.`);
+  }
+  return { url, cachePath: path.join(CACHE_ROOT, cacheName) };
+}
+
+function cacheHitReply(cachePath: string, url: string) {
+  const msg = `Cache already exists at ${cachePath}. Reusing it as-is (no re-clone, no pull).`;
+  return {
+    content: [{ type: "text" as const, text: msg }],
+    details: {
+      cache_path: cachePath,
+      reused: true,
+      cloned: false,
+      url,
+    },
+  };
+}
+
+function buildCloneArgs(
+  url: string,
+  cachePath: string,
+  params: GitCloneParams,
+): { shallow: boolean; cloneArgs: string[] } {
+  const shallow = params.shallow !== false;
+  const cloneArgs = ["clone", "--quiet"];
+  if (shallow) cloneArgs.push("--depth", "1");
+  if (params.branch?.trim()) {
+    cloneArgs.push("--branch", params.branch.trim());
+  }
+  cloneArgs.push(url, cachePath);
+  return { shallow, cloneArgs };
+}
+
+async function runClone(cloneArgs: string[], signal: AbortSignal | undefined): Promise<GitResult> {
+  try {
+    return await runGit(cloneArgs, tmpdir(), signal);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    throw new Error(`git clone failed: ${msg}`);
+  }
+}
+
+function formatCloneOutput(result: GitResult): string {
+  const combined = `${result.stdout}${result.stderr ? (result.stdout ? "\n" : "") + result.stderr : ""}`;
+  const truncation = truncateHead(combined, {
+    maxLines: Number.MAX_SAFE_INTEGER,
+    maxBytes: DEFAULT_MAX_BYTES,
+  });
+  let output = truncation.content.trim();
+  if (truncation.truncated) {
+    output += `\n\n[Output truncated: ${formatSize(DEFAULT_MAX_BYTES)} limit reached.]`;
+  }
+  return output;
+}
+
+function cloneFailureReply(cachePath: string, url: string, code: number, output: string) {
+  return {
+    content: [
+      {
+        type: "text" as const,
+        text: `git clone exited with code ${code}.\n${output}\n\nRepository may be private, the URL wrong, or the network unavailable (GIT_TERMINAL_PROMPT=0 disables interactive auth).`,
+      },
+    ],
+    details: {
+      cache_path: cachePath,
+      reused: false,
+      cloned: false,
+      exit_code: code,
+      url,
+    },
+  };
+}
+
+function cloneSuccessReply(cachePath: string, url: string, shallow: boolean, output: string) {
+  const finalMsg = `Cloned ${url} into ${cachePath} (shallow=${shallow}). Use grep/glob/read on cache_path to inspect the source.`;
+  const text = output ? `${finalMsg}\n\n${output}` : finalMsg;
+  return {
+    content: [{ type: "text" as const, text }],
+    details: {
+      cache_path: cachePath,
+      reused: false,
+      cloned: true,
+      shallow,
+      url,
+    },
+  };
+}
+
 export function registerGitCloneTool(pi: ExtensionAPI) {
   pi.registerTool({
     name: "git_clone",
@@ -143,92 +250,21 @@ export function registerGitCloneTool(pi: ExtensionAPI) {
         throw new Error("Operation aborted");
       }
 
-      const url = (params.url ?? "").trim();
-      if (!url) {
-        throw new Error("url is required");
-      }
-      if (isForbiddenUrl(url)) {
-        throw new Error(
-          "Refusing to clone: file://, git+ssh://, and ssh:// URLs are not allowed. Use https:// or git://.",
-        );
-      }
-
-      const cacheName = deriveCacheName(url, params.repo_name);
-      if (!cacheName) {
-        throw new Error(`Could not derive a cache directory name from URL: ${url}. Pass repo_name explicitly.`);
-      }
-      const cachePath = path.join(CACHE_ROOT, cacheName);
+      const { url, cachePath } = resolveCloneTarget(params);
 
       if (dirIsNonEmpty(cachePath)) {
-        const msg = `Cache already exists at ${cachePath}. Reusing it as-is (no re-clone, no pull).`;
-        return {
-          content: [{ type: "text", text: msg }],
-          details: {
-            cache_path: cachePath,
-            reused: true,
-            cloned: false,
-            url,
-          },
-        };
+        return cacheHitReply(cachePath, url);
       }
 
-      const shallow = params.shallow !== false;
-      const cloneArgs = ["clone", "--quiet"];
-      if (shallow) cloneArgs.push("--depth", "1");
-      if (params.branch?.trim()) {
-        cloneArgs.push("--branch", params.branch.trim());
-      }
-      cloneArgs.push(url, cachePath);
-
-      let result: { code: number; stdout: string; stderr: string };
-      try {
-        result = await runGit(cloneArgs, tmpdir(), signal);
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        throw new Error(`git clone failed: ${msg}`);
-      }
-
-      const combined = `${result.stdout}${result.stderr ? (result.stdout ? "\n" : "") + result.stderr : ""}`;
-      const truncation = truncateHead(combined, {
-        maxLines: Number.MAX_SAFE_INTEGER,
-        maxBytes: DEFAULT_MAX_BYTES,
-      });
-      let output = truncation.content.trim();
-      if (truncation.truncated) {
-        output += `\n\n[Output truncated: ${formatSize(DEFAULT_MAX_BYTES)} limit reached.]`;
-      }
+      const { shallow, cloneArgs } = buildCloneArgs(url, cachePath, params);
+      const result = await runClone(cloneArgs, signal);
+      const output = formatCloneOutput(result);
 
       if (result.code !== 0) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: `git clone exited with code ${result.code}.\n${output}\n\nRepository may be private, the URL wrong, or the network unavailable (GIT_TERMINAL_PROMPT=0 disables interactive auth).`,
-            },
-          ],
-          details: {
-            cache_path: cachePath,
-            reused: false,
-            cloned: false,
-            exit_code: result.code,
-            url,
-          },
-        };
+        return cloneFailureReply(cachePath, url, result.code, output);
       }
 
-      const finalMsg = `Cloned ${url} into ${cachePath} (shallow=${shallow}). Use grep/glob/read on cache_path to inspect the source.`;
-      const text = output ? `${finalMsg}\n\n${output}` : finalMsg;
-
-      return {
-        content: [{ type: "text", text }],
-        details: {
-          cache_path: cachePath,
-          reused: false,
-          cloned: true,
-          shallow,
-          url,
-        },
-      };
+      return cloneSuccessReply(cachePath, url, shallow, output);
     },
   });
 }

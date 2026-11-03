@@ -31,25 +31,32 @@ export function isDisabledByEnv(): boolean {
   return v === "0" || v === "false" || v === "off";
 }
 
+function asSettingsObject(v: unknown): Record<string, unknown> | undefined {
+  return v && typeof v === "object" ? (v as Record<string, unknown>) : undefined;
+}
+
 function readFromProjectSettings(raw: unknown): MemorySettings | undefined {
-  if (!raw || typeof raw !== "object") return undefined;
-  const block = (raw as Record<string, unknown>)[MEMORY_SETTINGS_KEY];
-  if (!block || typeof block !== "object") return undefined;
+  const root = asSettingsObject(raw);
+  if (!root) return undefined;
+  const block = asSettingsObject(root[MEMORY_SETTINGS_KEY]);
+  if (!block) return undefined;
   return block as MemorySettings;
+}
+
+function projectSettings(ctx?: ExtensionContext): unknown {
+  const settings = (ctx as { settingsManager?: { getProjectSettings?: () => unknown } })?.settingsManager;
+  return settings?.getProjectSettings?.();
+}
+
+function memorySettings(ctx?: ExtensionContext): MemorySettings | undefined {
+  return readFromProjectSettings(projectSettings(ctx));
 }
 
 export function isMemoryEnabled(ctx?: ExtensionContext): boolean {
   if (isDisabledByEnv()) return false;
-  const settings = (ctx as { settingsManager?: { getProjectSettings?: () => unknown } })?.settingsManager;
-  const project = settings?.getProjectSettings?.();
-  const cfg = readFromProjectSettings(project);
-  if (cfg?.enabled === false) return false;
-  return true;
+  return memorySettings(ctx)?.enabled !== false;
 }
 
 export function getNamespace(ctx?: ExtensionContext): string {
-  const settings = (ctx as { settingsManager?: { getProjectSettings?: () => unknown } })?.settingsManager;
-  const project = settings?.getProjectSettings?.();
-  const cfg = readFromProjectSettings(project);
-  return sanitizeNamespace(cfg?.namespace ?? "");
+  return sanitizeNamespace(memorySettings(ctx)?.namespace ?? "");
 }

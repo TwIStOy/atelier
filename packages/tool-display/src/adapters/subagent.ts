@@ -94,18 +94,28 @@ function statusGlyph(
 }
 
 function formatUsageSuffix(theme: Theme, inp?: number, out?: number, pct?: number | null): string {
-  const hasTok = (typeof inp === "number" && inp > 0) || (typeof out === "number" && out > 0);
-  if (!hasTok && (pct === undefined || pct === null)) return "";
+  const hasTok = hasTokenUsage(inp, out);
+  const pctPart = contextPercentPart(theme, pct);
+  if (!hasTok && pctPart === "") return "";
   const parts: string[] = [];
   if (hasTok) {
     parts.push(theme.fg("muted", formatTokenUsageArrows(inp ?? 0, out ?? 0)));
   }
-  if (pct != null) {
-    const s = usagePercentStressLevel(pct);
-    const c = s === "high" ? "error" : s === "medium" ? "warning" : "muted";
-    parts.push(theme.fg(c, `${Math.round(pct)}%`));
+  if (pctPart !== "") {
+    parts.push(pctPart);
   }
   return theme.fg("muted", " · ") + parts.join(theme.fg("muted", " · "));
+}
+
+function hasTokenUsage(inp?: number, out?: number): boolean {
+  return (typeof inp === "number" && inp > 0) || (typeof out === "number" && out > 0);
+}
+
+function contextPercentPart(theme: Theme, pct: number | null | undefined): string {
+  if (pct == null) return "";
+  const s = usagePercentStressLevel(pct);
+  const c = s === "high" ? "error" : s === "medium" ? "warning" : "muted";
+  return theme.fg(c, `${Math.round(pct)}%`);
 }
 
 const SUBAGENT_DESC_MAX = 56;
@@ -165,31 +175,49 @@ function formatCallSubtitle(args: SubagentArgs, theme: Theme): string {
   return theme.fg("muted", truncateDisplay(t, 72));
 }
 
-function formatMultiSubagentSubtitle(args: SubagentArgs, d: SubagentDetails | undefined, theme: Theme): string {
-  const n = args.tasks!.length;
-  const doneArr = d?.per_task_done;
-  const startArr = d?.per_task_started;
+function validPerTaskArray<T>(arr: T[] | undefined, n: number): T[] | undefined {
+  return Array.isArray(arr) && arr.length === n ? arr : undefined;
+}
+
+function countRunningFromStarted(startArr: boolean[] | undefined, n: number): number {
+  const arr = validPerTaskArray(startArr, n);
+  if (!arr) return 0;
+  let running = 0;
+  for (let i = 0; i < n; i++) {
+    if (arr[i]) running++;
+  }
+  return running;
+}
+
+function taskRunCounts(d: SubagentDetails | undefined, n: number): { running: number; completed: number } {
+  const doneArr = validPerTaskArray(d?.per_task_done, n);
+  if (!doneArr) {
+    return { running: countRunningFromStarted(d?.per_task_started, n), completed: 0 };
+  }
+  const startArr = validPerTaskArray(d?.per_task_started, n);
   let running = 0;
   let completed = 0;
-  if (Array.isArray(doneArr) && doneArr.length === n) {
-    for (let i = 0; i < n; i++) {
-      if (doneArr[i]) completed++;
-      else if (Array.isArray(startArr) && startArr.length === n && startArr[i]) running++;
-    }
-  } else if (Array.isArray(startArr) && startArr.length === n) {
-    for (let i = 0; i < n; i++) {
-      if (startArr[i]) running++;
-    }
+  for (let i = 0; i < n; i++) {
+    if (doneArr[i]) completed++;
+    else if (startArr?.[i]) running++;
   }
-  const base = theme.fg("accent", truncateDisplay(`${running} running · ${completed} done`, 72));
-  let sumIn = 0;
-  let sumOut = 0;
-  for (const v of d?.per_task_usage_input ?? []) {
-    if (typeof v === "number") sumIn += v;
+  return { running, completed };
+}
+
+function sumNumericArray(arr: number[] | undefined): number {
+  let sum = 0;
+  for (const v of arr ?? []) {
+    if (typeof v === "number") sum += v;
   }
-  for (const v of d?.per_task_usage_output ?? []) {
-    if (typeof v === "number") sumOut += v;
-  }
+  return sum;
+}
+
+function formatMultiSubagentSubtitle(args: SubagentArgs, d: SubagentDetails | undefined, theme: Theme): string {
+  const n = args.tasks!.length;
+  const counts = taskRunCounts(d, n);
+  const base = theme.fg("accent", truncateDisplay(`${counts.running} running · ${counts.completed} done`, 72));
+  const sumIn = sumNumericArray(d?.per_task_usage_input);
+  const sumOut = sumNumericArray(d?.per_task_usage_output);
   const tok = sumIn > 0 || sumOut > 0 ? formatUsageSuffix(theme, sumIn, sumOut, null) : "";
   return base + tok;
 }
@@ -198,50 +226,66 @@ function singleSubagentArgs(args: SubagentArgs): boolean {
   return !args.tasks || args.tasks.length <= 1;
 }
 
+type SingleSubagentStats = {
+  rawType: string | undefined;
+  tc: number;
+  usageIn?: number;
+  usageOut?: number;
+  ctxPct?: number | null;
+};
+
 function formatSingleSubagentInlineStats(args: SubagentArgs, d: SubagentDetails | undefined, theme: Theme): string {
-  let rawType: string | undefined;
-  let tc = 0;
-  let usageIn: number | undefined;
-  let usageOut: number | undefined;
-  let ctxPct: number | null | undefined;
-  if (d?.mode === "batch" && d.batch?.length === 1) {
-    const row = d.batch[0]!;
-    rawType = row.agent_type ?? args.tasks?.[0]?.agent_type ?? args.agent_type;
-    tc = typeof row.tool_calls === "number" ? row.tool_calls : 0;
-    usageIn = row.usage_input;
-    usageOut = row.usage_output;
-    ctxPct = row.context_percent;
-  } else {
-    rawType =
-      args.tasks?.length === 1
-        ? (args.tasks[0]?.agent_type ?? d?.agent_type ?? args.agent_type)
-        : (d?.agent_type ?? args.agent_type);
-    if (typeof d?.tool_calls === "number") tc = d.tool_calls;
-    else if (
-      args.tasks?.length === 1 &&
-      d &&
-      Array.isArray(d.per_task_tool_calls) &&
-      d.per_task_tool_calls.length >= 1
-    ) {
-      const v = d.per_task_tool_calls[0];
-      tc = typeof v === "number" ? v : 0;
-    }
-    if (!args.tasks || args.tasks.length <= 1) {
-      usageIn = d?.usage_input;
-      usageOut = d?.usage_output;
-      ctxPct = d?.context_percent;
-    }
-  }
-  const ct = capitalizeType(normalizeAgentType(rawType));
-  const w = tc === 1 ? "tool" : "tools";
+  const stats = singleSubagentStats(args, d);
+  const ct = capitalizeType(normalizeAgentType(stats.rawType));
+  const w = stats.tc === 1 ? "tool" : "tools";
   return (
     theme.fg("muted", " · ") +
     theme.fg("syntaxType", ct) +
     theme.fg("muted", " calls ") +
-    theme.fg("toolOutput", String(tc)) +
+    theme.fg("toolOutput", String(stats.tc)) +
     theme.fg("muted", ` ${w}`) +
-    formatUsageSuffix(theme, usageIn, usageOut, ctxPct ?? null)
+    formatUsageSuffix(theme, stats.usageIn, stats.usageOut, stats.ctxPct ?? null)
   );
+}
+
+function singleSubagentStats(args: SubagentArgs, d: SubagentDetails | undefined): SingleSubagentStats {
+  if (d?.mode === "batch" && d.batch?.length === 1) return singleBatchStats(args, d.batch[0]!);
+  return singlePlainStats(args, d);
+}
+
+function singleBatchStats(args: SubagentArgs, row: SubagentBatchRow): SingleSubagentStats {
+  return {
+    rawType: row.agent_type ?? args.tasks?.[0]?.agent_type ?? args.agent_type,
+    tc: typeof row.tool_calls === "number" ? row.tool_calls : 0,
+    usageIn: row.usage_input,
+    usageOut: row.usage_output,
+    ctxPct: row.context_percent,
+  };
+}
+
+function singlePlainStats(args: SubagentArgs, d: SubagentDetails | undefined): SingleSubagentStats {
+  const rawType = singleTaskAgentType(args, d);
+  const tc = plainToolCallCount(args, d);
+  if (!singleSubagentArgs(args)) return { rawType, tc };
+  return { rawType, tc, ...plainUsageStats(d) };
+}
+
+function singleTaskAgentType(args: SubagentArgs, d: SubagentDetails | undefined): string | undefined {
+  if (args.tasks?.length !== 1) return d?.agent_type ?? args.agent_type;
+  return args.tasks[0]?.agent_type ?? d?.agent_type ?? args.agent_type;
+}
+
+function plainUsageStats(d: SubagentDetails | undefined): Pick<SingleSubagentStats, "usageIn" | "usageOut" | "ctxPct"> {
+  return { usageIn: d?.usage_input, usageOut: d?.usage_output, ctxPct: d?.context_percent };
+}
+
+function plainToolCallCount(args: SubagentArgs, d: SubagentDetails | undefined): number {
+  if (typeof d?.tool_calls === "number") return d.tool_calls;
+  if (args.tasks?.length === 1 && d && Array.isArray(d.per_task_tool_calls) && d.per_task_tool_calls.length >= 1) {
+    const v = d.per_task_tool_calls[0];
+    return typeof v === "number" ? v : 0;
+  }
+  return 0;
 }
 
 function taskStartedAt(
@@ -252,13 +296,44 @@ function taskStartedAt(
   per: number[] | undefined,
   legacyOk: boolean,
 ): boolean {
-  const ps = d?.per_task_started;
-  if (Array.isArray(ps) && ps.length === n && ps[i]) return true;
-  if (havePerTask && per && (per[i] ?? 0) > 0) return true;
-  if (legacyOk && d && typeof d.task_index === "number" && d.task_index === i && typeof d.tool_calls === "number") {
-    return true;
-  }
-  return false;
+  const ps = validPerTaskArray(d?.per_task_started, n);
+  if (ps?.[i]) return true;
+  if (startedViaToolCalls(i, havePerTask, per)) return true;
+  return legacyOk && legacyTaskActive(d, i);
+}
+
+function startedViaToolCalls(i: number, havePerTask: boolean, per: number[] | undefined): boolean {
+  return havePerTask && per !== undefined && (per[i] ?? 0) > 0;
+}
+
+function legacyTaskActive(d: SubagentDetails | undefined, i: number): boolean {
+  return d?.task_index === i && typeof d?.tool_calls === "number";
+}
+
+function arrAt<T>(arr: T[] | undefined, i: number): T | undefined {
+  return Array.isArray(arr) ? arr[i] : undefined;
+}
+
+function perTaskFlag(arr: boolean[] | undefined, n: number, i: number): boolean {
+  const valid = validPerTaskArray(arr, n);
+  return valid?.[i] === true;
+}
+
+function perTaskValueAt<T>(arr: T[] | undefined, n: number, i: number): T | undefined {
+  const valid = validPerTaskArray(arr, n);
+  return valid ? valid[i] : undefined;
+}
+
+function taskCallCount(
+  d: SubagentDetails | undefined,
+  i: number,
+  havePerTask: boolean,
+  per: number[] | undefined,
+  legacyOk: boolean,
+): number {
+  if (havePerTask) return typeof per![i] === "number" ? per![i] : 0;
+  if (legacyOk && d!.task_index === i) return d!.tool_calls!;
+  return 0;
 }
 
 function formatCollapsedSubagentSummary(
@@ -269,96 +344,140 @@ function formatCollapsedSubagentSummary(
   spinAt: number,
   width: number,
 ): string[] | null {
-  const d = details && typeof details === "object" ? (details as SubagentDetails) : undefined;
+  const d = asSubagentDetails(details);
 
-  if (d?.mode === "batch" && Array.isArray(d.batch) && d.batch.length > 0) {
-    if (d.batch.length === 1) return null;
-    const sorted = [...d.batch].sort((a, b) => a.index - b.index);
-    const lines: string[] = [];
-    for (const item of sorted) {
-      const tc = typeof item.tool_calls === "number" ? item.tool_calls : 0;
-      const typ = typeForBatchRow(item, d.agent_type, args);
-      const rowDesc = descriptionForBatchRow(item, args);
-      const waiting = false;
-      const spinning = isPartial && item.ok === undefined;
-      const uExtra = formatUsageSuffix(theme, item.usage_input, item.usage_output, item.context_percent);
-      const row = callsLineStyled(
-        theme,
-        typ,
-        rowDesc,
-        tc,
-        item.ok,
-        item.error,
-        waiting,
-        spinning,
-        spinAt,
-        uExtra,
-        Math.max(1, width),
-      );
-      lines.push(fitRowWidth(row, width));
-    }
-    return lines;
+  const batch = batchRows(d);
+  if (batch) {
+    return batch.length === 1 ? null : formatBatchSummaryRows(batch, d!, args, theme, isPartial, spinAt, width);
   }
 
   const tasks = args.tasks;
   if (Array.isArray(tasks) && tasks.length > 1 && isPartial && !d?.batch?.length) {
-    const n = tasks.length;
-    if (d?.task_total !== undefined && d.task_total !== n) return null;
-    const per = d?.per_task_tool_calls;
-    const havePerTask = Array.isArray(per) && per.length === n;
-    const legacyOk =
-      Boolean(d) && !havePerTask && typeof d!.task_index === "number" && typeof d!.tool_calls === "number";
-    const pin = d?.per_task_usage_input;
-    const pout = d?.per_task_usage_output;
-    const ppct = d?.per_task_context_percent;
-    const lines: string[] = [];
-    for (let i = 0; i < n; i++) {
-      const typ = tasks[i]?.agent_type ?? args.agent_type;
-      const rowDesc = tasks[i]?.description?.trim() ?? "";
-      const started = taskStartedAt(d, n, i, havePerTask, per, legacyOk);
-      const pDone = d?.per_task_done;
-      const done = Array.isArray(pDone) && pDone.length === n && pDone[i] === true;
-      let rowOk: boolean | undefined;
-      const pOk = d?.per_task_ok;
-      if (done && Array.isArray(pOk) && pOk.length === n) {
-        rowOk = pOk[i];
-      }
-      const waiting = isPartial && !started && !done;
-      const spinning = isPartial && started && !done;
-      const tc = havePerTask
-        ? typeof per![i] === "number"
-          ? per![i]
-          : 0
-        : legacyOk && d!.task_index === i
-          ? d!.tool_calls!
-          : 0;
-      const uExtra = formatUsageSuffix(
-        theme,
-        Array.isArray(pin) ? pin[i] : undefined,
-        Array.isArray(pout) ? pout[i] : undefined,
-        Array.isArray(ppct) ? ppct[i] : undefined,
-      );
-      const row = callsLineStyled(
-        theme,
-        typ,
-        rowDesc,
-        tc,
-        rowOk,
-        undefined,
-        waiting,
-        spinning,
-        spinAt,
-        uExtra,
-        Math.max(1, width),
-      );
-      lines.push(fitRowWidth(row, width));
-    }
-    return lines;
+    return formatPartialTasksSummary(tasks, args, d, theme, spinAt, width);
   }
 
-  if (singleSubagentArgs(args)) return null;
-
   return null;
+}
+
+function asSubagentDetails(details: unknown): SubagentDetails | undefined {
+  return details && typeof details === "object" ? (details as SubagentDetails) : undefined;
+}
+
+function batchRows(d: SubagentDetails | undefined): SubagentBatchRow[] | undefined {
+  if (d?.mode !== "batch" || !Array.isArray(d.batch) || d.batch.length === 0) return undefined;
+  return d.batch;
+}
+
+function formatBatchSummaryRows(
+  batch: SubagentBatchRow[],
+  d: SubagentDetails,
+  args: SubagentArgs,
+  theme: Theme,
+  isPartial: boolean,
+  spinAt: number,
+  width: number,
+): string[] {
+  const sorted = [...batch].sort((a, b) => a.index - b.index);
+  const lines: string[] = [];
+  for (const item of sorted) {
+    const tc = typeof item.tool_calls === "number" ? item.tool_calls : 0;
+    const typ = typeForBatchRow(item, d.agent_type, args);
+    const rowDesc = descriptionForBatchRow(item, args);
+    const spinning = isPartial && item.ok === undefined;
+    const uExtra = formatUsageSuffix(theme, item.usage_input, item.usage_output, item.context_percent);
+    const row = callsLineStyled(
+      theme,
+      typ,
+      rowDesc,
+      tc,
+      item.ok,
+      item.error,
+      false,
+      spinning,
+      spinAt,
+      uExtra,
+      Math.max(1, width),
+    );
+    lines.push(fitRowWidth(row, width));
+  }
+  return lines;
+}
+
+function formatPartialTasksSummary(
+  tasks: SubagentTaskArg[],
+  args: SubagentArgs,
+  d: SubagentDetails | undefined,
+  theme: Theme,
+  spinAt: number,
+  width: number,
+): string[] | null {
+  const n = tasks.length;
+  if (d?.task_total !== undefined && d.task_total !== n) return null;
+  const per = d?.per_task_tool_calls;
+  const havePerTask = Array.isArray(per) && per.length === n;
+  const legacyOk = legacyPerTaskDetails(d, havePerTask);
+  const lines: string[] = [];
+  for (let i = 0; i < n; i++) {
+    lines.push(formatPartialTaskRow(tasks, args, d, theme, spinAt, width, { n, i, havePerTask, per, legacyOk }));
+  }
+  return lines;
+}
+
+function legacyPerTaskDetails(d: SubagentDetails | undefined, havePerTask: boolean): boolean {
+  if (!d || havePerTask) return false;
+  return typeof d.task_index === "number" && typeof d.tool_calls === "number";
+}
+
+function formatPartialTaskRow(
+  tasks: SubagentTaskArg[],
+  args: SubagentArgs,
+  d: SubagentDetails | undefined,
+  theme: Theme,
+  spinAt: number,
+  width: number,
+  ctx: { n: number; i: number; havePerTask: boolean; per: number[] | undefined; legacyOk: boolean },
+): string {
+  const { n, i, havePerTask, per, legacyOk } = ctx;
+  const typ = tasks[i]?.agent_type ?? args.agent_type;
+  const rowDesc = tasks[i]?.description?.trim() ?? "";
+  const state = taskRowState(d, n, i, havePerTask, per, legacyOk);
+  const waiting = !state.started && !state.done;
+  const spinning = state.started && !state.done;
+  const uExtra = formatUsageSuffix(
+    theme,
+    arrAt(d?.per_task_usage_input, i),
+    arrAt(d?.per_task_usage_output, i),
+    arrAt(d?.per_task_context_percent, i),
+  );
+  const row = callsLineStyled(
+    theme,
+    typ,
+    rowDesc,
+    state.tc,
+    state.rowOk,
+    undefined,
+    waiting,
+    spinning,
+    spinAt,
+    uExtra,
+    Math.max(1, width),
+  );
+  return fitRowWidth(row, width);
+}
+
+function taskRowState(
+  d: SubagentDetails | undefined,
+  n: number,
+  i: number,
+  havePerTask: boolean,
+  per: number[] | undefined,
+  legacyOk: boolean,
+): { started: boolean; done: boolean; rowOk: boolean | undefined; tc: number } {
+  const started = taskStartedAt(d, n, i, havePerTask, per, legacyOk);
+  const done = perTaskFlag(d?.per_task_done, n, i);
+  const rowOk = done ? perTaskValueAt(d?.per_task_ok, n, i) : undefined;
+  const tc = taskCallCount(d, i, havePerTask, per, legacyOk);
+  return { started, done, rowOk, tc };
 }
 
 export const subagentAdapter: ToolDisplayAdapter<SubagentArgs> = {

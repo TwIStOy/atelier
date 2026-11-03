@@ -153,61 +153,74 @@ function pickApi(entry: GatewayModelObject): Api {
   return "openai-completions";
 }
 
-function applyFamilyOverrides(config: ChatModelConfig, api: Api): void {
+function applyGptGlmOverrides(config: ChatModelConfig): boolean {
   const id = config.id;
   if (id.startsWith("gpt-5.6-")) {
     config.thinkingLevelMap = GPT_56_THINKING_LEVEL_MAP;
-    return;
+    return true;
   }
   if (id.startsWith("gpt-6-")) {
     config.thinkingLevelMap = GPT_56_THINKING_LEVEL_MAP;
-    return;
+    return true;
   }
   if (GLM_REASONING_EFFORT_IDS.has(id)) {
     config.compat = ZAI_COMPAT_REASONING_EFFORT;
     config.thinkingLevelMap = GLM_REASONING_EFFORT_MAP;
-    return;
+    return true;
   }
   if (id.startsWith("glm-")) {
     config.compat = ZAI_COMPAT;
-    return;
+    return true;
   }
+  return false;
+}
+
+function applyChineseFamilyOverrides(config: ChatModelConfig): boolean {
+  const id = config.id;
   if (id.startsWith("deepseek-")) {
     config.compat = DEEPSEEK_COMPAT;
     config.thinkingLevelMap = DEEPSEEK_THINKING_LEVEL_MAP;
     config.maxTokens = DEEPSEEK_MAX_TOKENS;
-    return;
+    return true;
   }
   if (id === "kimi-k3") {
     config.api = "anthropic-messages";
     config.baseUrl = GATEWAY_ROOT_BASE_URL;
     config.compat = KIMI_K3_COMPAT;
     config.thinkingLevelMap = KIMI_K3_THINKING_LEVEL_MAP;
-    return;
+    return true;
   }
   if (id.startsWith("kimi-")) {
     config.compat = MOONSHOT_COMPAT;
-    return;
+    return true;
   }
   if (id.startsWith("qwen")) {
     config.compat = QWEN_COMPAT;
-    return;
+    return true;
   }
   if (id.startsWith("mimo-")) {
     config.compat = MIMO_COMPAT;
-    return;
+    return true;
   }
   if (id.startsWith("hy3")) {
     config.compat = HY3_COMPAT;
-    return;
+    return true;
   }
-  if (id === "grok-4.5") {
-    if (api === "openai-responses") {
-      config.compat = { supportsLongCacheRetention: false };
-      config.thinkingLevelMap = GROK_45_THINKING_LEVEL_MAP;
-    }
-    return;
+  return false;
+}
+
+function applyGrokOverride(config: ChatModelConfig, api: Api): void {
+  if (config.id !== "grok-4.5") return;
+  if (api === "openai-responses") {
+    config.compat = { supportsLongCacheRetention: false };
+    config.thinkingLevelMap = GROK_45_THINKING_LEVEL_MAP;
   }
+}
+
+function applyFamilyOverrides(config: ChatModelConfig, api: Api): void {
+  if (applyGptGlmOverrides(config)) return;
+  if (applyChineseFamilyOverrides(config)) return;
+  applyGrokOverride(config, api);
 }
 
 const BRAND_DISPLAY_NAMES: Record<string, string> = {
@@ -259,42 +272,111 @@ export function guessDisplayName(id: string): string {
   return tokens.join(" ");
 }
 
-function toModelConfig(entry: GatewayModelObject): ProviderModelConfig {
-  const api = pickApi(entry);
-  const capabilities = entry.capabilities;
-  const hasImage = capabilities?.supported_input_modalities?.includes("image") ?? false;
-  const input = hasImage ? (["text", "image"] as ("text" | "image")[]) : (["text"] as ("text" | "image")[]);
+type GatewayCost = {
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+};
 
+type ModelInputModalities = ("text" | "image")[];
+
+function hasImageInput(capabilities: GatewayCapabilities | undefined): boolean {
+  const modalities = capabilities?.supported_input_modalities;
+  return modalities?.includes("image") ?? false;
+}
+
+function resolveModelInput(capabilities: GatewayCapabilities | undefined): ModelInputModalities {
+  return hasImageInput(capabilities) ? ["text", "image"] : ["text"];
+}
+
+function gatewayCostRate(tier: GatewayCostTier | undefined, key: "input" | "output" | "cache_read"): number {
+  return tier?.[key] ?? 0;
+}
+
+function resolveCost(entry: GatewayModelObject): GatewayCost {
   const tier = entry.cost?.[0];
-  const cost = {
-    input: tier?.input ?? 0,
-    output: tier?.output ?? 0,
-    cacheRead: tier?.cache_read ?? 0,
+  return {
+    input: gatewayCostRate(tier, "input"),
+    output: gatewayCostRate(tier, "output"),
+    cacheRead: gatewayCostRate(tier, "cache_read"),
     cacheWrite: 0,
   };
+}
 
-  if (entry.supported_formats?.some((format) => format === "typesafe-systemone" || format === "typesafe-system-one")) {
-    return {
-      type: "classifier",
-      id: entry.id,
-      name: guessDisplayName(entry.id),
-      api: "typesafe-system-one",
-      input,
-      cost,
-      contextWindow: entry.context_window ?? DEFAULT_CONTEXT_WINDOW,
-    };
-  }
+function isTypesafeClassifier(entry: GatewayModelObject): boolean {
+  const formats = entry.supported_formats;
+  if (!formats) return false;
+  return formats.some((format) => format === "typesafe-systemone" || format === "typesafe-system-one");
+}
 
-  const config: ChatModelConfig = {
+function toClassifierModelConfig(
+  entry: GatewayModelObject,
+  input: ModelInputModalities,
+  cost: GatewayCost,
+): ProviderModelConfig {
+  return {
+    type: "classifier",
+    id: entry.id,
+    name: guessDisplayName(entry.id),
+    api: "typesafe-system-one",
+    input,
+    cost,
+    contextWindow: entry.context_window ?? DEFAULT_CONTEXT_WINDOW,
+  };
+}
+
+function toChatModelConfig(
+  entry: GatewayModelObject,
+  api: Api,
+  input: ModelInputModalities,
+  cost: GatewayCost,
+): ChatModelConfig {
+  return {
     id: entry.id,
     name: guessDisplayName(entry.id),
     api,
-    reasoning: capabilities?.supports_reasoning ?? true,
+    reasoning: entry.capabilities?.supports_reasoning ?? true,
     input,
     cost,
     contextWindow: entry.context_window ?? DEFAULT_CONTEXT_WINDOW,
     maxTokens: DEFAULT_MAX_TOKENS,
   };
+}
+
+function applyDeveloperRoleCompat(config: ChatModelConfig, capabilities: GatewayCapabilities | undefined): void {
+  config.compat = { ...config.compat, supportsDeveloperRole: capabilities?.supports_developer_role ?? true };
+}
+
+function levelOrHidden(levels: ReadonlySet<string>, level: string): string | null {
+  return levels.has(level) ? level : null;
+}
+
+function applyGroupThinkingLevels(config: ChatModelConfig, capabilities: GatewayCapabilities | undefined): void {
+  const available = capabilities?.available_thinking_levels;
+  if (!config.id.startsWith("group:") || !available) return;
+  const levels = new Set(available);
+  config.thinkingLevelMap = {
+    minimal: levelOrHidden(levels, "minimal"),
+    low: levelOrHidden(levels, "low"),
+    medium: levelOrHidden(levels, "medium"),
+    high: levelOrHidden(levels, "high"),
+    xhigh: levelOrHidden(levels, "xhigh"),
+    max: levelOrHidden(levels, "max"),
+  };
+}
+
+function toModelConfig(entry: GatewayModelObject): ProviderModelConfig {
+  const api = pickApi(entry);
+  const capabilities = entry.capabilities;
+  const input = resolveModelInput(capabilities);
+  const cost = resolveCost(entry);
+
+  if (isTypesafeClassifier(entry)) {
+    return toClassifierModelConfig(entry, input, cost);
+  }
+
+  const config = toChatModelConfig(entry, api, input, cost);
 
   if (api === "anthropic-messages") {
     config.baseUrl = GATEWAY_ROOT_BASE_URL;
@@ -302,19 +384,8 @@ function toModelConfig(entry: GatewayModelObject): ProviderModelConfig {
 
   applyFamilyOverrides(config, api);
 
-  config.compat = { ...config.compat, supportsDeveloperRole: capabilities?.supports_developer_role ?? true };
-
-  if (config.id.startsWith("group:") && capabilities?.available_thinking_levels) {
-    const levels = new Set(capabilities.available_thinking_levels);
-    config.thinkingLevelMap = {
-      minimal: levels.has("minimal") ? "minimal" : null,
-      low: levels.has("low") ? "low" : null,
-      medium: levels.has("medium") ? "medium" : null,
-      high: levels.has("high") ? "high" : null,
-      xhigh: levels.has("xhigh") ? "xhigh" : null,
-      max: levels.has("max") ? "max" : null,
-    };
-  }
+  applyDeveloperRoleCompat(config, capabilities);
+  applyGroupThinkingLevels(config, capabilities);
 
   return config;
 }

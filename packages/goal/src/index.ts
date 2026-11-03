@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url";
 import type { AssistantMessage } from "@earendil-works/pi-ai";
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { GOAL_UPDATE_EVENT, isExtensionDisabled, isStaleCtxError } from "@htwang-contrib/common";
 import { Type } from "@sinclair/typebox";
 import { parseGoalCommand } from "./goal/command.ts";
@@ -62,14 +62,19 @@ function extractAssistantUsage(messages: unknown[]): TokenUsageSnapshot {
 }
 
 function lastAssistantStopReason(messages: unknown[]): { stopReason: string; errorMessage?: string } | null {
+  const m = lastAssistantMessage(messages);
+  if (!m) return null;
+  const stopReason = typeof m.stopReason === "string" ? (m.stopReason as string) : "stop";
+  const errorMessage = typeof m.errorMessage === "string" ? (m.errorMessage as string) : undefined;
+  return { stopReason, errorMessage };
+}
+
+function lastAssistantMessage(messages: unknown[]): Record<string, unknown> | undefined {
   for (let i = messages.length - 1; i >= 0; i--) {
     const m = messages[i] as Record<string, unknown>;
-    if (m.role !== "assistant") continue;
-    const stopReason = typeof m.stopReason === "string" ? (m.stopReason as string) : "stop";
-    const errorMessage = typeof m.errorMessage === "string" ? (m.errorMessage as string) : undefined;
-    return { stopReason, errorMessage };
+    if (m.role === "assistant") return m;
   }
-  return null;
+  return undefined;
 }
 
 export default function initGoal(pi: ExtensionAPI): void {
@@ -159,36 +164,56 @@ export default function initGoal(pi: ExtensionAPI): void {
     widgetCtx = ctx;
     resetGoalRuntime();
     try {
-      const ref = getStoreRef(ctx);
-      const goal = readGoal(ref);
-
-      let liveGoal: Goal | null = goal;
-      if (goal?.status === "active") {
-        liveGoal = reopenActiveInterval(ref) ?? goal;
-      }
-
-      emitGoalUpdate(liveGoal);
-
-      if (liveGoal && shouldQueueGoalContinuationWhenIdle(liveGoal, ctx.isIdle(), ctx.hasPendingMessages())) {
-        queueContinuation(liveGoal);
-      }
-
-      if (event.reason === "resume" && liveGoal?.status === "paused" && ctx.hasUI) {
-        const choice = await ctx.ui.select(`Goal is paused: "${liveGoal.objective}". Resume it?`, [
-          "Resume",
-          "Keep paused",
-        ]);
-        if (choice === "Resume") {
-          const updated = updateGoal(ref, { status: "active" });
-          emitGoalUpdate(updated);
-          ctx.ui.notify(`Goal resumed: ${updated.objective}`, "info");
-        }
-      }
+      await restoreGoalOnSessionStart(event, ctx);
     } catch (e) {
       if (isStaleCtxError(e)) return;
       throw e;
     }
   });
+
+  async function restoreGoalOnSessionStart(event: { reason: string }, ctx: ExtensionContext): Promise<void> {
+    const ref = getStoreRef(ctx);
+    const liveGoal = liveGoalOnStart(ref);
+    emitGoalUpdate(liveGoal);
+    queueContinuationIfIdle(liveGoal, ctx);
+    await offerResumeIfPaused(event, liveGoal, ref, ctx);
+  }
+
+  function liveGoalOnStart(ref: GoalStoreRef): Goal | null {
+    const goal = readGoal(ref);
+    if (goal?.status !== "active") return goal;
+    return reopenActiveInterval(ref) ?? goal;
+  }
+
+  function queueContinuationIfIdle(goal: Goal | null, ctx: ExtensionContext): void {
+    if (!goal) return;
+    if (shouldQueueGoalContinuationWhenIdle(goal, ctx.isIdle(), ctx.hasPendingMessages())) {
+      queueContinuation(goal);
+    }
+  }
+
+  async function offerResumeIfPaused(
+    event: { reason: string },
+    goal: Goal | null,
+    ref: GoalStoreRef,
+    ctx: ExtensionContext,
+  ): Promise<void> {
+    if (!pausedGoalResumable(event, goal, ctx)) return;
+    await offerPausedGoalResume(goal!, ref, ctx);
+  }
+
+  function pausedGoalResumable(event: { reason: string }, goal: Goal | null, ctx: ExtensionContext): boolean {
+    if (event.reason !== "resume" || !ctx.hasUI) return false;
+    return goal?.status === "paused";
+  }
+
+  async function offerPausedGoalResume(goal: Goal, ref: GoalStoreRef, ctx: ExtensionContext): Promise<void> {
+    const choice = await ctx.ui.select(`Goal is paused: "${goal.objective}". Resume it?`, ["Resume", "Keep paused"]);
+    if (choice !== "Resume") return;
+    const updated = updateGoal(ref, { status: "active" });
+    emitGoalUpdate(updated);
+    ctx.ui.notify(`Goal resumed: ${updated.objective}`, "info");
+  }
 
   pi.on("turn_start", () => {
     continuationGuard.clear();
@@ -200,59 +225,101 @@ export default function initGoal(pi: ExtensionAPI): void {
 
   pi.on("agent_end", (event, ctx) => {
     const usage = extractAssistantUsage(event.messages);
+    handleAgentEnd(event.messages, usage, ctx);
+  });
 
+  function handleAgentEnd(messages: unknown[], usage: TokenUsageSnapshot, ctx: ExtensionContext): void {
     try {
-      const ref = getStoreRef(ctx);
-      let goal: Goal | null = readGoal(ref);
-      if (goal) {
-        goal = accountGoalUsage(ref, usage, "agentEnd");
-        emitGoalUpdate(goal);
-      }
-
-      const last = lastAssistantStopReason(event.messages);
-
-      if (last?.stopReason === "error") {
-        noteRecoveryError(recoveryState, last.errorMessage ?? "unknown provider error");
-        const cfg = loadGoalConfig();
-        const count = recoveryState.consecutiveErrors;
-        if (goal && goal.status === "active" && count >= cfg.maxConsecutiveErrors) {
-          const paused = updateGoal(ref, { status: "paused" });
-          emitGoalUpdate(paused);
-          resetRecovery(recoveryState);
-          ctx.ui.notify(
-            `Goal paused after ${count} consecutive errors. Last: ${last.errorMessage ?? "unknown"}. Use /goal resume to retry.`,
-            "warning",
-          );
-          return;
-        }
-        ctx.ui.notify(
-          `Goal hit a provider error (${count}/${cfg.maxConsecutiveErrors}): ${last.errorMessage ?? "unknown"}. Auto-continuation paused; the host may still retry.`,
-          "warning",
-        );
-        return;
-      }
-
-      if (last?.stopReason === "aborted") {
-        return;
-      }
-
-      resetRecovery(recoveryState);
-
-      if (!goal) return;
-
-      if (shouldQueueBudgetLimitedPrompt(goal)) {
-        queueBudgetLimited(goal);
-        return;
-      }
-
-      if (shouldQueueGoalContinuationAfterAgentEnd(goal, ctx.hasPendingMessages())) {
-        queueContinuation(goal);
-      }
+      runAgentEndUpdate(messages, usage, ctx);
     } catch (e) {
       if (isStaleCtxError(e)) return;
       // goal may have been cleared during the turn
     }
-  });
+  }
+
+  function runAgentEndUpdate(messages: unknown[], usage: TokenUsageSnapshot, ctx: ExtensionContext): void {
+    const ref = getStoreRef(ctx);
+    const goal = accountAgentEndUsage(ref, usage);
+    const last = lastAssistantStopReason(messages);
+    if (last?.stopReason === "error") {
+      handleAgentError(ref, goal, last, ctx);
+      return;
+    }
+    continueAfterAgentEnd(goal, last, ctx);
+  }
+
+  function accountAgentEndUsage(ref: GoalStoreRef, usage: TokenUsageSnapshot): Goal | null {
+    let goal: Goal | null = readGoal(ref);
+    if (goal) {
+      goal = accountGoalUsage(ref, usage, "agentEnd");
+      emitGoalUpdate(goal);
+    }
+    return goal;
+  }
+
+  function continueAfterAgentEnd(
+    goal: Goal | null,
+    last: { stopReason: string; errorMessage?: string } | null,
+    ctx: ExtensionContext,
+  ): void {
+    if (last?.stopReason === "aborted") return;
+    resetRecovery(recoveryState);
+    if (!goal) return;
+    queueAgentEndContinuation(goal, ctx);
+  }
+
+  function queueAgentEndContinuation(goal: Goal, ctx: ExtensionContext): void {
+    if (shouldQueueBudgetLimitedPrompt(goal)) {
+      queueBudgetLimited(goal);
+      return;
+    }
+    if (shouldQueueGoalContinuationAfterAgentEnd(goal, ctx.hasPendingMessages())) {
+      queueContinuation(goal);
+    }
+  }
+
+  function handleAgentError(
+    ref: GoalStoreRef,
+    goal: Goal | null,
+    last: { stopReason: string; errorMessage?: string },
+    ctx: ExtensionContext,
+  ): void {
+    noteRecoveryError(recoveryState, last.errorMessage ?? "unknown provider error");
+    const cfg = loadGoalConfig();
+    const count = recoveryState.consecutiveErrors;
+    if (shouldPauseGoal(goal, count, cfg.maxConsecutiveErrors)) {
+      pauseGoalOnError(ref, ctx, last, count);
+      return;
+    }
+    ctx.ui.notify(
+      `Goal hit a provider error (${count}/${cfg.maxConsecutiveErrors}): ${last.errorMessage ?? "unknown"}. Auto-continuation paused; the host may still retry.`,
+      "warning",
+    );
+  }
+
+  function shouldPauseGoal(goal: Goal | null, count: number, max: number): boolean {
+    if (!isGoalActive(goal)) return false;
+    return count >= max;
+  }
+
+  function isGoalActive(goal: Goal | null): boolean {
+    return goal?.status === "active";
+  }
+
+  function pauseGoalOnError(
+    ref: GoalStoreRef,
+    ctx: ExtensionContext,
+    last: { errorMessage?: string },
+    count: number,
+  ): void {
+    const paused = updateGoal(ref, { status: "paused" });
+    emitGoalUpdate(paused);
+    resetRecovery(recoveryState);
+    ctx.ui.notify(
+      `Goal paused after ${count} consecutive errors. Last: ${last.errorMessage ?? "unknown"}. Use /goal resume to retry.`,
+      "warning",
+    );
+  }
 
   pi.on("session_shutdown", (_event, ctx) => {
     widgetCtx = null;
@@ -278,81 +345,99 @@ export default function initGoal(pi: ExtensionAPI): void {
     handler: async (rawArgs, ctx) => {
       const ref = getStoreRef(ctx);
       const cmd = parseGoalCommand(rawArgs);
-
-      switch (cmd.kind) {
-        case "show": {
-          const goal = readGoal(ref);
-          if (!goal) {
-            ctx.ui.notify("No active goal. Use /goal <objective> to set one.", "info");
-            return;
-          }
-          ctx.ui.notify(formatGoalForTool(goal), "info");
-          return;
-        }
-
-        case "setObjective": {
-          const objective = validateObjective(cmd.objective);
-          const existing = readGoal(ref);
-          if (existing) {
-            const choice = await ctx.ui.select("Goal already exists. Replace it?", ["Replace", "Cancel"]);
-            if (choice !== "Replace") {
-              ctx.ui.notify("Goal unchanged.", "info");
-              return;
-            }
-            clearGoal(ref);
-          }
-          resetGoalRuntime();
-          const goal = createGoal(ref, objective, null);
-          ctx.ui.notify(`Goal set: ${goal.objective}`, "info");
-          emitGoalUpdate(goal);
-          if (shouldQueueGoalContinuationWhenIdle(goal, ctx.isIdle(), ctx.hasPendingMessages())) {
-            queueContinuation(goal);
-          }
-          return;
-        }
-
-        case "setStatus": {
-          const goal = readGoal(ref);
-          if (!goal) {
-            ctx.ui.notify("No goal to update.", "warning");
-            return;
-          }
-          if (cmd.status === "paused" && goal.status !== "active") {
-            ctx.ui.notify(`Goal is already ${goal.status}, cannot pause.`, "warning");
-            return;
-          }
-          if (cmd.status === "active" && goal.status === "active") {
-            ctx.ui.notify("Goal is already active.", "info");
-            return;
-          }
-          const updated = updateGoal(ref, { status: cmd.status });
-          const label = cmd.status === "paused" ? "paused" : "resumed";
-          ctx.ui.notify(`Goal ${label}: ${updated.objective}`, "info");
-          emitGoalUpdate(updated);
-          if (cmd.status === "active") {
-            resetGoalRuntime();
-            if (shouldQueueGoalContinuationWhenIdle(updated, ctx.isIdle(), ctx.hasPendingMessages())) {
-              queueContinuation(updated);
-            }
-          }
-          return;
-        }
-
-        case "clear": {
-          const goal = readGoal(ref);
-          if (!goal) {
-            ctx.ui.notify("No goal to clear.", "info");
-            return;
-          }
-          clearGoal(ref);
-          clearContinuationState();
-          ctx.ui.notify("Goal cleared.", "info");
-          emitGoalUpdate(null);
-          return;
-        }
-      }
+      if (cmd.kind === "show") return showGoalCommand(ref, ctx);
+      if (cmd.kind === "clear") return clearGoalCommand(ref, ctx);
+      if (cmd.kind === "setObjective") return setGoalCommand(ref, ctx, cmd.objective);
+      return setGoalStatusCommand(ref, ctx, cmd.status);
     },
   });
+
+  function showGoalCommand(ref: GoalStoreRef, ctx: ExtensionCommandContext): void {
+    const goal = readGoal(ref);
+    if (!goal) {
+      ctx.ui.notify("No active goal. Use /goal <objective> to set one.", "info");
+      return;
+    }
+    ctx.ui.notify(formatGoalForTool(goal), "info");
+  }
+
+  async function setGoalCommand(ref: GoalStoreRef, ctx: ExtensionCommandContext, objective: string): Promise<void> {
+    const validated = validateObjective(objective);
+    const existing = readGoal(ref);
+    if (existing && !(await confirmGoalReplace(ctx))) return;
+    if (existing) clearGoal(ref);
+    resetGoalRuntime();
+    const goal = createGoal(ref, validated, null);
+    ctx.ui.notify(`Goal set: ${goal.objective}`, "info");
+    emitGoalUpdate(goal);
+    queueContinuationWhenIdle(goal, ctx);
+  }
+
+  async function confirmGoalReplace(ctx: ExtensionCommandContext): Promise<boolean> {
+    const choice = await ctx.ui.select("Goal already exists. Replace it?", ["Replace", "Cancel"]);
+    if (choice !== "Replace") {
+      ctx.ui.notify("Goal unchanged.", "info");
+      return false;
+    }
+    return true;
+  }
+
+  function setGoalStatusCommand(ref: GoalStoreRef, ctx: ExtensionCommandContext, status: "active" | "paused"): void {
+    const goal = readGoal(ref);
+    if (!goal) {
+      ctx.ui.notify("No goal to update.", "warning");
+      return;
+    }
+    if (goalStatusTransitionBlocked(status, goal.status)) {
+      notifyBlockedStatus(ctx, status, goal.status);
+      return;
+    }
+    const updated = updateGoal(ref, { status });
+    notifyGoalStatus(ctx, status, updated);
+    emitGoalUpdate(updated);
+    if (status === "active") resumeGoalRuntime(updated, ctx);
+  }
+
+  function goalStatusTransitionBlocked(status: "active" | "paused", current: string): boolean {
+    if (status === "paused" && current !== "active") return true;
+    return status === "active" && current === "active";
+  }
+
+  function notifyBlockedStatus(ctx: ExtensionCommandContext, status: "active" | "paused", current: string): void {
+    if (status === "paused") {
+      ctx.ui.notify(`Goal is already ${current}, cannot pause.`, "warning");
+      return;
+    }
+    ctx.ui.notify("Goal is already active.", "info");
+  }
+
+  function notifyGoalStatus(ctx: ExtensionCommandContext, status: "active" | "paused", goal: Goal): void {
+    const label = status === "paused" ? "paused" : "resumed";
+    ctx.ui.notify(`Goal ${label}: ${goal.objective}`, "info");
+  }
+
+  function resumeGoalRuntime(goal: Goal, ctx: ExtensionCommandContext): void {
+    resetGoalRuntime();
+    queueContinuationWhenIdle(goal, ctx);
+  }
+
+  function queueContinuationWhenIdle(goal: Goal, ctx: ExtensionCommandContext): void {
+    if (shouldQueueGoalContinuationWhenIdle(goal, ctx.isIdle(), ctx.hasPendingMessages())) {
+      queueContinuation(goal);
+    }
+  }
+
+  function clearGoalCommand(ref: GoalStoreRef, ctx: ExtensionCommandContext): void {
+    const goal = readGoal(ref);
+    if (!goal) {
+      ctx.ui.notify("No goal to clear.", "info");
+      return;
+    }
+    clearGoal(ref);
+    clearContinuationState();
+    ctx.ui.notify("Goal cleared.", "info");
+    emitGoalUpdate(null);
+  }
 
   // --- Tools ---
 

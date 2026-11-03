@@ -1,6 +1,6 @@
 import { writeFileSync } from "node:fs";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { Container } from "@earendil-works/pi-tui";
+import { type Component, Container } from "@earendil-works/pi-tui";
 
 interface ComponentStats {
   calls: number;
@@ -44,28 +44,40 @@ function recordComponent(name: string, ms: number): void {
   }
 }
 
+function renderChildLines(child: Component, width: number): string[] {
+  const childStart = performance.now();
+  const childLines = child.render(width);
+  recordComponent(child.constructor?.name ?? "<anonymous>", performance.now() - childStart);
+  return childLines;
+}
+
+function collectChildLines(children: Component[], width: number): string[] {
+  const lines: string[] = [];
+  for (const child of children) {
+    for (const line of renderChildLines(child, width)) {
+      lines.push(line);
+    }
+  }
+  return lines;
+}
+
+function recordFrame(ms: number, lineCount: number): void {
+  frames++;
+  frameTotalMs += ms;
+  if (ms > frameMaxMs) frameMaxMs = ms;
+  if (frameSamples.length < MAX_FRAME_SAMPLES) {
+    frameSamples.push({ ms, lines: lineCount });
+  }
+}
+
 function instrumentedRender(this: Container, width: number): string[] {
   const isOutermost = renderDepth === 0;
   renderDepth++;
   const t0 = performance.now();
   try {
-    const lines: string[] = [];
-    for (const child of this.children) {
-      const childStart = performance.now();
-      const childLines = child.render(width);
-      recordComponent(child.constructor?.name ?? "<anonymous>", performance.now() - childStart);
-      for (const line of childLines) {
-        lines.push(line);
-      }
-    }
+    const lines = collectChildLines(this.children, width);
     if (isOutermost) {
-      const ms = performance.now() - t0;
-      frames++;
-      frameTotalMs += ms;
-      if (ms > frameMaxMs) frameMaxMs = ms;
-      if (frameSamples.length < MAX_FRAME_SAMPLES) {
-        frameSamples.push({ ms, lines: lines.length });
-      }
+      recordFrame(performance.now() - t0, lines.length);
     }
     return lines;
   } finally {
@@ -129,6 +141,29 @@ function removePatch(): void {
   patched = false;
 }
 
+function startSampling(ctx: ExtensionContext): void {
+  resetStats();
+  installPatch();
+  ctx.ui.notify("render-probe: sampling started. Type around, then /render-probe stop.", "info");
+}
+
+function reportSampling(ctx: ExtensionContext): void {
+  if (!patched) {
+    ctx.ui.notify("render-probe: not sampling. Run /render-probe start first.", "warning");
+    return;
+  }
+  report(ctx);
+}
+
+function stopSampling(ctx: ExtensionContext): void {
+  if (!patched) {
+    ctx.ui.notify("render-probe: not sampling.", "warning");
+    return;
+  }
+  removePatch();
+  report(ctx);
+}
+
 export default function renderProbe(pi: ExtensionAPI): void {
   pi.registerCommand("render-probe", {
     description:
@@ -136,26 +171,15 @@ export default function renderProbe(pi: ExtensionAPI): void {
     async handler(args, ctx) {
       const sub = args.trim();
       if (sub === "start") {
-        resetStats();
-        installPatch();
-        ctx.ui.notify("render-probe: sampling started. Type around, then /render-probe stop.", "info");
+        startSampling(ctx);
         return;
       }
       if (sub === "report") {
-        if (!patched) {
-          ctx.ui.notify("render-probe: not sampling. Run /render-probe start first.", "warning");
-          return;
-        }
-        report(ctx);
+        reportSampling(ctx);
         return;
       }
       if (sub === "stop") {
-        if (!patched) {
-          ctx.ui.notify("render-probe: not sampling.", "warning");
-          return;
-        }
-        removePatch();
-        report(ctx);
+        stopSampling(ctx);
         return;
       }
       ctx.ui.notify("Usage: /render-probe start | stop | report", "info");

@@ -5,6 +5,7 @@ import { executeSideCall } from "@htwang-contrib/common";
 import {
   commit,
   countChanges,
+  type DiffResult,
   getDiff,
   getRepoRoot,
   hasStagedChanges,
@@ -19,6 +20,10 @@ import { showCommitterOverlay } from "./widget.ts";
 
 type AnyModel = Model<any>;
 
+type PreparationFailure = { status: "aborted" } | { status: "error"; message: string };
+type PreparationSuccess = { status: "ready"; repoRoot: string; model: AnyModel; diff: DiffResult };
+type Preparation = PreparationFailure | PreparationSuccess;
+
 export async function handleCommit(args: string, ctx: ExtensionCommandContext): Promise<void> {
   if (!ctx.hasUI) {
     ctx.ui.notify("/commit requires an interactive terminal.", "warning");
@@ -26,7 +31,47 @@ export async function handleCommit(args: string, ctx: ExtensionCommandContext): 
   }
 
   const controller = new AbortController();
-  const progress: CommitterProgress = {
+  const progress = createProgress();
+  const { overlayPromise, ctrl } = await showCommitterOverlay(ctx, progress, controller);
+
+  try {
+    const preparation = await prepareRun(ctx, progress, ctrl, controller.signal);
+    if (preparation.status !== "ready") {
+      await finishFailedPreparation(preparation, progress, ctrl, overlayPromise);
+      return;
+    }
+
+    const shouldGroup = preparation.diff.files.length >= loadConfig().groupingThreshold && !args.includes("--single");
+    if (shouldGroup) {
+      await commitGrouped(
+        preparation.repoRoot,
+        preparation.diff.diff,
+        preparation.model,
+        ctx,
+        progress,
+        ctrl,
+        controller.signal,
+      );
+    } else {
+      await commitSingle(
+        preparation.repoRoot,
+        preparation.diff.diff,
+        preparation.model,
+        ctx,
+        progress,
+        ctrl,
+        controller.signal,
+      );
+    }
+  } catch (err) {
+    reportRunError(err, progress, ctrl, controller.signal);
+  }
+
+  await overlayPromise;
+}
+
+function createProgress(): CommitterProgress {
+  return {
     phase: "preparing",
     statusMessage: "",
     model: undefined,
@@ -36,79 +81,86 @@ export async function handleCommit(args: string, ctx: ExtensionCommandContext): 
     commitLog: [],
     startTime: Date.now(),
   };
+}
 
-  const { overlayPromise, ctrl } = await showCommitterOverlay(ctx, progress, controller);
-
-  try {
-    if (controller.signal.aborted) return;
-
-    progress.statusMessage = "Checking repository...";
-    ctrl.invalidate();
-
-    const repoRoot = await getRepoRoot(ctx.cwd, controller.signal);
-    if (!repoRoot) {
-      progress.phase = "error";
-      progress.errorMessage = "Not a git repository.";
-      ctrl.invalidate();
-      await overlayPromise;
-      return;
-    }
-
-    progress.statusMessage = "Resolving model...";
-    ctrl.invalidate();
-
-    const model = resolveCommitModel(ctx);
-    if (!model) {
-      progress.phase = "error";
-      progress.errorMessage = "No model available for commit generation.";
-      ctrl.invalidate();
-      await overlayPromise;
-      return;
-    }
-    progress.model = `${model.provider}/${model.id}`;
-
-    progress.statusMessage = "Checking changes...";
-    ctrl.invalidate();
-
-    const changeCount = await countChanges(repoRoot, controller.signal);
-    if (changeCount === 0) {
-      progress.phase = "error";
-      progress.errorMessage = "No changes to commit.";
-      ctrl.invalidate();
-      await overlayPromise;
-      return;
-    }
-
-    progress.statusMessage = "Staging changes...";
-    ctrl.invalidate();
-
-    await stageAll(repoRoot, controller.signal);
-
-    const diff = await getDiff(repoRoot, 1_000_000, controller.signal);
-    progress.filesTotal = diff.files.length;
-    progress.diffStat = diff.stat;
-    ctrl.invalidate();
-
-    if (controller.signal.aborted) return;
-
-    const shouldGroup = diff.files.length >= loadConfig().groupingThreshold && !args.includes("--single");
-
-    if (shouldGroup) {
-      await commitGrouped(repoRoot, diff.diff, model, ctx, progress, ctrl, controller.signal);
-    } else {
-      await commitSingle(repoRoot, diff.diff, model, ctx, progress, ctrl, controller.signal);
-    }
-  } catch (err) {
-    if (controller.signal.aborted) {
-      progress.phase = "cancelled";
-    } else {
-      progress.phase = "error";
-      progress.errorMessage = err instanceof Error ? err.message : String(err);
-    }
-    ctrl.invalidate();
-  }
-
+async function finishFailedPreparation(
+  preparation: PreparationFailure,
+  progress: CommitterProgress,
+  ctrl: CommitterOverlayController,
+  overlayPromise: Promise<void>,
+): Promise<void> {
+  if (preparation.status === "aborted") return;
+  progress.phase = "error";
+  progress.errorMessage = preparation.message;
+  ctrl.invalidate();
   await overlayPromise;
+}
+
+async function prepareRun(
+  ctx: ExtensionCommandContext,
+  progress: CommitterProgress,
+  ctrl: CommitterOverlayController,
+  signal: AbortSignal,
+): Promise<Preparation> {
+  if (signal.aborted) return { status: "aborted" };
+
+  progress.statusMessage = "Checking repository...";
+  ctrl.invalidate();
+
+  const repoRoot = await getRepoRoot(ctx.cwd, signal);
+  if (!repoRoot) return { status: "error", message: "Not a git repository." };
+
+  progress.statusMessage = "Resolving model...";
+  ctrl.invalidate();
+
+  const model = resolveCommitModel(ctx);
+  if (!model) return { status: "error", message: "No model available for commit generation." };
+  progress.model = `${model.provider}/${model.id}`;
+
+  return prepareChanges(repoRoot, model, progress, ctrl, signal);
+}
+
+async function prepareChanges(
+  repoRoot: string,
+  model: AnyModel,
+  progress: CommitterProgress,
+  ctrl: CommitterOverlayController,
+  signal: AbortSignal,
+): Promise<Preparation> {
+  progress.statusMessage = "Checking changes...";
+  ctrl.invalidate();
+
+  const changeCount = await countChanges(repoRoot, signal);
+  if (changeCount === 0) return { status: "error", message: "No changes to commit." };
+
+  progress.statusMessage = "Staging changes...";
+  ctrl.invalidate();
+
+  await stageAll(repoRoot, signal);
+
+  const diff = await getDiff(repoRoot, 1_000_000, signal);
+  progress.filesTotal = diff.files.length;
+  progress.diffStat = diff.stat;
+  ctrl.invalidate();
+
+  if (signal.aborted) return { status: "aborted" };
+
+  return { status: "ready", repoRoot, model, diff };
+}
+
+function reportRunError(
+  err: unknown,
+  progress: CommitterProgress,
+  ctrl: CommitterOverlayController,
+  signal: AbortSignal,
+): void {
+  if (signal.aborted) {
+    progress.phase = "cancelled";
+  } else {
+    progress.phase = "error";
+    progress.errorMessage = err instanceof Error ? err.message : String(err);
+  }
+  ctrl.invalidate();
 }
 
 async function commitTracked(
@@ -356,23 +408,34 @@ function parseGroups(response: string): CommitGroup[] {
   if (!json) return [];
 
   try {
-    const parsed = JSON.parse(json);
-    if (!Array.isArray(parsed)) return [];
-
-    const groups: CommitGroup[] = [];
-    for (const item of parsed) {
-      if (!item || typeof item !== "object" || !Array.isArray(item.files) || typeof item.message !== "string") continue;
-
-      const files = item.files.map((f: unknown) => String(f)).filter((f: string) => f.length > 0);
-      if (files.length === 0 || !item.message.trim()) continue;
-
-      groups.push({ files, message: item.message.trim() });
-    }
-
-    return groups;
+    return parseGroupItems(JSON.parse(json));
   } catch {
     return [];
   }
+}
+
+function parseGroupItems(parsed: unknown): CommitGroup[] {
+  if (!Array.isArray(parsed)) return [];
+  const groups: CommitGroup[] = [];
+  for (const item of parsed) {
+    const group = parseGroupItem(item);
+    if (group !== null) groups.push(group);
+  }
+  return groups;
+}
+
+function isGroupItem(item: unknown): item is { files: unknown[]; message: string } {
+  if (typeof item !== "object" || item === null) return false;
+  const candidate = item as { files?: unknown; message?: unknown };
+  return Array.isArray(candidate.files) && typeof candidate.message === "string";
+}
+
+function parseGroupItem(item: unknown): CommitGroup | null {
+  if (!isGroupItem(item)) return null;
+  const files = item.files.map((f: unknown) => String(f)).filter((f: string) => f.length > 0);
+  const message = item.message.trim();
+  if (files.length === 0 || !message) return null;
+  return { files, message };
 }
 
 function extractJson(text: string): string | null {

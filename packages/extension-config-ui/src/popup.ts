@@ -1,7 +1,7 @@
 import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import type { TUI } from "@earendil-works/pi-tui";
 import { Key, matchesKey } from "@earendil-works/pi-tui";
-import type { ConfigItemPreviewHandle } from "@htwang-contrib/common";
+import type { ConfigItemPreviewHandle, ConfigItemSelectOption } from "@htwang-contrib/common";
 import {
   buildSelectDisplayOptions,
   buildSettingRows,
@@ -48,6 +48,10 @@ function syncViewport(ui: UiState, itemCount: number): void {
 
 function findRowById(rows: SettingRow[], id: string): SettingRow | undefined {
   return rows.find((r) => r.id === id);
+}
+
+function isPrintableChar(data: string): boolean {
+  return data.length === 1 && data >= " " && data !== "\x7f";
 }
 
 function createConfigComponent(
@@ -185,223 +189,240 @@ function createConfigComponent(
 
   function handleInput(data: string): void {
     if (ui.editing) {
-      if (matchesKey(data, Key.escape) || matchesKey(data, "ctrl+c")) {
-        ui.editing = undefined;
-        requestRender();
-        return;
-      }
-      if (matchesKey(data, Key.enter) || matchesKey(data, "return")) {
-        saveInlineEdit();
-        return;
-      }
-      if (handleInlineEditInput(ui.editing, data)) {
-        requestRender();
-      }
+      handleEditingInput(data);
       return;
     }
-
     if (ui.selecting) {
-      const row = findRowById(rows, ui.selecting.rowId);
-      const { options: opts, canFilter } = row
-        ? buildSelectDisplayOptions(row, ui.selecting.filter)
-        : { options: [], canFilter: false };
-      const filterActive = ui.selecting.filter.length > 0;
-
-      if (matchesKey(data, Key.escape)) {
-        if (filterActive) {
-          ui.selecting.filter = "";
-          ui.selecting.selectedOptionIndex = 0;
-          ui.selecting.scroll = 0;
-        } else {
-          ui.selecting = undefined;
-        }
-        requestRender();
-        return;
-      }
-      if (canFilter && (matchesKey(data, "backspace") || matchesKey(data, "ctrl+u"))) {
-        if (matchesKey(data, "ctrl+u")) ui.selecting.filter = "";
-        else ui.selecting.filter = ui.selecting.filter.slice(0, -1);
-        ui.selecting.selectedOptionIndex = 0;
-        syncSelectScroll(ui.selecting, opts.length);
-        requestRender();
-        return;
-      }
-      if (canFilter && data.length === 1 && data >= " " && data !== "\x7f") {
-        ui.selecting.filter += data;
-        ui.selecting.selectedOptionIndex = 0;
-        syncSelectScroll(ui.selecting, opts.length);
-        requestRender();
-        return;
-      }
-      if (matchesKey(data, "up")) {
-        ui.selecting.selectedOptionIndex = Math.max(0, ui.selecting.selectedOptionIndex - 1);
-        syncSelectScroll(ui.selecting, opts.length);
-        requestRender();
-        return;
-      }
-      if (matchesKey(data, "down")) {
-        ui.selecting.selectedOptionIndex = Math.min(opts.length - 1, ui.selecting.selectedOptionIndex + 1);
-        syncSelectScroll(ui.selecting, opts.length);
-        requestRender();
-        return;
-      }
-      if (matchesKey(data, "-") || matchesKey(data, "pageUp")) {
-        ui.selecting.selectedOptionIndex = Math.max(0, ui.selecting.selectedOptionIndex - SELECT_PAGE_SIZE);
-        syncSelectScroll(ui.selecting, opts.length);
-        requestRender();
-        return;
-      }
-      if (matchesKey(data, "=") || matchesKey(data, "pageDown")) {
-        ui.selecting.selectedOptionIndex = Math.min(
-          opts.length - 1,
-          ui.selecting.selectedOptionIndex + SELECT_PAGE_SIZE,
-        );
-        syncSelectScroll(ui.selecting, opts.length);
-        requestRender();
-        return;
-      }
-      if (matchesKey(data, Key.enter) || matchesKey(data, "return")) {
-        const opt = opts[ui.selecting.selectedOptionIndex];
-        if (!opt || !row) return;
-        if (row.item.type === "select") {
-          saveSetting(row, opt.value);
-          row.currentValue = opt.value;
-          row.isExplicit = true;
-          ui.selecting = undefined;
-        } else if (row.item.type === "multiselect") {
-          const newVals = toggleMultiSelectValue(row, opt.value);
-          saveSetting(row, newVals);
-          row.currentValue = newVals;
-          row.isExplicit = true;
-        } else if (row.item.type === "reorderable") {
-          const newVals = toggleReorderableValue(row, opt.value);
-          saveSetting(row, newVals);
-          row.currentValue = newVals;
-          row.isExplicit = true;
-        }
-        requestRender();
-        return;
-      }
-      const moveSelectedReorderable = (delta: -1 | 1): boolean => {
-        const sel = ui.selecting;
-        if (!sel || row?.item.type !== "reorderable" || filterActive) return false;
-        const vals = Array.isArray(row.currentValue) ? [...row.currentValue] : [];
-        const optVal = opts[sel.selectedOptionIndex]?.value;
-        const fromIdx = vals.findIndex((v) => JSON.stringify(v) === JSON.stringify(optVal));
-        if (fromIdx < 0 || fromIdx + delta < 0 || fromIdx + delta >= vals.length) return false;
-        const newVals = moveReorderableItem(row, fromIdx, delta);
-        saveSetting(row, newVals);
-        row.currentValue = newVals;
-        row.isExplicit = true;
-        sel.selectedOptionIndex = Math.max(0, Math.min(opts.length - 1, sel.selectedOptionIndex + delta));
-        return true;
-      };
-      if (
-        row?.item.type === "reorderable" &&
-        !filterActive &&
-        (matchesKey(data, "alt+up") || matchesKey(data, "ctrl+p")) &&
-        moveSelectedReorderable(-1)
-      ) {
-        requestRender();
-        return;
-      }
-      if (
-        row?.item.type === "reorderable" &&
-        !filterActive &&
-        (matchesKey(data, "alt+down") || matchesKey(data, "ctrl+n")) &&
-        moveSelectedReorderable(1)
-      ) {
-        requestRender();
-        return;
-      }
+      handleSelectingInput(data);
       return;
     }
+    handleBrowseInput(data);
+  }
 
+  function handleEditingInput(data: string): void {
+    const editing = ui.editing;
+    if (!editing) return;
+    if (matchesKey(data, Key.escape) || matchesKey(data, "ctrl+c")) {
+      ui.editing = undefined;
+      requestRender();
+      return;
+    }
+    if (matchesKey(data, Key.enter) || matchesKey(data, "return")) {
+      saveInlineEdit();
+      return;
+    }
+    if (handleInlineEditInput(editing, data)) {
+      requestRender();
+    }
+  }
+
+  function handleSelectingInput(data: string): void {
+    const sel = ui.selecting;
+    if (!sel) return;
+    const row = findRowById(rows, sel.rowId);
+    const built = row ? buildSelectDisplayOptions(row, sel.filter) : { options: [], canFilter: false };
+
+    if (matchesKey(data, Key.escape)) {
+      exitOrClearSelectFilter(sel);
+      return;
+    }
+    if (built.canFilter && editSelectFilter(sel, built.options, data)) return;
+    if (moveSelectIndex(sel, built.options, data)) return;
+    if (confirmSelectChoice(sel, built.options, row, data)) return;
+    if (tryMoveReorderable(sel, built.options, row, sel.filter.length > 0, data)) requestRender();
+  }
+
+  function exitOrClearSelectFilter(sel: SelectingState): void {
+    if (sel.filter.length > 0) {
+      sel.filter = "";
+      sel.selectedOptionIndex = 0;
+      sel.scroll = 0;
+    } else {
+      ui.selecting = undefined;
+    }
+    requestRender();
+  }
+
+  function confirmSelectChoice(
+    sel: SelectingState,
+    opts: ConfigItemSelectOption[],
+    row: SettingRow | undefined,
+    data: string,
+  ): boolean {
+    if (!(matchesKey(data, Key.enter) || matchesKey(data, "return")) || !row) return false;
+    const opt = opts[sel.selectedOptionIndex];
+    if (opt) applySelectChoice(row, opt);
+    return true;
+  }
+
+  function editSelectFilter(sel: SelectingState, opts: ConfigItemSelectOption[], data: string): boolean {
+    if (matchesKey(data, "backspace") || matchesKey(data, "ctrl+u")) {
+      sel.filter = matchesKey(data, "ctrl+u") ? "" : sel.filter.slice(0, -1);
+      sel.selectedOptionIndex = 0;
+      syncSelectScroll(sel, opts.length);
+      requestRender();
+      return true;
+    }
+    if (isPrintableChar(data)) {
+      sel.filter += data;
+      sel.selectedOptionIndex = 0;
+      syncSelectScroll(sel, opts.length);
+      requestRender();
+      return true;
+    }
+    return false;
+  }
+
+  function moveSelectIndex(sel: SelectingState, opts: ConfigItemSelectOption[], data: string): boolean {
+    const last = opts.length - 1;
+    if (matchesKey(data, "up")) sel.selectedOptionIndex = Math.max(0, sel.selectedOptionIndex - 1);
+    else if (matchesKey(data, "down")) sel.selectedOptionIndex = Math.min(last, sel.selectedOptionIndex + 1);
+    else if (matchesKey(data, "-") || matchesKey(data, "pageUp"))
+      sel.selectedOptionIndex = Math.max(0, sel.selectedOptionIndex - SELECT_PAGE_SIZE);
+    else if (matchesKey(data, "=") || matchesKey(data, "pageDown"))
+      sel.selectedOptionIndex = Math.min(last, sel.selectedOptionIndex + SELECT_PAGE_SIZE);
+    else return false;
+    syncSelectScroll(sel, opts.length);
+    requestRender();
+    return true;
+  }
+
+  function applySelectChoice(row: SettingRow, opt: ConfigItemSelectOption): void {
+    if (row.item.type === "select") {
+      saveSetting(row, opt.value);
+      row.currentValue = opt.value;
+      row.isExplicit = true;
+      ui.selecting = undefined;
+    } else if (row.item.type === "multiselect") {
+      const newVals = toggleMultiSelectValue(row, opt.value);
+      saveSetting(row, newVals);
+      row.currentValue = newVals;
+      row.isExplicit = true;
+    } else if (row.item.type === "reorderable") {
+      const newVals = toggleReorderableValue(row, opt.value);
+      saveSetting(row, newVals);
+      row.currentValue = newVals;
+      row.isExplicit = true;
+    }
+    requestRender();
+  }
+
+  function tryMoveReorderable(
+    sel: SelectingState,
+    opts: ConfigItemSelectOption[],
+    row: SettingRow | undefined,
+    filterActive: boolean,
+    data: string,
+  ): boolean {
+    if (row?.item.type !== "reorderable" || filterActive) return false;
+    const delta = reorderMoveDelta(data);
+    if (delta === 0) return false;
+
+    const vals = Array.isArray(row.currentValue) ? [...row.currentValue] : [];
+    const optVal = opts[sel.selectedOptionIndex]?.value;
+    const fromIdx = vals.findIndex((v) => JSON.stringify(v) === JSON.stringify(optVal));
+    if (fromIdx < 0 || fromIdx + delta < 0 || fromIdx + delta >= vals.length) return false;
+    const newVals = moveReorderableItem(row, fromIdx, delta);
+    saveSetting(row, newVals);
+    row.currentValue = newVals;
+    row.isExplicit = true;
+    sel.selectedOptionIndex = Math.max(0, Math.min(opts.length - 1, sel.selectedOptionIndex + delta));
+    return true;
+  }
+
+  function reorderMoveDelta(data: string): -1 | 1 | 0 {
+    if (matchesKey(data, "alt+up") || matchesKey(data, "ctrl+p")) return -1;
+    if (matchesKey(data, "alt+down") || matchesKey(data, "ctrl+n")) return 1;
+    return 0;
+  }
+
+  function handleBrowseInput(data: string): void {
+    if (handleBrowseNavigation(data)) return;
+    handleBrowseAction(data);
+  }
+
+  function handleBrowseNavigation(data: string): boolean {
     if (matchesKey(data, Key.escape) || matchesKey(data, "ctrl+c")) {
       done();
-      return;
+      return true;
     }
-
     if (matchesKey(data, "tab") || matchesKey(data, "right")) {
       switchTab(1);
-      return;
+      return true;
     }
     if (matchesKey(data, "shift+tab") || matchesKey(data, "left")) {
       switchTab(-1);
-      return;
+      return true;
     }
-    if (matchesKey(data, "up")) {
-      ui.selected -= 1;
-      clamp();
-      requestRender();
-      return;
-    }
-    if (matchesKey(data, "down")) {
-      ui.selected += 1;
-      clamp();
-      requestRender();
-      return;
-    }
-    if (matchesKey(data, "-") || matchesKey(data, "pageUp")) {
-      ui.selected -= getLayout().listRows;
-      clamp();
-      requestRender();
-      return;
-    }
-    if (matchesKey(data, "=") || matchesKey(data, "pageDown")) {
-      ui.selected += getLayout().listRows;
-      clamp();
-      requestRender();
-      return;
-    }
-    if (matchesKey(data, "backspace")) {
-      ui.search = ui.search.slice(0, -1);
-      ui.selected = 0;
-      clamp();
-      requestRender();
-      return;
-    }
-    if (matchesKey(data, "ctrl+u")) {
-      ui.search = "";
-      ui.selected = 0;
-      clamp();
-      requestRender();
-      return;
-    }
+    return moveBrowseSelection(data);
+  }
+
+  function moveBrowseSelection(data: string): boolean {
+    const listRows = getLayout().listRows;
+    if (matchesKey(data, "up")) ui.selected -= 1;
+    else if (matchesKey(data, "down")) ui.selected += 1;
+    else if (matchesKey(data, "-") || matchesKey(data, "pageUp")) ui.selected -= listRows;
+    else if (matchesKey(data, "=") || matchesKey(data, "pageDown")) ui.selected += listRows;
+    else return false;
+    clamp();
+    requestRender();
+    return true;
+  }
+
+  function handleBrowseAction(data: string): void {
+    if (editBrowseSearch(data)) return;
     if (matchesKey(data, "delete")) {
-      const row = selectedRow();
-      if (row) {
-        resetSetting(row);
-        row.currentValue = typeof row.item.value === "function" ? (row.item.value as () => unknown)() : row.item.value;
-        row.isExplicit = false;
-      }
-      requestRender();
+      resetSelectedRow();
       return;
     }
     if (matchesKey(data, "alt+x") || matchesKey(data, "ctrl+x")) {
-      const row = selectedRow();
-      if (row) {
-        resetExtensionSettings(rows, row.extensionId);
-        for (const r of rows) {
-          if (r.extensionId === row.extensionId) {
-            r.currentValue = typeof r.item.value === "function" ? (r.item.value as () => unknown)() : r.item.value;
-            r.isExplicit = false;
-          }
-        }
-      }
-      requestRender();
+      resetSelectedExtension();
       return;
     }
     if (matchesKey(data, Key.enter) || matchesKey(data, "return")) {
       enterSelectPage();
       return;
     }
-    if (data.length === 1 && data >= " " && data !== "\x7f") {
+    if (isPrintableChar(data)) {
       ui.search += data;
       ui.selected = 0;
       clamp();
       requestRender();
     }
+  }
+
+  function editBrowseSearch(data: string): boolean {
+    if (matchesKey(data, "backspace")) ui.search = ui.search.slice(0, -1);
+    else if (matchesKey(data, "ctrl+u")) ui.search = "";
+    else return false;
+    ui.selected = 0;
+    clamp();
+    requestRender();
+    return true;
+  }
+
+  function resetSelectedRow(): void {
+    const row = selectedRow();
+    if (row) {
+      resetSetting(row);
+      row.currentValue = typeof row.item.value === "function" ? (row.item.value as () => unknown)() : row.item.value;
+      row.isExplicit = false;
+    }
+    requestRender();
+  }
+
+  function resetSelectedExtension(): void {
+    const row = selectedRow();
+    if (row) {
+      resetExtensionSettings(rows, row.extensionId);
+      for (const r of rows) {
+        if (r.extensionId === row.extensionId) {
+          r.currentValue = typeof r.item.value === "function" ? (r.item.value as () => unknown)() : r.item.value;
+          r.isExplicit = false;
+        }
+      }
+    }
+    requestRender();
   }
 
   function render(width: number): string[] {

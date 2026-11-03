@@ -12,13 +12,7 @@ export const memoryDomains = {
   execute: async (_id: string, _args: Record<string, unknown>, signal?: AbortSignal) => {
     try {
       const result = await runHat(["memory", "domains"], { signal });
-      const items = (parseListResult(result, "domains") as unknown[]).map((d: unknown) => {
-        if (typeof d === "string") return d;
-        const item = d as Record<string, unknown>;
-        const name = item.name ?? item.domain ?? item.id ?? "?";
-        const count = item.count ?? item.node_count;
-        return count !== undefined ? `${name} (${count})` : name;
-      });
+      const items = (parseListResult(result, "domains") as unknown[]).map(domainItem);
       return jsonResult(result, {
         total: items.length,
         domains: items,
@@ -28,3 +22,15 @@ export const memoryDomains = {
     }
   },
 };
+
+function domainItemName(item: Record<string, unknown>): unknown {
+  return item.name ?? item.domain ?? item.id ?? "?";
+}
+
+function domainItem(d: unknown): unknown {
+  if (typeof d === "string") return d;
+  const item = d as Record<string, unknown>;
+  const name = domainItemName(item);
+  const count = item.count ?? item.node_count;
+  return count !== undefined ? `${name} (${count})` : name;
+}

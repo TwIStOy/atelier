@@ -238,108 +238,154 @@ type GroupRole =
 // region around the component: verb-group claims rule-registered tools and
 // eligible ThoughtMembers first, then the truncation layer folds what remains
 // of over-long dense tool runs.
+type RegionSpan = { leader: number; members: number[]; thoughts: number[]; groupExpanded: boolean };
+
 function computeRegionRoles(siblings: unknown[], lo: number, hi: number): Map<number, GroupRole> {
-  const { groupToolVerbs, groupMaxVisible } = loadConfig();
+  const { groupMaxVisible } = loadConfig();
+  const verbClasses = classifyRegionSiblings(siblings, lo, hi);
+  const spans = collectVerbSpans(siblings, lo, hi, verbClasses);
+  // A group of one carries no aggregate information (it would just hide the
+  // path behind "Read 1 file"), so singleton spans render as ordinary tools.
+  // They neither claim their adjacent thoughts nor count as span-covered for
+  // the truncation layer.
+  const groupSpans = spans.filter((span) => span.members.length >= 2);
+  markRegionThoughts(siblings, lo, hi, groupSpans);
   const roles = new Map<number, GroupRole>();
+  const spanCovered = assignGroupRoles(roles, siblings, groupSpans);
+  computeTruncationRoles(siblings, lo, hi, spanCovered, groupMaxVisible, roles);
+  return roles;
+}
 
-  type VerbClass = "member" | "thought" | "transparent" | "break";
-  const verbClasses = new Map<number, VerbClass>();
+function classifyRegionSiblings(siblings: unknown[], lo: number, hi: number): Map<number, string> {
+  const { groupToolVerbs } = loadConfig();
+  const verbClasses = new Map<number, string>();
   for (let i = lo; i <= hi; i++) {
-    const sibling = siblings[i];
-    const tool = asToolExecution(sibling);
-    if (tool) {
-      if (tool.hideComponent) {
-        verbClasses.set(i, "transparent");
-      } else if (tool.expanded) {
-        // A leader expanded through its own subrow keeps heading its expanded
-        // group; any other expanded tool is Transparent to the scan.
-        const headsExpandedGroup =
-          groupToolVerbs &&
-          aggregateRuleFor(tool.toolName) !== undefined &&
-          aggregateGroupState.get(tool)?.expanded === true;
-        verbClasses.set(i, headsExpandedGroup ? "member" : "transparent");
-      } else if (groupToolVerbs && aggregateRuleFor(tool.toolName) !== undefined) {
-        verbClasses.set(i, "member");
-      } else {
-        verbClasses.set(i, "break");
-      }
-    } else if (isThoughtMember(sibling)) {
-      verbClasses.set(i, "thought");
-    } else {
-      verbClasses.set(i, "transparent");
-    }
+    verbClasses.set(i, classifyRegionSibling(siblings[i], groupToolVerbs));
   }
+  return verbClasses;
+}
 
-  const spans: { leader: number; members: number[]; thoughts: number[]; groupExpanded: boolean }[] = [];
+function classifyRegionSibling(sibling: unknown, groupToolVerbs: boolean): string {
+  const tool = asToolExecution(sibling);
+  if (tool) return classifyToolSibling(tool, groupToolVerbs);
+  if (isThoughtMember(sibling)) return "thought";
+  return "transparent";
+}
+
+function classifyToolSibling(tool: ToolExecutionPatchThis, groupToolVerbs: boolean): string {
+  if (tool.hideComponent) return "transparent";
+  if (tool.expanded) {
+    // A leader expanded through its own subrow keeps heading its expanded
+    // group; any other expanded tool is Transparent to the scan.
+    const headsExpandedGroup =
+      groupToolVerbs &&
+      aggregateRuleFor(tool.toolName) !== undefined &&
+      aggregateGroupState.get(tool)?.expanded === true;
+    return headsExpandedGroup ? "member" : "transparent";
+  }
+  if (groupToolVerbs && aggregateRuleFor(tool.toolName) !== undefined) return "member";
+  return "break";
+}
+
+function collectVerbSpans(siblings: unknown[], lo: number, hi: number, verbClasses: Map<number, string>): RegionSpan[] {
+  const spans: RegionSpan[] = [];
   let i = lo;
   while (i <= hi) {
     if (verbClasses.get(i) !== "member") {
       i++;
       continue;
     }
-    const leaderTool = asToolExecution(siblings[i]) as ToolExecutionPatchThis;
-    const groupExpanded = aggregateGroupState.get(leaderTool)?.expanded === true;
-    const members = [i];
-    const thoughts: number[] = [];
-    let lastMember = i;
-    let j = i + 1;
-    for (; j <= hi; j++) {
-      const cls = verbClasses.get(j);
-      if (cls === "member") {
-        members.push(j);
-        lastMember = j;
-      } else if (cls === "thought") {
-        thoughts.push(j);
-      } else if (cls === "transparent" && groupExpanded) {
-        // An expanded group keeps counting individually expanded members; they
-        // render their full rows in place instead of a subrow.
-        const tool = asToolExecution(siblings[j]);
-        if (tool?.expanded && !tool.hideComponent && aggregateRuleFor(tool.toolName) !== undefined) {
-          members.push(j);
-          lastMember = j;
-        }
-      } else if (cls !== "transparent") {
-        break;
-      }
-    }
-    spans.push({ leader: i, members, thoughts: thoughts.filter((t) => t < lastMember), groupExpanded });
-    i = j;
+    const collected = collectSpanFrom(siblings, i, hi, verbClasses);
+    spans.push(collected.span);
+    i = collected.next;
   }
+  return spans;
+}
 
-  // A group of one carries no aggregate information (it would just hide the
-  // path behind "Read 1 file"), so singleton spans render as ordinary tools.
-  // They neither claim their adjacent thoughts nor count as span-covered for
-  // the truncation layer.
-  const groupSpans = spans.filter((span) => span.members.length >= 2);
+function collectSpanFrom(
+  siblings: unknown[],
+  leader: number,
+  hi: number,
+  verbClasses: Map<number, string>,
+): { span: RegionSpan; next: number } {
+  const leaderTool = asToolExecution(siblings[leader]) as ToolExecutionPatchThis;
+  const groupExpanded = aggregateGroupState.get(leaderTool)?.expanded === true;
+  const members = [leader];
+  const thoughts: number[] = [];
+  let lastMember = leader;
+  let j = leader + 1;
+  for (; j <= hi; j++) {
+    const cls = verbClasses.get(j);
+    if (cls === "member") {
+      members.push(j);
+      lastMember = j;
+    } else if (cls === "thought") {
+      thoughts.push(j);
+    } else if (cls === "transparent" && groupExpanded && extendsExpandedSpan(siblings[j])) {
+      // An expanded group keeps counting individually expanded members; they
+      // render their full rows in place instead of a subrow.
+      members.push(j);
+      lastMember = j;
+    } else if (cls !== "transparent") {
+      break;
+    }
+  }
+  const span: RegionSpan = { leader, members, thoughts: thoughts.filter((t) => t < lastMember), groupExpanded };
+  return { span, next: j };
+}
 
+function extendsExpandedSpan(sibling: unknown): boolean {
+  const tool = asToolExecution(sibling);
+  return tool?.expanded === true && !tool.hideComponent && aggregateRuleFor(tool.toolName) !== undefined;
+}
+
+function markRegionThoughts(siblings: unknown[], lo: number, hi: number, groupSpans: RegionSpan[]): void {
   const claimedThoughts = new Set<number>();
   const expandedThoughts = new Set<number>();
   for (const span of groupSpans) {
-    if (span.groupExpanded) {
-      const lastMember = span.members[span.members.length - 1] ?? span.leader;
-      for (let k = span.leader + 1; k < lastMember; k++) {
-        if (isThoughtMember(siblings[k]) || isThoughtTransparent(siblings[k])) expandedThoughts.add(k);
-      }
-      continue;
-    }
-    for (const t of span.thoughts) claimedThoughts.add(t);
+    collectSpanThoughts(siblings, span, claimedThoughts, expandedThoughts);
   }
-  for (let k = lo; k <= hi; k++) {
-    if (verbClasses.get(k) === "thought") {
-      setThoughtMemberClaimed(siblings[k] as object, claimedThoughts.has(k));
-    }
-    if (isThoughtMember(siblings[k]) || isThoughtTransparent(siblings[k])) {
-      setThoughtGroupExpanded(siblings[k] as object, expandedThoughts.has(k));
-    }
-  }
+  applyRegionThoughtMarkers(siblings, lo, hi, claimedThoughts, expandedThoughts);
+}
 
+function collectSpanThoughts(
+  siblings: unknown[],
+  span: RegionSpan,
+  claimedThoughts: Set<number>,
+  expandedThoughts: Set<number>,
+): void {
+  if (span.groupExpanded) {
+    const lastMember = span.members[span.members.length - 1] ?? span.leader;
+    for (let k = span.leader + 1; k < lastMember; k++) {
+      if (isThoughtMember(siblings[k]) || isThoughtTransparent(siblings[k])) expandedThoughts.add(k);
+    }
+    return;
+  }
+  for (const t of span.thoughts) claimedThoughts.add(t);
+}
+
+function applyRegionThoughtMarkers(
+  siblings: unknown[],
+  lo: number,
+  hi: number,
+  claimedThoughts: Set<number>,
+  expandedThoughts: Set<number>,
+): void {
+  for (let k = lo; k <= hi; k++) {
+    const claimed = claimedThoughts.has(k);
+    const groupExpanded = expandedThoughts.has(k);
+    if (isThoughtMember(siblings[k])) setThoughtMemberClaimed(siblings[k] as object, claimed);
+    if (isThoughtMember(siblings[k]) || isThoughtTransparent(siblings[k])) {
+      setThoughtGroupExpanded(siblings[k] as object, groupExpanded);
+    }
+  }
+}
+
+function assignGroupRoles(roles: Map<number, GroupRole>, siblings: unknown[], groupSpans: RegionSpan[]): Set<number> {
   const spanCovered = new Set<number>();
   for (const span of groupSpans) {
     for (const m of span.members) spanCovered.add(m);
     for (const t of span.thoughts) spanCovered.add(t);
-  }
-
-  for (const span of groupSpans) {
     roles.set(span.leader, {
       role: "verb-leader",
       members: span.members.map((m) => asToolExecution(siblings[m]) as ToolExecutionPatchThis),
@@ -349,54 +395,72 @@ function computeRegionRoles(siblings: unknown[], lo: number, hi: number): Map<nu
       if (m !== span.leader) roles.set(m, { role: "claimed", groupExpanded: span.groupExpanded });
     }
   }
+  return spanCovered;
+}
 
-  if (groupMaxVisible > 0) {
-    const runs: number[][] = [];
-    let current: number[] = [];
-    const flushRun = () => {
-      if (current.length > 0) {
-        runs.push(current);
-        current = [];
-      }
-    };
-    for (let k = lo; k <= hi; k++) {
-      if (spanCovered.has(k)) {
-        flushRun();
-        continue;
-      }
-      const tool = asToolExecution(siblings[k]);
-      if (tool) {
-        if (!tool.hideComponent && !tool.expanded) current.push(k);
-        continue;
-      }
-      // Truncation folds contiguous collapsed tools: any sibling that keeps its
-      // own rows (unclaimed thought heading, streaming/expanded thinking panel)
-      // breaks the run. Zero-line leftovers (claimed thoughts, hidden widgets)
-      // are skipped without breaking.
-      if (isThoughtTransparent(siblings[k])) {
-        flushRun();
-        continue;
-      }
-      if (isThoughtMember(siblings[k]) && !isThoughtMemberClaimed(siblings[k])) {
-        flushRun();
-      }
+function computeTruncationRoles(
+  siblings: unknown[],
+  lo: number,
+  hi: number,
+  spanCovered: Set<number>,
+  groupMaxVisible: number,
+  roles: Map<number, GroupRole>,
+): void {
+  if (groupMaxVisible <= 0) return;
+  const runs = collectTruncationRuns(siblings, lo, hi, spanCovered);
+  for (const run of runs) assignTruncationRun(siblings, run, groupMaxVisible, roles);
+}
+
+function collectTruncationRuns(siblings: unknown[], lo: number, hi: number, spanCovered: Set<number>): number[][] {
+  const runs: number[][] = [];
+  let current: number[] = [];
+  const flushRun = () => {
+    if (current.length > 0) {
+      runs.push(current);
+      current = [];
     }
-    flushRun();
-
-    for (const run of runs) {
-      if (run.length <= groupMaxVisible + 1) continue;
-      const hidden = run.slice(0, run.length - groupMaxVisible);
-      roles.set(hidden[0] as number, {
-        role: "truncation-leader",
-        hidden: hidden.map((m) => asToolExecution(siblings[m]) as ToolExecutionPatchThis),
-      });
-      for (const m of hidden) {
-        if (m !== hidden[0]) roles.set(m, { role: "claimed", groupExpanded: false });
-      }
+  };
+  for (let k = lo; k <= hi; k++) {
+    if (spanCovered.has(k)) {
+      flushRun();
+      continue;
+    }
+    const tool = asToolExecution(siblings[k]);
+    if (tool) {
+      if (!tool.hideComponent && !tool.expanded) current.push(k);
+      continue;
+    }
+    // Truncation folds contiguous collapsed tools: any sibling that keeps its
+    // own rows (unclaimed thought heading, streaming/expanded thinking panel)
+    // breaks the run. Zero-line leftovers (claimed thoughts, hidden widgets)
+    // are skipped without breaking.
+    if (isThoughtTransparent(siblings[k])) {
+      flushRun();
+      continue;
+    }
+    if (isThoughtMember(siblings[k]) && !isThoughtMemberClaimed(siblings[k])) {
+      flushRun();
     }
   }
+  flushRun();
+  return runs;
+}
 
-  return roles;
+function assignTruncationRun(
+  siblings: unknown[],
+  run: number[],
+  groupMaxVisible: number,
+  roles: Map<number, GroupRole>,
+): void {
+  if (run.length <= groupMaxVisible + 1) return;
+  const hidden = run.slice(0, run.length - groupMaxVisible);
+  roles.set(hidden[0] as number, {
+    role: "truncation-leader",
+    hidden: hidden.map((m) => asToolExecution(siblings[m]) as ToolExecutionPatchThis),
+  });
+  for (const m of hidden) {
+    if (m !== hidden[0]) roles.set(m, { role: "claimed", groupExpanded: false });
+  }
 }
 
 function resolveGroupRole(component: ToolExecutionPatchThis, width: number): GroupRole | undefined {
@@ -524,32 +588,14 @@ function patchToolExecutionRender(
     previous: unknown,
   ): string[] {
     if (groupRole?.role === "claimed" && !component.expanded) {
-      if (!groupRole.groupExpanded) return [];
-      return [renderAggregateMemberSubrow(component, theme, width, proto.__tdRegistry, headerAnnotation)];
+      return renderClaimedMember(component, groupRole, width, theme, headerAnnotation);
     }
 
     let aggregatePrefix: string[] = [];
     if (groupRole?.role === "verb-leader") {
-      const lines = renderAggregateLine(
-        aggregateMemberStates(groupRole.members),
-        theme,
-        width,
-        Date.now(),
-        groupRole.groupExpanded,
-      );
-      // Click routing must match the layout the TUI routed the event against, so the
-      // separator state is captured at render time instead of being recomputed from the
-      // mouse event's width.
-      component.__tdAggregateLeadingBlank =
-        !(previous instanceof ToolExecutionComponent) && readRailTailSpacing(previous) === undefined;
-      if (!groupRole.groupExpanded) {
-        return applyGroupSpacing(lines, previous, true);
-      }
-      if (!component.expanded) {
-        lines.push(renderAggregateMemberSubrow(component, theme, width, proto.__tdRegistry, headerAnnotation));
-        return applyGroupSpacing(lines, previous, true);
-      }
-      aggregatePrefix = lines;
+      const header = renderGroupHeader(component, groupRole, width, theme, previous, headerAnnotation);
+      if (header.finished) return header.finished;
+      aggregatePrefix = header.prefix;
     }
     if (groupRole?.role === "truncation-leader") {
       const lines = renderTruncationLine(
@@ -561,17 +607,90 @@ function patchToolExecutionRender(
       return applyGroupSpacing(lines, previous, true);
     }
 
+    return renderAdapterLines(component, width, theme, headerAnnotation, aggregatePrefix, previous);
+  }
+
+  function renderClaimedMember(
+    component: ToolExecutionPatchThis,
+    groupRole: Extract<GroupRole, { role: "claimed" }>,
+    width: number,
+    theme: Theme,
+    headerAnnotation: string | undefined,
+  ): string[] {
+    if (!groupRole.groupExpanded) return [];
+    return [renderAggregateMemberSubrow(component, theme, width, proto.__tdRegistry, headerAnnotation)];
+  }
+
+  function renderGroupHeader(
+    component: ToolExecutionPatchThis,
+    groupRole: Extract<GroupRole, { role: "verb-leader" }>,
+    width: number,
+    theme: Theme,
+    previous: unknown,
+    headerAnnotation: string | undefined,
+  ): { finished?: string[]; prefix: string[] } {
+    const lines = renderAggregateLine(
+      aggregateMemberStates(groupRole.members),
+      theme,
+      width,
+      Date.now(),
+      groupRole.groupExpanded,
+    );
+    // Click routing must match the layout the TUI routed the event against, so the
+    // separator state is captured at render time instead of being recomputed from the
+    // mouse event's width.
+    component.__tdAggregateLeadingBlank =
+      !(previous instanceof ToolExecutionComponent) && readRailTailSpacing(previous) === undefined;
+    if (!groupRole.groupExpanded) {
+      return { finished: applyGroupSpacing(lines, previous, true), prefix: [] };
+    }
+    if (!component.expanded) {
+      lines.push(renderAggregateMemberSubrow(component, theme, width, proto.__tdRegistry, headerAnnotation));
+      return { finished: applyGroupSpacing(lines, previous, true), prefix: [] };
+    }
+    return { prefix: lines };
+  }
+
+  function renderAdapterLines(
+    component: ToolExecutionPatchThis,
+    width: number,
+    theme: Theme,
+    headerAnnotation: string | undefined,
+    aggregatePrefix: string[],
+    previous: unknown,
+  ): string[] {
     const reg = proto.__tdRegistry;
     const adapter = reg.get(component.toolName);
-    const callR = component.getCallRenderer?.();
-    const resultR = component.result ? component.getResultRenderer?.() : undefined;
-    const mcpOwned =
-      !adapter && isMcpTool(component.toolName, component.toolDefinition?.label) && loadConfig().mcpToolCalls;
-    if (!adapter && (callR != null || resultR != null) && !mcpOwned) {
+    const mcpOwned = isMcpOwned(component, adapter);
+    if (usesStockRenderer(component, adapter, mcpOwned)) {
       const lines = originalRender.call(component, width) as string[];
       return applyGroupSpacing(lines, previous, false);
     }
 
+    const opts = buildToolCallOpts(component, reg, mcpOwned, headerAnnotation);
+    const rendered = renderToolCall(opts, theme);
+    const lines = rendered.render(width);
+
+    return applyGroupSpacing([...aggregatePrefix, ...lines], previous, true);
+  }
+
+  function isMcpOwned(component: ToolExecutionPatchThis, adapter: unknown): boolean {
+    return !adapter && isMcpTool(component.toolName, component.toolDefinition?.label) && loadConfig().mcpToolCalls;
+  }
+
+  function usesStockRenderer(component: ToolExecutionPatchThis, adapter: unknown, mcpOwned: boolean): boolean {
+    if (adapter || mcpOwned) return false;
+    const callR = component.getCallRenderer?.();
+    const resultR = component.result ? component.getResultRenderer?.() : undefined;
+    return callR != null || resultR != null;
+  }
+
+  function buildToolCallOpts(
+    component: ToolExecutionPatchThis,
+    reg: typeof globalToolDisplayRegistry,
+    mcpOwned: boolean,
+    headerAnnotation: string | undefined,
+  ) {
     const getTextOutput = component.getTextOutput?.bind(component);
     const output = component.result
       ? cachedTextOutput(component.result, component.showImages === true, () => getTextOutput?.())
@@ -579,7 +698,7 @@ function patchToolExecutionRender(
 
     const timing = timings.get(component) ?? {};
 
-    const opts = {
+    return {
       toolName: component.toolName,
       args: component.args,
       output,
@@ -594,11 +713,6 @@ function patchToolExecutionRender(
       displayName: mcpOwned ? mcpDisplayName(component.toolName, component.toolDefinition?.label) : undefined,
       headerAnnotation,
     };
-
-    const rendered = renderToolCall(opts, theme);
-    const lines = rendered.render(width);
-
-    return applyGroupSpacing([...aggregatePrefix, ...lines], previous, true);
   }
 
   const originalRender = proto.render;
@@ -607,58 +721,92 @@ function patchToolExecutionRender(
       recordFrameLineCount(this, 0);
       return [];
     }
+    return renderToolExecutionCached(this, width);
+  };
+
+  function renderToolExecutionCached(component: ToolExecutionPatchThis, width: number): string[] {
     const theme = proto.__tdGetTheme?.() ?? FALLBACK_THEME;
-    const headerAnnotation = this.toolName === "bash" ? proto.__tdGetHeaderAnnotation?.(this.toolCallId) : undefined;
-    const groupRole = memoizedGroupRole<GroupRole | undefined>(this, width, () => resolveGroupRole(this, width));
+    const headerAnnotation =
+      component.toolName === "bash" ? proto.__tdGetHeaderAnnotation?.(component.toolCallId) : undefined;
+    const groupRole = memoizedGroupRole<GroupRole | undefined>(component, width, () =>
+      resolveGroupRole(component, width),
+    );
 
     // Claimed members render either nothing or a bare subrow; neither applies
     // group spacing, so the backward visibility probe is skipped for them.
-    const skipPrev = groupRole?.role === "claimed" && !this.expanded;
-    const previous = skipPrev ? undefined : findPreviousVisibleOf(this, width);
+    const skipPrev = groupRole?.role === "claimed" && !component.expanded;
+    const previous = skipPrev ? undefined : findPreviousVisibleOf(component, width);
 
     const now = Date.now();
-    const timing = timings.get(this) ?? {};
-    if (timing.startedAtMs === undefined) timing.startedAtMs = now;
-    if (!this.isPartial && this.result && timing.endedAtMs === undefined) {
-      timing.endedAtMs = now;
+    const timing = updateRenderTimings(component, now);
+    const key = renderLinesCacheKey(component, width, previous, groupRole, headerAnnotation, theme, timing, now);
+    const cached = getCachedRenderLines(component, key);
+    if (cached) {
+      recordFrameLineCount(component, cached.length);
+      return cached;
     }
-    timings.set(this, timing);
+    const lines = renderToolExecutionUncached(component, width, theme, headerAnnotation, groupRole, previous);
+    setCachedRenderLines(component, key, lines);
+    recordFrameLineCount(component, lines.length);
+    return lines;
+  }
 
-    const spinMembers =
-      groupRole?.role === "verb-leader"
-        ? groupRole.members
-        : groupRole?.role === "truncation-leader"
-          ? groupRole.hidden
-          : undefined;
-    const spins = this.isPartial || spinMembers?.some((member) => member.isPartial) === true;
-    const elapsedMs = (timing.endedAtMs ?? now) - (timing.startedAtMs ?? now);
+  function updateRenderTimings(component: ToolExecutionPatchThis, now: number) {
+    const existing = timings.get(component) ?? {};
+    const startedAtMs = existing.startedAtMs ?? now;
+    const endedAtMs = existing.endedAtMs ?? (!component.isPartial && component.result ? now : undefined);
+    timings.set(component, { startedAtMs, endedAtMs });
+    return { startedAtMs, endedAtMs };
+  }
+
+  function spinMembersOf(groupRole: GroupRole | undefined): ToolExecutionPatchThis[] | undefined {
+    if (groupRole === undefined) return undefined;
+    return roleMembers(groupRole);
+  }
+
+  function roleMembers(groupRole: GroupRole): ToolExecutionPatchThis[] | undefined {
+    if (groupRole.role === "verb-leader") return groupRole.members;
+    if (groupRole.role === "truncation-leader") return groupRole.hidden;
+    return undefined;
+  }
+
+  function anyMemberPartial(members: ToolExecutionPatchThis[] | undefined): boolean {
+    return members?.some((member) => member.isPartial) === true;
+  }
+
+  function spinTickOf(spins: boolean, now: number): number {
+    return spins ? Math.floor(now / 80) : 0;
+  }
+
+  function renderLinesCacheKey(
+    component: ToolExecutionPatchThis,
+    width: number,
+    previous: unknown,
+    groupRole: GroupRole | undefined,
+    headerAnnotation: string | undefined,
+    theme: Theme,
+    timing: { startedAtMs: number; endedAtMs?: number },
+    now: number,
+  ): RenderLinesKey {
+    const spins = component.isPartial || anyMemberPartial(spinMembersOf(groupRole));
+    const elapsedMs = (timing.endedAtMs ?? now) - timing.startedAtMs;
     const timerLabel = elapsedMs >= TIMER_MIN_ELAPSED_MS ? formatDuration(elapsedMs) : undefined;
-
-    const key: RenderLinesKey = {
+    return {
       width,
       probed: currentProbeDepth() > 0,
-      stateVersion: componentStateVersion(this),
-      hovered: this.__tdHovered === true,
+      stateVersion: componentStateVersion(component),
+      hovered: component.__tdHovered === true,
       headerAnnotation,
       roleSummary: groupRoleSummary(groupRole),
       prevIsTool: previous instanceof ToolExecutionComponent,
       prevHasRailTail: readRailTailSpacing(previous) !== undefined,
-      spinTick: spins ? Math.floor(now / 80) : 0,
+      spinTick: spinTickOf(spins, now),
       timerLabel,
       theme,
       envVersion: currentRenderEnvVersion(),
       configVersion: getConfigFileVersion(),
     };
-    const cached = getCachedRenderLines(this, key);
-    if (cached) {
-      recordFrameLineCount(this, cached.length);
-      return cached;
-    }
-    const lines = renderToolExecutionUncached(this, width, theme, headerAnnotation, groupRole, previous);
-    setCachedRenderLines(this, key, lines);
-    recordFrameLineCount(this, lines.length);
-    return lines;
-  };
+  }
 
   const originalHandleMouse = proto.handleMouse as
     | ((this: ToolExecutionPatchThis, event: PatchedMouseEvent) => unknown)
@@ -682,61 +830,94 @@ function patchToolExecutionRender(
     role: Extract<GroupRole, { role: "verb-leader" | "claimed" }>,
     event: PatchedMouseEvent,
   ): { handled: true } | undefined {
-    if (role.role === "verb-leader") {
-      const summaryY = component.__tdAggregateLeadingBlank === true ? 1 : 0;
-      const y = event.y ?? 0;
-      if (role.groupExpanded && y > summaryY) {
-        if (!component.expanded && !component.result) return undefined;
-        component.setExpanded(!component.expanded);
-        return { handled: true };
-      }
-      if (y < summaryY) return undefined;
-      toggleAggregateGroup(component, role.members);
-      return { handled: true };
-    }
+    if (role.role === "verb-leader") return handleLeaderClick(component, role, event);
+    return handleMemberClick(component, role);
+  }
+
+  function handleLeaderClick(
+    component: ToolExecutionPatchThis,
+    role: Extract<GroupRole, { role: "verb-leader" }>,
+    event: PatchedMouseEvent,
+  ): { handled: true } | undefined {
+    const summaryY = component.__tdAggregateLeadingBlank === true ? 1 : 0;
+    const y = event.y ?? 0;
+    if (role.groupExpanded && y > summaryY) return toggleExpandedWithResult(component);
+    if (y < summaryY) return undefined;
+    toggleAggregateGroup(component, role.members);
+    return { handled: true };
+  }
+
+  function handleMemberClick(
+    component: ToolExecutionPatchThis,
+    role: Extract<GroupRole, { role: "claimed" }>,
+  ): { handled: true } | undefined {
     if (!role.groupExpanded) return undefined;
+    return toggleExpandedWithResult(component);
+  }
+
+  function toggleExpandedWithResult(component: ToolExecutionPatchThis): { handled: true } | undefined {
     if (!component.expanded && !component.result) return undefined;
     component.setExpanded(!component.expanded);
     return { handled: true };
   }
 
+  function resolveEventGroupRole(component: ToolExecutionPatchThis, event: PatchedMouseEvent): GroupRole | undefined {
+    const width = event.width ?? 0;
+    return memoizedGroupRole<GroupRole | undefined>(component, width, () => resolveGroupRole(component, width));
+  }
+
+  function dispatchGroupClick(component: ToolExecutionPatchThis, event: PatchedMouseEvent) {
+    const groupRole = resolveEventGroupRole(component, event);
+    if (!groupRole) return undefined;
+    if (event.button !== "left") return undefined;
+    if (groupRole.role === "truncation-leader") return undefined;
+    return handleAggregateClick(component, groupRole, event);
+  }
+
   proto.handleMouse = function (this: ToolExecutionPatchThis, event: PatchedMouseEvent) {
-    if (event.type === "click") {
-      const groupRole = memoizedGroupRole<GroupRole | undefined>(this, event.width ?? 0, () =>
-        resolveGroupRole(this, event.width ?? 0),
-      );
-      if (groupRole) {
-        if (event.button !== "left") return undefined;
-        if (groupRole.role === "truncation-leader") return undefined;
-        return handleAggregateClick(this, groupRole, event);
-      }
+    if (event.type === "click" && resolveEventGroupRole(this, event)) {
+      return dispatchGroupClick(this, event);
     }
     // Claim hover moves before the stock handler: for default-shell tools the stock
     // handleMouse delegates through Container.prototype.handleMouse, which the
     // hover-leave patch treats as an unclaimed move and clears hover while the cursor
     // is still inside this widget — flipping the bullet between › and ◆ on every move.
-    if (event.type === "move" && this.result && !this.expanded) {
-      if (hoveredTool === this && this.__tdHovered) return { handled: true };
-      clearHoveredTool();
-      hoveredTool = this;
-      this.__tdHovered = true;
-      return { handled: true, render: true };
-    }
+    const hover = claimHoverMove(this, event);
+    if (hover) return hover;
     const childResult = originalHandleMouse?.call(this, event);
     if (childResult) return childResult;
+    return finishUnclaimedClick(this, event);
+  };
+
+  function claimHoverMove(
+    component: ToolExecutionPatchThis,
+    event: PatchedMouseEvent,
+  ): { handled: true; render?: boolean } | undefined {
+    if (event.type !== "move" || !component.result || component.expanded) return undefined;
+    if (hoveredTool === component && component.__tdHovered) return { handled: true };
+    clearHoveredTool();
+    hoveredTool = component;
+    component.__tdHovered = true;
+    return { handled: true, render: true };
+  }
+
+  function finishUnclaimedClick(
+    component: ToolExecutionPatchThis,
+    event: PatchedMouseEvent,
+  ): { handled: true } | undefined {
     if (event.type === "move") return undefined;
     const ownedByPatch =
-      proto.__tdRegistry.get(this.toolName) !== undefined ||
-      (isMcpTool(this.toolName, this.toolDefinition?.label) && loadConfig().mcpToolCalls);
+      proto.__tdRegistry.get(component.toolName) !== undefined ||
+      (isMcpTool(component.toolName, component.toolDefinition?.label) && loadConfig().mcpToolCalls);
     if (!ownedByPatch) return undefined;
     // Adapter-rendered blocks bypass the stock MouseRegion wrappers: the patched render
     // never updates selfRenderHeight (edit is renderShell "self"), and default-shell child
     // heights no longer match our rendered lines. Finish unhandled left clicks ourselves,
     // mirroring the stock createResultRegion semantics.
-    if (!this.result || event.type !== "click" || event.button !== "left") return undefined;
-    this.setExpanded(!this.expanded);
+    if (!component.result || event.type !== "click" || event.button !== "left") return undefined;
+    component.setExpanded(!component.expanded);
     return { handled: true };
-  };
+  }
   proto.__tdPatched = true;
 }
 
@@ -800,6 +981,13 @@ export default function (pi: ExtensionAPI) {
 
   pi.on("tool_call", (event, ctx) => {
     if (!isTui || event.toolName !== "bash") return;
+    requestBashAssessment(event, ctx);
+  });
+
+  function requestBashAssessment(
+    event: { toolCallId: string; input: Record<string, unknown> },
+    ctx: { cwd: string; signal: AbortSignal | undefined },
+  ): void {
     try {
       if (!loadConfig().bashAssessment || !loadSystemOneConfig().apiKey?.trim()) return;
       const command = event.input.command;
@@ -809,7 +997,7 @@ export default function (pi: ExtensionAPI) {
     } catch (error) {
       logger.warn(`Bash assessment setup failed: ${String(error)}`);
     }
-  });
+  }
 
   pi.on("session_shutdown", () => {
     isTui = false;

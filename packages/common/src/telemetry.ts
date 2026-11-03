@@ -298,71 +298,113 @@ export class TurnTelemetryTracker {
   }
 }
 
-function finalizeTurn(turn: TurnTiming, caps: Map<string, number>): FinalizedTurn | null {
-  let input = 0;
-  let output = 0;
-  let cacheRead = 0;
-  let cacheWrite = 0;
-  let cost = 0;
-  for (const m of turn.messages) {
-    input += m.input;
-    output += m.output;
-    cacheRead += m.cacheRead;
-    cacheWrite += m.cacheWrite;
-    cost += m.cost;
+interface TurnMeasurement {
+  tps: number | null;
+  measurementMs: number | null;
+  primary: boolean;
+}
+
+function sumTurnUsage(messages: MessageTiming[]): MessageTiming {
+  const totals: MessageTiming = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0 };
+  for (const m of messages) {
+    totals.input += m.input;
+    totals.output += m.output;
+    totals.cacheRead += m.cacheRead;
+    totals.cacheWrite += m.cacheWrite;
+    totals.cost += m.cost;
   }
+  return totals;
+}
 
-  if (output <= 0 || turn.modelKey === null) return null;
+function streamSpanMeasurable(streamMs: number, turn: TurnTiming, averageGapMs: number): boolean {
+  return (
+    streamMs >= MIN_STREAM_MS && turn.streamUpdateCount >= MIN_STREAM_UPDATES && averageGapMs >= MIN_INTER_CHUNK_MS
+  );
+}
 
-  const hasStream = turn.streamUpdateCount > 0;
-  const streamMs = hasStream ? turn.streamMs : null;
+function streamSpanDominatesStalls(streamMs: number, turn: TurnTiming): boolean {
+  return (
+    turn.stallMs < streamMs && streamMs - turn.stallMs >= MIN_GENERATION_MS && turn.stallMs < streamMs - turn.stallMs
+  );
+}
+
+function streamTpsMeasurement(
+  turn: TurnTiming,
+  streamMs: number,
+  averageGapMs: number,
+  output: number,
+): { tps: number; measurementMs: number } | null {
+  if (!streamSpanMeasurable(streamMs, turn, averageGapMs)) return null;
+  if (!streamSpanDominatesStalls(streamMs, turn)) return null;
+  const measurementMs = streamMs - turn.stallMs;
+  return { tps: round1(output / (measurementMs / 1000)), measurementMs };
+}
+
+function fallbackTpsMeasurement(turn: TurnTiming, output: number): { tps: number; measurementMs: number } {
+  let activeMs = turn.generationMs - turn.stallMs;
+  if (activeMs < MIN_GENERATION_MS || turn.stallMs > turn.generationMs * STALL_DOMINANCE_RATIO) {
+    activeMs = turn.generationMs - turn.stallMs / 2;
+  }
+  const measurementMs = Math.max(activeMs, MIN_GENERATION_MS);
+  return { tps: round1(output / (measurementMs / 1000)), measurementMs };
+}
+
+function measureTurnTps(turn: TurnTiming, output: number): TurnMeasurement {
+  const streamMs = turn.streamUpdateCount > 0 ? turn.streamMs : null;
   const averageGapMs = turn.streamIntervals > 0 ? turn.streamMs / turn.streamIntervals : 0;
-
-  let tps: number | null = null;
-  let measurementMs: number | null = null;
-  let primary = false;
-
-  if (
-    streamMs !== null &&
-    streamMs >= MIN_STREAM_MS &&
-    turn.streamUpdateCount >= MIN_STREAM_UPDATES &&
-    averageGapMs >= MIN_INTER_CHUNK_MS &&
-    turn.stallMs < streamMs &&
-    streamMs - turn.stallMs >= MIN_GENERATION_MS &&
-    turn.stallMs < streamMs - turn.stallMs
-  ) {
-    measurementMs = streamMs - turn.stallMs;
-    tps = round1(output / (measurementMs / 1000));
-    primary = true;
-  } else if (turn.streamUpdateCount >= 2 && turn.generationMs >= MIN_GENERATION_MS) {
-    let activeMs = turn.generationMs - turn.stallMs;
-    if (activeMs < MIN_GENERATION_MS || turn.stallMs > turn.generationMs * STALL_DOMINANCE_RATIO) {
-      activeMs = turn.generationMs - turn.stallMs / 2;
-    }
-    measurementMs = Math.max(activeMs, MIN_GENERATION_MS);
-    tps = round1(output / (measurementMs / 1000));
+  const streamed = streamMs !== null ? streamTpsMeasurement(turn, streamMs, averageGapMs, output) : null;
+  if (streamed !== null) return { ...streamed, primary: true };
+  if (turn.streamUpdateCount >= 2 && turn.generationMs >= MIN_GENERATION_MS) {
+    return { ...fallbackTpsMeasurement(turn, output), primary: false };
   }
+  return { tps: null, measurementMs: null, primary: false };
+}
 
+function clampToolCallTps(
+  tps: number,
+  measurementMs: number | null,
+  output: number,
+  caps: Map<string, number>,
+  modelKey: string,
+  primary: boolean,
+): TurnMeasurement {
+  const cap = caps.get(modelKey);
+  if (cap === undefined) return { tps: null, measurementMs: null, primary };
+  if (tps > cap) {
+    return { tps: cap, measurementMs: Math.max(measurementMs ?? 0, (output * 1000) / cap), primary };
+  }
+  return { tps, measurementMs, primary };
+}
+
+function applyTpsCaps(
+  measurement: TurnMeasurement,
+  turn: TurnTiming,
+  output: number,
+  caps: Map<string, number>,
+): TurnMeasurement {
+  const { tps, measurementMs, primary } = measurement;
   if (tps !== null && tps > MAX_PLAUSIBLE_TPS) {
-    tps = null;
-    measurementMs = null;
-    primary = false;
+    return { tps: null, measurementMs: null, primary: false };
   }
-
   if (turn.isToolCall && tps !== null) {
-    const cap = caps.get(turn.modelKey ?? "");
-    if (cap !== undefined && tps > cap) {
-      tps = cap;
-      measurementMs = Math.max(measurementMs ?? 0, (output * 1000) / cap);
-    } else if (cap === undefined) {
-      tps = null;
-      measurementMs = null;
-    }
+    return clampToolCallTps(tps, measurementMs, output, caps, turn.modelKey ?? "", primary);
   }
+  return { tps, measurementMs, primary };
+}
 
-  if (primary && !turn.isToolCall && tps !== null && turn.modelKey !== null) {
-    const prev = caps.get(turn.modelKey);
-    if (prev === undefined || tps > prev) caps.set(turn.modelKey, tps);
+function learnTpsCap(caps: Map<string, number>, modelKey: string, tps: number): void {
+  const prev = caps.get(modelKey);
+  if (prev === undefined || tps > prev) caps.set(modelKey, tps);
+}
+
+function finalizeTurn(turn: TurnTiming, caps: Map<string, number>): FinalizedTurn | null {
+  const totals = sumTurnUsage(turn.messages);
+  if (totals.output <= 0 || turn.modelKey === null) return null;
+
+  const measured = applyTpsCaps(measureTurnTps(turn, totals.output), turn, totals.output, caps);
+
+  if (measured.primary && !turn.isToolCall && measured.tps !== null && turn.modelKey !== null) {
+    learnTpsCap(caps, turn.modelKey, measured.tps);
   }
 
   return {
@@ -376,14 +418,14 @@ function finalizeTurn(turn: TurnTiming, caps: Map<string, number>): FinalizedTur
     streamMs: turn.streamMs,
     streamIntervals: turn.streamIntervals,
     streamUpdateCount: turn.streamUpdateCount,
-    input,
-    output,
-    cacheRead,
-    cacheWrite,
-    cost,
-    tps,
-    measurementMs,
-    primary,
+    input: totals.input,
+    output: totals.output,
+    cacheRead: totals.cacheRead,
+    cacheWrite: totals.cacheWrite,
+    cost: totals.cost,
+    tps: measured.tps,
+    measurementMs: measured.measurementMs,
+    primary: measured.primary,
   };
 }
 
@@ -398,19 +440,8 @@ function round1(n: number): number {
  *
  * Example: `> TPS 42.5 tok/s · TTFT 1.2s · +29.7s · ↑567 ↓1.2k · stall 1x/4.3s · $3.60/M`
  */
-export function formatTurnTelemetry(t: TurnTelemetry, options?: TelemetryFormatOptions): string {
-  const opts = {
-    tps: true,
-    ttft: true,
-    duration: true,
-    tokens: true,
-    stalls: true,
-    cost: true,
-    ...options,
-  };
-
+function coreTelemetrySegments(t: TurnTelemetry, opts: Required<TelemetryFormatOptions>): string[] {
   const segments: string[] = [];
-
   if (opts.tps && t.tps !== null) {
     segments.push(`TPS ${t.tps} tok/s`);
   }
@@ -423,6 +454,11 @@ export function formatTurnTelemetry(t: TurnTelemetry, options?: TelemetryFormatO
   if (opts.tokens) {
     segments.push(`↑${formatTokens(t.inputTokens)} ↓${formatTokens(t.outputTokens)}`);
   }
+  return segments;
+}
+
+function auxTelemetrySegments(t: TurnTelemetry, opts: Required<TelemetryFormatOptions>): string[] {
+  const segments: string[] = [];
   if (opts.stalls && t.stalls > 0) {
     segments.push(`stall ${t.stalls}x/${formatMs(t.stallMs)}`);
   }
@@ -430,6 +466,21 @@ export function formatTurnTelemetry(t: TurnTelemetry, options?: TelemetryFormatO
     const perM = (t.cost * 1_000_000) / t.outputTokens;
     segments.push(`$${perM.toFixed(2)}/M`);
   }
+  return segments;
+}
+
+export function formatTurnTelemetry(t: TurnTelemetry, options?: TelemetryFormatOptions): string {
+  const opts = {
+    tps: true,
+    ttft: true,
+    duration: true,
+    tokens: true,
+    stalls: true,
+    cost: true,
+    ...options,
+  };
+
+  const segments = [...coreTelemetrySegments(t, opts), ...auxTelemetrySegments(t, opts)];
 
   if (segments.length === 0) return "";
   return `> ${segments.join(" · ")}`;

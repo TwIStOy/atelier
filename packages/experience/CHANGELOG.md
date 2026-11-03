@@ -5,6 +5,7 @@
 ### Changed
 
 - `addHiddenRule` / `removeHiddenRule` share one mutation helper; identical `RuleChangeResult` shapes and persistence behavior.
+- Extracted helpers in `hide-models` subcommand dispatch and rule-option building to clear `fallow health` complexity findings; no behavior change.
 
 ## [0.7.0] - 2026-10-30
 

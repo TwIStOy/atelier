@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Added
+
+- Smoke tests for the queue widget renderer and panel key handling (navigation, confirm, delete, close).
+
+### Changed
+
+- Split the queue panel key dispatcher into move/jump/confirm/delete helpers and extracted widget show/hide and input-routing helpers in the extension entry; no behavior change.
+
 ### Removed
 
 - Dead `Queue.peek()` and `Queue.length` accessors, found by static analysis.

@@ -5,6 +5,7 @@
 ### Changed
 
 - Single and grouped commit flows share one `commitTracked` helper (identical log entries, cancel/error handling); overlay scrolling uses `scrollKeyOffset`.
+- Split oversized functions (`buildLines`, `handleInput`, `render`, `handleCommit`, `parseGroups`, `enrichGitError`, `selectModel`) into single-purpose helpers to clear all `fallow health` complexity findings; no behavior changes.
 
 ### Removed
 

@@ -99,82 +99,111 @@ export class CommitterOverlayController implements Component {
     return p === "done" || p === "error" || p === "cancelled";
   }
 
+  private readonly phaseBuilders: Record<CommitPhase, (innerW: number) => string[]> = {
+    preparing: () => this.preparingLines(),
+    generating: () => this.generatingLines(),
+    committing: () => this.committingLines(),
+    done: (innerW) => this.doneLines(innerW),
+    cancelled: () => this.cancelledLines(),
+    error: (innerW) => this.errorLines(innerW),
+  };
+
   private buildLines(width: number): string[] {
     const innerW = Math.max(1, width - 4);
-    const content: string[] = [];
     const elapsed = formatElapsedSeconds((Date.now() - this.progress.startTime) / 1000);
 
-    const banner = ` /commit  ${this.phaseLabel()}  ${elapsed}`;
-    content.push(this.theme.bg("selectedBg", truncateToWidth(banner, innerW, "…", true)));
+    const content: string[] = [];
+    content.push(this.bannerLine(innerW, elapsed));
     content.push("");
+    content.push(...this.summaryLines());
+    content.push(...this.diffStatLines(innerW));
+    content.push("");
+    content.push(...this.phaseBuilders[this.progress.phase](innerW));
+    content.push("");
+    content.push(this.footerLine(innerW));
 
+    return this.frameLines(content, width, innerW);
+  }
+
+  private bannerLine(innerW: number, elapsed: string): string {
+    const banner = ` /commit  ${this.phaseLabel()}  ${elapsed}`;
+    return this.theme.bg("selectedBg", truncateToWidth(banner, innerW, "…", true));
+  }
+
+  private summaryLines(): string[] {
+    const lines: string[] = [];
     if (this.progress.model) {
-      content.push(this.theme.fg("dim", `Model: ${this.progress.model}`));
+      lines.push(this.theme.fg("dim", `Model: ${this.progress.model}`));
     }
 
     if (this.progress.filesTotal > 0) {
-      content.push(this.theme.fg("dim", `Files: ${this.progress.filesTotal} changed`));
+      lines.push(this.theme.fg("dim", `Files: ${this.progress.filesTotal} changed`));
     }
+    return lines;
+  }
 
-    if (this.progress.diffStat) {
-      const statLines = this.progress.diffStat.split("\n").slice(0, 5);
-      for (const sl of statLines) {
-        content.push(this.theme.fg("dim", truncateToWidth(`  ${sl}`, innerW)));
-      }
+  private diffStatLines(innerW: number): string[] {
+    if (!this.progress.diffStat) return [];
+    const lines: string[] = [];
+    for (const sl of this.progress.diffStat.split("\n").slice(0, 5)) {
+      lines.push(this.theme.fg("dim", truncateToWidth(`  ${sl}`, innerW)));
     }
+    return lines;
+  }
 
-    content.push("");
+  private preparingLines(): string[] {
+    return [`  ${spinnerGlyph(this.theme)} Staging changes...`];
+  }
 
-    switch (this.progress.phase) {
-      case "preparing":
-        content.push(`  ${spinnerGlyph(this.theme)} Staging changes...`);
-        break;
+  private generatingLines(): string[] {
+    return [`  ${spinnerGlyph(this.theme)} ${this.progress.statusMessage || "Generating commit message..."}`];
+  }
 
-      case "generating":
-        content.push(`  ${spinnerGlyph(this.theme)} ${this.progress.statusMessage || "Generating commit message..."}`);
-        break;
+  private committingLines(): string[] {
+    const { commitsCompleted, commitsTotal } = this.progress;
+    const prog = commitsTotal > 1 ? ` (${commitsCompleted}/${commitsTotal})` : "";
+    return [`  ${spinnerGlyph(this.theme)} Creating commit${prog}...`];
+  }
 
-      case "committing": {
-        const { commitsCompleted, commitsTotal } = this.progress;
-        const prog = commitsTotal > 1 ? ` (${commitsCompleted}/${commitsTotal})` : "";
-        content.push(`  ${spinnerGlyph(this.theme)} Creating commit${prog}...`);
-        break;
-      }
-
-      case "done": {
-        content.push(this.theme.fg("accent", "  ✓ Commits created:"));
-        for (const entry of this.progress.commitLog) {
-          const icon = entry.success ? "✓" : "✗";
-          const color = entry.success ? "accent" : "error";
-          const firstLine = entry.message.split("\n")[0] ?? "";
-          content.push(this.theme.fg(color, `  ${icon} ${entry.hash} ${truncateToWidth(firstLine, innerW - 8)}`));
-        }
-        break;
-      }
-
-      case "cancelled":
-        content.push(this.theme.fg("warning", "  ○ Cancelled"));
-        break;
-
-      case "error": {
-        const msg = this.progress.errorMessage ?? "Unknown error";
-        const errLines = msg.split("\n").flatMap((l) => wrapLine(l, innerW - 4));
-        for (const [i, l] of errLines.entries()) {
-          content.push(this.theme.fg("error", i === 0 ? `  ✗ ${l}` : `    ${l}`));
-        }
-        break;
-      }
+  private doneLines(innerW: number): string[] {
+    const lines: string[] = [this.theme.fg("accent", "  ✓ Commits created:")];
+    for (const entry of this.progress.commitLog) {
+      lines.push(this.commitEntryLine(entry, innerW));
     }
+    return lines;
+  }
 
-    content.push("");
+  private commitEntryLine(entry: CommitEntry, innerW: number): string {
+    const icon = entry.success ? "✓" : "✗";
+    const color = entry.success ? "accent" : "error";
+    const firstLine = entry.message.split("\n")[0] ?? "";
+    return this.theme.fg(color, `  ${icon} ${entry.hash} ${truncateToWidth(firstLine, innerW - 8)}`);
+  }
 
+  private cancelledLines(): string[] {
+    return [this.theme.fg("warning", "  ○ Cancelled")];
+  }
+
+  private errorLines(innerW: number): string[] {
+    const msg = this.progress.errorMessage ?? "Unknown error";
+    const errLines = msg.split("\n").flatMap((l) => wrapLine(l, innerW - 4));
+    const lines: string[] = [];
+    for (const [i, l] of errLines.entries()) {
+      lines.push(this.theme.fg("error", i === 0 ? `  ✗ ${l}` : `    ${l}`));
+    }
+    return lines;
+  }
+
+  private footerLine(innerW: number): string {
     const footer: string[] = [`${this.theme.fg("dim", "Esc")} dismiss`];
     if (this.isTerminal) {
       footer.push(`${this.theme.fg("dim", "Enter")} close`);
       footer.push(`${this.theme.fg("dim", "↑↓")} scroll`);
     }
-    content.push(this.theme.fg("dim", truncateToWidth(footer.join("  "), innerW)));
+    return this.theme.fg("dim", truncateToWidth(footer.join("  "), innerW));
+  }
 
+  private frameLines(content: string[], width: number, innerW: number): string[] {
     const dim = (s: string) => this.theme.fg("dim", s);
     const hBorder = dim("─".repeat(Math.max(0, width - 2)));
     const vBar = dim("│");
@@ -183,7 +212,6 @@ export class CommitterOverlayController implements Component {
       lines.push(`${vBar} ${padToVisible(c, innerW)} ${vBar}`);
     }
     lines.push(`${dim("└")}${hBorder}${dim("┘")}`);
-
     return lines;
   }
 

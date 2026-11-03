@@ -1,14 +1,18 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionUIContext, ToolCallEventResult } from "@earendil-works/pi-coding-agent";
 import { isExtensionDisabled, registerChildExtensionFactory } from "@htwang-contrib/common";
 import { checkBashCommand, DEFAULT_PROTECTED_PATHS } from "./bash-check.ts";
 import { loadProjectConfig } from "./config.ts";
 
 const READ_LIKE_TOOLS = new Set(["read", "glob", "grep"]);
 
+function matchesPrefix(resolved: string, prefix: string): boolean {
+  return resolved === prefix || resolved.startsWith(`${prefix}/`);
+}
+
 function matchProtectedPath(p: string, protectedPaths: readonly string[]): string | null {
   const resolved = p.startsWith("/") ? p : `/${p}`;
   for (const prefix of protectedPaths) {
-    if (resolved === prefix || resolved.startsWith(`${prefix}/`)) return prefix;
+    if (matchesPrefix(resolved, prefix)) return prefix;
   }
   return null;
 }
@@ -27,6 +31,40 @@ function checkPath(
   return null;
 }
 
+function readLikeToolBlock(
+  toolName: string,
+  input: Record<string, unknown>,
+  protectedPaths: readonly string[],
+  ui: ExtensionUIContext,
+): ToolCallEventResult | null {
+  if (!READ_LIKE_TOOLS.has(toolName)) return null;
+  const hit = checkPath(input, protectedPaths);
+  if (!hit) return null;
+  ui.notify(`Blocked: ${toolName} targeting protected path ${hit.matched}`, "warning");
+  return {
+    block: true,
+    reason: `Access denied: "${hit.path}" is under "${hit.matched}", which is a protected secrets location. Its contents are secrets and must not be read.`,
+  };
+}
+
+function bashToolBlock(
+  toolName: string,
+  input: Record<string, unknown>,
+  protectedPaths: readonly string[],
+  ui: ExtensionUIContext,
+): ToolCallEventResult | null {
+  if (toolName !== "bash") return null;
+  const command = input.command;
+  if (typeof command !== "string") return null;
+  const reason = checkBashCommand(command, protectedPaths);
+  if (!reason) return null;
+  ui.notify(`Blocked: bash command accesses protected path`, "warning");
+  return {
+    block: true,
+    reason: `Access denied: ${reason}. The command touches a protected secrets location; secrets must not be exposed to stdout.`,
+  };
+}
+
 export default function protectSecrets(pi: ExtensionAPI) {
   if (isExtensionDisabled("protect-secrets")) return;
   registerChildExtensionFactory("protect-secrets", protectSecrets);
@@ -41,31 +79,11 @@ export default function protectSecrets(pi: ExtensionAPI) {
   pi.on("tool_call", async (event, ctx) => {
     const { paths } = loadProjectConfig(ctx.cwd);
     const protectedPaths = paths.length > 0 ? [...DEFAULT_PROTECTED_PATHS, ...paths] : DEFAULT_PROTECTED_PATHS;
-
-    if (READ_LIKE_TOOLS.has(event.toolName)) {
-      const hit = checkPath(event.input as Record<string, unknown>, protectedPaths);
-      if (hit) {
-        ctx.ui.notify(`Blocked: ${event.toolName} targeting protected path ${hit.matched}`, "warning");
-        return {
-          block: true,
-          reason: `Access denied: "${hit.path}" is under "${hit.matched}", which is a protected secrets location. Its contents are secrets and must not be read.`,
-        };
-      }
-    }
-
-    if (event.toolName === "bash") {
-      const command = (event.input as Record<string, unknown>).command;
-      if (typeof command !== "string") return;
-      const reason = checkBashCommand(command, protectedPaths);
-      if (reason) {
-        ctx.ui.notify(`Blocked: bash command accesses protected path`, "warning");
-        return {
-          block: true,
-          reason: `Access denied: ${reason}. The command touches a protected secrets location; secrets must not be exposed to stdout.`,
-        };
-      }
-    }
-
+    const input = event.input as Record<string, unknown>;
+    const readBlock = readLikeToolBlock(event.toolName, input, protectedPaths, ctx.ui);
+    if (readBlock) return readBlock;
+    const bashBlock = bashToolBlock(event.toolName, input, protectedPaths, ctx.ui);
+    if (bashBlock) return bashBlock;
     return;
   });
 }

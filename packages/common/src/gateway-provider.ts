@@ -89,14 +89,7 @@ export async function refreshModelsCatalog(
   fetchCatalog: (context: RefreshModelsContext) => Promise<ProviderModelConfig[]>,
   refreshIntervalMs = 4 * 60 * 60 * 1000,
 ): Promise<ProviderModelConfig[]> {
-  if (!context.allowNetwork || context.signal?.aborted) {
-    return storedAsConfig(context.stored);
-  }
-  if (
-    !context.force &&
-    context.stored?.checkedAt !== undefined &&
-    Date.now() - context.stored.checkedAt < refreshIntervalMs
-  ) {
+  if (shouldServeStoredCatalog(context, refreshIntervalMs)) {
     return storedAsConfig(context.stored);
   }
   const refreshed = await fetchCatalog(context);
@@ -108,6 +101,18 @@ export async function refreshModelsCatalog(
     },
   });
   return refreshed;
+}
+
+function shouldServeStoredCatalog(context: RefreshModelsContext, refreshIntervalMs: number): boolean {
+  if (!context.allowNetwork) return true;
+  if (context.signal?.aborted) return true;
+  return storedCatalogIsUsable(context, refreshIntervalMs);
+}
+
+function storedCatalogIsUsable(context: RefreshModelsContext, refreshIntervalMs: number): boolean {
+  if (context.force) return false;
+  const checkedAt = context.stored?.checkedAt;
+  return checkedAt !== undefined && Date.now() - checkedAt < refreshIntervalMs;
 }
 
 function storedAsConfig(stored: { models: readonly ProviderModelConfig[] } | undefined): ProviderModelConfig[] {

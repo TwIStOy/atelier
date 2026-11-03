@@ -131,24 +131,46 @@ export class WrappingSelect implements Component {
 
   invalidate(): void {}
 
+  private itemIsActive(i: number): boolean {
+    return i === this.selectedIndex && this.focused;
+  }
+
+  private renderWindowRows(startIndex: number, endIndex: number, width: number, numberWidth: number): string[] {
+    const lines: string[] = [];
+    for (let i = startIndex; i < endIndex; i++) {
+      const item = this.items[i];
+      if (!item) continue;
+      lines.push(...this.renderItem(item, i, this.itemIsActive(i), width, numberWidth));
+    }
+    return lines;
+  }
+
   render(width: number): string[] {
     if (this.items.length === 0) return [];
 
     const { startIndex, endIndex } = this.computeVisibleWindow();
     const numberWidth = String(Math.max(1, this.totalItemsForNumbering)).length;
-    const lines: string[] = [];
-
-    for (let i = startIndex; i < endIndex; i++) {
-      const item = this.items[i];
-      if (!item) continue;
-      const isActive = i === this.selectedIndex && this.focused;
-      lines.push(...this.renderItem(item, i, isActive, width, numberWidth));
-    }
+    const lines = this.renderWindowRows(startIndex, endIndex, width, numberWidth);
 
     if (this.hasItemsOutsideWindow(startIndex, endIndex)) {
       lines.push(this.theme.scrollInfo(`  (${this.selectedIndex + 1}/${this.items.length})`));
     }
     return lines;
+  }
+
+  private scanWindowForSelectedRow(width: number, numberWidth: number): [number, number] {
+    const { startIndex, endIndex } = this.computeVisibleWindow();
+    let row = 0;
+    for (let i = startIndex; i < endIndex; i++) {
+      const item = this.items[i];
+      if (!item) continue;
+      const itemRowCount = this.computeItemRowCount(item, i, this.itemIsActive(i), width, numberWidth);
+      if (i === this.selectedIndex) {
+        return [row, row + itemRowCount];
+      }
+      row += itemRowCount;
+    }
+    return [0, 1];
   }
 
   /**
@@ -158,20 +180,8 @@ export class WrappingSelect implements Component {
    */
   focusedItemRowRange(width: number): [number, number] {
     if (this.items.length === 0) return [0, 0];
-    const { startIndex, endIndex } = this.computeVisibleWindow();
     const numberWidth = String(Math.max(1, this.totalItemsForNumbering)).length;
-    let row = 0;
-    for (let i = startIndex; i < endIndex; i++) {
-      const item = this.items[i];
-      if (!item) continue;
-      const isActive = i === this.selectedIndex && this.focused;
-      const itemRowCount = this.computeItemRowCount(item, i, isActive, width, numberWidth);
-      if (i === this.selectedIndex) {
-        return [row, row + itemRowCount];
-      }
-      row += itemRowCount;
-    }
-    return [0, 1];
+    return this.scanWindowForSelectedRow(width, numberWidth);
   }
 
   /**
@@ -272,17 +282,32 @@ export class WrappingSelect implements Component {
    * break — the conventional workaround documented across ANSI-aware string
    * wrappers.
    */
+  private resolvedCursorOffset(buffer: string): number {
+    const requested = this.inputCursorOffset;
+    if (requested === undefined || requested < 0 || requested > buffer.length) return buffer.length;
+    return requested;
+  }
+
+  private cursorGrapheme(buffer: string, offset: number): string {
+    const [firstGrapheme] = graphemeSegmenter.segment(buffer.slice(offset));
+    return firstGrapheme ? firstGrapheme.segment : "";
+  }
+
+  /**
+   * Whitespace at cursor (including end-of-buffer fallback) tokenizes as a wrap
+   * break inside `wrapTextWithAnsi`, splitting the line at the cursor. Substitute
+   * U+00A0 (NBSP): visually identical to a space, wrap-safe.
+   */
+  private atCursorCell(rawAt: string): string {
+    return rawAt === "" || rawAt === " " ? "\u00a0" : rawAt;
+  }
+
   private renderInlineInputRow(rowPrefix: string, continuationPrefix: string, contentWidth: number): string[] {
     const buffer = this.inputBuffer;
-    const requested = this.inputCursorOffset;
-    const offset = requested !== undefined && requested >= 0 && requested <= buffer.length ? requested : buffer.length;
+    const offset = this.resolvedCursorOffset(buffer);
     const before = buffer.slice(0, offset);
-    const [firstGrapheme] = graphemeSegmenter.segment(buffer.slice(offset));
-    const rawAt = firstGrapheme ? firstGrapheme.segment : "";
-    // Whitespace at cursor (including end-of-buffer fallback) tokenizes as a wrap
-    // break inside `wrapTextWithAnsi`, splitting the line at the cursor. Substitute
-    // U+00A0 (NBSP): visually identical to a space, wrap-safe.
-    const atCursor = rawAt === "" || rawAt === " " ? " " : rawAt;
+    const rawAt = this.cursorGrapheme(buffer, offset);
+    const atCursor = this.atCursorCell(rawAt);
     const after = buffer.slice(offset + rawAt.length);
     const raw = `${before}${CURSOR_MARKER}\x1b[7m${atCursor}\x1b[27m${after}`;
     const wrapped = wrapTextWithAnsi(raw, contentWidth);

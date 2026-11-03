@@ -22,20 +22,37 @@ async function git(cwd: string, args: string[], opts?: GitOptions): Promise<stri
   }
 }
 
-function enrichGitError(err: unknown): unknown {
-  if (!err || typeof err !== "object") return err;
-  const e = err as { message?: unknown; stderr?: unknown; stdout?: unknown };
-  if (typeof e.message !== "string") return err;
+type GitCommandError = { message: string; stderr?: unknown; stdout?: unknown };
 
+function isGitCommandError(err: unknown): err is GitCommandError {
+  if (typeof err !== "object" || err === null) return false;
+  const candidate = err as GitCommandError;
+  return typeof candidate.message === "string";
+}
+
+function streamDetail(message: string, stream: unknown): string | null {
+  if (typeof stream !== "string") return null;
+  const text = stream.trim();
+  if (!text || message.includes(text)) return null;
+  return text;
+}
+
+function collectStreamDetails(message: string, streams: unknown[]): string[] {
   const extra: string[] = [];
-  for (const stream of [e.stderr, e.stdout]) {
-    if (typeof stream !== "string") continue;
-    const text = stream.trim();
-    if (text && !e.message.includes(text)) extra.push(text);
+  for (const stream of streams) {
+    const detail = streamDetail(message, stream);
+    if (detail !== null) extra.push(detail);
   }
+  return extra;
+}
+
+function enrichGitError(err: unknown): unknown {
+  if (!isGitCommandError(err)) return err;
+
+  const extra = collectStreamDetails(err.message, [err.stderr, err.stdout]);
   if (extra.length === 0) return err;
 
-  const enriched = new Error(`${e.message.trimEnd()}\n${extra.join("\n")}`);
+  const enriched = new Error(`${err.message.trimEnd()}\n${extra.join("\n")}`);
   return Object.assign(enriched, err);
 }
 

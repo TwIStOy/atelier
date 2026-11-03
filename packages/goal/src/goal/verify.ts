@@ -71,20 +71,24 @@ function buildVerificationTask(objective: string): string {
 
 function extractAssistantText(messages: AgentMessage[]): string {
   for (let i = messages.length - 1; i >= 0; i--) {
-    const msg = messages[i];
-    if (msg.role !== "assistant") continue;
-    const parts = msg.content;
-    if (!Array.isArray(parts)) continue;
-    const chunks: string[] = [];
-    for (const part of parts as TextContent[]) {
-      if (part.type === "text" && typeof part.text === "string") {
-        chunks.push(part.text);
-      }
-    }
-    const joined = chunks.join("").trim();
-    if (joined) return joined;
+    const text = assistantMessageText(messages[i]);
+    if (text) return text;
   }
   return "";
+}
+
+function assistantMessageText(msg: AgentMessage): string {
+  if (msg.role !== "assistant") return "";
+  return joinTextParts(msg.content);
+}
+
+function joinTextParts(parts: unknown): string {
+  if (!Array.isArray(parts)) return "";
+  const chunks: string[] = [];
+  for (const part of parts as TextContent[]) {
+    if (part.type === "text" && typeof part.text === "string") chunks.push(part.text);
+  }
+  return chunks.join("").trim();
 }
 
 function parseVerdict(text: string): VerdictParseResult {
@@ -125,7 +129,29 @@ export async function verifyGoalCompletion(
       message: "no active model available to run the verification agent",
     };
   }
+  const setup = await createVerifierSession(ctx, verifierModel);
+  if ("error" in setup) {
+    return { error: true, message: setup.error };
+  }
+  return runVerifierSession(setup.session, goal, signal);
+}
 
+type VerifierModel = ReturnType<typeof resolveVerifierModel>;
+
+async function createVerifierSession(
+  ctx: ExtensionContext,
+  verifierModel: VerifierModel,
+): Promise<{ session: AgentSession } | { error: string }> {
+  try {
+    const session = await buildVerifierSession(ctx, verifierModel);
+    await session.bindExtensions({});
+    return { session };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+async function buildVerifierSession(ctx: ExtensionContext, verifierModel: VerifierModel): Promise<AgentSession> {
   const cwd = ctx.cwd;
   const agentDir = getAgentDir();
   const verifierDir = path.join(agentDir, "goal-verifiers");
@@ -152,94 +178,114 @@ export async function verifyGoalCompletion(
   });
   await loader.reload();
 
-  let session: AgentSession;
-  try {
-    const modelRuntime = await ModelRuntime.create();
-    const { session: created } = await createAgentSession({
-      cwd,
-      agentDir,
-      modelRuntime,
-      model: verifierModel,
-      tools: VERIFIER_TOOLS,
-      resourceLoader: loader,
-      sessionManager,
-      settingsManager,
-    });
-    session = created;
-    await created.bindExtensions({});
-  } catch (e) {
-    return {
-      error: true,
-      message: e instanceof Error ? e.message : String(e),
-    };
-  }
-
-  const onAbort = () => {
-    void session.abort();
-  };
-  if (signal) signal.addEventListener("abort", onAbort, { once: true });
-
-  const { verifierMaxTurns, verifierMaxRetries } = loadGoalConfig();
-  const maxTurns = verifierMaxTurns;
-  const limited = maxTurns > 0;
-
-  let turnCount = 0;
-  let soft = false;
-  const unsub = session.subscribe((event: AgentSessionEvent) => {
-    if (event.type !== "turn_end") return;
-    turnCount += 1;
-    if (!limited) return;
-    if (!soft && turnCount >= maxTurns) {
-      soft = true;
-      void session.steer(
-        "You have reached the investigation turn limit. Stop running new tools and give your final verdict now.",
-      );
-    } else if (soft && turnCount >= maxTurns + TURN_GRACE) {
-      void session.abort();
-    }
+  const modelRuntime = await ModelRuntime.create();
+  const { session } = await createAgentSession({
+    cwd,
+    agentDir,
+    modelRuntime,
+    model: verifierModel,
+    tools: VERIFIER_TOOLS,
+    resourceLoader: loader,
+    sessionManager,
+    settingsManager,
   });
+  return session;
+}
 
-  let outcome: GoalVerificationResult;
+async function runVerifierSession(
+  session: AgentSession,
+  goal: Goal,
+  signal: AbortSignal | undefined,
+): Promise<GoalVerificationResult> {
+  const detachAbort = attachAbort(signal, () => void session.abort());
+  const unsub = subscribeTurnLimiter(session);
   try {
-    await session.prompt(buildVerificationTask(goal.objective));
-    let parsed: VerdictParseResult | undefined;
-    let retriesLeft = verifierMaxRetries;
-    while (true) {
-      parsed = parseVerdict(extractAssistantText(session.messages));
-      if (parsed.parsed) break;
-      if (retriesLeft <= 0) {
-        parsed = undefined;
-        break;
-      }
-      retriesLeft -= 1;
-      await session.prompt(FORMAT_NUDGE);
-    }
-    if (parsed?.parsed) {
-      outcome = {
-        complete: parsed.complete,
-        reasoning: truncateForDisplay(parsed.reasoning),
-      };
-    } else {
-      outcome = {
-        error: true,
-        message: `verifier did not emit a valid VERDICT line after ${verifierMaxRetries + 1} attempt(s)`,
-      };
-    }
+    return await collectVerifierOutcome(session, goal, loadGoalConfig().verifierMaxRetries);
   } catch (e) {
-    if (signal?.aborted) {
-      outcome = {
-        error: true,
-        message: "verification aborted by parent session",
-      };
-    } else {
-      outcome = {
-        error: true,
-        message: e instanceof Error ? e.message : String(e),
-      };
-    }
+    return verifierFailure(e, signal);
   } finally {
     unsub();
-    if (signal) signal.removeEventListener("abort", onAbort);
+    detachAbort();
   }
-  return outcome;
+}
+
+function attachAbort(signal: AbortSignal | undefined, onAbort: () => void): () => void {
+  if (!signal) return () => {};
+  signal.addEventListener("abort", onAbort, { once: true });
+  return () => signal.removeEventListener("abort", onAbort);
+}
+
+function subscribeTurnLimiter(session: AgentSession): () => void {
+  const maxTurns = loadGoalConfig().verifierMaxTurns;
+  const state = { count: 0, soft: false };
+  return session.subscribe((event: AgentSessionEvent) => {
+    if (event.type !== "turn_end") return;
+    noteVerifierTurn(session, state, maxTurns);
+  });
+}
+
+function noteVerifierTurn(session: AgentSession, state: { count: number; soft: boolean }, maxTurns: number): void {
+  state.count += 1;
+  if (maxTurns <= 0) return;
+  applyTurnLimit(session, state, maxTurns);
+}
+
+function applyTurnLimit(session: AgentSession, state: { count: number; soft: boolean }, maxTurns: number): void {
+  if (!state.soft && state.count >= maxTurns) {
+    state.soft = true;
+    void session.steer(
+      "You have reached the investigation turn limit. Stop running new tools and give your final verdict now.",
+    );
+    return;
+  }
+  if (state.soft && state.count >= maxTurns + TURN_GRACE) {
+    void session.abort();
+  }
+}
+
+async function collectVerifierOutcome(
+  session: AgentSession,
+  goal: Goal,
+  retries: number,
+): Promise<GoalVerificationResult> {
+  await session.prompt(buildVerificationTask(goal.objective));
+  const parsed = await parseVerifierVerdict(session, retries);
+  return verifierOutcome(parsed, retries);
+}
+
+async function parseVerifierVerdict(session: AgentSession, retries: number): Promise<VerdictParseResult | undefined> {
+  let retriesLeft = retries;
+  while (true) {
+    const parsed = parseVerdict(extractAssistantText(session.messages));
+    if (parsed.parsed) return parsed;
+    if (retriesLeft <= 0) return undefined;
+    retriesLeft -= 1;
+    await session.prompt(FORMAT_NUDGE);
+  }
+}
+
+function verifierOutcome(parsed: VerdictParseResult | undefined, retries: number): GoalVerificationResult {
+  if (parsed?.parsed) {
+    return {
+      complete: parsed.complete,
+      reasoning: truncateForDisplay(parsed.reasoning),
+    };
+  }
+  return {
+    error: true,
+    message: `verifier did not emit a valid VERDICT line after ${retries + 1} attempt(s)`,
+  };
+}
+
+function verifierFailure(e: unknown, signal: AbortSignal | undefined): GoalVerificationResult {
+  if (signal?.aborted) {
+    return {
+      error: true,
+      message: "verification aborted by parent session",
+    };
+  }
+  return {
+    error: true,
+    message: e instanceof Error ? e.message : String(e),
+  };
 }

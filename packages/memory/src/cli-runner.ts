@@ -15,8 +15,28 @@ function buildHatArgv(args: string[], options?: RunHatOptions): string[] {
   return ["--json", ...(ns ? ["--namespace", ns] : []), ...args];
 }
 
+function aborted(options?: RunHatOptions): boolean {
+  return !!options?.signal?.aborted;
+}
+
+function errorCause(e: unknown): ErrorOptions | undefined {
+  return e instanceof Error ? { cause: e } : undefined;
+}
+
+function hatErrorMessage(e: unknown): string {
+  const err = e as { stderr?: string; message?: string };
+  return err.stderr?.trim() || err.message || String(e);
+}
+
+function hatFailure(e: unknown, options?: RunHatOptions): Error {
+  if (aborted(options)) {
+    return new Error("Operation aborted", errorCause(e));
+  }
+  return new Error(hatErrorMessage(e), errorCause(e));
+}
+
 export async function runHat(args: string[], options?: RunHatOptions): Promise<unknown> {
-  if (options?.signal?.aborted) {
+  if (aborted(options)) {
     throw new Error("Operation aborted");
   }
   try {
@@ -26,11 +46,6 @@ export async function runHat(args: string[], options?: RunHatOptions): Promise<u
     });
     return JSON.parse(stdout);
   } catch (e: unknown) {
-    if (options?.signal?.aborted) {
-      throw new Error("Operation aborted", e instanceof Error ? { cause: e } : undefined);
-    }
-    const err = e as { stderr?: string; message?: string };
-    const message = err.stderr?.trim() || err.message || String(e);
-    throw new Error(message, e instanceof Error ? { cause: e } : undefined);
+    throw hatFailure(e, options);
   }
 }

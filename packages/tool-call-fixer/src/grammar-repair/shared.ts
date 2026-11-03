@@ -48,8 +48,16 @@ function normalizeArgumentsObject(value: JsonValue | undefined): JsonObject | un
   return undefined;
 }
 
+function nestedFunctionName(value: JsonObject): unknown {
+  return isObject(value.function) ? value.function.name : undefined;
+}
+
+function toolCallNameFrom(value: JsonObject): unknown {
+  return value.name ?? value.function_name ?? nestedFunctionName(value);
+}
+
 function callFromJsonObject(value: JsonObject): { name: string; arguments: JsonObject } | undefined {
-  const name = value.name ?? value.function_name ?? (isObject(value.function) ? value.function.name : undefined);
+  const name = toolCallNameFrom(value);
   if (typeof name !== "string" || !name.trim()) return undefined;
   let args: JsonValue | undefined = value.arguments ?? value.args ?? value.parameters;
   if (args === undefined && isObject(value.function)) args = value.function.arguments;
@@ -75,20 +83,32 @@ export function extractFirstBalancedJson(text: string): { json: string; start: n
   return { json: text.slice(start, end + 1), start, end: end + 1 };
 }
 
+interface QuoteScan {
+  quote: string | undefined;
+  escaped: boolean;
+}
+
+function advanceQuoteScan(scan: QuoteScan, ch: string): void {
+  if (scan.escaped) {
+    scan.escaped = false;
+  } else if (ch === "\\") {
+    scan.escaped = true;
+  } else if (ch === scan.quote) {
+    scan.quote = undefined;
+  }
+}
+
 function findMatching(text: string, openIndex: number, opener: string, closer: string): number | undefined {
   let depth = 0;
-  let quote: string | undefined;
-  let escaped = false;
+  const scan: QuoteScan = { quote: undefined, escaped: false };
   for (let i = openIndex; i < text.length; i++) {
     const ch = text[i];
-    if (quote) {
-      if (escaped) escaped = false;
-      else if (ch === "\\") escaped = true;
-      else if (ch === quote) quote = undefined;
+    if (scan.quote) {
+      advanceQuoteScan(scan, ch);
       continue;
     }
     if (ch === '"' || ch === "'") {
-      quote = ch;
+      scan.quote = ch;
       continue;
     }
     if (ch === opener) depth++;

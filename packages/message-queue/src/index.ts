@@ -1,5 +1,11 @@
 import type { ImageContent, TextContent } from "@earendil-works/pi-ai";
-import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
+import type {
+  ExtensionAPI,
+  ExtensionCommandContext,
+  ExtensionContext,
+  InputEvent,
+  Theme,
+} from "@earendil-works/pi-coding-agent";
 import type { TUI } from "@earendil-works/pi-tui";
 import { getKeybindings, Key, matchesKey } from "@earendil-works/pi-tui";
 import { isExtensionDisabled, MODAL_ACTIVE_EVENT, registerTuiCommands } from "@htwang-contrib/common";
@@ -23,11 +29,19 @@ export default function messageQueueExtension(pi: ExtensionAPI): void {
     if (!widgetCtx?.hasUI) return;
     currentWidgetMessages = queue.items;
     if (queue.isEmpty) {
-      widgetCtx.ui.setWidget(WIDGET_KEY, undefined, WIDGET_OPTIONS);
-      if (!panelOpen) disableEmptyEnter();
+      hideQueueWidget();
       return;
     }
-    widgetCtx.ui.setWidget(
+    showQueueWidget();
+  }
+
+  function hideQueueWidget(): void {
+    widgetCtx?.ui.setWidget(WIDGET_KEY, undefined, WIDGET_OPTIONS);
+    if (!panelOpen) disableEmptyEnter();
+  }
+
+  function showQueueWidget(): void {
+    widgetCtx?.ui.setWidget(
       WIDGET_KEY,
       (_tui: unknown, theme: Theme) => ({
         render(width: number): string[] {
@@ -74,26 +88,33 @@ export default function messageQueueExtension(pi: ExtensionAPI): void {
 
   function isEmptyEditorSubmit(data: string): boolean {
     const kb = getKeybindings();
-    return (
-      kb.matches(data, "tui.input.submit") ||
-      kb.matches(data, "tui.select.confirm") ||
-      matchesKey(data, Key.enter) ||
-      matchesKey(data, "return") ||
-      data === "\r" ||
-      data === "\n"
-    );
+    return kb.matches(data, "tui.input.submit") || kb.matches(data, "tui.select.confirm") || isPlainEnter(data);
+  }
+
+  function isPlainEnter(data: string): boolean {
+    return matchesKey(data, Key.enter) || matchesKey(data, "return") || data === "\r" || data === "\n";
   }
 
   function handleEmptyEnter(data: string): { consume: boolean } | undefined {
-    if (modalActive) return undefined;
-    if (panelOpen) return undefined;
-    if (queue.isEmpty) return undefined;
-    if (!isEmptyEditorSubmit(data)) return undefined;
-    if (!widgetCtx?.hasUI) return undefined;
-    if (widgetCtx.ui.getEditorText().length > 0) return undefined;
+    if (!emptyEnterAllowed(data)) return undefined;
     flushOnInput();
     refreshWidget();
     return { consume: true };
+  }
+
+  function emptyEnterAllowed(data: string): boolean {
+    if (!queueInteractable()) return false;
+    if (!isEmptyEditorSubmit(data)) return false;
+    return editorIsEmpty();
+  }
+
+  function queueInteractable(): boolean {
+    return !modalActive && !panelOpen && !queue.isEmpty;
+  }
+
+  function editorIsEmpty(): boolean {
+    if (!widgetCtx?.hasUI) return false;
+    return widgetCtx.ui.getEditorText().length === 0;
   }
 
   function enableEmptyEnter(): void {
@@ -127,29 +148,29 @@ export default function messageQueueExtension(pi: ExtensionAPI): void {
 
   pi.on("input", (event, ctx) => {
     widgetCtx = ctx;
-
-    if (event.source === "extension") {
-      return { action: "continue" } as const;
-    }
-
-    const trimmed = event.text.trim();
-
-    if (event.text.startsWith("/")) {
-      return { action: "continue" } as const;
-    }
-
-    if (trimmed.length === 0) {
-      return { action: "continue" } as const;
-    }
-
-    if (!queue.isEmpty || !ctx.isIdle()) {
-      queue.enqueue(event.text, event.images);
-      refreshWidget();
-      return { action: "handled" } as const;
-    }
-
-    return { action: "continue" } as const;
+    return routeQueueInput(event, ctx);
   });
+
+  function routeQueueInput(
+    event: InputEvent,
+    ctx: { isIdle(): boolean },
+  ): { action: "continue" } | { action: "handled" } {
+    if (shouldBypassQueue(event, ctx)) return { action: "continue" } as const;
+    queue.enqueue(event.text, event.images);
+    refreshWidget();
+    return { action: "handled" } as const;
+  }
+
+  function shouldBypassQueue(event: { source: string; text: string }, ctx: { isIdle(): boolean }): boolean {
+    if (!isQueueableText(event)) return true;
+    return queue.isEmpty && ctx.isIdle();
+  }
+
+  function isQueueableText(event: { source: string; text: string }): boolean {
+    if (event.source === "extension") return false;
+    if (event.text.startsWith("/")) return false;
+    return event.text.trim().length > 0;
+  }
 
   pi.on("agent_end", (_event, ctx) => {
     widgetCtx = ctx;
@@ -164,36 +185,44 @@ export default function messageQueueExtension(pi: ExtensionAPI): void {
     api.registerCommand("queue", {
       description: "Manage queued messages in an interactive panel",
       handler: async (_rawArgs, ctx) => {
-        if (!ctx.hasUI) {
-          ctx.ui.notify("/queue requires an interactive terminal.", "warning");
-          return;
-        }
-        if (queue.isEmpty) {
-          ctx.ui.notify("No messages in queue.", "info");
-          return;
-        }
-
-        panelOpen = true;
-        disableEmptyEnter();
-
-        const action = await ctx.ui.custom<QueueAction>((tui: TUI, theme: Theme, kb, done) =>
-          createQueuePanel(
-            () => queue.items,
-            (idx) => deleteAt(idx),
-            theme,
-            tui,
-            kb,
-            done,
-          ),
-        );
-
-        panelOpen = false;
-        refreshWidget();
-
-        if (action?.kind === "send") {
-          sendFromPanel(action.index);
-        }
+        if (!queuePanelAvailable(ctx)) return;
+        await openQueuePanel(ctx);
       },
     });
   });
+
+  function queuePanelAvailable(ctx: ExtensionCommandContext): boolean {
+    if (!ctx.hasUI) {
+      ctx.ui.notify("/queue requires an interactive terminal.", "warning");
+      return false;
+    }
+    if (queue.isEmpty) {
+      ctx.ui.notify("No messages in queue.", "info");
+      return false;
+    }
+    return true;
+  }
+
+  async function openQueuePanel(ctx: ExtensionCommandContext): Promise<void> {
+    panelOpen = true;
+    disableEmptyEnter();
+
+    const action = await ctx.ui.custom<QueueAction>((tui: TUI, theme: Theme, kb, done) =>
+      createQueuePanel(
+        () => queue.items,
+        (idx) => deleteAt(idx),
+        theme,
+        tui,
+        kb,
+        done,
+      ),
+    );
+
+    panelOpen = false;
+    refreshWidget();
+
+    if (action?.kind === "send") {
+      sendFromPanel(action.index);
+    }
+  }
 }

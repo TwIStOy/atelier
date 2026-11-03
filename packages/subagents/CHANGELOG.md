@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Refactor: split the largest `subagent` package functions (tool execution phases, viewer overlay key handling and conversation rendering, batch orchestration and text formatting, input validation, `git_clone` execution, and background finalize/settings helpers) into small helpers to clear `fallow health` complexity findings with no behavior changes.
+
 ### Removed
 
 - Dead exports found by static analysis: the `SubagentAgentFileOptions` / `SubagentAgentEntry` / `SubagentAgentType` aliases, `SUBAGENT_FALLBACK_AGENT_ID`, `normalizeSubagentAgentId`, `subagentSystemPromptFromCatalog`, `getBackgroundJob`, `readSubagentConcurrencyLimits`, `SUBAGENT_TOOL_UI_TICK_MS`, and the redundant `export type { Component }` re-exports in `viewer/`.

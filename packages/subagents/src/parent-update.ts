@@ -3,16 +3,19 @@ import type { SubagentRunDetails } from "./run-agent.ts";
 
 const SUBAGENT_TOOL_UI_TICK_MS = 100;
 
+function silenceMaybePromise(r: void | Promise<void>): void {
+  if (r != null && typeof (r as Promise<void>).then === "function") {
+    void (r as Promise<void>).catch(() => {});
+  }
+}
+
 export function tryParentToolUpdate(
   onUpdate: AgentToolUpdateCallback<SubagentRunDetails> | undefined,
   payload: AgentToolResult<SubagentRunDetails>,
 ) {
   if (!onUpdate) return;
   try {
-    const r = onUpdate(payload);
-    if (r != null && typeof (r as Promise<void>).then === "function") {
-      void (r as Promise<void>).catch(() => {});
-    }
+    silenceMaybePromise(onUpdate(payload));
   } catch {}
 }
 

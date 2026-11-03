@@ -1,7 +1,7 @@
 import * as nodeFs from "node:fs";
 import * as nodePath from "node:path";
 import type { TextContent } from "@earendil-works/pi-ai";
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext, ToolResultEvent } from "@earendil-works/pi-coding-agent";
 import {
   type ExtensionConfigSchema,
   isExtensionDisabled,
@@ -88,33 +88,47 @@ function writeOutputFile(targetPath: string, text: string): void {
   nodeFs.renameSync(tmp, targetPath);
 }
 
+function collectResultText(event: ToolResultEvent): string {
+  const textParts = event.content.filter(
+    (part): part is TextContent => part.type === "text" && typeof part.text === "string",
+  );
+  return textParts.map((part) => part.text).join("\n");
+}
+
+function notifyOffloadFailure(ctx: ExtensionContext, toolName: string, err: unknown): void {
+  try {
+    ctx.ui.notify(`truncate-outputs: failed to offload ${toolName} output: ${String(err)}`, "warning");
+  } catch {
+    // ctx may be stale during shutdown; nothing to do.
+  }
+}
+
+function offloadOutput(ctx: ExtensionContext, toolName: string, savedPath: string, text: string): boolean {
+  try {
+    writeOutputFile(savedPath, text);
+    return true;
+  } catch (err) {
+    if (!isStaleCtxError(err)) {
+      notifyOffloadFailure(ctx, toolName, err);
+    }
+    return false;
+  }
+}
+
 export default function (pi: ExtensionAPI) {
   if (isExtensionDisabled("truncate-outputs")) return;
   registerConfig();
 
   pi.on("tool_result", async (event, ctx) => {
     const config = loadConfig();
-    const textParts = event.content.filter(
-      (part): part is TextContent => part.type === "text" && typeof part.text === "string",
-    );
-    const text = textParts.map((part) => part.text).join("\n");
+    const text = collectResultText(event);
     const decision = shouldTruncate(event.toolName, Buffer.byteLength(text, "utf8"), config);
     if (!decision.truncate) {
       return;
     }
 
     const savedPath = buildTempFilePath(event.toolName, event.toolCallId, config);
-    try {
-      writeOutputFile(savedPath, text);
-    } catch (err) {
-      if (isStaleCtxError(err)) {
-        return;
-      }
-      try {
-        ctx.ui.notify(`truncate-outputs: failed to offload ${event.toolName} output: ${String(err)}`, "warning");
-      } catch {
-        // ctx may be stale during shutdown; nothing to do.
-      }
+    if (!offloadOutput(ctx, event.toolName, savedPath, text)) {
       return;
     }
 

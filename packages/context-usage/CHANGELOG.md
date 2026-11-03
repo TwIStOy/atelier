@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Split complex render/detail builders into smaller phase helpers; no behavior change.
+
 ## [0.7.0] - 2026-10-30
 
 ### Changed

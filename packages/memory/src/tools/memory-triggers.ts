@@ -1,6 +1,7 @@
 import { Type } from "@sinclair/typebox";
 import { runHat } from "../cli-runner.js";
 import { jsonError, jsonResult } from "../tool-result.js";
+import { pushCsv } from "./cli-args.js";
 
 export const memoryTriggers = {
   name: "memory-triggers",
@@ -25,17 +26,25 @@ export const memoryTriggers = {
   }),
   execute: async (_id: string, args: Record<string, unknown>, signal?: AbortSignal) => {
     try {
-      const cliArgs = ["memory", "triggers", args.uri as string];
-      if ((args.add as string[])?.length) cliArgs.push("--add", (args.add as string[]).join(","));
-      if ((args.remove as string[])?.length) cliArgs.push("--remove", (args.remove as string[]).join(","));
-      const result = await runHat(cliArgs, { signal });
+      const result = await runHat(buildTriggersCliArgs(args), { signal });
       return jsonResult(result, {
         uri: args.uri,
-        added: (args.add as string[])?.length ?? 0,
-        removed: (args.remove as string[])?.length ?? 0,
+        added: itemCount(args.add),
+        removed: itemCount(args.remove),
       });
     } catch (e) {
       return jsonError(e);
     }
   },
 };
+
+function buildTriggersCliArgs(args: Record<string, unknown>): string[] {
+  const cliArgs = ["memory", "triggers", args.uri as string];
+  pushCsv(cliArgs, "--add", args.add);
+  pushCsv(cliArgs, "--remove", args.remove);
+  return cliArgs;
+}
+
+function itemCount(value: unknown): number {
+  return (value as string[] | undefined)?.length ?? 0;
+}

@@ -35,6 +35,19 @@ function ensureBelowState(ctx: ExtensionContext): BelowState | undefined {
   return state;
 }
 
+function hideBelowWidget(ctx: ExtensionContext, state: BelowState | undefined): void {
+  if (ctx.hasUI && state?.visible) {
+    ctx.ui.setWidget(CONTEXT_USAGE_WIDGET_KEY, undefined, WIDGET_OPTIONS);
+  }
+}
+
+function teardownBelowState(ctx: ExtensionContext): void {
+  const state = belowStateByCtx.get(ctx);
+  hideBelowWidget(ctx, state);
+  state?.unsubscribeInput?.();
+  belowStateByCtx.delete(ctx);
+}
+
 export default function initContextUsage(pi: ExtensionAPI): void {
   if (isExtensionDisabled("context-usage")) return;
   const guard = pi as unknown as Record<symbol, boolean>;
@@ -52,12 +65,7 @@ export default function initContextUsage(pi: ExtensionAPI): void {
   });
 
   pi.on("session_shutdown", (_event, ctx) => {
-    const state = belowStateByCtx.get(ctx);
-    if (ctx.hasUI && state?.visible) {
-      ctx.ui.setWidget(CONTEXT_USAGE_WIDGET_KEY, undefined, WIDGET_OPTIONS);
-    }
-    state?.unsubscribeInput?.();
-    belowStateByCtx.delete(ctx);
+    teardownBelowState(ctx);
   });
 
   registerTuiCommands(pi, (api) => {

@@ -1,7 +1,7 @@
-import type { Message } from "@earendil-works/pi-ai";
+import type { Message, Model } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { serializeConversation } from "@earendil-works/pi-coding-agent";
-import { branchToMessages, createLogger, executeSideCall } from "@htwang-contrib/common";
+import { branchToMessages, createLogger, executeSideCall, type SideCallResult } from "@htwang-contrib/common";
 import { loadRecapConfig, type RecapConfig, resolveRecapModel } from "./config.ts";
 import { clearRecapWidget, setRecapLoadingWidget, setRecapTextWidget } from "./widget.ts";
 
@@ -18,6 +18,14 @@ const SYSTEM_PROMPT = [
 
 const MAX_CONVERSATION_CHARS = 8_000;
 const RECAP_MAX_CHARS = 400;
+
+type AnyModel = Model<any>;
+type SideCallFailure = Extract<SideCallResult, { ok: false }>;
+
+interface PreparedRecap {
+  model: AnyModel;
+  messages: Message[];
+}
 
 export function buildRecapPrompt(messages: Message[]): string {
   const text = serializeConversation(messages);
@@ -62,73 +70,113 @@ export class RecapManager {
     this.inflight = controller;
 
     try {
-      const model = resolveRecapModel(ctx.modelRegistry, this.config) ?? ctx.model;
-      if (controller.signal.aborted || this.inflight !== controller) return;
-      if (!model) {
-        ctx.ui.notify("No model available for recap", "warning");
-        return;
-      }
-
-      const messages = branchToMessages(ctx.sessionManager.getBranch());
-      if (controller.signal.aborted || this.inflight !== controller) return;
-      if (messages.length === 0) {
-        clearRecapWidget(ctx);
-        return;
-      }
-
-      setRecapLoadingWidget(ctx);
-      this.active = false;
-
-      const result = await executeSideCall({
-        model,
-        modelRegistry: ctx.modelRegistry,
-        systemPrompt: SYSTEM_PROMPT,
-        messages: [
-          {
-            role: "user",
-            content: buildRecapPrompt(messages),
-            timestamp: Date.now(),
-          },
-        ],
-        signal: controller.signal,
-        commandName: "recap",
-      });
-      if (controller.signal.aborted || this.inflight !== controller) return;
-
-      if (!result.ok) {
-        if ("aborted" in result) {
-          clearRecapWidget(ctx);
-        } else {
-          logger.debug(`recap side-call failed: ${result.error}`);
-          setRecapTextWidget(ctx, "Unable to generate recap.");
-        }
-        this.active = false;
-        return;
-      }
-
-      const content = parseRecap(result.answer);
-      if (!content) {
-        clearRecapWidget(ctx);
-        return;
-      }
-
-      setRecapTextWidget(ctx, content);
-      this.active = true;
-
-      this.pi.appendEntry("recap", {
-        provider: model.provider,
-        model: model.id,
-        usage: result.assistantMessage.usage,
-        content,
-      });
+      await this.execute(ctx, controller);
     } catch (error) {
-      if (controller.signal.aborted || this.inflight !== controller) return;
-      logger.debug(`recap run threw: ${String(error).slice(0, 300)}`);
-      setRecapTextWidget(ctx, "Unable to generate recap.");
-      this.active = false;
+      this.handleRunError(error, controller, ctx);
     } finally {
       if (this.inflight === controller) this.inflight = undefined;
     }
+  }
+
+  private async execute(ctx: ExtensionContext, controller: AbortController): Promise<void> {
+    const prepared = this.prepareRecap(ctx, controller);
+    if (!prepared) return;
+    const result = await this.callRecapModel(prepared.model, prepared.messages, ctx, controller);
+    if (!result) return;
+    this.applyRecapResult(result, prepared.model, ctx);
+  }
+
+  private prepareRecap(ctx: ExtensionContext, controller: AbortController): PreparedRecap | null {
+    const model = this.resolveRecapModelFor(ctx, controller);
+    if (!model) return null;
+
+    const messages = branchToMessages(ctx.sessionManager.getBranch());
+    if (this.isStale(controller)) return null;
+    if (messages.length === 0) {
+      clearRecapWidget(ctx);
+      return null;
+    }
+
+    setRecapLoadingWidget(ctx);
+    this.active = false;
+    return { model, messages };
+  }
+
+  private resolveRecapModelFor(ctx: ExtensionContext, controller: AbortController): AnyModel | undefined {
+    const model = resolveRecapModel(ctx.modelRegistry, this.config) ?? ctx.model;
+    if (this.isStale(controller)) return undefined;
+    if (!model) {
+      ctx.ui.notify("No model available for recap", "warning");
+    }
+    return model;
+  }
+
+  private async callRecapModel(
+    model: AnyModel,
+    messages: Message[],
+    ctx: ExtensionContext,
+    controller: AbortController,
+  ): Promise<SideCallResult | undefined> {
+    const result = await executeSideCall({
+      model,
+      modelRegistry: ctx.modelRegistry,
+      systemPrompt: SYSTEM_PROMPT,
+      messages: [
+        {
+          role: "user",
+          content: buildRecapPrompt(messages),
+          timestamp: Date.now(),
+        },
+      ],
+      signal: controller.signal,
+      commandName: "recap",
+    });
+    if (this.isStale(controller)) return undefined;
+    return result;
+  }
+
+  private applyRecapResult(result: SideCallResult, model: AnyModel, ctx: ExtensionContext): void {
+    if (!result.ok) {
+      this.handleRecapFailure(result, ctx);
+      return;
+    }
+
+    const content = parseRecap(result.answer);
+    if (!content) {
+      clearRecapWidget(ctx);
+      return;
+    }
+
+    setRecapTextWidget(ctx, content);
+    this.active = true;
+
+    this.pi.appendEntry("recap", {
+      provider: model.provider,
+      model: model.id,
+      usage: result.assistantMessage.usage,
+      content,
+    });
+  }
+
+  private handleRecapFailure(result: SideCallFailure, ctx: ExtensionContext): void {
+    if ("aborted" in result) {
+      clearRecapWidget(ctx);
+    } else {
+      logger.debug(`recap side-call failed: ${result.error}`);
+      setRecapTextWidget(ctx, "Unable to generate recap.");
+    }
+    this.active = false;
+  }
+
+  private handleRunError(error: unknown, controller: AbortController, ctx: ExtensionContext): void {
+    if (this.isStale(controller)) return;
+    logger.debug(`recap run threw: ${String(error).slice(0, 300)}`);
+    setRecapTextWidget(ctx, "Unable to generate recap.");
+    this.active = false;
+  }
+
+  private isStale(controller: AbortController): boolean {
+    return controller.signal.aborted || this.inflight !== controller;
   }
 
   clear(ctx: ExtensionContext): void {

@@ -13,15 +13,18 @@ function entryCountFromDetails(details: unknown): number | undefined {
   return typeof n === "number" ? n : undefined;
 }
 
+function limitSuffix(lim: number | undefined): string {
+  if (typeof lim !== "number" || !Number.isFinite(lim)) return "";
+  return ` (limit ${Math.floor(lim)})`;
+}
+
 export const lsAdapter: ToolDisplayAdapter<LsArgs> = {
   formatCallHeader(args, theme, _details?: unknown, _isPartial?: boolean, _expanded?: boolean) {
     const rawPath = typeof args.path === "string" ? args.path.trim() : "";
     const displayPath = rawPath ? shortenPath(rawPath) : ".";
-    const lim = args.limit;
+    const suffix = limitSuffix(args.limit);
     let header = `${theme.fg("toolTitle", theme.bold("Ls"))} ${theme.fg("accent", displayPath)}`;
-    if (typeof lim === "number" && Number.isFinite(lim)) {
-      header += theme.fg("toolOutput", ` (limit ${Math.floor(lim)})`);
-    }
+    if (suffix) header += theme.fg("toolOutput", suffix);
     return header;
   },
 

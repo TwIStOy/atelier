@@ -1,6 +1,10 @@
 import type { ConfigItemPreview } from "@htwang-contrib/common";
 import { resolveSpinner } from "@htwang-contrib/common";
 
+function clipLine(line: string, width: number): string {
+  return line.length > width ? line.slice(0, width) : line;
+}
+
 export function createSpinnerPreview(): ConfigItemPreview {
   return ({ getValue, requestRender }) => {
     let frameIndex = 0;
@@ -29,19 +33,17 @@ export function createSpinnerPreview(): ConfigItemPreview {
       }
     };
 
+    const frameOf = (frames: string[]): string => frames[frameIndex] ?? frames[0] ?? "";
+
     return {
       render(width, theme) {
         syncTimer();
         const style = resolveSpinner(activeKey ?? "");
-        const frame = style.frames[frameIndex] ?? style.frames[0] ?? "";
+        const frame = frameOf(style.frames);
         const glyph = theme.fg("accent", theme.bold(frame));
         const meta = theme.fg("muted", `  width ${style.width} · interval ${style.intervalMs}ms`);
         const detail = theme.fg("dim", `  ${activeKey ?? ""} · ${style.frames.length} frames`);
-        const line1 = `${glyph}${meta}`;
-        return [
-          line1.length > width ? line1.slice(0, width) : line1,
-          detail.length > width ? detail.slice(0, width) : detail,
-        ];
+        return [clipLine(`${glyph}${meta}`, width), clipLine(detail, width)];
       },
       dispose: stopTimer,
     };

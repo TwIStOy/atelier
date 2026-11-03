@@ -15,6 +15,25 @@ function objectivePreview(args: GoalArgs, theme: Theme, maxLen: number): string 
   return theme.fg("dim", truncateDisplay(obj, maxLen));
 }
 
+function statusText(d: Record<string, unknown> | undefined, fallback: string): string {
+  return typeof d?.status === "string" ? d.status : fallback;
+}
+
+function hasGoalId(d: Record<string, unknown> | undefined): boolean {
+  const id = d?.id;
+  return id !== undefined && id !== null;
+}
+
+function objectiveText(d: Record<string, unknown> | undefined): string {
+  return typeof d?.objective === "string" ? d.objective : "";
+}
+
+function statusGlyph(status: string): string {
+  if (status === "active") return "●";
+  if (status === "complete") return "✓";
+  return "○";
+}
+
 export const createGoalAdapter: ToolDisplayAdapter<GoalArgs> = {
   formatCallHeader(args, theme, _details, _isPartial, _expanded) {
     const label = theme.fg("toolTitle", theme.bold("CreateGoal"));
@@ -25,7 +44,7 @@ export const createGoalAdapter: ToolDisplayAdapter<GoalArgs> = {
   formatCollapsedContent(_args, output, theme, _width, details) {
     if (!output) return [];
     const d = details as Record<string, unknown> | undefined;
-    const status = typeof d?.status === "string" ? d.status : "";
+    const status = statusText(d, "");
     if (status === "active") {
       return [theme.fg("muted", `└ ● active — ${firstLine(output)}`)];
     }
@@ -66,15 +85,12 @@ export const getGoalAdapter: ToolDisplayAdapter<GoalArgs> = {
 
   formatCollapsedContent(_args, _output, theme, width, details) {
     const d = details as Record<string, unknown> | undefined;
-    const hasGoal = d?.id !== undefined && d?.id !== null;
-    if (!hasGoal) {
+    if (!hasGoalId(d)) {
       return [theme.fg("muted", "└ no goal set")];
     }
-    const status = typeof d?.status === "string" ? d.status : "unknown";
-    const objective = typeof d?.objective === "string" ? d.objective : "";
-    const statusGlyph = status === "active" ? "●" : status === "complete" ? "✓" : "○";
-    const preview = truncateDisplay(objective, Math.max(1, width - 10));
-    return [theme.fg("muted", `└ ${statusGlyph} ${status} — ${preview}`)];
+    const status = statusText(d, "unknown");
+    const preview = truncateDisplay(objectiveText(d), Math.max(1, width - 10));
+    return [theme.fg("muted", `└ ${statusGlyph(status)} ${status} — ${preview}`)];
   },
 
   formatExpandedContent(_args, output, theme, width) {

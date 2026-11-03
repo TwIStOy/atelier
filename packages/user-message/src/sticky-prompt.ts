@@ -96,7 +96,17 @@ function getPinnedPrompt(layout: LayoutFrame): PinnedPrompt | undefined {
   const prompts: PromptBounds[] = [];
   const origin = viewport.rect.y - view.scrollTop;
   for (const child of viewport.children) collectLayoutPrompts(child, origin, prompts);
+
   const top = view.scrollTop + viewport.clip.y - viewport.rect.y;
+  const bracket = findBracketingPrompt(prompts, top);
+  if (!bracket) return undefined;
+  return buildPinnedPrompt(view, viewport, bracket, top);
+}
+
+function findBracketingPrompt(
+  prompts: PromptBounds[],
+  top: number,
+): { current: PromptBounds; next?: PromptBounds } | undefined {
   let current: PromptBounds | undefined;
   let next: PromptBounds | undefined;
   for (const prompt of prompts) {
@@ -107,36 +117,76 @@ function getPinnedPrompt(layout: LayoutFrame): PinnedPrompt | undefined {
     current = prompt;
   }
   if (!current || current.start === top) return undefined;
+  return { current, next };
+}
 
+function buildPinnedPrompt(
+  view: ScrollView,
+  viewport: LayoutBox,
+  bracket: { current: PromptBounds; next?: PromptBounds },
+  top: number,
+): PinnedPrompt | undefined {
   const source = viewport.scrollContentLines;
-  let start = current.start;
-  let end = current.end;
-  while (start < end && !stripTerminalSequences(source[start] ?? "").trim()) start++;
-  while (end > start && !stripTerminalSequences(source[end - 1] ?? "").trim()) end--;
-  if (start === end) return undefined;
-
+  if (!source) return undefined;
+  const bounds = trimPromptBounds(source, bracket.current.start, bracket.current.end);
+  if (!bounds) return undefined;
   const contentWidth = Math.min(view.getContentWidth(viewport.rect.width), viewport.clip.width);
   if (contentWidth < 1) return undefined;
-  const maxLines = Math.min(3, Math.floor(viewport.clip.height / 2) - 1);
-  const lines = source
-    .slice(start, Math.min(end, start + maxLines))
-    .map((line) => line.replace(/\x1b\]133;[ABC](?:\x07|\x1b\\)/g, ""));
-  if (end - start > maxLines) {
-    lines[lines.length - 1] = `${truncateToWidth(lines.at(-1) ?? "", contentWidth - 1, "")}…`;
-  }
+  const pinnedLines = pinnedPromptLines(source, bounds, viewport.clip.height, contentWidth);
+  if (bracket.next && bracket.next.start - top < pinnedLines.length) return undefined;
   const markerOffset = Math.floor((contentWidth - 1) / 2);
-  const pinnedLines = [...lines.map((line) => truncateToWidth(line, contentWidth, "")), `${" ".repeat(markerOffset)}▲`];
-  if (next && next.start - top < pinnedLines.length) return undefined;
   return {
     view,
-    prompt: current,
+    prompt: bracket.current,
     row: viewport.clip.y,
     column: viewport.rect.x,
     markerColumn: viewport.rect.x + markerOffset,
     width: contentWidth,
-    clearHeight: Math.min(viewport.clip.height, Math.max(pinnedLines.length, current.end - top)),
+    clearHeight: Math.min(viewport.clip.height, Math.max(pinnedLines.length, bracket.current.end - top)),
     lines: pinnedLines,
   };
+}
+
+function trimPromptBounds(
+  source: readonly string[],
+  start: number,
+  end: number,
+): { start: number; end: number } | undefined {
+  const trimmedStart = firstContentLine(source, start, end);
+  const trimmedEnd = lastContentLine(source, trimmedStart, end);
+  if (trimmedStart === trimmedEnd) return undefined;
+  return { start: trimmedStart, end: trimmedEnd };
+}
+
+function firstContentLine(source: readonly string[], start: number, end: number): number {
+  let index = start;
+  while (index < end && !stripTerminalSequences(source[index] ?? "").trim()) index++;
+  return index;
+}
+
+function lastContentLine(source: readonly string[], start: number, end: number): number {
+  let index = end;
+  while (index > start && !stripTerminalSequences(source[index - 1] ?? "").trim()) index--;
+  return index;
+}
+
+function pinnedPromptLines(
+  source: readonly string[],
+  bounds: { start: number; end: number },
+  clipHeight: number,
+  contentWidth: number,
+): string[] {
+  const maxLines = Math.min(3, Math.floor(clipHeight / 2) - 1);
+  const lines = source.slice(bounds.start, Math.min(bounds.end, bounds.start + maxLines)).map(stripPromptMarker);
+  if (bounds.end - bounds.start > maxLines) {
+    lines[lines.length - 1] = `${truncateToWidth(lines.at(-1) ?? "", contentWidth - 1, "")}…`;
+  }
+  const markerOffset = Math.floor((contentWidth - 1) / 2);
+  return [...lines.map((line) => truncateToWidth(line, contentWidth, "")), `${" ".repeat(markerOffset)}▲`];
+}
+
+function stripPromptMarker(line: string): string {
+  return line.replace(/\x1b\]133;[ABC](?:\x07|\x1b\\)/g, "");
 }
 
 export function installStickyPrompt(tui: TUI): () => void {
@@ -151,24 +201,41 @@ export function installStickyPrompt(tui: TUI): () => void {
     render: () => ["▲"],
     invalidate() {},
     handleMouse(event) {
-      if (!active || !pinned || tui.hasOverlay() || event.button !== "left") return undefined;
-      if (event.type === "press") {
-        pressed = pinned;
-        return { handled: true, render: false };
-      }
-      if (event.type === "drag") {
-        pressed = undefined;
-        return { handled: true, render: false };
-      }
+      if (!markerAcceptsEvent(event)) return undefined;
+      const update = markerPressUpdate(event);
+      if (update) return update;
       if (event.type === "release") return { handled: true, render: false };
       if (event.type !== "click") return undefined;
-      if (pressed?.view === pinned.view && pressed.prompt.component === pinned.prompt.component) {
-        pinned.view.scrollTo(pinned.prompt.start, { disableFollow: true });
-      }
-      pressed = undefined;
-      return { handled: true };
+      return markerClick();
     },
   };
+
+  function markerAcceptsEvent(event: { button?: string }): boolean {
+    if (!active || !pinned) return false;
+    if (tui.hasOverlay() || event.button !== "left") return false;
+    return true;
+  }
+
+  function markerPressUpdate(event: { type: string }): { handled: boolean; render: boolean } | undefined {
+    if (event.type === "press") {
+      pressed = pinned;
+      return { handled: true, render: false };
+    }
+    if (event.type === "drag") {
+      pressed = undefined;
+      return { handled: true, render: false };
+    }
+    return undefined;
+  }
+
+  function markerClick(): { handled: boolean } {
+    const current = pinned;
+    if (current && pressed?.view === current.view && pressed.prompt.component === current.prompt.component) {
+      current.view.scrollTo(current.prompt.start, { disableFollow: true });
+    }
+    pressed = undefined;
+    return { handled: true };
+  }
   const patched = (screen: string[], layout: LayoutFrame, width: number): string[] => {
     pinned = undefined;
     const rendered = original.call(tui, screen, layout, width);

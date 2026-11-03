@@ -116,35 +116,49 @@ function closeActiveInterval(goal: Goal, now: string): void {
 }
 
 function transitionStatus(goal: Goal, next: Goal["status"], now: string): void {
-  const current = goal.status;
-
   switch (next) {
     case "paused":
-      if (current === "active") {
-        closeActiveInterval(goal, now);
-        goal.status = "paused";
-      }
+      pauseGoalStatus(goal, now);
       break;
     case "active":
-      if (current === "paused" || current === "budgetLimited") {
-        goal.status = "active";
-        goal.lastStartedAt = now;
-      }
+      activateGoalStatus(goal, now);
       break;
     case "complete":
-      if (current === "active" || current === "paused" || current === "budgetLimited") {
-        closeActiveInterval(goal, now);
-        goal.status = "complete";
-        goal.completedAt = now;
-      }
+      completeGoalStatus(goal, now);
       break;
     case "budgetLimited":
-      if (current === "active") {
-        closeActiveInterval(goal, now);
-        goal.status = "budgetLimited";
-      }
+      budgetLimitGoalStatus(goal, now);
       break;
   }
+}
+
+function pauseGoalStatus(goal: Goal, now: string): void {
+  if (goal.status !== "active") return;
+  closeActiveInterval(goal, now);
+  goal.status = "paused";
+}
+
+function activateGoalStatus(goal: Goal, now: string): void {
+  if (goal.status !== "paused" && goal.status !== "budgetLimited") return;
+  goal.status = "active";
+  goal.lastStartedAt = now;
+}
+
+function completeGoalStatus(goal: Goal, now: string): void {
+  if (!completableFrom(goal.status)) return;
+  closeActiveInterval(goal, now);
+  goal.status = "complete";
+  goal.completedAt = now;
+}
+
+function completableFrom(status: Goal["status"]): boolean {
+  return status === "active" || status === "paused" || status === "budgetLimited";
+}
+
+function budgetLimitGoalStatus(goal: Goal, now: string): void {
+  if (goal.status !== "active") return;
+  closeActiveInterval(goal, now);
+  goal.status = "budgetLimited";
 }
 
 export function reopenActiveInterval(ref: GoalStoreRef): Goal | null {

@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Split `RecapManager.run` and the `session_start` handler into phase helpers to clear `fallow health` complexity findings; no behavior change.
+
 ## [0.7.0] - 2026-10-30
 
 ### Added

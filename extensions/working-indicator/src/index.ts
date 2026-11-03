@@ -1,4 +1,5 @@
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { AssistantMessage } from "@earendil-works/pi-ai";
+import type { ExtensionAPI, ExtensionContext, MessageUpdateEvent } from "@earendil-works/pi-coding-agent";
 import { isExtensionDisabled, SPINNER_STYLES } from "@htwang-contrib/common";
 import { loadConfig, registerWorkingIndicatorConfigItems } from "./config.ts";
 import { type NarrowWidthOptions, resolveEffectiveSpinnerKey } from "./narrow-screen.ts";
@@ -47,15 +48,20 @@ export default function (pi: ExtensionAPI) {
 
   function currentMessage(): string {
     const base = currentPhrase;
-    if (thinking) {
-      const seconds = Math.max(0, Math.floor((Date.now() - thinkingStartMs) / 1000));
-      return `${base}... [thinking ${seconds}s...]`;
-    }
-    if (tracker.isStreaming) {
-      const speed = tracker.liveTokS();
-      if (speed !== null && speed > 0) {
-        return `${base}... ${formatSpeed(speed)}`;
-      }
+    if (thinking) return thinkingMessage(base);
+    if (tracker.isStreaming) return streamingMessage(base);
+    return `${base}...`;
+  }
+
+  function thinkingMessage(base: string): string {
+    const seconds = Math.max(0, Math.floor((Date.now() - thinkingStartMs) / 1000));
+    return `${base}... [thinking ${seconds}s...]`;
+  }
+
+  function streamingMessage(base: string): string {
+    const speed = tracker.liveTokS();
+    if (speed !== null && speed > 0) {
+      return `${base}... ${formatSpeed(speed)}`;
     }
     return `${base}...`;
   }
@@ -100,30 +106,42 @@ export default function (pi: ExtensionAPI) {
     currentSpinnerKey = key;
 
     if (!style) {
-      stopRuncatEngine();
-      runcatIntervalMs = undefined;
-      setPlainIndicator(ctx, undefined);
+      clearIndicator(ctx);
       return;
     }
 
     if (key === RUNCAT_SPINNER_KEY) {
-      runcatIntervalMs = runcatSpeedConfig.defaultIntervalMs;
-      if (!runcatEngine) {
-        runcatEngine = new RuncatIndicatorEngine(makeRuncatSink(ctx), {
-          frames: style.frames,
-          intervalMs: runcatSpeedConfig.defaultIntervalMs,
-        });
-      } else {
-        runcatEngine.setFrames(style.frames);
-        runcatEngine.setTargetInterval(runcatSpeedConfig.defaultIntervalMs);
-      }
-      setPlainIndicator(ctx, {
-        frames: [style.frames[0] ?? ""],
-        intervalMs: runcatSpeedConfig.defaultIntervalMs,
-      });
+      applyRuncatSpinner(ctx, style);
       return;
     }
 
+    applyPlainSpinner(ctx, style);
+  }
+
+  function clearIndicator(ctx: ExtensionContext): void {
+    stopRuncatEngine();
+    runcatIntervalMs = undefined;
+    setPlainIndicator(ctx, undefined);
+  }
+
+  function applyRuncatSpinner(ctx: ExtensionContext, style: { frames: string[] }): void {
+    runcatIntervalMs = runcatSpeedConfig.defaultIntervalMs;
+    if (!runcatEngine) {
+      runcatEngine = new RuncatIndicatorEngine(makeRuncatSink(ctx), {
+        frames: style.frames,
+        intervalMs: runcatSpeedConfig.defaultIntervalMs,
+      });
+    } else {
+      runcatEngine.setFrames(style.frames);
+      runcatEngine.setTargetInterval(runcatSpeedConfig.defaultIntervalMs);
+    }
+    setPlainIndicator(ctx, {
+      frames: [style.frames[0] ?? ""],
+      intervalMs: runcatSpeedConfig.defaultIntervalMs,
+    });
+  }
+
+  function applyPlainSpinner(ctx: ExtensionContext, style: { frames: string[]; intervalMs: number }): void {
     stopRuncatEngine();
     runcatIntervalMs = undefined;
     setPlainIndicator(ctx, {
@@ -140,10 +158,13 @@ export default function (pi: ExtensionAPI) {
   }
 
   function refreshRuncatInterval(): void {
-    if (currentSpinnerKey !== RUNCAT_SPINNER_KEY) return;
     const engine = runcatEngine;
-    if (!engine) return;
+    if (currentSpinnerKey !== RUNCAT_SPINNER_KEY || !engine) return;
     if (!shouldRefreshRuncatInterval(thinking)) return;
+    applyAdaptiveRuncatInterval(engine);
+  }
+
+  function applyAdaptiveRuncatInterval(engine: RuncatIndicatorEngine): void {
     const target = quantizeInterval(runcatSpeedIntervalMs(tracker.liveTokS(), runcatSpeedConfig), runcatSpeedConfig);
     const current = runcatIntervalMs ?? runcatSpeedConfig.defaultIntervalMs;
     if (!shouldUpdateInterval(current, target, runcatSpeedConfig)) return;
@@ -232,48 +253,82 @@ export default function (pi: ExtensionAPI) {
   pi.on("message_update", (event, ctx) => {
     if (!ctx.hasUI) return;
     if (event.message.role !== "assistant") return;
-    const delta = event.assistantMessageEvent;
-    if (delta.type === "thinking_start" || delta.type === "thinking_delta") {
-      if (!thinking) {
-        thinking = true;
-        thinkingStartMs = Date.now();
-        resetRuncatInterval();
-      }
-    } else if (delta.type === "text_start" || delta.type === "text_delta" || delta.type === "toolcall_start") {
-      if (thinking) {
-        thinking = false;
-      }
-    }
-    if ((delta.type === "text_delta" || delta.type === "thinking_delta") && "partial" in delta) {
-      tracker.recordDelta(delta.delta, delta.partial?.usage?.output);
-    }
+    handleAssistantDelta(event.assistantMessageEvent);
     pushMessage(ctx);
   });
+
+  function handleAssistantDelta(delta: MessageUpdateEvent["assistantMessageEvent"]): void {
+    updateThinkingState(delta);
+    recordUsageDelta(delta);
+  }
+
+  function updateThinkingState(delta: MessageUpdateEvent["assistantMessageEvent"]): void {
+    if (isThinkingDelta(delta)) {
+      startThinkingIfIdle();
+    } else if (endsThinking(delta)) {
+      thinking = false;
+    }
+  }
+
+  function isThinkingDelta(delta: { type: string }): boolean {
+    return delta.type === "thinking_start" || delta.type === "thinking_delta";
+  }
+
+  function endsThinking(delta: { type: string }): boolean {
+    return delta.type === "text_start" || delta.type === "text_delta" || delta.type === "toolcall_start";
+  }
+
+  function startThinkingIfIdle(): void {
+    if (thinking) return;
+    thinking = true;
+    thinkingStartMs = Date.now();
+    resetRuncatInterval();
+  }
+
+  function recordUsageDelta(delta: MessageUpdateEvent["assistantMessageEvent"]): void {
+    if (delta.type !== "text_delta" && delta.type !== "thinking_delta") return;
+    if (!("partial" in delta)) return;
+    tracker.recordDelta(delta.delta, deltaUsage(delta));
+  }
+
+  function deltaUsage(delta: { partial?: { usage?: { output?: number } } }): number | undefined {
+    return delta.partial?.usage?.output;
+  }
 
   pi.on("message_end", (event, ctx) => {
     if (!ctx.hasUI) return;
     if (event.message.role !== "assistant") return;
-    thinking = false;
-    if (tracker.isStreaming) {
-      tracker.finishMessage(event.message.usage?.output ?? 0, event.message.stopReason);
-    }
+    finishAssistantMessage(event.message);
     resetRuncatInterval();
   });
+
+  function finishAssistantMessage(message: AssistantMessage): void {
+    thinking = false;
+    if (!tracker.isStreaming) return;
+    tracker.finishMessage(message.usage?.output ?? 0, message.stopReason);
+  }
 
   pi.on("agent_end", (_event, ctx) => {
     stopTicking();
     // Agent run finished — park the engine until the next agent_start.
     runcatEngine?.stop();
-    if (ctx.hasUI && currentSpinnerKey === RUNCAT_SPINNER_KEY) {
-      const style = SPINNER_STYLES[RUNCAT_SPINNER_KEY];
-      if (style) {
-        setPlainIndicator(ctx, {
-          frames: [style.frames[0] ?? ""],
-          intervalMs: runcatSpeedConfig.defaultIntervalMs,
-        });
-      }
-    }
+    parkRuncatSpinner(ctx);
   });
+
+  function parkRuncatSpinner(ctx: ExtensionContext): void {
+    if (!runcatParkable(ctx)) return;
+    const style = SPINNER_STYLES[RUNCAT_SPINNER_KEY];
+    if (!style) return;
+    setPlainIndicator(ctx, {
+      frames: [style.frames[0] ?? ""],
+      intervalMs: runcatSpeedConfig.defaultIntervalMs,
+    });
+  }
+
+  function runcatParkable(ctx: ExtensionContext): boolean {
+    if (!ctx.hasUI) return false;
+    return currentSpinnerKey === RUNCAT_SPINNER_KEY;
+  }
 
   pi.on("session_shutdown", () => {
     stopTicking();

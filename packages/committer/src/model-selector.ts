@@ -68,128 +68,154 @@ export class ModelSelectController implements Component {
   render(width: number): string[] {
     const lines: string[] = [];
 
-    lines.push(
-      this.theme.bg(
-        "selectedBg",
-        truncateToWidth(
-          ` Select commit model  ${this.query ? `(${this.filtered.length})` : `(${this.entries.length})`}`,
-          width,
-          "…",
-          true,
-        ),
-      ),
-    );
-
-    const promptLine = `  ${this.theme.fg("accent", ">")} ${this.query}${this.theme.fg("dim", "█")}`;
-    lines.push(promptLine);
+    lines.push(this.headerLine(width));
+    lines.push(`  ${this.theme.fg("accent", ">")} ${this.query}${this.theme.fg("dim", "█")}`);
     lines.push("");
 
-    const maxVisible = Math.max(3, Math.floor(this.tui.terminal.rows * 0.6 - 6));
-    const visible = this.filtered.slice(this.scrollOffset, this.scrollOffset + maxVisible);
-
+    const visible = this.visibleEntries();
     for (let i = 0; i < visible.length; i++) {
-      const entry = visible[i];
-      const realIdx = this.scrollOffset + i;
-      const selected = realIdx === this.cursorIndex;
-      const isCurrent =
-        this.currentModel &&
-        entry.model.provider === this.currentModel.provider &&
-        entry.model.id === this.currentModel.id;
-
-      const marker = isCurrent ? " ✓" : "  ";
-      const prefix = selected ? this.theme.bg("selectedBg", marker) : marker;
-
-      const label = selected
-        ? this.theme.bg("selectedBg", truncateToWidth(entry.label, width - 4))
-        : truncateToWidth(entry.label, width - 4);
-
-      lines.push(prefix + label);
+      lines.push(this.entryLine(visible[i], this.scrollOffset + i, width));
     }
 
-    if (this.filtered.length === 0 && this.query) {
-      lines.push(this.theme.fg("dim", "  No matches"));
-    }
+    const noMatch = this.noMatchesLine();
+    if (noMatch !== null) lines.push(noMatch);
 
     lines.push("");
+    lines.push(this.theme.fg("dim", this.footerText()));
+
+    return lines;
+  }
+
+  private headerLine(width: number): string {
+    const count = this.query ? this.filtered.length : this.entries.length;
+    return this.theme.bg("selectedBg", truncateToWidth(` Select commit model  (${count})`, width, "…", true));
+  }
+
+  private visibleEntries(): ModelEntry[] {
+    const maxVisible = Math.max(3, Math.floor(this.tui.terminal.rows * 0.6 - 6));
+    return this.filtered.slice(this.scrollOffset, this.scrollOffset + maxVisible);
+  }
+
+  private entryLine(entry: ModelEntry, realIdx: number, width: number): string {
+    const selected = realIdx === this.cursorIndex;
+    const marker = this.isCurrentModel(entry) ? " ✓" : "  ";
+    const prefix = selected ? this.theme.bg("selectedBg", marker) : marker;
+    const label = selected
+      ? this.theme.bg("selectedBg", truncateToWidth(entry.label, width - 4))
+      : truncateToWidth(entry.label, width - 4);
+    return prefix + label;
+  }
+
+  private isCurrentModel(entry: ModelEntry): boolean {
+    const current = this.currentModel;
+    return !!current && entry.model.provider === current.provider && entry.model.id === current.id;
+  }
+
+  private noMatchesLine(): string | null {
+    if (this.filtered.length === 0 && this.query) return this.theme.fg("dim", "  No matches");
+    return null;
+  }
+
+  private footerText(): string {
     const footer: string[] = [
       `${this.theme.fg("dim", "Enter")} select`,
       `${this.theme.fg("dim", "Esc")} cancel`,
       `${this.theme.fg("dim", "↑↓")} navigate`,
     ];
-    lines.push(this.theme.fg("dim", footer.join("  ")));
-
-    return lines;
+    return footer.join("  ");
   }
 
+  private readonly inputHandlers: Array<(data: string) => boolean> = [
+    (data) => this.handleEscapeKey(data),
+    (data) => this.handleEnterKey(data),
+    (data) => this.handleUpKey(data),
+    (data) => this.handleDownKey(data),
+    (data) => this.handleBackspaceKey(data),
+    (data) => this.handleClearQueryKey(data),
+    (data) => this.appendCharKey(data),
+  ];
+
   handleInput(data: string): void {
-    if (matchesKey(data, Key.escape)) {
-      if (this.query) {
-        this.query = "";
-        this.applyFilter();
-        this.cursorIndex = 0;
-        this.scrollOffset = 0;
-        this.invalidate();
-        return;
-      }
-      this.resolve(undefined);
-      this.done();
-      return;
+    for (const handler of this.inputHandlers) {
+      if (handler(data)) return;
     }
+  }
 
-    if (matchesKey(data, Key.enter)) {
-      if (this.filtered.length === 0) return;
-      const entry = this.filtered[this.cursorIndex];
-      if (!entry) return;
-      this.resolve(entry.model);
-      this.done();
-      return;
-    }
-
-    if (matchesKey(data, Key.up)) {
-      if (this.cursorIndex > 0) {
-        this.cursorIndex--;
-        this.adjustScroll();
-        this.invalidate();
-      }
-      return;
-    }
-
-    if (matchesKey(data, Key.down)) {
-      if (this.cursorIndex < this.filtered.length - 1) {
-        this.cursorIndex++;
-        this.adjustScroll();
-        this.invalidate();
-      }
-      return;
-    }
-
-    if (matchesKey(data, Key.backspace)) {
-      if (this.query.length > 0) {
-        this.query = this.query.slice(0, -1);
-        this.applyFilter();
-        this.cursorIndex = Math.min(this.cursorIndex, Math.max(0, this.filtered.length - 1));
-        this.scrollOffset = 0;
-        this.invalidate();
-      }
-      return;
-    }
-
-    if (data === "\x15" || data === "\x17") {
+  private handleEscapeKey(data: string): boolean {
+    if (!matchesKey(data, Key.escape)) return false;
+    if (this.query) {
       this.query = "";
       this.applyFilter();
       this.cursorIndex = 0;
       this.scrollOffset = 0;
       this.invalidate();
-      return;
+      return true;
     }
+    this.resolve(undefined);
+    this.done();
+    return true;
+  }
 
-    if (data.length === 1 && data >= " ") {
-      this.query += data;
+  private handleEnterKey(data: string): boolean {
+    if (!matchesKey(data, Key.enter)) return false;
+    if (this.filtered.length === 0) return true;
+    const entry = this.filtered[this.cursorIndex];
+    if (!entry) return true;
+    this.resolve(entry.model);
+    this.done();
+    return true;
+  }
+
+  private handleUpKey(data: string): boolean {
+    if (!matchesKey(data, Key.up)) return false;
+    if (this.cursorIndex > 0) {
+      this.cursorIndex--;
+      this.adjustScroll();
+      this.invalidate();
+    }
+    return true;
+  }
+
+  private handleDownKey(data: string): boolean {
+    if (!matchesKey(data, Key.down)) return false;
+    if (this.cursorIndex < this.filtered.length - 1) {
+      this.cursorIndex++;
+      this.adjustScroll();
+      this.invalidate();
+    }
+    return true;
+  }
+
+  private handleBackspaceKey(data: string): boolean {
+    if (!matchesKey(data, Key.backspace)) return false;
+    if (this.query.length > 0) {
+      this.query = this.query.slice(0, -1);
       this.applyFilter();
-      this.cursorIndex = 0;
+      this.cursorIndex = Math.min(this.cursorIndex, Math.max(0, this.filtered.length - 1));
       this.scrollOffset = 0;
       this.invalidate();
     }
+    return true;
+  }
+
+  private handleClearQueryKey(data: string): boolean {
+    if (data !== "\x15" && data !== "\x17") return false;
+    this.query = "";
+    this.applyFilter();
+    this.cursorIndex = 0;
+    this.scrollOffset = 0;
+    this.invalidate();
+    return true;
+  }
+
+  private appendCharKey(data: string): boolean {
+    if (data.length !== 1 || data < " ") return false;
+    this.query += data;
+    this.applyFilter();
+    this.cursorIndex = 0;
+    this.scrollOffset = 0;
+    this.invalidate();
+    return true;
   }
 
   invalidate(): void {

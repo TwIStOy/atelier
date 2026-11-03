@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Split oversized functions in `index.ts`, `injection.ts`, and `reporter.ts` into small helpers to clear `fallow health` complexity findings; no behavior change.
+
 ### Removed
 
 - Dead exports found by static analysis: `MirrorResolution`, `InjectionConfig`, `CONFIG_ID`, `defaultConfigPath`, `SINGLETON_SESSION_KEY`, `STATUS_KEY`, `WIDGET_KEY`, `Cache.clearAll()`.

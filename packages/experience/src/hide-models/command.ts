@@ -27,32 +27,48 @@ const HELP_LINES = [
 type AnyModel = Model<Api>;
 
 export async function handleHideModels(args: string, ctx: ExtensionCommandContext): Promise<void> {
+  const { sub, target } = parseSubcommandArgs(args);
+  await dispatchSubcommand(sub, target, ctx);
+}
+
+function parseSubcommandArgs(args: string): { sub: string; target: string } {
   const trimmed = args.trim();
   const firstSpace = trimmed.search(/\s/);
-  const sub = firstSpace === -1 ? trimmed : trimmed.slice(0, firstSpace);
-  const target = firstSpace === -1 ? "" : trimmed.slice(firstSpace + 1).trim();
+  if (firstSpace === -1) return { sub: trimmed, target: "" };
+  return { sub: trimmed.slice(0, firstSpace), target: trimmed.slice(firstSpace + 1).trim() };
+}
 
-  switch (sub) {
-    case "":
-      await printStatus(ctx);
-      return;
-    case "add":
-      await cmdAdd(target, ctx);
-      return;
-    case "remove":
-      await cmdRemove(target, ctx);
-      return;
-    case "reset":
-      await cmdReset(ctx);
-      return;
-    case "help":
-    case "-h":
-    case "--help":
-      ctx.ui.notify(HELP_LINES.join("\n"), "info");
-      return;
-    default:
-      ctx.ui.notify(`Unknown subcommand "${sub}". Try: /hide-models help`, "warning");
+async function dispatchSubcommand(sub: string, target: string, ctx: ExtensionCommandContext): Promise<void> {
+  if (sub === "") {
+    await printStatus(ctx);
+    return;
   }
+  if (await runRuleCommand(sub, target, ctx)) return;
+  if (isHelpFlag(sub)) {
+    ctx.ui.notify(HELP_LINES.join("\n"), "info");
+    return;
+  }
+  ctx.ui.notify(`Unknown subcommand "${sub}". Try: /hide-models help`, "warning");
+}
+
+async function runRuleCommand(sub: string, target: string, ctx: ExtensionCommandContext): Promise<boolean> {
+  if (sub === "add") {
+    await cmdAdd(target, ctx);
+    return true;
+  }
+  if (sub === "remove") {
+    await cmdRemove(target, ctx);
+    return true;
+  }
+  if (sub === "reset") {
+    await cmdReset(ctx);
+    return true;
+  }
+  return false;
+}
+
+function isHelpFlag(sub: string): boolean {
+  return sub === "help" || sub === "-h" || sub === "--help";
 }
 
 interface Snapshot {
@@ -123,8 +139,7 @@ async function cmdAdd(target: string, ctx: ExtensionCommandContext): Promise<voi
     ctx.ui.notify("Usage: /hide-models add <provider[/model]>", "warning");
     return;
   }
-  const parsed = parseTarget(target);
-  if (!parsed) {
+  if (!parseTarget(target)) {
     ctx.ui.notify(`Invalid target: ${target}`, "warning");
     return;
   }
@@ -136,12 +151,16 @@ async function cmdAdd(target: string, ctx: ExtensionCommandContext): Promise<voi
     return;
   }
   setSuppress(false);
-  if (result.changed) {
-    const note = matched ? "" : "  (no matching model right now — added anyway)";
-    ctx.ui.notify(`Hidden ${describeRule(result.canonical)}.${note}`, "info");
-  } else {
-    ctx.ui.notify(`Already hidden: ${describeRule(result.canonical)}`, "info");
+  notifyAddResult(result.changed, result.canonical, matched, ctx);
+}
+
+function notifyAddResult(changed: boolean, canonical: string, matched: boolean, ctx: ExtensionCommandContext): void {
+  if (!changed) {
+    ctx.ui.notify(`Already hidden: ${describeRule(canonical)}`, "info");
+    return;
   }
+  const note = matched ? "" : "  (no matching model right now — added anyway)";
+  ctx.ui.notify(`Hidden ${describeRule(canonical)}.${note}`, "info");
 }
 
 async function cmdRemove(target: string, ctx: ExtensionCommandContext): Promise<void> {

@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Split the message_update/agent_end handlers and spinner application into per-branch helpers (thinking-state, usage deltas, runcat park/apply); no behavior change.
+
 ### Removed
 
 - Dead exports found by static analysis: `DEFAULT_RUNCAT_*` constants, `DEFAULT_PHRASES`, `resolvePhrases`, `CONFIG_ID`/`DEFAULT_CONFIG`/`CONFIG_SCHEMA`, `TokenEvent`.

@@ -114,26 +114,37 @@ function parseToolsField(fm: Record<string, unknown>): string[] | undefined {
 }
 
 function parseFileOptionsFromFrontmatter(fm: Record<string, unknown>): AgentPersonaFileOptions {
-  const descriptionRaw = parseStringField(fm, "description");
-  const description = descriptionRaw && descriptionRaw.length > 72 ? descriptionRaw.slice(0, 72) : descriptionRaw;
+  const out: AgentPersonaFileOptions = {};
+  applyStringPersonaOptions(out, fm);
+  applyFlagPersonaOptions(out, fm);
+  return out;
+}
+
+function applyStringPersonaOptions(out: AgentPersonaFileOptions, fm: Record<string, unknown>): void {
+  const description = clampPersonaLength(parseStringField(fm, "description"), 72);
   const whenToUseRaw = parseStringField(fm, "whenToUse") ?? parseStringField(fm, "when_to_use");
-  const whenToUse = whenToUseRaw && whenToUseRaw.length > 2000 ? whenToUseRaw.slice(0, 2000) : whenToUseRaw;
+  const whenToUse = clampPersonaLength(whenToUseRaw, 2000);
   const model = parseStringField(fm, "model");
   const thinking = parseStringField(fm, "thinking");
-  const inherit_context = parseBooleanField(fm, "inherit_context");
-  const isolated = parseBooleanField(fm, "isolated");
-  const max_turns = parseMaxTurnsField(fm);
-  const tools = parseToolsField(fm);
-  const out: AgentPersonaFileOptions = {};
   if (description) out.description = description;
   if (whenToUse) out.whenToUse = whenToUse;
   if (model) out.model = model;
   if (thinking) out.thinking = thinking;
+}
+
+function clampPersonaLength(value: string | undefined, max: number): string | undefined {
+  return value && value.length > max ? value.slice(0, max) : value;
+}
+
+function applyFlagPersonaOptions(out: AgentPersonaFileOptions, fm: Record<string, unknown>): void {
+  const inherit_context = parseBooleanField(fm, "inherit_context");
+  const isolated = parseBooleanField(fm, "isolated");
+  const max_turns = parseMaxTurnsField(fm);
+  const tools = parseToolsField(fm);
   if (inherit_context !== undefined) out.inherit_context = inherit_context;
   if (isolated !== undefined) out.isolated = isolated;
   if (max_turns !== undefined) out.max_turns = max_turns;
   if (tools !== undefined) out.tools = tools;
-  return out;
 }
 
 function parsePersonaMarkdown(
@@ -255,7 +266,7 @@ export function sharedPersonasDir(): string {
   return fileURLToPath(new URL("../../../../agents/", import.meta.url));
 }
 
-export function buildAgentPersonaCatalog(cwd: string, opts?: BuildAgentPersonaCatalogOptions): AgentPersonaCatalog {
+function personaScanLayers(cwd: string, opts?: BuildAgentPersonaCatalogOptions): ScanLayer[] {
   const layers: ScanLayer[] = [
     { dirs: [sharedPersonasDir(), ...(opts?.shippedDirs ?? [])] },
     { dirs: [join(homedir(), ".config", "pi", "agents")] },
@@ -267,39 +278,58 @@ export function buildAgentPersonaCatalog(cwd: string, opts?: BuildAgentPersonaCa
     extDirs.push(...readPiAgentsDirsFromPackageRoot(root));
   }
   layers.push({ dirs: extDirs });
+  return layers;
+}
 
+function malformedPersonaWarning(file: string, agents: Map<string, AgentPersonaEntry>, e: unknown): string {
+  const msg = e instanceof Error ? e.message : String(e);
+  const base = normalizePersonaId(basename(file, ".md"));
+  const replacedBy = agents.get(base)?.sourcePath;
+  if (replacedBy) {
+    return `skipping malformed agent file ${file}: ${msg}; using ${replacedBy} instead`;
+  }
+  return `skipping malformed agent file ${file}: ${msg}`;
+}
+
+function loadPersonaFromFile(file: string, agents: Map<string, AgentPersonaEntry>): string | null {
+  let row: ReturnType<typeof loadMdPersonaFile>;
+  try {
+    row = loadMdPersonaFile(file);
+  } catch (e) {
+    return malformedPersonaWarning(file, agents, e);
+  }
+  if (!row) return null;
+  agents.set(row.id, {
+    prompt: row.prompt,
+    fileOptions: row.fileOptions,
+    sourcePath: resolvePath(file),
+  });
+  return null;
+}
+
+function ensureFallbackPersona(agents: Map<string, AgentPersonaEntry>): void {
+  if (agents.has(FALLBACK_PERSONA_ID)) return;
+  agents.set(FALLBACK_PERSONA_ID, {
+    prompt: ULTIMATE_DEFAULT_PROMPT,
+    fileOptions: {},
+    sourcePath: `<built-in ${FALLBACK_PERSONA_ID}>`,
+  });
+}
+
+export function buildAgentPersonaCatalog(cwd: string, opts?: BuildAgentPersonaCatalogOptions): AgentPersonaCatalog {
+  const layers = personaScanLayers(cwd, opts);
   const agents = new Map<string, AgentPersonaEntry>();
   const warnings: string[] = [];
   for (const layer of layers) {
     for (const dir of layer.dirs) {
       for (const file of collectMdFilesInDir(dir)) {
-        let row: ReturnType<typeof loadMdPersonaFile>;
-        try {
-          row = loadMdPersonaFile(file);
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e);
-          const warning = `skipping malformed agent file ${file}: ${msg}`;
-          const replacedBy = agents.get(normalizePersonaId(basename(file, ".md")))?.sourcePath;
-          warnings.push(replacedBy ? `${warning}; using ${replacedBy} instead` : warning);
-          continue;
-        }
-        if (!row) continue;
-        agents.set(row.id, {
-          prompt: row.prompt,
-          fileOptions: row.fileOptions,
-          sourcePath: resolvePath(file),
-        });
+        const warning = loadPersonaFromFile(file, agents);
+        if (warning) warnings.push(warning);
       }
     }
   }
   for (const warning of warnings) log.warn(warning);
-  if (!agents.has(FALLBACK_PERSONA_ID)) {
-    agents.set(FALLBACK_PERSONA_ID, {
-      prompt: ULTIMATE_DEFAULT_PROMPT,
-      fileOptions: {},
-      sourcePath: `<built-in ${FALLBACK_PERSONA_ID}>`,
-    });
-  }
+  ensureFallbackPersona(agents);
   return { agents, warnings };
 }
 

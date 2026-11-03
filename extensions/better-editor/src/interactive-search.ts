@@ -24,6 +24,13 @@ const NF_ARROW_RIGHT = "\uf061";
 
 type SkimResult = { ok: true; lines: string[] } | { ok: false; reason: string };
 
+function skimExitResult(code: number | null, stdout: string): SkimResult {
+  if (code !== 0 && code !== 1) {
+    return { ok: false, reason: `exit ${code ?? "?"}` };
+  }
+  return { ok: true, lines: stdout.split("\n").filter(Boolean) };
+}
+
 function runSkimFilter(lines: string[], filter: string, cwd: string): Promise<SkimResult> {
   return new Promise((resolve) => {
     if (lines.length === 0) {
@@ -57,9 +64,7 @@ function runSkimFilter(lines: string[], filter: string, cwd: string): Promise<Sk
     child.once("close", (code) => {
       if (settled) return;
       clearTimeout(timer);
-      const out = stdout.split("\n").filter(Boolean);
-      if (code === 0 || code === 1) finish({ ok: true, lines: out });
-      else finish({ ok: false, reason: `exit ${code ?? "?"}` });
+      finish(skimExitResult(code, stdout));
     });
     child.stdin.end(`${lines.join("\n")}\n`, "utf8");
   });
@@ -196,34 +201,57 @@ export class InteractiveHistorySearch extends Container {
     }, SKIM_DEBOUNCE_MS);
   }
 
+  private skimResultStatus(res: SkimResult, q: string): string {
+    if (!res.ok) {
+      return `skim: ${res.reason} — using built-in fuzzy until \`sk\` works`;
+    }
+    const n = res.lines.length;
+    if (n === 0) {
+      return `skim: no matches for “${q}”`;
+    }
+    return `skim: ${n} match${n === 1 ? "" : "es"} for “${q}”`;
+  }
+
+  private applySkimResult(res: SkimResult, q: string): void {
+    if (res.ok) {
+      this.skimCache = { query: q, lines: res.lines };
+    } else {
+      this.skimCache = undefined;
+    }
+    this.statusText.setText(this.theme.fg("muted", this.skimResultStatus(res, q)));
+  }
+
+  private applySkimError(): void {
+    this.skimCache = undefined;
+    this.statusText.setText(this.theme.fg("muted", "skim: error — using built-in fuzzy"));
+  }
+
   private async runSkim(q: string): Promise<void> {
     const seq = ++this.skimSeq;
     try {
       const res = await runSkimFilter(this.history, q, this.ctx.cwd);
       if (seq !== this.skimSeq) return;
-      if (!res.ok) {
-        this.skimCache = undefined;
-        this.statusText.setText(
-          this.theme.fg("muted", `skim: ${res.reason} — using built-in fuzzy until \`sk\` works`),
-        );
-      } else {
-        this.skimCache = { query: q, lines: res.lines };
-        const n = res.lines.length;
-        this.statusText.setText(
-          this.theme.fg(
-            "muted",
-            n === 0 ? `skim: no matches for “${q}”` : `skim: ${n} match${n === 1 ? "" : "es"} for “${q}”`,
-          ),
-        );
-      }
+      this.applySkimResult(res, q);
     } catch {
       if (seq !== this.skimSeq) return;
-      this.skimCache = undefined;
-      this.statusText.setText(this.theme.fg("muted", "skim: error — using built-in fuzzy"));
+      this.applySkimError();
     }
     this.rebuildMatches();
     this.updateListText();
     this.tui.requestRender();
+  }
+
+  private candidateList(q: string): string[] {
+    if (this.skimCache?.query === q) {
+      return this.skimCache.lines;
+    }
+    return fuzzyFilter(this.history, q, (x) => x);
+  }
+
+  private clampSelection(): void {
+    if (this.selectedIndex >= this.matches.length) {
+      this.selectedIndex = Math.max(0, this.matches.length - 1);
+    }
   }
 
   private rebuildMatches(): void {
@@ -233,17 +261,10 @@ export class InteractiveHistorySearch extends Container {
       this.selectedIndex = Math.min(this.selectedIndex, Math.max(0, this.matches.length - 1));
       return;
     }
-    let list: string[];
-    if (this.skimCache?.query === q) {
-      list = this.skimCache.lines;
-    } else {
-      list = fuzzyFilter(this.history, q, (x) => x);
-    }
+    let list = this.candidateList(q);
     if (list.length > SELECT_LIMIT * 2) list = list.slice(0, SELECT_LIMIT * 2);
     this.matches = list.slice(0, SELECT_LIMIT);
-    if (this.selectedIndex >= this.matches.length) {
-      this.selectedIndex = Math.max(0, this.matches.length - 1);
-    }
+    this.clampSelection();
   }
 
   private updateListText(): void {

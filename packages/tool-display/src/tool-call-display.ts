@@ -85,27 +85,33 @@ export function defaultGenericCollapsedRenderer(output: string, theme: Theme, wi
 function subagentRunFinished(details: unknown): "ok" | "err" | undefined {
   if (details == null || typeof details !== "object") return undefined;
   const d = details as Record<string, unknown>;
-  const ptd = d.per_task_done;
-  const pto = d.per_task_ok;
-  if (
-    Array.isArray(ptd) &&
-    ptd.length > 0 &&
-    ptd.every((x) => x === true) &&
-    Array.isArray(pto) &&
-    pto.length === ptd.length
-  ) {
-    return pto.every((x) => x === true) ? "ok" : "err";
-  }
+  const perTask = perTaskRunFinished(d);
+  if (perTask !== undefined) return perTask;
   if (d.ok === true) return "ok";
   if (d.ok === false) return "err";
-  if (d.mode === "batch" && Array.isArray(d.batch)) {
-    const b = d.batch as { ok?: boolean }[];
-    if (b.length > 0 && b.every((x) => typeof x.ok === "boolean")) {
-      return b.every((x) => x.ok) ? "ok" : "err";
-    }
-  }
-  return undefined;
+  return batchRunFinished(d);
 }
+
+function perTaskDoneComplete(perTaskDone: unknown): perTaskDone is unknown[] {
+  return Array.isArray(perTaskDone) && perTaskDone.length > 0 && perTaskDone.every((x) => x === true);
+}
+
+function perTaskRunFinished(d: Record<string, unknown>): "ok" | "err" | undefined {
+  const ptd = d.per_task_done;
+  const pto = d.per_task_ok;
+  if (!perTaskDoneComplete(ptd)) return undefined;
+  if (!Array.isArray(pto) || pto.length !== ptd.length) return undefined;
+  return pto.every((x) => x === true) ? "ok" : "err";
+}
+
+function batchRunFinished(d: Record<string, unknown>): "ok" | "err" | undefined {
+  if (d.mode !== "batch" || !Array.isArray(d.batch)) return undefined;
+  const b = d.batch as { ok?: boolean }[];
+  if (b.length === 0 || !b.every((x) => typeof x.ok === "boolean")) return undefined;
+  return b.every((x) => x.ok) ? "ok" : "err";
+}
+
+type BulletState = { spinning: boolean; failed: boolean };
 
 export function toolBullet(
   toolName: string,
@@ -116,39 +122,72 @@ export function toolBullet(
   spinAt: number,
   hoverAffordance: boolean,
 ): { bullet: string; status?: RailStatus } {
-  let spinning = false;
-  let failed = false;
+  const state = bulletStateFor(toolName, isPartial, isError, details);
+  if (state.spinning) return { bullet: spinnerGlyph(theme, spinAt) };
+  return { bullet: hoverAffordance ? "›" : "◆", status: state.failed ? "error" : "success" };
+}
 
-  if (toolName === "subagent") {
-    const fin = subagentRunFinished(details);
-    if (fin === "ok") failed = false;
-    else if (fin === "err") failed = true;
-    else if (isPartial) spinning = true;
-    else failed = isError;
-  } else if (toolName === "subagent_status") {
-    const d = details && typeof details === "object" ? (details as Record<string, unknown>) : undefined;
-    const st = typeof d?.status === "string" ? d.status : "";
-    if (st === "running") spinning = true;
-    else if (st === "unknown" || st === "error" || (st === "done" && d?.ok === false) || isError) failed = true;
-  } else if (toolName === "workflow") {
-    const d = details && typeof details === "object" ? (details as Record<string, unknown>) : undefined;
-    if (d?.ok === true) failed = false;
-    else if (d?.ok === false) failed = true;
-    else if (isPartial) spinning = true;
-    else failed = isError;
-  } else if (toolName === "apply_patch") {
-    const d = details && typeof details === "object" ? (details as Record<string, unknown>) : undefined;
-    const r = typeof d?.result === "object" && d.result !== null ? (d.result as { failures?: unknown[] }) : undefined;
-    if (r && Array.isArray(r.failures) && r.failures.length > 0) failed = true;
-    else if (isPartial) spinning = true;
-    else failed = isError;
-  } else {
-    if (isPartial) spinning = true;
-    else failed = isError;
+function bulletStateFor(toolName: string, isPartial: boolean, isError: boolean, details: unknown): BulletState {
+  switch (toolName) {
+    case "subagent":
+      return subagentBulletState(isPartial, isError, details);
+    case "subagent_status":
+      return subagentStatusBulletState(isError, details);
+    case "workflow":
+      return workflowBulletState(isPartial, isError, details);
+    case "apply_patch":
+      return applyPatchBulletState(isPartial, isError, details);
+    default:
+      return defaultBulletState(isPartial, isError);
   }
+}
 
-  if (spinning) return { bullet: spinnerGlyph(theme, spinAt) };
-  return { bullet: hoverAffordance ? "›" : "◆", status: failed ? "error" : "success" };
+function defaultBulletState(isPartial: boolean, isError: boolean): BulletState {
+  if (isPartial) return { spinning: true, failed: false };
+  return { spinning: false, failed: isError };
+}
+
+function subagentBulletState(isPartial: boolean, isError: boolean, details: unknown): BulletState {
+  const fin = subagentRunFinished(details);
+  if (fin === "ok") return { spinning: false, failed: false };
+  if (fin === "err") return { spinning: false, failed: true };
+  return defaultBulletState(isPartial, isError);
+}
+
+function subagentStatusBulletState(isError: boolean, details: unknown): BulletState {
+  const d = detailRecord(details);
+  const st = statusString(d);
+  if (st === "running") return { spinning: true, failed: false };
+  if (subagentStatusFailed(st, d, isError)) return { spinning: false, failed: true };
+  return { spinning: false, failed: false };
+}
+
+function statusString(d: Record<string, unknown> | undefined): string {
+  return typeof d?.status === "string" ? d.status : "";
+}
+
+function subagentStatusFailed(st: string, d: Record<string, unknown> | undefined, isError: boolean): boolean {
+  if (st === "unknown" || st === "error") return true;
+  if (st === "done" && d?.ok === false) return true;
+  return isError;
+}
+
+function workflowBulletState(isPartial: boolean, isError: boolean, details: unknown): BulletState {
+  const d = detailRecord(details);
+  if (d?.ok === true) return { spinning: false, failed: false };
+  if (d?.ok === false) return { spinning: false, failed: true };
+  return defaultBulletState(isPartial, isError);
+}
+
+function applyPatchBulletState(isPartial: boolean, isError: boolean, details: unknown): BulletState {
+  const d = detailRecord(details);
+  const r = typeof d?.result === "object" && d.result !== null ? (d.result as { failures?: unknown[] }) : undefined;
+  if (r && Array.isArray(r.failures) && r.failures.length > 0) return { spinning: false, failed: true };
+  return defaultBulletState(isPartial, isError);
+}
+
+function detailRecord(details: unknown): Record<string, unknown> | undefined {
+  return details && typeof details === "object" ? (details as Record<string, unknown>) : undefined;
 }
 
 export function defaultCollapsedRenderer(content: string, theme: Theme, width: number): string[] {
@@ -201,6 +240,130 @@ export interface ToolCallDisplayOpts {
   headerAnnotation?: string;
 }
 
+const ADAPTER_PARTIAL_PREVIEW_TOOLS = new Set(["grep", "glob", "ls"]);
+
+function shouldUseAdapter(
+  adapter: ToolDisplayAdapter | undefined,
+  opts: ToolCallDisplayOpts,
+): adapter is ToolDisplayAdapter {
+  if (!adapter) return false;
+  if (opts.expanded || opts.output) return true;
+  if (collapsedWebSearchError(opts)) return true;
+  if (opts.toolName === "subagent" || opts.toolName === "workflow" || opts.toolName === "codemode") return true;
+  return opts.isPartial === true && ADAPTER_PARTIAL_PREVIEW_TOOLS.has(opts.toolName);
+}
+
+function collapsedWebSearchError(opts: ToolCallDisplayOpts): boolean {
+  if (opts.toolName !== "web_search" || opts.expanded) return false;
+  return detailsErrorPresent(opts.details);
+}
+
+function detailsErrorPresent(details: unknown): boolean {
+  if (details == null || typeof details !== "object") return false;
+  const error = (details as Record<string, unknown>).error;
+  return typeof error === "string" && error.length > 0;
+}
+
+function renderHeaderLines(
+  adapter: ToolDisplayAdapter | undefined,
+  opts: ToolCallDisplayOpts,
+  theme: Theme,
+  width: number,
+  spinAt: number,
+): string[] {
+  const bodyWidth = toolRailBodyWidth(width);
+  const elapsedMs = opts.startedAtMs !== undefined ? (opts.endedAtMs ?? spinAt) - opts.startedAtMs : undefined;
+  const timerLabel =
+    elapsedMs !== undefined && elapsedMs >= TIMER_MIN_ELAPSED_MS ? formatDuration(elapsedMs) : undefined;
+  const timerPart = timerLabel ? `${theme.fg("dim", timerLabel)} ` : "";
+  const timerWidth = timerLabel ? visibleWidth(timerLabel) + 1 : 0;
+  const innerWidth = Math.max(1, bodyWidth - timerWidth);
+
+  const headerText = adapter
+    ? adapter.formatCallHeader(
+        opts.args,
+        theme,
+        opts.details,
+        opts.isPartial,
+        opts.expanded,
+        innerWidth,
+        opts.output,
+        opts.headerAnnotation,
+      )
+    : formatGenericToolHeader(opts.toolName, opts.args, theme, innerWidth, opts.displayName);
+
+  const headerLines = headerText.split("\n");
+  if (timerPart) headerLines[0] = timerPart + headerLines[0];
+  return headerLines;
+}
+
+function renderBodyLines(
+  adapter: ToolDisplayAdapter | undefined,
+  opts: ToolCallDisplayOpts,
+  theme: Theme,
+  width: number,
+  spinAt: number,
+): string[] {
+  const bodyWidth = toolRailBodyWidth(width);
+  const out = opts.output ?? "";
+  if (showsErroredReason(opts, out)) return erroredReasonBody(adapter, opts, theme, bodyWidth, out);
+  if (shouldUseAdapter(adapter, opts)) {
+    return opts.expanded
+      ? adapter.formatExpandedContent(opts.args, out, theme, bodyWidth, opts.details)
+      : adapter.formatCollapsedContent(opts.args, out, theme, bodyWidth, opts.details, opts.isPartial, spinAt);
+  }
+  return fallbackBody(adapter, opts, theme, bodyWidth);
+}
+
+function showsErroredReason(opts: ToolCallDisplayOpts, out: string): boolean {
+  if (opts.toolName === "codemode" || collapsedWebSearchError(opts)) return false;
+  return opts.isError && !opts.isPartial && out.trim().length > 0;
+}
+
+function erroredReasonBody(
+  adapter: ToolDisplayAdapter | undefined,
+  opts: ToolCallDisplayOpts,
+  theme: Theme,
+  bodyWidth: number,
+  out: string,
+): string[] {
+  const reason = out.replace(/\n+/g, " ").trim();
+  if (!opts.expanded) {
+    return [theme.fg("muted", truncateToWidth(`└ ${reason}`, bodyWidth, "…"))];
+  }
+  const lines: string[] = [];
+  const icon = theme.fg("error", "\ue654 ");
+  const cont = " ".repeat(visibleWidth(icon));
+  const wrapWidth = Math.max(1, bodyWidth - visibleWidth(icon));
+  const wrapped = wrapTextWithAnsi(reason, wrapWidth);
+  wrapped.forEach((wl, i) => {
+    const prefix = i === 0 ? icon : cont;
+    lines.push(prefix + theme.fg("muted", truncateToWidth(wl, wrapWidth, "…")));
+  });
+  if (adapter) {
+    lines.push(...adapter.formatExpandedContent(opts.args, out, theme, bodyWidth, opts.details));
+  }
+  return lines;
+}
+
+function fallbackBody(
+  adapter: ToolDisplayAdapter | undefined,
+  opts: ToolCallDisplayOpts,
+  theme: Theme,
+  bodyWidth: number,
+): string[] {
+  if (!opts.output) {
+    if (!opts.isPartial && !opts.isError) return [theme.fg("muted", "done")];
+    return [];
+  }
+  const collapsedRenderer =
+    opts.renderCollapsed ?? (adapter ? defaultCollapsedRenderer : defaultGenericCollapsedRenderer);
+  const expandedRenderer = opts.renderExpanded ?? (adapter ? defaultExpandedRenderer : defaultGenericExpandedRenderer);
+  return opts.expanded
+    ? expandedRenderer(opts.output, theme, bodyWidth)
+    : collapsedRenderer(opts.output, theme, bodyWidth);
+}
+
 export function renderToolCall(
   opts: ToolCallDisplayOpts,
   theme: Theme,
@@ -210,8 +373,6 @@ export function renderToolCall(
   return {
     render(width: number): string[] {
       const spinAt = Date.now();
-      const elapsedMs = opts.startedAtMs !== undefined ? (opts.endedAtMs ?? spinAt) - opts.startedAtMs : undefined;
-      const bodyWidth = toolRailBodyWidth(width);
       const bullet = toolBullet(
         opts.toolName,
         opts.isPartial,
@@ -221,113 +382,14 @@ export function renderToolCall(
         spinAt,
         opts.hoverAffordance === true,
       );
-
-      const timerLabel =
-        elapsedMs !== undefined && elapsedMs >= TIMER_MIN_ELAPSED_MS ? formatDuration(elapsedMs) : undefined;
-      const timerPart = timerLabel ? `${theme.fg("dim", timerLabel)} ` : "";
-      const timerWidth = timerLabel ? visibleWidth(timerLabel) + 1 : 0;
-      const innerWidth = Math.max(1, bodyWidth - timerWidth);
-
-      const headerText = adapter
-        ? adapter.formatCallHeader(
-            opts.args,
-            theme,
-            opts.details,
-            opts.isPartial,
-            opts.expanded,
-            innerWidth,
-            opts.output,
-            opts.headerAnnotation,
-          )
-        : formatGenericToolHeader(opts.toolName, opts.args, theme, innerWidth, opts.displayName);
-
-      const headerLines = headerText.split("\n");
-      if (timerPart) headerLines[0] = timerPart + headerLines[0];
-      const lines = [...headerLines];
-
-      const out = opts.output ?? "";
-      const hasTextOutput = Boolean(out);
-      const detailsRecord =
-        opts.details != null && typeof opts.details === "object"
-          ? (opts.details as Record<string, unknown>)
-          : undefined;
-      const collapsedWebSearchError =
-        opts.toolName === "web_search" &&
-        !opts.expanded &&
-        typeof detailsRecord?.error === "string" &&
-        detailsRecord.error.length > 0;
-      const detailsOnlyCollapsed =
-        opts.toolName === "subagent" && !opts.expanded && !opts.isPartial && opts.details !== undefined;
-
-      const grepCollapsedPartial = opts.toolName === "grep" && !opts.expanded && opts.isPartial;
-
-      const globCollapsedPartial = opts.toolName === "glob" && !opts.expanded && opts.isPartial;
-
-      const lsCollapsedPartial = opts.toolName === "ls" && !opts.expanded && opts.isPartial;
-
-      const useAdapter =
-        adapter &&
-        (opts.expanded ||
-          hasTextOutput ||
-          collapsedWebSearchError ||
-          detailsOnlyCollapsed ||
-          grepCollapsedPartial ||
-          globCollapsedPartial ||
-          lsCollapsedPartial ||
-          (opts.toolName === "subagent" && !opts.expanded) ||
-          (opts.toolName === "workflow" && !opts.expanded) ||
-          (opts.toolName === "codemode" && !opts.expanded));
-
-      // A failed codemode script returns its output plus a "Script error:" section as
-      // text; the adapter splits and styles those instead of the squashed one-liner.
-      const erroredReason =
-        opts.isError &&
-        !opts.isPartial &&
-        out.trim().length > 0 &&
-        opts.toolName !== "codemode" &&
-        !collapsedWebSearchError;
-
-      if (erroredReason) {
-        const reason = out.replace(/\n+/g, " ").trim();
-        if (opts.expanded) {
-          const icon = theme.fg("error", "\ue654 ");
-          const cont = " ".repeat(visibleWidth(icon));
-          const wrapWidth = Math.max(1, bodyWidth - visibleWidth(icon));
-          const wrapped = wrapTextWithAnsi(reason, wrapWidth);
-          wrapped.forEach((wl, i) => {
-            const prefix = i === 0 ? icon : cont;
-            lines.push(prefix + theme.fg("muted", truncateToWidth(wl, wrapWidth, "…")));
-          });
-          if (adapter) {
-            lines.push(...adapter.formatExpandedContent(opts.args, out, theme, bodyWidth, opts.details));
-          }
-        } else {
-          lines.push(theme.fg("muted", truncateToWidth(`└ ${reason}`, bodyWidth, "…")));
-        }
-      } else if (useAdapter) {
-        const contentLines = opts.expanded
-          ? adapter.formatExpandedContent(opts.args, out, theme, bodyWidth, opts.details)
-          : adapter.formatCollapsedContent(opts.args, out, theme, bodyWidth, opts.details, opts.isPartial, spinAt);
-        lines.push(...contentLines);
-      } else if (opts.output) {
-        const collapsedRenderer =
-          opts.renderCollapsed ?? (adapter ? defaultCollapsedRenderer : defaultGenericCollapsedRenderer);
-        const expandedRenderer =
-          opts.renderExpanded ?? (adapter ? defaultExpandedRenderer : defaultGenericExpandedRenderer);
-        const contentLines = opts.expanded
-          ? expandedRenderer(opts.output, theme, bodyWidth)
-          : collapsedRenderer(opts.output, theme, bodyWidth);
-        lines.push(...contentLines);
-      } else if (!opts.isPartial && !opts.isError) {
-        lines.push(theme.fg("muted", "done"));
-      }
-
+      const header = renderHeaderLines(adapter, opts, theme, width, spinAt);
+      const body = renderBodyLines(adapter, opts, theme, width, spinAt);
       const spec: RailSpec = {
         mark: "run",
         bullet: bullet.bullet,
         status: bullet.status,
       };
-      return renderRailLines(lines, spec, theme, width);
+      return renderRailLines([...header, ...body], spec, theme, width);
     },
     invalidate() {},
   };

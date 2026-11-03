@@ -110,52 +110,70 @@ function perMillion(perToken: string | undefined): number {
   if (!perToken) return 0;
   const trimmed = perToken.trim();
   const decimal = /^(\d+)(?:\.(\d+))?$/.exec(trimmed);
-  if (!decimal) {
-    const numeric = Number(trimmed);
-    if (!Number.isFinite(numeric) || numeric < 0) return 0;
-    return numeric * 1_000_000;
-  }
+  if (!decimal) return numericPerMillion(trimmed);
+  return decimalPerMillion(decimal);
+}
+
+function numericPerMillion(trimmed: string): number {
+  const numeric = Number(trimmed);
+  if (!Number.isFinite(numeric) || numeric < 0) return 0;
+  return numeric * 1_000_000;
+}
+
+function decimalPerMillion(decimal: RegExpExecArray): number {
   const whole = decimal[1] ?? "0";
   const frac = decimal[2] ?? "";
   const scale = 6;
-  const shifted =
-    frac.length <= scale
-      ? { intDigits: whole + frac.padEnd(scale, "0"), fracDigits: "" }
-      : { intDigits: whole + frac.slice(0, scale), fracDigits: frac.slice(scale).replace(/0+$/, "") };
+  const shifted = shiftDecimal(whole, frac, scale);
   const intDigits = shifted.intDigits.replace(/^0+(?=\d)/, "");
   const text = shifted.fracDigits ? `${intDigits}.${shifted.fracDigits}` : intDigits;
   const value = Number(text);
   return Number.isFinite(value) ? value : 0;
 }
 
+function shiftDecimal(whole: string, frac: string, scale: number): { intDigits: string; fracDigits: string } {
+  if (frac.length <= scale) return { intDigits: whole + frac.padEnd(scale, "0"), fracDigits: "" };
+  return { intDigits: whole + frac.slice(0, scale), fracDigits: frac.slice(scale).replace(/0+$/, "") };
+}
+
 function toModelConfig(entry: MagpieModel, v1BaseUrl: string): ProviderModelConfig | undefined {
   if (!entry.id) return undefined;
   if (entry.object !== undefined && entry.object !== "model") return undefined;
+  const config = chatModelConfigFor(entry, entry.id, v1BaseUrl);
+  const levels = thinkingLevelMap(reasoningLevels(entry));
+  if (levels) config.thinkingLevelMap = levels;
+  return config;
+}
 
+function chatModelConfigFor(entry: MagpieModel, id: string, v1BaseUrl: string): ChatModelConfig {
   const efforts = reasoningLevels(entry);
-  const input: ("text" | "image")[] = entry.modalities?.input?.includes("image") ? ["text", "image"] : ["text"];
-  const pricing = entry.pricing;
   const chosen = pickApi(entry.native_endpoints, v1BaseUrl);
   const config: ChatModelConfig = {
-    id: entry.id,
-    name: entry.display_name?.trim() || entry.id,
+    id,
+    name: entry.display_name?.trim() || id,
     api: chosen.api,
     reasoning: entry.reasoning === true || efforts.length > 0,
-    input,
-    cost: {
-      input: perMillion(pricing?.prompt),
-      output: perMillion(pricing?.completion),
-      cacheRead: perMillion(pricing?.input_cache_read),
-      cacheWrite: perMillion(pricing?.input_cache_write),
-    },
+    input: modelInput(entry),
+    cost: magpieCost(entry.pricing),
     contextWindow: entry.context_window ?? entry.context_length ?? DEFAULT_CONTEXT_WINDOW,
     maxTokens: entry.max_output_tokens ?? DEFAULT_MAX_TOKENS,
     compat: MAGPIE_COMPAT,
   };
   if (chosen.baseUrl) config.baseUrl = chosen.baseUrl;
-  const levels = thinkingLevelMap(efforts);
-  if (levels) config.thinkingLevelMap = levels;
   return config;
+}
+
+function modelInput(entry: MagpieModel): ("text" | "image")[] {
+  return entry.modalities?.input?.includes("image") ? ["text", "image"] : ["text"];
+}
+
+function magpieCost(pricing: MagpieModel["pricing"]): ChatModelConfig["cost"] {
+  return {
+    input: perMillion(pricing?.prompt),
+    output: perMillion(pricing?.completion),
+    cacheRead: perMillion(pricing?.input_cache_read),
+    cacheWrite: perMillion(pricing?.input_cache_write),
+  };
 }
 
 export async function fetchCatalog(

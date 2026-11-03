@@ -7,6 +7,24 @@ function heapMb(): number {
   return Math.round(process.memoryUsage().heapUsed / MB);
 }
 
+function isClearKeyword(raw: string): boolean {
+  return raw === "" || raw === "0" || raw === "clear";
+}
+
+function shouldRelease(raw: string, target: number): boolean {
+  if (isClearKeyword(raw)) return true;
+  return !Number.isFinite(target) || target <= 0;
+}
+
+function inflateHeap(target: number): number {
+  chunks.length = 0;
+  const count = Math.floor(target);
+  for (let i = 0; i < count; i++) {
+    chunks.push("x".repeat(MB));
+  }
+  return count;
+}
+
 export default function heapProbe(pi: ExtensionAPI): void {
   pi.registerCommand("heap-probe", {
     description:
@@ -15,18 +33,14 @@ export default function heapProbe(pi: ExtensionAPI): void {
       const raw = args.trim();
       const target = Number(raw);
 
-      if (raw === "" || raw === "0" || raw === "clear" || !Number.isFinite(target) || target <= 0) {
+      if (shouldRelease(raw, target)) {
         chunks.length = 0;
         ctx.ui.notify(`heap-probe: released. heapUsed now ${heapMb()}MB`, "info");
         return;
       }
 
       const before = heapMb();
-      chunks.length = 0;
-      const count = Math.floor(target);
-      for (let i = 0; i < count; i++) {
-        chunks.push("x".repeat(MB));
-      }
+      const count = inflateHeap(target);
       ctx.ui.notify(
         `heap-probe: +${count}MB resident (no messages added). heapUsed ${before}->${heapMb()}MB. Type to test: lag => GC(heap); smooth => rendering(msg count).`,
         "info",

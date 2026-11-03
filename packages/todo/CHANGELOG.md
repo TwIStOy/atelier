@@ -9,6 +9,7 @@
 ### Changed
 
 - Trimmed `todo_update` and `todo_list` prompt guidelines to behavior policy only: the explicit-status-defaults, addBlockedBy additive-merge, and includeDeleted/tombstone mechanics duplicated the tool and parameter schema descriptions, which already carry them in the API tools field. The self-block/cycle rejection clause moved into the `addBlockedBy` parameter description.
+- Split `applyTaskMutation` into per-action helpers (create/update/list/get/delete/clear) behind the same switch, and extracted the `tool_result` reminder gate into `reminderSuppressed`/`hasVisibleTodoTasks` helpers, clearing the `fallow health` complexity findings with no behavior, error-message, or public API changes.
 
 ## [0.7.0] - 2026-10-30
 

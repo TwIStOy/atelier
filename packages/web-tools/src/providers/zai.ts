@@ -38,14 +38,30 @@ function unwrapMcpText(raw: unknown): unknown {
   return parsed;
 }
 
+function isRateLimitMessage(msg: string): boolean {
+  const codeMatch = msg.match(/"code"\s*:\s*"(\d+)"/);
+  return codeMatch !== null && ZAI_RATE_LIMIT_CODES.has(codeMatch[1]!);
+}
+
 function rewriteMcpError(name: string, err: unknown): never {
   if (err instanceof ProviderError) throw err;
   const msg = err instanceof Error ? err.message : String(err);
-  const codeMatch = msg.match(/"code"\s*:\s*"(\d+)"/);
-  if (codeMatch && ZAI_RATE_LIMIT_CODES.has(codeMatch[1]!)) {
+  if (isRateLimitMessage(msg)) {
     throw new ProviderError(name, 429, msg, { isRateLimit: true });
   }
   throw new ProviderError(name, 500, msg);
+}
+
+function zaiReadResponse(parsed: unknown): FetchResponse {
+  if (typeof parsed === "string") {
+    return { text: parsed, contentType: "text/plain" };
+  }
+  const data = parsed as ZaiWebReadResult;
+  return {
+    text: data.content ?? JSON.stringify(parsed, null, 2),
+    title: data.title || undefined,
+    contentType: "text/plain",
+  };
 }
 
 export class ZaiProvider implements FullProvider {
@@ -114,17 +130,6 @@ export class ZaiProvider implements FullProvider {
       throw new Error(`Z.AI Fetch error: no content returned for ${url}`);
     }
 
-    const parsed = unwrapMcpText(text);
-
-    if (typeof parsed === "string") {
-      return { text: parsed, contentType: "text/plain" };
-    }
-
-    const data = parsed as ZaiWebReadResult;
-    return {
-      text: data.content ?? JSON.stringify(parsed, null, 2),
-      title: data.title || undefined,
-      contentType: "text/plain",
-    };
+    return zaiReadResponse(unwrapMcpText(text));
   }
 }

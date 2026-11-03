@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Behavior-preserving refactor: `instrumentedRender` split into child-render/frame-record helpers and the `/render-probe` command dispatch split per subcommand.
+
 ## [0.5.0] - 2026-08-12
 
 ### Added

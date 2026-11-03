@@ -14,30 +14,26 @@ export interface ProviderCredentials {
   apiKey?: string;
 }
 
+type ProviderFactory = (apiKey: string) => SearchProvider | FullProvider;
+
+const PROVIDER_FACTORIES = new Map<string, ProviderFactory>([
+  ["brave", (apiKey) => new BraveProvider(apiKey)],
+  ["tavily", (apiKey) => new TavilyProvider(apiKey)],
+  ["serper", (apiKey) => new SerperProvider(apiKey)],
+  ["perplexity", (apiKey) => new PerplexityProvider(apiKey)],
+  ["exa", (apiKey) => new ExaProvider(apiKey)],
+  ["youcom", (apiKey) => new YouComProvider(apiKey)],
+  ["jina", (apiKey) => new JinaProvider(apiKey)],
+  ["firecrawl", (apiKey) => new FirecrawlProvider(apiKey)],
+  ["zai", (apiKey) => new ZaiProvider(apiKey)],
+  ["anysearch", (apiKey) => new AnySearchProvider(apiKey)],
+]);
+
 export function createSearchProvider(name: string, creds: ProviderCredentials): SearchProvider | FullProvider {
   const apiKey = creds.apiKey ?? "";
-  switch (name) {
-    case "brave":
-      return new BraveProvider(apiKey);
-    case "tavily":
-      return new TavilyProvider(apiKey);
-    case "serper":
-      return new SerperProvider(apiKey);
-    case "perplexity":
-      return new PerplexityProvider(apiKey);
-    case "exa":
-      return new ExaProvider(apiKey);
-    case "youcom":
-      return new YouComProvider(apiKey);
-    case "jina":
-      return new JinaProvider(apiKey);
-    case "firecrawl":
-      return new FirecrawlProvider(apiKey);
-    case "zai":
-      return new ZaiProvider(apiKey);
-    case "anysearch":
-      return new AnySearchProvider(apiKey);
-    default:
-      throw new Error(`Unknown search provider: "${name}"`);
+  const factory = PROVIDER_FACTORIES.get(name);
+  if (!factory) {
+    throw new Error(`Unknown search provider: "${name}"`);
   }
+  return factory(apiKey);
 }

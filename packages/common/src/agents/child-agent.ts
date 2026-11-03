@@ -31,7 +31,7 @@ import { resolveChildToolNames } from "./child-tools.ts";
 import { type PersonaTypeDefaults, personaDefaultsForType, readPersonaDefaultsByType } from "./persona-defaults.ts";
 import { recordChildSessionFinished, recordChildSessionStarted } from "./session-links.ts";
 import { shutdownChildSession } from "./session-shutdown.ts";
-import { loadSubagentModelConfig, resolveSubagentModelPattern } from "./subagent-models.ts";
+import { loadSubagentModelConfig, resolveSubagentModelPattern, type SubagentModelConfig } from "./subagent-models.ts";
 
 export const STRUCTURED_OUTPUT_TOOL_NAME = "structured_output";
 
@@ -223,6 +223,333 @@ function snapshotUsage(child: AgentSession): ChildAgentUsageSnapshot {
   };
 }
 
+type ChildResultPartial = Omit<
+  RunChildAgentResult,
+  "parent_session_id" | "parent_session_file" | keyof ChildAgentUsageSnapshot
+> &
+  Partial<Pick<RunChildAgentResult, "parent_session_id" | "parent_session_file"> & ChildAgentUsageSnapshot>;
+
+function mergedUsageSnapshot(partial: ChildResultPartial, base: ChildAgentUsageSnapshot): ChildAgentUsageSnapshot {
+  return {
+    usage_input: partial.usage_input ?? base.usage_input,
+    usage_output: partial.usage_output ?? base.usage_output,
+    usage_cache_read: partial.usage_cache_read ?? base.usage_cache_read,
+    usage_cache_write: partial.usage_cache_write ?? base.usage_cache_write,
+    usage_cost_usd: partial.usage_cost_usd ?? base.usage_cost_usd,
+    context_percent: partial.context_percent ?? base.context_percent,
+    context_tokens: partial.context_tokens ?? base.context_tokens,
+    context_window: partial.context_window ?? base.context_window,
+  };
+}
+
+function buildChildResult(
+  partial: ChildResultPartial,
+  session: AgentSession | undefined,
+  toolCallCount: number,
+  parentSessionId: string,
+  parentSessionFile: string,
+): RunChildAgentResult {
+  const base = session ? snapshotUsage(session) : EMPTY_USAGE;
+  return {
+    parent_session_id: partial.parent_session_id ?? parentSessionId,
+    parent_session_file: partial.parent_session_file ?? parentSessionFile,
+    tool_calls: partial.tool_calls ?? toolCallCount,
+    sub_session_file: partial.sub_session_file ?? session?.sessionManager.getSessionFile(),
+    text: partial.text,
+    value: partial.value,
+    isError: partial.isError,
+    errorMessage: partial.errorMessage,
+    ...mergedUsageSnapshot(partial, base),
+  };
+}
+
+function childTaskError(task: string, signal: AbortSignal | undefined): string | undefined {
+  if (task.trim() === "") return "task is empty";
+  if (signal?.aborted) return "Operation aborted";
+  return undefined;
+}
+
+type StructuredOutputTool = ReturnType<typeof createStructuredOutputTool>;
+
+type ChildAgentSetup = {
+  opts: EffectiveChildOptions;
+  effectiveTask: string;
+  structured: StructuredOutputTool | undefined;
+  toolList: string[];
+  systemPrompt: string;
+  modelConfig: SubagentModelConfig;
+};
+
+function composeEffectiveTask(task: string, opts: EffectiveChildOptions, ctx: ExtensionContext): string {
+  if (!opts.inherit_context) return task;
+  const sys = ctx.getSystemPrompt();
+  const head = sys.length > 12_000 ? `${sys.slice(0, 12_000)}\n…` : sys;
+  return `The parent agent session provided the following system prompt context (truncated):\n\n${head}\n\n---\n\nYour assignment:\n\n${task}`;
+}
+
+function buildChildSystemPrompt(agentType: string, agentCatalog: AgentPersonaCatalog, structured: boolean): string {
+  const systemPrompt = personaSystemPrompt(agentType, agentCatalog);
+  if (!structured) return systemPrompt;
+  return `${systemPrompt}\n\nWhen you have completed the assignment, call the \`${STRUCTURED_OUTPUT_TOOL_NAME}\` tool exactly once with your final result matching the tool's parameter schema. Do not end the session with a plain-text summary; the tool call is the only accepted final answer.`;
+}
+
+function buildChildTooling(
+  input: RunChildAgentInput,
+  agentType: string,
+  agentCatalog: AgentPersonaCatalog,
+  personaTools: string[] | undefined,
+  opts: EffectiveChildOptions,
+): { structured: StructuredOutputTool | undefined; toolList: string[]; systemPrompt: string } {
+  const structured = input.outputSchema ? createStructuredOutputTool(input.outputSchema) : undefined;
+  const toolList = resolveChildToolNames(opts.isolated, personaTools);
+  if (structured) toolList.push(STRUCTURED_OUTPUT_TOOL_NAME);
+  const systemPrompt = buildChildSystemPrompt(agentType, agentCatalog, structured !== undefined);
+  return { structured, toolList, systemPrompt };
+}
+
+function resolveChildSetup(ctx: ExtensionContext, input: RunChildAgentInput): ChildAgentSetup {
+  const agentCatalog = input.catalog ?? buildAgentPersonaCatalog(ctx.cwd);
+  const agentType = resolvePersonaId(input.agent_type, agentCatalog);
+  const fileOptions = agentCatalog.agents.get(agentType)?.fileOptions ?? {};
+  const modelConfig = loadSubagentModelConfig();
+  const opts = resolveEffectiveChildOptions(
+    input,
+    fileOptions,
+    personaDefaultsForType(readPersonaDefaultsByType(), agentType),
+    modelConfig.agentModels[agentType],
+  );
+  const { structured, toolList, systemPrompt } = buildChildTooling(
+    input,
+    agentType,
+    agentCatalog,
+    fileOptions.tools,
+    opts,
+  );
+  const effectiveTask = composeEffectiveTask(input.task.trim(), opts, ctx);
+  return { opts, effectiveTask, structured, toolList, systemPrompt, modelConfig };
+}
+
+type ParentSessionHeader = ReturnType<ExtensionContext["sessionManager"]["getHeader"]>;
+
+function childSessionOptions(parentSessionId: string | undefined): { id: string; parentSession?: string } {
+  const newOpts: { id: string; parentSession?: string } = { id: randomUUID() };
+  if (parentSessionId) {
+    newOpts.parentSession = parentSessionId;
+  }
+  return newOpts;
+}
+
+async function spawnChildSession(
+  ctx: ExtensionContext,
+  input: RunChildAgentInput,
+  setup: ChildAgentSetup,
+  parentHeader: ParentSessionHeader,
+): Promise<AgentSession> {
+  const cwd = ctx.cwd;
+  const agentDir = getAgentDir();
+  const settingsManager = SettingsManager.create(cwd, agentDir);
+  const model = resolveModelForChild(resolveSubagentModelPattern(setup.opts.model, setup.modelConfig.modelTiers), ctx);
+  const thinkingLevel = parseThinking(setup.opts.thinking);
+
+  fs.mkdirSync(input.sessionDir, { recursive: true });
+
+  const sessionManager = SessionManager.create(cwd, input.sessionDir, childSessionOptions(parentHeader?.id));
+
+  const loader = new DefaultResourceLoader({
+    cwd,
+    agentDir,
+    settingsManager,
+    noExtensions: true,
+    extensionFactories: [...(input.extensionFactories ?? []), ...getChildExtensionFactories()],
+    noSkills: true,
+    noPromptTemplates: true,
+    noThemes: true,
+    noContextFiles: true,
+    systemPromptOverride: () => setup.systemPrompt,
+    appendSystemPromptOverride: () => [],
+  });
+  await loader.reload();
+
+  const modelRuntime = await ModelRuntime.create();
+  const { session } = await createAgentSession({
+    cwd,
+    agentDir,
+    modelRuntime,
+    model,
+    thinkingLevel,
+    tools: setup.toolList,
+    customTools: setup.structured ? [setup.structured.tool] : undefined,
+    resourceLoader: loader,
+    sessionManager,
+    settingsManager,
+  });
+  return session;
+}
+
+async function activateChildSession(
+  created: AgentSession,
+  parentSessionId: string,
+  parentSessionFile: string,
+): Promise<void> {
+  recordChildSessionStarted(parentSessionId, {
+    parentSessionFile,
+    childSessionFile: created.sessionManager.getSessionFile() ?? "",
+  });
+  await created.bindExtensions({});
+}
+
+type TurnLimitState = { count: number; soft: boolean };
+
+function applyTurnLimitAction(state: TurnLimitState, created: AgentSession, maxTurns: number, grace: number): void {
+  if (!state.soft && state.count >= maxTurns) {
+    state.soft = true;
+    void created.steer(
+      "You have reached the turn limit. Finish now with a short final answer; do not start new tool work.",
+    );
+    return;
+  }
+  if (state.soft && state.count >= maxTurns + grace) {
+    void created.abort();
+  }
+}
+
+function enforceTurnLimit(
+  state: TurnLimitState,
+  created: AgentSession,
+  maxTurns: number | undefined,
+  grace: number,
+): void {
+  if (maxTurns === undefined || maxTurns <= 0) return;
+  state.count += 1;
+  applyTurnLimitAction(state, created, maxTurns, grace);
+}
+
+type ToolCallCounter = { count: number };
+
+function childProgressPayload(
+  created: AgentSession,
+  input: RunChildAgentInput,
+  usage: ChildAgentUsageSnapshot,
+  toolCallCount: number,
+): ChildAgentProgress {
+  return {
+    tool_calls: toolCallCount,
+    sub_session_file: created.sessionManager.getSessionFile(),
+    ...(input.stream
+      ? {
+          task_index: input.stream.task_index,
+          task_total: input.stream.task_total,
+        }
+      : {}),
+    ...usage,
+  };
+}
+
+type ChildSessionObserver = { unsub: () => void; emitProgress: () => void };
+
+function observeChildSession(
+  created: AgentSession,
+  input: RunChildAgentInput,
+  toolCalls: ToolCallCounter,
+  maxTurns: number | undefined,
+): ChildSessionObserver {
+  const grace = 3;
+  const turnLimit: TurnLimitState = { count: 0, soft: false };
+  const emitProgress = () => {
+    const u = snapshotUsage(created);
+    input.onProgress?.(childProgressPayload(created, input, u, toolCalls.count));
+  };
+  const unsub = created.subscribe((event: AgentSessionEvent) => {
+    if (event.type === "tool_execution_end") {
+      toolCalls.count += 1;
+      emitProgress();
+      return;
+    }
+    if (event.type !== "turn_end") return;
+    emitProgress();
+    enforceTurnLimit(turnLimit, created, maxTurns, grace);
+  });
+  return { unsub, emitProgress };
+}
+
+async function runChildPrompt(
+  created: AgentSession,
+  task: string,
+  unsub: () => void,
+  cleanupAbort: () => void,
+): Promise<void> {
+  try {
+    await created.prompt(task);
+  } finally {
+    unsub();
+    cleanupAbort();
+  }
+}
+
+function structuredChildResult(
+  structured: StructuredOutputTool,
+  created: AgentSession,
+  toolCallCount: number,
+  finish: (partial: ChildResultPartial) => RunChildAgentResult,
+): RunChildAgentResult {
+  if (!structured.wasCalled) {
+    return finish({
+      text: extractAssistantText(created.messages),
+      isError: true,
+      errorMessage: `child agent ended without calling ${STRUCTURED_OUTPUT_TOOL_NAME}`,
+      tool_calls: toolCallCount,
+    });
+  }
+  const failure = finalTurnError(created.messages);
+  return finish({
+    text: JSON.stringify(structured.captured, null, 2),
+    value: structured.captured,
+    isError: Boolean(failure),
+    errorMessage: failure,
+    tool_calls: toolCallCount,
+  });
+}
+
+function plainChildResult(
+  created: AgentSession,
+  toolCallCount: number,
+  finish: (partial: ChildResultPartial) => RunChildAgentResult,
+): RunChildAgentResult {
+  const raw = extractAssistantText(created.messages);
+  const trunc = truncateHead(raw, {
+    maxLines: DEFAULT_MAX_LINES,
+    maxBytes: DEFAULT_MAX_BYTES,
+  });
+  let text = trunc.content;
+  if (trunc.truncated) {
+    text += `\n\n[Output truncated: ${trunc.outputLines} of ${trunc.totalLines} lines (${formatSize(trunc.outputBytes)} of ${formatSize(trunc.totalBytes)}).]`;
+  }
+  const failure = finalTurnError(created.messages);
+  return finish({
+    text,
+    isError: Boolean(failure),
+    errorMessage: failure,
+    tool_calls: toolCallCount,
+  });
+}
+
+async function settleChildSession(
+  session: AgentSession | undefined,
+  parentSessionId: string,
+  parentSessionFile: string,
+  toolCallCount: number,
+): Promise<void> {
+  const subFile = session?.sessionManager.getSessionFile();
+  if (subFile) {
+    recordChildSessionFinished(parentSessionId, {
+      parentSessionFile,
+      childSessionFile: subFile,
+      toolCalls: toolCallCount,
+    });
+  }
+  await shutdownChildSession(session);
+}
+
 export async function runChildAgent(
   ctx: ExtensionContext,
   input: RunChildAgentInput,
@@ -233,244 +560,42 @@ export async function runChildAgent(
   const parentSessionFile = ctx.sessionManager.getSessionFile() ?? "";
 
   let session: AgentSession | undefined;
-  let toolCallCount = 0;
+  const toolCalls: ToolCallCounter = { count: 0 };
 
-  const finish = (
-    partial: Omit<RunChildAgentResult, "parent_session_id" | "parent_session_file" | keyof ChildAgentUsageSnapshot> &
-      Partial<Pick<RunChildAgentResult, "parent_session_id" | "parent_session_file"> & ChildAgentUsageSnapshot>,
-  ): RunChildAgentResult => {
-    const u = session ? snapshotUsage(session) : EMPTY_USAGE;
-    return {
-      parent_session_id: partial.parent_session_id ?? parentSessionId,
-      parent_session_file: partial.parent_session_file ?? parentSessionFile,
-      tool_calls: partial.tool_calls ?? toolCallCount,
-      sub_session_file: partial.sub_session_file ?? session?.sessionManager.getSessionFile(),
-      text: partial.text,
-      value: partial.value,
-      isError: partial.isError,
-      errorMessage: partial.errorMessage,
-      usage_input: partial.usage_input ?? u.usage_input,
-      usage_output: partial.usage_output ?? u.usage_output,
-      usage_cache_read: partial.usage_cache_read ?? u.usage_cache_read,
-      usage_cache_write: partial.usage_cache_write ?? u.usage_cache_write,
-      usage_cost_usd: partial.usage_cost_usd ?? u.usage_cost_usd,
-      context_percent: partial.context_percent ?? u.context_percent,
-      context_tokens: partial.context_tokens ?? u.context_tokens,
-      context_window: partial.context_window ?? u.context_window,
-    };
-  };
+  const finish = (partial: ChildResultPartial): RunChildAgentResult =>
+    buildChildResult(partial, session, toolCalls.count, parentSessionId, parentSessionFile);
 
   // Setup failures throw: pi marks a tool call failed only when execute throws,
   // and a returned isError flag is discarded — a spawn that never started must
   // not read as an agent that ran and reported a problem (upstream #179).
   // Callers that need per-item error results (batch) catch and convert.
   try {
-    let effectiveTask = input.task.trim();
-    if (!effectiveTask) {
-      return finish({
-        text: "",
-        isError: true,
-        errorMessage: "task is empty",
-        tool_calls: 0,
-      });
-    }
-    if (signal?.aborted) {
-      return finish({
-        text: "",
-        isError: true,
-        errorMessage: "Operation aborted",
-        tool_calls: 0,
-      });
-    }
-    const cwd = ctx.cwd;
-    const agentCatalog = input.catalog ?? buildAgentPersonaCatalog(cwd);
-    const agentType = resolvePersonaId(input.agent_type, agentCatalog);
-    const fileOptions = agentCatalog.agents.get(agentType)?.fileOptions ?? {};
-    const modelConfig = loadSubagentModelConfig();
-    const opts = resolveEffectiveChildOptions(
-      input,
-      fileOptions,
-      personaDefaultsForType(readPersonaDefaultsByType(), agentType),
-      modelConfig.agentModels[agentType],
-    );
-
-    if (opts.inherit_context) {
-      const sys = ctx.getSystemPrompt();
-      const head = sys.length > 12_000 ? `${sys.slice(0, 12_000)}\n…` : sys;
-      effectiveTask = `The parent agent session provided the following system prompt context (truncated):\n\n${head}\n\n---\n\nYour assignment:\n\n${effectiveTask}`;
+    const earlyError = childTaskError(input.task, signal);
+    if (earlyError) {
+      return finish({ text: "", isError: true, errorMessage: earlyError, tool_calls: 0 });
     }
 
-    const personaTools = fileOptions.tools;
-
-    const structured = input.outputSchema ? createStructuredOutputTool(input.outputSchema) : undefined;
-    const toolList = resolveChildToolNames(opts.isolated, personaTools);
-    if (structured) toolList.push(STRUCTURED_OUTPUT_TOOL_NAME);
-
-    let systemPrompt = personaSystemPrompt(agentType, agentCatalog);
-    if (structured) {
-      systemPrompt += `\n\nWhen you have completed the assignment, call the \`${STRUCTURED_OUTPUT_TOOL_NAME}\` tool exactly once with your final result matching the tool's parameter schema. Do not end the session with a plain-text summary; the tool call is the only accepted final answer.`;
-    }
-
-    const agentDir = getAgentDir();
-    const settingsManager = SettingsManager.create(cwd, agentDir);
-    const model = resolveModelForChild(resolveSubagentModelPattern(opts.model, modelConfig.modelTiers), ctx);
-    const thinkingLevel = parseThinking(opts.thinking);
-
-    fs.mkdirSync(input.sessionDir, { recursive: true });
-
-    const newOpts: { id: string; parentSession?: string } = {
-      id: randomUUID(),
-    };
-    if (parentHeader?.id) {
-      newOpts.parentSession = parentHeader.id;
-    }
-
-    const sessionManager = SessionManager.create(cwd, input.sessionDir, newOpts);
-
-    const loader = new DefaultResourceLoader({
-      cwd,
-      agentDir,
-      settingsManager,
-      noExtensions: true,
-      extensionFactories: [...(input.extensionFactories ?? []), ...getChildExtensionFactories()],
-      noSkills: true,
-      noPromptTemplates: true,
-      noThemes: true,
-      noContextFiles: true,
-      systemPromptOverride: () => systemPrompt,
-      appendSystemPromptOverride: () => [],
-    });
-    await loader.reload();
-
-    const modelRuntime = await ModelRuntime.create();
-    const { session: created } = await createAgentSession({
-      cwd,
-      agentDir,
-      modelRuntime,
-      model,
-      thinkingLevel,
-      tools: toolList,
-      customTools: structured ? [structured.tool] : undefined,
-      resourceLoader: loader,
-      sessionManager,
-      settingsManager,
-    });
+    const setup = resolveChildSetup(ctx, input);
+    const created = await spawnChildSession(ctx, input, setup, parentHeader);
     session = created;
+    await activateChildSession(created, parentSessionId, parentSessionFile);
 
-    recordChildSessionStarted(parentSessionId, {
-      parentSessionFile,
-      childSessionFile: created.sessionManager.getSessionFile() ?? "",
-    });
-
-    await created.bindExtensions({});
-
-    const maxTurns = opts.max_turns;
-    const grace = 3;
-    let turnCount = 0;
-    let soft = false;
-
-    const emitProgress = () => {
-      const u = snapshotUsage(created);
-      input.onProgress?.({
-        tool_calls: toolCallCount,
-        sub_session_file: created.sessionManager.getSessionFile(),
-        ...(input.stream
-          ? {
-              task_index: input.stream.task_index,
-              task_total: input.stream.task_total,
-            }
-          : {}),
-        ...u,
-      });
-    };
-
-    const unsub = created.subscribe((event: AgentSessionEvent) => {
-      if (event.type === "tool_execution_end") {
-        toolCallCount += 1;
-        emitProgress();
-        return;
-      }
-      if (event.type !== "turn_end") return;
-      emitProgress();
-      if (maxTurns === undefined || maxTurns <= 0) return;
-      turnCount += 1;
-      if (!soft && turnCount >= maxTurns) {
-        soft = true;
-        void created.steer(
-          "You have reached the turn limit. Finish now with a short final answer; do not start new tool work.",
-        );
-      } else if (soft && turnCount >= maxTurns + grace) {
-        void created.abort();
-      }
-    });
-
+    const { unsub, emitProgress } = observeChildSession(created, input, toolCalls, setup.opts.max_turns);
     const cleanupAbort = forwardAbort(created, signal);
-
     emitProgress();
 
     // The run phase: failures here settle on the result, never throw.
     try {
-      try {
-        await created.prompt(effectiveTask);
-      } finally {
-        unsub();
-        cleanupAbort();
+      await runChildPrompt(created, setup.effectiveTask, unsub, cleanupAbort);
+      if (setup.structured) {
+        return structuredChildResult(setup.structured, created, toolCalls.count, finish);
       }
-
-      if (structured) {
-        if (!structured.wasCalled) {
-          return finish({
-            text: extractAssistantText(created.messages),
-            isError: true,
-            errorMessage: `child agent ended without calling ${STRUCTURED_OUTPUT_TOOL_NAME}`,
-            tool_calls: toolCallCount,
-          });
-        }
-        const failure = finalTurnError(created.messages);
-        return finish({
-          text: JSON.stringify(structured.captured, null, 2),
-          value: structured.captured,
-          isError: Boolean(failure),
-          errorMessage: failure,
-          tool_calls: toolCallCount,
-        });
-      }
-
-      const raw = extractAssistantText(created.messages);
-      const trunc = truncateHead(raw, {
-        maxLines: DEFAULT_MAX_LINES,
-        maxBytes: DEFAULT_MAX_BYTES,
-      });
-      let text = trunc.content;
-      if (trunc.truncated) {
-        text += `\n\n[Output truncated: ${trunc.outputLines} of ${trunc.totalLines} lines (${formatSize(trunc.outputBytes)} of ${formatSize(trunc.totalBytes)}).]`;
-      }
-
-      const failure = finalTurnError(created.messages);
-      return finish({
-        text,
-        isError: Boolean(failure),
-        errorMessage: failure,
-        tool_calls: toolCallCount,
-      });
+      return plainChildResult(created, toolCalls.count, finish);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      return finish({
-        text: "",
-        isError: true,
-        errorMessage: msg,
-        tool_calls: toolCallCount,
-      });
+      return finish({ text: "", isError: true, errorMessage: msg, tool_calls: toolCalls.count });
     }
   } finally {
-    const subFile = session?.sessionManager.getSessionFile();
-    if (subFile) {
-      recordChildSessionFinished(parentSessionId, {
-        parentSessionFile,
-        childSessionFile: subFile,
-        toolCalls: toolCallCount,
-      });
-    }
-    await shutdownChildSession(session);
+    await settleChildSession(session, parentSessionId, parentSessionFile, toolCalls.count);
   }
 }

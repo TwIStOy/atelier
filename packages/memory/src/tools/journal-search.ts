@@ -1,6 +1,7 @@
 import { Type } from "@sinclair/typebox";
 import { runHat } from "../cli-runner.js";
 import { jsonError, jsonResult } from "../tool-result.js";
+import { pushCsv, pushDefined } from "./cli-args.js";
 import { parseListResult } from "./parse-list.js";
 
 export const journalSearch = {
@@ -32,16 +33,8 @@ export const journalSearch = {
   }),
   execute: async (_id: string, args: Record<string, unknown>, signal?: AbortSignal) => {
     try {
-      const cliArgs = ["journal", "search"];
-      if (args.text) cliArgs.push("--text", args.text as string);
-      if ((args.tags as string[])?.length) cliArgs.push("--tags", (args.tags as string[]).join(","));
-      if (args.limit !== undefined) cliArgs.push("--limit", String(args.limit));
-      if (args.offset !== undefined) cliArgs.push("--offset", String(args.offset));
-      const result = await runHat(cliArgs, { signal });
-      const items = parseListResult(result, "results").map((e: Record<string, unknown>) => ({
-        id: String(e.id ?? e.timestamp ?? ""),
-        title: String(e.title ?? ""),
-      }));
+      const result = await runHat(buildJournalSearchArgs(args), { signal });
+      const items = parseListResult(result, "results").map(journalSearchItem);
       return jsonResult(result, {
         query: args.text ?? args.tags ?? "",
         total: items.length,
@@ -52,3 +45,19 @@ export const journalSearch = {
     }
   },
 };
+
+function buildJournalSearchArgs(args: Record<string, unknown>): string[] {
+  const cliArgs = ["journal", "search"];
+  if (args.text) cliArgs.push("--text", args.text as string);
+  pushCsv(cliArgs, "--tags", args.tags);
+  pushDefined(cliArgs, "--limit", args.limit);
+  pushDefined(cliArgs, "--offset", args.offset);
+  return cliArgs;
+}
+
+function journalSearchItem(e: Record<string, unknown>): { id: string; title: string } {
+  return {
+    id: String(e.id ?? e.timestamp ?? ""),
+    title: String(e.title ?? ""),
+  };
+}

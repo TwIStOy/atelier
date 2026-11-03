@@ -99,7 +99,18 @@ export function listAvailableModels(registry: ModelRegistry): ModelArray {
 export function buildHideRuleOptions(): ConfigItemSelectOption<string>[] {
   const runtime = capturedRuntime;
   if (!runtime) return [];
-  const models = callSnapshotOriginal(runtime);
+  const byProvider = groupModelsByProvider(callSnapshotOriginal(runtime));
+  const options: ConfigItemSelectOption<string>[] = [];
+  for (const [provider, list] of byProvider) {
+    options.push(providerOption(provider, list.length));
+    for (const m of list) {
+      options.push(modelOption(provider, m));
+    }
+  }
+  return options;
+}
+
+function groupModelsByProvider(models: readonly Model<Api>[]): Map<string, Model<Api>[]> {
   const byProvider = new Map<string, Model<Api>[]>();
   for (const m of models) {
     const provider = String(m.provider);
@@ -107,16 +118,16 @@ export function buildHideRuleOptions(): ConfigItemSelectOption<string>[] {
     if (list) list.push(m);
     else byProvider.set(provider, [m]);
   }
-  const options: ConfigItemSelectOption<string>[] = [];
-  for (const [provider, list] of byProvider) {
-    const count = list.length;
-    options.push({
-      label: `${provider}/*  (whole provider · ${count} model${count === 1 ? "" : "s"})`,
-      value: provider,
-    });
-    for (const m of list) {
-      options.push({ label: `  ${provider}/${m.id} — ${m.name}`, value: `${provider}/${m.id}` });
-    }
-  }
-  return options;
+  return byProvider;
+}
+
+function providerOption(provider: string, count: number): ConfigItemSelectOption<string> {
+  return {
+    label: `${provider}/*  (whole provider · ${count} model${count === 1 ? "" : "s"})`,
+    value: provider,
+  };
+}
+
+function modelOption(provider: string, m: Model<Api>): ConfigItemSelectOption<string> {
+  return { label: `  ${provider}/${m.id} — ${m.name}`, value: `${provider}/${m.id}` };
 }

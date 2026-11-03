@@ -12,6 +12,22 @@ export function personaDefaultsFilePath(): string {
   return path.join(getAgentDir(), "subagents", "settings.json");
 }
 
+function trimmedStringField(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function parsePersonaDefaultsRow(row: unknown): PersonaTypeDefaults | undefined {
+  if (!row || typeof row !== "object" || Array.isArray(row)) return undefined;
+  const record = row as Record<string, unknown>;
+  const model = trimmedStringField(record.model);
+  const thinking = trimmedStringField(record.thinking);
+  if (!model && !thinking) return undefined;
+  return {
+    ...(model ? { model } : {}),
+    ...(thinking ? { thinking } : {}),
+  };
+}
+
 export function parsePersonaDefaultsByType(raw: unknown): Partial<Record<string, PersonaTypeDefaults>> {
   const out: Partial<Record<string, PersonaTypeDefaults>> = {};
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return out;
@@ -19,17 +35,8 @@ export function parsePersonaDefaultsByType(raw: unknown): Partial<Record<string,
   for (const k of Object.keys(obj)) {
     const nk = normalizePersonaId(k);
     if (!nk) continue;
-    const v = obj[k];
-    if (!v || typeof v !== "object" || Array.isArray(v)) continue;
-    const row = v as Record<string, unknown>;
-    const model = typeof row.model === "string" && row.model.trim() ? row.model.trim() : undefined;
-    const thinking = typeof row.thinking === "string" && row.thinking.trim() ? row.thinking.trim() : undefined;
-    if (model || thinking) {
-      out[nk] = {
-        ...(model ? { model } : {}),
-        ...(thinking ? { thinking } : {}),
-      };
-    }
+    const row = parsePersonaDefaultsRow(obj[k]);
+    if (row) out[nk] = row;
   }
   return out;
 }

@@ -229,15 +229,18 @@ export function countFirstSummary(
   return `${theme.fg("success", `${total} ${noun}${total === 1 ? "" : "s"}`)} ${theme.fg("dim", first)}${more}`;
 }
 
-export function stringField(details: unknown, key: string): string | undefined {
+function fieldOf(details: unknown, key: string): unknown {
   if (details == null || typeof details !== "object") return undefined;
-  const v = (details as Record<string, unknown>)[key];
+  return (details as Record<string, unknown>)[key];
+}
+
+export function stringField(details: unknown, key: string): string | undefined {
+  const v = fieldOf(details, key);
   return typeof v === "string" && v.length > 0 ? v : undefined;
 }
 
 export function numberField(details: unknown, key: string): number | undefined {
-  if (details == null || typeof details !== "object") return undefined;
-  const v = (details as Record<string, unknown>)[key];
+  const v = fieldOf(details, key);
   return typeof v === "number" ? v : undefined;
 }
 
@@ -249,8 +252,17 @@ export function backendTag(theme: Theme, details: unknown): string {
 
 /** Accent-styled shortened file path for edit/write headers. */
 export function filePathDisplay(args: { file_path?: string; path?: string } | undefined, theme: Theme): string {
-  const path = shortenPath(args?.file_path ?? args?.path ?? "");
+  const path = shortenPath(rawPathOf(args));
   return path ? theme.fg("accent", path) : theme.fg("toolOutput", "...");
+}
+
+function pathField(args: { path?: string } | undefined): string {
+  return args?.path ?? "";
+}
+
+/** Raw (unshortened) `file_path`/`path` from tool args, or an empty string. */
+export function rawPathOf(args: { file_path?: string; path?: string } | undefined): string {
+  return args?.file_path ?? pathField(args);
 }
 
 /** `Title <label> · settled/total <noun>` header, width-truncated. */

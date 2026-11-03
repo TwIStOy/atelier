@@ -35,6 +35,44 @@ function isDirty(s: GitStatus): boolean {
   return s.staged + s.modified + s.untracked + s.conflicted > 0;
 }
 
+function parseBranchHeader(header: string, status: GitStatus): void {
+  if (header.startsWith("HEAD (no branch)")) {
+    status.detached = true;
+    return;
+  }
+  const branchMatch = header.match(/^(\S+?)(?:\.\.\.\S+)?(?:\s+\[([^\]]+)\])?$/);
+  if (branchMatch) status.branch = branchMatch[1];
+  if (branchMatch?.[2]) applyAheadBehind(branchMatch[2], status);
+}
+
+function applyAheadBehind(bracket: string, status: GitStatus): void {
+  for (const part of bracket.split(", ")) {
+    const ahead = part.match(/^ahead (\d+)$/);
+    if (ahead) status.ahead = parseInt(ahead[1], 10);
+    const behind = part.match(/^behind (\d+)$/);
+    if (behind) status.behind = parseInt(behind[1], 10);
+  }
+}
+
+function isConflicted(x: string, y: string): boolean {
+  return x === "U" || y === "U" || (x === "C" && y === "C");
+}
+
+function countStagedAndModified(x: string, y: string, status: GitStatus): void {
+  if (x !== " " && x !== "?") status.staged++;
+  if (y === "M" || y === "D") status.modified++;
+}
+
+function countEntryFlags(x: string, y: string, status: GitStatus): void {
+  if (isConflicted(x, y)) {
+    status.conflicted++;
+  } else if (x === "?" && y === "?") {
+    status.untracked++;
+  } else {
+    countStagedAndModified(x, y, status);
+  }
+}
+
 /**
  * Parse `git status --porcelain=v1 --branch --show-stash` output into a
  * structured status. Branch header forms handled:
@@ -49,21 +87,7 @@ export function parseGitPorcelain(stdout: string): GitStatus {
     if (line === "") continue;
 
     if (line.startsWith("## ")) {
-      const header = line.slice(3);
-      if (header.startsWith("HEAD (no branch)")) {
-        status.detached = true;
-        continue;
-      }
-      const branchMatch = header.match(/^(\S+?)(?:\.\.\.\S+)?(?:\s+\[([^\]]+)\])?$/);
-      if (branchMatch) status.branch = branchMatch[1];
-      if (branchMatch?.[2]) {
-        for (const part of branchMatch[2].split(", ")) {
-          const ahead = part.match(/^ahead (\d+)$/);
-          if (ahead) status.ahead = parseInt(ahead[1], 10);
-          const behind = part.match(/^behind (\d+)$/);
-          if (behind) status.behind = parseInt(behind[1], 10);
-        }
-      }
+      parseBranchHeader(line.slice(3), status);
       continue;
     }
 
@@ -72,16 +96,7 @@ export function parseGitPorcelain(stdout: string): GitStatus {
       continue;
     }
 
-    const x = line[0];
-    const y = line[1];
-    if (x === "U" || y === "U" || (x === "C" && y === "C")) {
-      status.conflicted++;
-    } else if (x === "?" && y === "?") {
-      status.untracked++;
-    } else {
-      if (x !== " " && x !== "?") status.staged++;
-      if (y === "M" || y === "D") status.modified++;
-    }
+    countEntryFlags(line[0], line[1], status);
   }
 
   return status;

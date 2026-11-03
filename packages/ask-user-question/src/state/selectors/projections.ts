@@ -1,3 +1,4 @@
+import type { QuestionData } from "../../tool/types.ts";
 import { MULTI_SUBMIT_LABEL, type MultiSelectViewProps } from "../../view/components/multi-select-view.ts";
 import type { OptionListViewProps } from "../../view/components/option-list-view.ts";
 import type { PreviewPaneProps } from "../../view/components/preview/preview-pane.ts";
@@ -5,8 +6,24 @@ import type { SubmitPickerProps } from "../../view/components/submit-picker.ts";
 import type { TabBarProps } from "../../view/components/tab-bar.ts";
 import type { DialogProps } from "../../view/dialog-builder.ts";
 import { ROW_INTENT_META } from "../row-intent.ts";
+import type { QuestionnaireState } from "../state.ts";
 import type { GlobalSelector, PerTabSelector } from "./contract.ts";
 import { selectConfirmedIndicator } from "./derivations.ts";
+
+function multiSelectRows(
+  question: QuestionData,
+  state: QuestionnaireState,
+  focused: boolean,
+): { checked: boolean; active: boolean }[] {
+  const rows: { checked: boolean; active: boolean }[] = [];
+  for (let i = 0; i < question.options.length; i++) {
+    rows.push({
+      checked: state.multiSelectChecked.has(i),
+      active: focused && i === state.optionIndex,
+    });
+  }
+  return rows;
+}
 
 export const selectMultiSelectProps: PerTabSelector<MultiSelectViewProps> = (state, ctx) => {
   const question = ctx.questions[ctx.i];
@@ -17,17 +34,10 @@ export const selectMultiSelectProps: PerTabSelector<MultiSelectViewProps> = (sta
       nextLabel: ROW_INTENT_META.next.label,
     };
   const focused = ctx.activeView === "options";
-  const rows: { checked: boolean; active: boolean }[] = [];
-  for (let i = 0; i < question.options.length; i++) {
-    rows.push({
-      checked: state.multiSelectChecked.has(i),
-      active: focused && i === state.optionIndex,
-    });
-  }
   const nextActive = focused && state.optionIndex === question.options.length;
   const isLastQuestion = ctx.i === ctx.questions.length - 1;
   const nextLabel = isLastQuestion ? MULTI_SUBMIT_LABEL : ROW_INTENT_META.next.label;
-  return { rows, nextActive, nextLabel };
+  return { rows: multiSelectRows(question, state, focused), nextActive, nextLabel };
 };
 
 export const selectOptionListProps: PerTabSelector<OptionListViewProps> = (state, ctx) => {

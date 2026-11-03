@@ -49,15 +49,11 @@ function notesValueFor(state: QuestionnaireState, tab: number): string {
   return state.notesByTab.get(tab) ?? state.answers.get(tab)?.notes ?? "";
 }
 
-function syncMultiSelectFromAnswers(
-  answers: ReadonlyMap<number, QuestionAnswer>,
-  questions: readonly QuestionData[],
-  tab: number,
-): ReadonlySet<number> {
-  const q = questions[tab];
-  if (!q?.multiSelect) return new Set();
-  const saved = answers.get(tab);
-  const labels = saved?.selected ?? [];
+function savedMultiLabels(answers: ReadonlyMap<number, QuestionAnswer>, tab: number): string[] {
+  return answers.get(tab)?.selected ?? [];
+}
+
+function checkedIndicesForLabels(q: QuestionData, labels: readonly string[]): ReadonlySet<number> {
   const indices = new Set<number>();
   for (let i = 0; i < q.options.length; i++) {
     if (labels.includes(q.options[i]!.label)) indices.add(i);
@@ -65,26 +61,46 @@ function syncMultiSelectFromAnswers(
   return indices;
 }
 
-function persistMultiSelectAnswer(state: QuestionnaireState, ctx: ApplyContext): ReadonlyMap<number, QuestionAnswer> {
-  const q = ctx.questions[state.currentTab];
-  if (!q?.multiSelect) return state.answers;
+function syncMultiSelectFromAnswers(
+  answers: ReadonlyMap<number, QuestionAnswer>,
+  questions: readonly QuestionData[],
+  tab: number,
+): ReadonlySet<number> {
+  const q = questions[tab];
+  if (!q?.multiSelect) return new Set();
+  return checkedIndicesForLabels(q, savedMultiLabels(answers, tab));
+}
+
+/** Spread `{ notes }` onto a multi-select answer when an unconfirmed draft exists for the current tab. */
+function multiAnswerNotes(state: QuestionnaireState): { notes?: string } {
+  const pendingNotes = state.notesByTab.get(state.currentTab);
+  return pendingNotes && pendingNotes.length > 0 ? { notes: pendingNotes } : {};
+}
+
+function selectedLabelsForQuestion(q: QuestionData, state: QuestionnaireState): string[] {
   const selected: string[] = [];
   for (let i = 0; i < q.options.length; i++) {
     if (state.multiSelectChecked.has(i)) selected.push(q.options[i]!.label);
   }
+  return selected;
+}
+
+function persistMultiSelectAnswer(state: QuestionnaireState, ctx: ApplyContext): ReadonlyMap<number, QuestionAnswer> {
+  const q = ctx.questions[state.currentTab];
+  if (!q?.multiSelect) return state.answers;
+  const selected = selectedLabelsForQuestion(q, state);
   const out = new Map(state.answers);
   if (selected.length === 0) {
     out.delete(state.currentTab);
     return out;
   }
-  const pendingNotes = state.notesByTab.get(state.currentTab);
   out.set(state.currentTab, {
     questionIndex: state.currentTab,
     question: q.question,
     kind: "multi",
     answer: null,
     selected,
-    ...(pendingNotes && pendingNotes.length > 0 ? { notes: pendingNotes } : {}),
+    ...multiAnswerNotes(state),
   });
   return out;
 }
@@ -188,19 +204,39 @@ const navHandler: Handler<"nav"> = (state, action, ctx) => {
 
 const tabSwitchHandler: Handler<"tab_switch"> = (state, action, ctx) => switchTabResult(state, action.nextTab, ctx);
 
-const confirmHandler: Handler<"confirm"> = (state, action, ctx) => {
-  let answer = action.answer;
-  if (answer.kind === "option" && answer.answer) {
-    const q = ctx.questions[answer.questionIndex];
-    const matched = q?.options.find((o) => o.label === answer.answer);
-    if (matched?.preview && matched.preview.length > 0) {
-      answer = { ...answer, preview: matched.preview };
-    }
-  }
+function findOptionByLabel(
+  ctx: ApplyContext,
+  questionIndex: number,
+  label: string,
+): QuestionData["options"][number] | undefined {
+  const q = ctx.questions[questionIndex];
+  return q?.options.find((o) => o.label === label);
+}
+
+function optionPreviewOf(matched: QuestionData["options"][number] | undefined): string | undefined {
+  if (!matched?.preview) return undefined;
+  if (matched.preview.length === 0) return undefined;
+  return matched.preview;
+}
+
+function attachOptionPreview(answer: QuestionAnswer, ctx: ApplyContext): QuestionAnswer {
+  if (answer.kind !== "option" || !answer.answer) return answer;
+  const matched = findOptionByLabel(ctx, answer.questionIndex, answer.answer);
+  const preview = optionPreviewOf(matched);
+  if (preview === undefined) return answer;
+  return { ...answer, preview };
+}
+
+function attachPendingNotes(answer: QuestionAnswer, state: QuestionnaireState): QuestionAnswer {
   const pendingNotes = state.notesByTab.get(answer.questionIndex);
   if (pendingNotes && pendingNotes.length > 0) {
-    answer = { ...answer, notes: pendingNotes };
+    return { ...answer, notes: pendingNotes };
   }
+  return answer;
+}
+
+const confirmHandler: Handler<"confirm"> = (state, action, ctx) => {
+  const answer = attachPendingNotes(attachOptionPreview(action.answer, ctx), state);
   const answers = new Map(state.answers);
   answers.set(answer.questionIndex, answer);
   const drafts = new Map(state.customDraftsByTab);
@@ -225,7 +261,6 @@ const toggleHandler: Handler<"toggle"> = (state, action, ctx) => {
 const multiConfirmHandler: Handler<"multi_confirm"> = (state, action, ctx) => {
   const q = ctx.questions[state.currentTab];
   if (!q) return { state, effects: [] };
-  const pendingNotes = state.notesByTab.get(state.currentTab);
   const answers = new Map(state.answers);
   answers.set(state.currentTab, {
     questionIndex: state.currentTab,
@@ -233,7 +268,7 @@ const multiConfirmHandler: Handler<"multi_confirm"> = (state, action, ctx) => {
     kind: "multi",
     answer: null,
     selected: action.selected,
-    ...(pendingNotes && pendingNotes.length > 0 ? { notes: pendingNotes } : {}),
+    ...multiAnswerNotes(state),
   });
   const synced: QuestionnaireState = {
     ...state,
@@ -255,22 +290,35 @@ const notesEnterHandler: Handler<"notes_enter"> = (state, _action, _ctx) => {
   };
 };
 
+function clearNotesFor(notes: Map<number, string>, answers: Map<number, QuestionAnswer>, tab: number): void {
+  notes.delete(tab);
+  const prev = answers.get(tab);
+  if (prev?.notes) {
+    const stripped = { ...prev };
+    delete (stripped as { notes?: string }).notes;
+    answers.set(tab, stripped);
+  }
+}
+
+function persistNotesFor(
+  notes: Map<number, string>,
+  answers: Map<number, QuestionAnswer>,
+  tab: number,
+  trimmed: string,
+): void {
+  notes.set(tab, trimmed);
+  const prev = answers.get(tab);
+  if (prev) answers.set(tab, { ...prev, notes: trimmed });
+}
+
 const notesExitHandler: Handler<"notes_exit"> = (state, _action, _ctx) => {
   const trimmed = state.notesDraft.trim();
   const notes = new Map(state.notesByTab);
   const answers = new Map(state.answers);
   if (trimmed.length === 0) {
-    notes.delete(state.currentTab);
-    const prev = answers.get(state.currentTab);
-    if (prev?.notes) {
-      const stripped = { ...prev };
-      delete (stripped as { notes?: string }).notes;
-      answers.set(state.currentTab, stripped);
-    }
+    clearNotesFor(notes, answers, state.currentTab);
   } else {
-    notes.set(state.currentTab, trimmed);
-    const prev = answers.get(state.currentTab);
-    if (prev) answers.set(state.currentTab, { ...prev, notes: trimmed });
+    persistNotesFor(notes, answers, state.currentTab, trimmed);
   }
   return {
     state: { ...state, notesByTab: notes, answers, notesVisible: false },

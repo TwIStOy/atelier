@@ -16,29 +16,49 @@ function padLineToWidth(line: string, width: number): string {
 }
 
 function linesForQueuedMessage(msg: QueuedMessage, index: number, theme: Theme, width: number): string[] {
-  const badge = theme.fg("accent", `💬 #${index + 1}`);
-  const sep = theme.fg("muted", " ");
-  const prefix = `${badge}${sep}`;
-  const prefixW = visibleWidth(prefix);
-  const available = Math.max(1, width - prefixW);
-  const indent = " ".repeat(prefixW);
+  const prefix = queueMessagePrefix(index, theme);
+  const available = Math.max(1, width - visibleWidth(prefix));
+  const indent = " ".repeat(visibleWidth(prefix));
 
-  const parts = msg.text.split("\n");
   const out: string[] = [];
-  let firstLineOfMessage = true;
-
-  for (let pi = 0; pi < parts.length; pi++) {
-    const raw = parts[pi]!;
-    const para = raw.length === 0 ? " " : raw;
-    const wrapped = wrapTextWithAnsi(theme.fg("dim", para), available);
-    for (let wi = 0; wi < wrapped.length; wi++) {
-      const piece = wrapped[wi]!;
-      out.push(firstLineOfMessage && wi === 0 ? `${prefix}${piece}` : `${indent}${piece}`);
-    }
-    firstLineOfMessage = false;
+  let isFirstParagraph = true;
+  for (const raw of msg.text.split("\n")) {
+    isFirstParagraph = pushWrappedParagraph(out, raw, prefix, indent, available, theme, isFirstParagraph);
   }
 
   return out;
+}
+
+function queueMessagePrefix(index: number, theme: Theme): string {
+  const badge = theme.fg("accent", `💬 #${index + 1}`);
+  return `${badge}${theme.fg("muted", " ")}`;
+}
+
+function pushWrappedParagraph(
+  out: string[],
+  raw: string,
+  prefix: string,
+  indent: string,
+  available: number,
+  theme: Theme,
+  isFirstParagraph: boolean,
+): boolean {
+  const para = raw.length === 0 ? " " : raw;
+  const wrapped = wrapTextWithAnsi(theme.fg("dim", para), available);
+  for (let wi = 0; wi < wrapped.length; wi++) {
+    out.push(queueMessageLine(isFirstParagraph, wi, prefix, indent, wrapped[wi]!));
+  }
+  return false;
+}
+
+function queueMessageLine(
+  isFirstParagraph: boolean,
+  lineIndex: number,
+  prefix: string,
+  indent: string,
+  line: string,
+): string {
+  return isFirstParagraph && lineIndex === 0 ? `${prefix}${line}` : `${indent}${line}`;
 }
 
 export function renderQueueWidget(messages: readonly QueuedMessage[], theme: Theme, width: number): string[] {

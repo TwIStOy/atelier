@@ -1,6 +1,7 @@
 import { Type } from "@sinclair/typebox";
 import { runHat } from "../cli-runner.js";
 import { jsonError, jsonResult } from "../tool-result.js";
+import { pushDefined, pushTruthy } from "./cli-args.js";
 
 export const memoryCreate = {
   name: "memory-create",
@@ -32,11 +33,7 @@ export const memoryCreate = {
   }),
   execute: async (_id: string, args: Record<string, unknown>, signal?: AbortSignal) => {
     try {
-      const cliArgs = ["memory", "create", args.parent_uri as string, args.content as string];
-      if (args.priority !== undefined) cliArgs.push("--priority", String(args.priority));
-      if (args.title) cliArgs.push("--title", args.title as string);
-      if (args.disclosure) cliArgs.push("--disclosure", args.disclosure as string);
-      const result = await runHat(cliArgs, { signal });
+      const result = await runHat(buildCreateCliArgs(args), { signal });
       return jsonResult(result, {
         parent_uri: args.parent_uri,
         title: args.title ?? "",
@@ -48,3 +45,11 @@ export const memoryCreate = {
     }
   },
 };
+
+function buildCreateCliArgs(args: Record<string, unknown>): string[] {
+  const cliArgs = ["memory", "create", args.parent_uri as string, args.content as string];
+  pushDefined(cliArgs, "--priority", args.priority);
+  pushTruthy(cliArgs, "--title", args.title);
+  pushTruthy(cliArgs, "--disclosure", args.disclosure);
+  return cliArgs;
+}

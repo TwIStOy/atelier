@@ -25,6 +25,14 @@ function normalizeExaResults(results: ExaRawResult[]): SearchResult[] {
   }));
 }
 
+function exaFetchResponse(label: string, url: string, result: ExaRawResult | undefined): FetchResponse {
+  return {
+    text: requireContent(label, url, result?.text),
+    title: result?.title || undefined,
+    contentType: "text/plain",
+  };
+}
+
 export class ExaProvider implements FullProvider {
   readonly name = "exa";
   readonly label = "Exa";
@@ -74,13 +82,6 @@ export class ExaProvider implements FullProvider {
       },
       signal,
     );
-    const result = data.results?.[0];
-    const text = requireContent(this.label, url, result?.text);
-
-    return {
-      text,
-      title: result?.title || undefined,
-      contentType: "text/plain",
-    };
+    return exaFetchResponse(this.label, url, data.results?.[0]);
   }
 }

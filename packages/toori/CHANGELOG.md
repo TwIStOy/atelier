@@ -4,6 +4,7 @@
 
 ### Changed
 
+- Behavior-preserving refactor of `catalog.ts`: family overrides split into per-family helpers and `toModelConfig` split per config field (input, cost, classifier/chat shape, compat, group thinking levels).
 - Catalog refresh and the `/refresh-toori` command handler now come from `@htwang-contrib/common`'s `gateway-provider` module instead of a package-private copy (identical notifications, including the `INFERENCE_V2_TWISTOY_API_KEY` pre-check).
 
 ## [0.7.0] - 2026-10-30

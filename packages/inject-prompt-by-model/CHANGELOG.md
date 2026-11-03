@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Behavior-preserving refactor: `applyModel` extracts rule resolution into a helper to reduce complexity.
+
 ## [0.6.0] - 2026-08-19
 
 ### Changed

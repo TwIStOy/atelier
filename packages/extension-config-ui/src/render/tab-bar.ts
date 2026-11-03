@@ -10,6 +10,63 @@ function inactivePill(theme: Theme, label: string): string {
   return theme.bg("selectedBg", theme.fg("accent", label));
 }
 
+interface TabRange {
+  start: number;
+  end: number;
+}
+
+function sliceWidth(widths: number[], tabCount: number, s: number, e: number): number {
+  let total = 0;
+  for (let i = s; i < e; i += 1) total += widths[i]!;
+  total += Math.max(0, e - s - 1);
+  total += s > 0 ? 2 : 0;
+  total += e < tabCount ? 2 : 0;
+  return total;
+}
+
+function expandRight(range: TabRange, widths: number[], tabCount: number, safeWidth: number): boolean {
+  if (range.end < tabCount && sliceWidth(widths, tabCount, range.start, range.end + 1) <= safeWidth) {
+    range.end += 1;
+    return true;
+  }
+  return false;
+}
+
+function expandLeft(range: TabRange, widths: number[], tabCount: number, safeWidth: number): boolean {
+  if (range.start > 0 && sliceWidth(widths, tabCount, range.start - 1, range.end) <= safeWidth) {
+    range.start -= 1;
+    return true;
+  }
+  return false;
+}
+
+function expandStep(
+  range: TabRange,
+  widths: number[],
+  tabCount: number,
+  safeWidth: number,
+  preferRight: boolean,
+): boolean {
+  if (preferRight) {
+    const grewRight = expandRight(range, widths, tabCount, safeWidth);
+    const grewLeft = expandLeft(range, widths, tabCount, safeWidth);
+    return grewRight || grewLeft;
+  }
+  const grewLeft = expandLeft(range, widths, tabCount, safeWidth);
+  const grewRight = expandRight(range, widths, tabCount, safeWidth);
+  return grewLeft || grewRight;
+}
+
+function computeTabRange(widths: number[], tabCount: number, activeIndex: number, safeWidth: number): TabRange {
+  const range: TabRange = { start: activeIndex, end: activeIndex + 1 };
+  let preferRight = true;
+  while (range.start > 0 || range.end < tabCount) {
+    if (!expandStep(range, widths, tabCount, safeWidth, preferRight)) break;
+    preferRight = !preferRight;
+  }
+  return range;
+}
+
 export function renderTabBar(tabs: TabDef[], activeId: string, width: number, theme: Theme): string {
   const safeWidth = Math.max(1, width);
   if (tabs.length === 0) return " ".repeat(safeWidth);
@@ -19,47 +76,7 @@ export function renderTabBar(tabs: TabDef[], activeId: string, width: number, th
     tabs.findIndex((tab) => tab.id === activeId),
   );
   const widths = tabs.map((tab) => visibleWidth(tab.label) + 2);
-
-  const sliceWidth = (s: number, e: number): number => {
-    let total = 0;
-    for (let i = s; i < e; i += 1) total += widths[i]!;
-    total += Math.max(0, e - s - 1);
-    total += s > 0 ? 2 : 0;
-    total += e < tabs.length ? 2 : 0;
-    return total;
-  };
-
-  let start = activeIndex;
-  let end = activeIndex + 1;
-  let preferRight = true;
-
-  while (start > 0 || end < tabs.length) {
-    let progressed = false;
-    const tryRight = (): boolean => {
-      if (end < tabs.length && sliceWidth(start, end + 1) <= safeWidth) {
-        end += 1;
-        return true;
-      }
-      return false;
-    };
-    const tryLeft = (): boolean => {
-      if (start > 0 && sliceWidth(start - 1, end) <= safeWidth) {
-        start -= 1;
-        return true;
-      }
-      return false;
-    };
-
-    if (preferRight) {
-      if (tryRight()) progressed = true;
-      if (tryLeft()) progressed = true;
-    } else {
-      if (tryLeft()) progressed = true;
-      if (tryRight()) progressed = true;
-    }
-    if (!progressed) break;
-    preferRight = !preferRight;
-  }
+  const { start, end } = computeTabRange(widths, tabs.length, activeIndex, safeWidth);
 
   const cells = tabs.slice(start, end).map((tab) => {
     const label = ` ${tab.label} `;

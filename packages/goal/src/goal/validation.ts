@@ -14,8 +14,12 @@ export function validateObjective(value: unknown): string {
 
 export function validateTokenBudget(value: unknown): number | null {
   if (value === undefined || value === null) return null;
-  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+  if (!isValidTokenBudget(value)) {
     throw new Error("Token budget must be a positive integer.");
   }
-  return Math.floor(value);
+  return Math.floor(value as number);
+}
+
+function isValidTokenBudget(value: unknown): boolean {
+  return typeof value === "number" && Number.isFinite(value) && value > 0;
 }

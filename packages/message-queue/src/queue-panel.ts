@@ -1,9 +1,20 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import type { KeybindingsManager, TUI } from "@earendil-works/pi-tui";
+import type { KeybindingsManager, KeyId, TUI } from "@earendil-works/pi-tui";
 import { Key, matchesKey, truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 import type { QueuedMessage } from "./queue.ts";
 
 const MIN_VISIBLE = 3;
+
+const MOVE_DELTAS: Array<[KeyId, number]> = [
+  ["up", -1],
+  ["k", -1],
+  ["down", 1],
+  ["j", 1],
+  ["pageUp", -MIN_VISIBLE],
+  ["-", -MIN_VISIBLE],
+  ["pageDown", MIN_VISIBLE],
+  ["=", MIN_VISIBLE],
+];
 
 interface QueuePanelState {
   selected: number;
@@ -34,29 +45,36 @@ function renderMessageRows(
   contentWidth: number,
   theme: Theme,
 ): string[] {
-  const bullet = isSelected ? theme.fg("accent", "▸") : " ";
-  const num = theme.fg("dim", `#${index + 1}`);
-  const sep = theme.fg("dim", " ");
-  const prefix = `${bullet} ${num}${sep}`;
-  const prefixW = visibleWidth(prefix);
-  const available = Math.max(1, contentWidth - prefixW);
-  const indent = " ".repeat(prefixW);
+  const prefix = messageRowPrefix(index, isSelected, theme);
+  const available = Math.max(1, contentWidth - visibleWidth(prefix));
+  const indent = " ".repeat(visibleWidth(prefix));
 
-  const parts = msg.text.split("\n");
   const rows: string[] = [];
   let first = true;
-
-  for (const raw of parts) {
-    const para = raw.length === 0 ? " " : raw;
-    const wrapped = wrapTextWithAnsi(theme.fg(isSelected ? "text" : "dim", para), available);
-    for (let wi = 0; wi < wrapped.length; wi++) {
-      const line = wrapped[wi]!;
-      const full = first && wi === 0 ? `${prefix}${line}` : `${indent}${line}`;
-      rows.push(`┃ ${padOrTruncate(full, contentWidth)}┃`);
+  for (const raw of msg.text.split("\n")) {
+    for (const line of wrappedParagraph(theme, raw, isSelected, available)) {
+      rows.push(messageRowLine(first, prefix, indent, line, contentWidth));
       first = false;
     }
   }
   return rows;
+}
+
+function messageRowPrefix(index: number, isSelected: boolean, theme: Theme): string {
+  const bullet = isSelected ? theme.fg("accent", "▸") : " ";
+  const num = theme.fg("dim", `#${index + 1}`);
+  const sep = theme.fg("dim", " ");
+  return `${bullet} ${num}${sep}`;
+}
+
+function wrappedParagraph(theme: Theme, raw: string, isSelected: boolean, available: number): string[] {
+  const para = raw.length === 0 ? " " : raw;
+  return wrapTextWithAnsi(theme.fg(isSelected ? "text" : "dim", para), available);
+}
+
+function messageRowLine(first: boolean, prefix: string, indent: string, line: string, contentWidth: number): string {
+  const full = first ? `${prefix}${line}` : `${indent}${line}`;
+  return `┃ ${padOrTruncate(full, contentWidth)}┃`;
 }
 
 export type QueueAction = { kind: "send"; index: number } | { kind: "close" };
@@ -81,88 +99,90 @@ export function createQueuePanel(
   }
 
   function isConfirmKey(data: string): boolean {
-    return (
-      keybindings.matches(data, "tui.select.confirm") ||
-      keybindings.matches(data, "tui.input.submit") ||
-      matchesKey(data, Key.enter) ||
-      matchesKey(data, "return") ||
-      data === "\r" ||
-      data === "\n"
-    );
+    return isBindingConfirm(data) || isPlainConfirm(data);
+  }
+
+  function isBindingConfirm(data: string): boolean {
+    return keybindings.matches(data, "tui.select.confirm") || keybindings.matches(data, "tui.input.submit");
+  }
+
+  function isPlainConfirm(data: string): boolean {
+    return matchesKey(data, Key.enter) || matchesKey(data, "return") || isRawEnter(data);
+  }
+
+  function isRawEnter(data: string): boolean {
+    return data === "\r" || data === "\n";
   }
 
   function handleInput(data: string): void {
     const msgs = getMessages();
-    if (msgs.length === 0) {
+    if (closeRequested(data, msgs.length)) {
       done({ kind: "close" });
       return;
     }
+    if (moveSelection(data, msgs)) return;
+    runSelectionAction(data, msgs);
+  }
 
-    if (matchesKey(data, Key.escape) || matchesKey(data, "ctrl+c")) {
-      done({ kind: "close" });
-      return;
-    }
+  function closeRequested(data: string, messageCount: number): boolean {
+    if (messageCount === 0) return true;
+    return matchesKey(data, Key.escape) || matchesKey(data, "ctrl+c");
+  }
 
-    if (matchesKey(data, "up") || matchesKey(data, "k")) {
-      state.selected -= 1;
-      clamp();
-      tui.requestRender();
-      return;
-    }
-
-    if (matchesKey(data, "down") || matchesKey(data, "j")) {
-      state.selected += 1;
-      clamp();
-      tui.requestRender();
-      return;
-    }
-
-    if (matchesKey(data, "pageUp") || matchesKey(data, "-")) {
-      state.selected -= MIN_VISIBLE;
-      clamp();
-      tui.requestRender();
-      return;
-    }
-
-    if (matchesKey(data, "pageDown") || matchesKey(data, "=")) {
-      state.selected += MIN_VISIBLE;
-      clamp();
-      tui.requestRender();
-      return;
-    }
-
-    if (matchesKey(data, "g")) {
-      state.selected = 0;
-      clamp();
-      tui.requestRender();
-      return;
-    }
-
-    if (matchesKey(data, "shift+g")) {
-      state.selected = msgs.length - 1;
-      clamp();
-      tui.requestRender();
-      return;
-    }
-
+  function runSelectionAction(data: string, msgs: readonly QueuedMessage[]): void {
     if (isConfirmKey(data)) {
-      const idx = state.selected;
-      if (idx >= 0 && idx < msgs.length) {
-        done({ kind: "send", index: idx });
-      }
+      sendSelection(msgs);
       return;
     }
+    if (matchesKey(data, "d") || matchesKey(data, "delete")) deleteSelection();
+  }
 
-    if (matchesKey(data, "d") || matchesKey(data, "delete")) {
-      const idx = state.selected;
-      if (idx >= 0 && idx < msgs.length) {
-        onDelete(idx);
-        state.selected = Math.min(state.selected, getMessages().length - 1);
-        clamp();
-        tui.requestRender();
-      }
-      return;
+  function moveSelection(data: string, msgs: readonly QueuedMessage[]): boolean {
+    const delta = moveDelta(data);
+    if (delta !== undefined) {
+      state.selected += delta;
+      return applySelectionMove();
     }
+    const jump = jumpTarget(data, msgs.length);
+    if (jump === undefined) return false;
+    state.selected = jump;
+    return applySelectionMove();
+  }
+
+  function moveDelta(data: string): number | undefined {
+    for (const [key, delta] of MOVE_DELTAS) {
+      if (matchesKey(data, key)) return delta;
+    }
+    return undefined;
+  }
+
+  function jumpTarget(data: string, messageCount: number): number | undefined {
+    if (matchesKey(data, "g")) return 0;
+    if (matchesKey(data, "shift+g")) return messageCount - 1;
+    return undefined;
+  }
+
+  function applySelectionMove(): boolean {
+    clamp();
+    tui.requestRender();
+    return true;
+  }
+
+  function sendSelection(msgs: readonly QueuedMessage[]): void {
+    const idx = state.selected;
+    if (idx >= 0 && idx < msgs.length) {
+      done({ kind: "send", index: idx });
+    }
+  }
+
+  function deleteSelection(): void {
+    const idx = state.selected;
+    const msgs = getMessages();
+    if (idx < 0 || idx >= msgs.length) return;
+    onDelete(idx);
+    state.selected = Math.min(state.selected, getMessages().length - 1);
+    clamp();
+    tui.requestRender();
   }
 
   function render(width: number): string[] {

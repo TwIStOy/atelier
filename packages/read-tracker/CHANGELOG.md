@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Behavior-preserving refactor: the `tool_call` handler and `/read-tracker` command dispatch split into small helpers to reduce complexity.
+
 ### Removed
 
 - Dead exports found by static analysis: `isBlockReason`, `outcomeFromReason`, `CheckVerbose`, `terminalWidth` import, `ReadTracker.entry()`.

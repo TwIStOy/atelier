@@ -1,5 +1,11 @@
 import type { TextContent } from "@earendil-works/pi-ai";
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type {
+  ExtensionAPI,
+  ExtensionCommandContext,
+  ExtensionContext,
+  ToolResultEvent,
+  ToolResultEventResult,
+} from "@earendil-works/pi-coding-agent";
 import { isReadToolResult } from "@earendil-works/pi-coding-agent";
 import { Box, Text } from "@earendil-works/pi-tui";
 import { isExtensionDisabled } from "@htwang-contrib/common";
@@ -13,47 +19,35 @@ import {
   clearStatus,
   clearWidget,
   type InjectedEntryData,
+  type InjectedEntryFile,
   type InjectedFileMeta,
+  type ThemeFn,
   updateStatus,
   updateWidget,
 } from "./reporter.ts";
 import { getSessionKey } from "./session-key.ts";
-import { DEFAULT_FILE_NAMES, DEFAULT_MAX_BYTES_PER_FILE, DEFAULT_MAX_BYTES_PER_READ } from "./types.ts";
+import {
+  DEFAULT_FILE_NAMES,
+  DEFAULT_MAX_BYTES_PER_FILE,
+  DEFAULT_MAX_BYTES_PER_READ,
+  type InjectedFileInfo,
+  type InjectionResult,
+} from "./types.ts";
 
 const FLAG_DISABLE = "no-agents-mirror";
 const COMMAND = "agents-mirror";
 const ENTRY_TYPE_DEBUG = "agents-mirror:debug";
 const ENTRY_TYPE_INJECTED = "agents-mirror:injected";
 
+type CommandArgKind = "reload" | "toggle" | "unknown";
+
 export default function agentsMirror(pi: ExtensionAPI): void {
   if (isExtensionDisabled("agents-mirror")) return;
   registerConfig();
 
-  pi.registerEntryRenderer<InjectedEntryData>(ENTRY_TYPE_INJECTED, (entry, { expanded }, theme) => {
-    const data = entry.data;
-    if (!data || data.files.length === 0) return undefined;
-    const projectCount = data.files.filter((f) => f.source === "project").length;
-    const mirrorCount = data.files.length - projectCount;
-    const parts: string[] = [];
-    if (projectCount > 0) parts.push(`${projectCount} project`);
-    if (mirrorCount > 0) parts.push(`${mirrorCount} mirror`);
-    const box = new Box();
-    box.addChild(
-      new Text(
-        theme.fg("dim", `  \u21B3 agents-mirror \u00B7 injected ${data.files.length} (${parts.join(", ")})`),
-        0,
-        0,
-      ),
-    );
-    if (expanded) {
-      for (const f of data.files) {
-        const tag = f.source === "mirror" ? " [mirror]" : "";
-        const trunc = f.truncated ? " (truncated)" : "";
-        box.addChild(new Text(theme.fg("dim", `      ${f.display}${tag}${trunc}`), 0, 0));
-      }
-    }
-    return box;
-  });
+  pi.registerEntryRenderer<InjectedEntryData>(ENTRY_TYPE_INJECTED, (entry, { expanded }, theme) =>
+    renderInjectedEntry(entry.data, expanded, theme),
+  );
 
   pi.registerFlag(FLAG_DISABLE, {
     description: "Disable agents-mirror context injection.",
@@ -87,12 +81,16 @@ export default function agentsMirror(pi: ExtensionAPI): void {
 
   pi.on("tool_result", async (event, ctx) => {
     if (disabled) return undefined;
-    if (!isReadToolResult(event) || event.isError) return undefined;
-    const filePath = event.input.path;
-    if (typeof filePath !== "string" || filePath.length === 0) return undefined;
-    const hasText = event.content.some((block) => block.type === "text");
-    if (!hasText) return undefined;
+    const filePath = injectionPath(event);
+    if (!filePath) return undefined;
+    return recordInjection(filePath, event, ctx);
+  });
 
+  async function recordInjection(
+    filePath: string,
+    event: ToolResultEvent,
+    ctx: ExtensionContext,
+  ): Promise<ToolResultEventResult | undefined> {
     const sessionKey = getSessionKey(ctx);
     const mirrorRoot = resolveMirrorForCwd(ctx.cwd);
 
@@ -107,41 +105,58 @@ export default function agentsMirror(pi: ExtensionAPI): void {
       maxBytesPerRead: DEFAULT_MAX_BYTES_PER_READ,
     });
 
-    const errorsRecorded = errorsPerSession.has(sessionKey);
-    const hasErrors = errorsRecorded || result.errors.length > 0;
-    if (result.errors.length > 0) errorsPerSession.add(sessionKey);
+    const hasErrors = noteSessionErrors(sessionKey, result);
 
     if (!result.injectedText) {
       updateStatus(ctx, cache, sessionKey, hasErrors);
       return undefined;
     }
 
+    const metaMap = mergeInjectedFiles(sessionKey, result.injectedFiles);
+
+    updateStatus(ctx, cache, sessionKey, hasErrors);
+    if (widgetVisible) updateWidget(ctx, true, [...metaMap.values()]);
+
+    appendInjectedEntry(filePath, ctx, result.injectedFiles, mirrorRoot);
+
+    const textBlock: TextContent = { type: "text", text: result.injectedText };
+    return { content: [...event.content, textBlock] };
+  }
+
+  function noteSessionErrors(sessionKey: string, result: InjectionResult): boolean {
+    const hasErrors = errorsPerSession.has(sessionKey) || result.errors.length > 0;
+    if (result.errors.length > 0) errorsPerSession.add(sessionKey);
+    return hasErrors;
+  }
+
+  function mergeInjectedFiles(sessionKey: string, files: InjectedFileInfo[]): Map<string, InjectedFileMeta> {
     let metaMap = filesPerSession.get(sessionKey);
     if (!metaMap) {
       metaMap = new Map();
       filesPerSession.set(sessionKey, metaMap);
     }
-    for (const file of result.injectedFiles) {
+    for (const file of files) {
       metaMap.set(file.absolutePath, {
         absolutePath: file.absolutePath,
         source: file.source,
         truncated: file.truncated,
       });
     }
+    return metaMap;
+  }
 
-    updateStatus(ctx, cache, sessionKey, hasErrors);
-    if (widgetVisible) updateWidget(ctx, true, [...metaMap.values()]);
-
-    if (loadInlineEntry()) {
-      pi.appendEntry<InjectedEntryData>(
-        ENTRY_TYPE_INJECTED,
-        buildInjectedEntryData({ readPath: filePath, files: result.injectedFiles, cwd: ctx.cwd, mirrorRoot }),
-      );
-    }
-
-    const textBlock: TextContent = { type: "text", text: result.injectedText };
-    return { content: [...event.content, textBlock] };
-  });
+  function appendInjectedEntry(
+    readPath: string,
+    ctx: ExtensionContext,
+    files: InjectedFileInfo[],
+    mirrorRoot: string | null,
+  ): void {
+    if (!loadInlineEntry()) return;
+    pi.appendEntry<InjectedEntryData>(
+      ENTRY_TYPE_INJECTED,
+      buildInjectedEntryData({ readPath, files, cwd: ctx.cwd, mirrorRoot }),
+    );
+  }
 
   pi.on("session_compact", async (_event, ctx) => {
     const sessionKey = getSessionKey(ctx);
@@ -166,29 +181,86 @@ export default function agentsMirror(pi: ExtensionAPI): void {
         ctx.ui.notify("agents-mirror is disabled via --no-agents-mirror", "info");
         return;
       }
-      const trimmed = (args ?? "").trim().toLowerCase();
-      if (trimmed === "reload") {
-        clearMappingsCache();
-        resolvedMirror = null;
-        const sessionKey = getSessionKey(ctx);
-        const files = [...(filesPerSession.get(sessionKey)?.values() ?? [])];
-        ctx.ui.notify("agents-mirror mapping cache reloaded.", "info");
-        if (widgetVisible) updateWidget(ctx, true, files);
+      const kind = classifyCommandArg(args);
+      if (kind === "reload") {
+        reloadMappings(ctx);
         return;
       }
-      if (trimmed !== "") {
+      if (kind === "unknown") {
         ctx.ui.notify(`Unknown argument: ${args}. Usage: /${COMMAND} [reload]`, "warning");
         return;
       }
-      widgetVisible = !widgetVisible;
-      const sessionKey = getSessionKey(ctx);
-      const files = [...(filesPerSession.get(sessionKey)?.values() ?? [])];
-      updateWidget(ctx, widgetVisible, files);
-      pi.appendEntry(ENTRY_TYPE_DEBUG, buildDebugRecord({ cache, sessionKey, files }));
-      ctx.ui.notify(
-        widgetVisible ? "Agents Mirror context widget shown" : "Agents Mirror context widget hidden",
-        "info",
-      );
+      toggleWidget(ctx);
     },
   });
+
+  function classifyCommandArg(args: string): CommandArgKind {
+    const trimmed = (args ?? "").trim().toLowerCase();
+    if (trimmed === "reload") return "reload";
+    if (trimmed !== "") return "unknown";
+    return "toggle";
+  }
+
+  function reloadMappings(ctx: ExtensionCommandContext): void {
+    clearMappingsCache();
+    resolvedMirror = null;
+    const sessionKey = getSessionKey(ctx);
+    const files = sessionFiles(sessionKey);
+    ctx.ui.notify("agents-mirror mapping cache reloaded.", "info");
+    if (widgetVisible) updateWidget(ctx, true, files);
+  }
+
+  function toggleWidget(ctx: ExtensionCommandContext): void {
+    widgetVisible = !widgetVisible;
+    const sessionKey = getSessionKey(ctx);
+    const files = sessionFiles(sessionKey);
+    updateWidget(ctx, widgetVisible, files);
+    pi.appendEntry(ENTRY_TYPE_DEBUG, buildDebugRecord({ cache, sessionKey, files }));
+    ctx.ui.notify(widgetVisible ? "Agents Mirror context widget shown" : "Agents Mirror context widget hidden", "info");
+  }
+
+  function sessionFiles(sessionKey: string): InjectedFileMeta[] {
+    return [...(filesPerSession.get(sessionKey)?.values() ?? [])];
+  }
+}
+
+function injectionPath(event: ToolResultEvent): string | null {
+  if (event.isError || !hasTextContent(event.content)) return null;
+  return readToolPath(event);
+}
+
+function hasTextContent(content: ToolResultEvent["content"]): boolean {
+  return content.some((block) => block.type === "text");
+}
+
+function readToolPath(event: ToolResultEvent): string | null {
+  if (!isReadToolResult(event)) return null;
+  const filePath = event.input.path;
+  if (typeof filePath !== "string" || filePath.length === 0) return null;
+  return filePath;
+}
+
+function renderInjectedEntry(data: InjectedEntryData | undefined, expanded: boolean, theme: ThemeFn): Box | undefined {
+  if (!data || data.files.length === 0) return undefined;
+  const box = new Box();
+  box.addChild(new Text(theme.fg("dim", injectedEntrySummary(data.files)), 0, 0));
+  if (expanded) addInjectedEntryFiles(box, data.files, theme);
+  return box;
+}
+
+function injectedEntrySummary(files: InjectedEntryFile[]): string {
+  const projectCount = files.filter((f) => f.source === "project").length;
+  const mirrorCount = files.length - projectCount;
+  const parts: string[] = [];
+  if (projectCount > 0) parts.push(`${projectCount} project`);
+  if (mirrorCount > 0) parts.push(`${mirrorCount} mirror`);
+  return `  \u21B3 agents-mirror \u00B7 injected ${files.length} (${parts.join(", ")})`;
+}
+
+function addInjectedEntryFiles(box: Box, files: InjectedEntryFile[], theme: ThemeFn): void {
+  for (const f of files) {
+    const tag = f.source === "mirror" ? " [mirror]" : "";
+    const trunc = f.truncated ? " (truncated)" : "";
+    box.addChild(new Text(theme.fg("dim", `      ${f.display}${tag}${trunc}`), 0, 0));
+  }
 }

@@ -112,25 +112,15 @@ export class BtwOverlayController implements Component {
     this.tui.requestRender();
   }
 
-  private buildNaturalLines(width: number): string[] {
-    const lines: string[] = [];
-
-    const bannerText = BANNER_PREFIX + this.question;
-    lines.push(this.theme.bg("selectedBg", truncateToWidth(bannerText, width, "…", true)));
-
-    lines.push("");
-
-    if (this.history.length > 0 && !this.historyCleared) {
-      for (const turn of this.history) {
-        const qText = extractShort(turn.userMessage);
-        lines.push(this.theme.fg("dim", truncateToWidth(HISTORY_PREFIX + qText, width)));
-      }
+  private appendHistoryLines(lines: string[], width: number): void {
+    if (this.history.length === 0 || this.historyCleared) return;
+    for (const turn of this.history) {
+      const qText = extractShort(turn.userMessage);
+      lines.push(this.theme.fg("dim", truncateToWidth(HISTORY_PREFIX + qText, width)));
     }
+  }
 
-    lines.push(this.theme.fg("accent", ECHO_PREFIX + this.theme.fg("muted", this.question)));
-
-    lines.push("");
-
+  private appendAnswerLines(lines: string[], width: number): void {
     const indent = " ".repeat(ANSWER_INDENT);
     const answerWidth = Math.max(1, width - ANSWER_INDENT);
 
@@ -149,9 +139,9 @@ export class BtwOverlayController implements Component {
         lines.push(indent + this.theme.fg("error", this.answer.message));
         break;
     }
+  }
 
-    lines.push("");
-
+  private appendFooter(lines: string[]): void {
     const footerParts: string[] = [];
     footerParts.push(`${this.theme.fg("dim", "Esc")} dismiss`);
     if (this.history.length > 0 && !this.historyCleared) {
@@ -161,6 +151,27 @@ export class BtwOverlayController implements Component {
       footerParts.push(`${this.theme.fg("dim", "↑↓")} scroll`);
     }
     lines.push(this.theme.fg("dim", footerParts.join("  ")));
+  }
+
+  private buildNaturalLines(width: number): string[] {
+    const lines: string[] = [];
+
+    const bannerText = BANNER_PREFIX + this.question;
+    lines.push(this.theme.bg("selectedBg", truncateToWidth(bannerText, width, "…", true)));
+
+    lines.push("");
+
+    this.appendHistoryLines(lines, width);
+
+    lines.push(this.theme.fg("accent", ECHO_PREFIX + this.theme.fg("muted", this.question)));
+
+    lines.push("");
+
+    this.appendAnswerLines(lines, width);
+
+    lines.push("");
+
+    this.appendFooter(lines);
 
     return lines;
   }

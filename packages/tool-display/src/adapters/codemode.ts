@@ -107,6 +107,32 @@ function nestedCallHeader(call: CodemodeCall, theme: Theme, width: number): stri
   }
 }
 
+function callArgs(call: CodemodeCall): string {
+  return call.args ?? "";
+}
+
+function headerRow(glyph: string, header: string, suffix: string, width: number): string {
+  const headerLines = header.split("\n");
+  if (headerLines.length === 1 && visibleWidth(headerLines[0]) + visibleWidth(suffix) <= width - 2) {
+    headerLines[0] += suffix;
+  }
+  let row = `${glyph} ${headerLines[0]}`;
+  if (headerLines.length > 1) {
+    row += `\n${headerLines
+      .slice(1)
+      .map((line) => `  ${line}`)
+      .join("\n")}`;
+  }
+  return row;
+}
+
+function argsRow(glyph: string, call: CodemodeCall, theme: Theme, suffix: string, expanded: boolean): string {
+  const parts: string[] = [theme.fg("toolTitle", call.name ?? "tool")];
+  const argsText = expanded ? callArgs(call) : truncateDisplay(callArgs(call), COLLAPSED_ARGS_CHARS, "...");
+  if (argsText) parts.push(theme.fg("muted", argsText));
+  return `${glyph} ${parts.join(" ")}${suffix}`;
+}
+
 function formatCallRow(
   theme: Theme,
   call: CodemodeCall,
@@ -121,25 +147,8 @@ function formatCallRow(
   if (call.cost) suffix += ` ${theme.fg("dim", formatCost(call.cost))}`;
 
   const header = nestedCallHeader(call, theme, Math.max(1, width - 2));
-  let row: string;
-  if (header !== undefined) {
-    const headerLines = header.split("\n");
-    if (headerLines.length === 1 && visibleWidth(headerLines[0]) + visibleWidth(suffix) <= width - 2) {
-      headerLines[0] += suffix;
-    }
-    row = `${glyph} ${headerLines[0]}`;
-    if (headerLines.length > 1) {
-      row += `\n${headerLines
-        .slice(1)
-        .map((line) => `  ${line}`)
-        .join("\n")}`;
-    }
-  } else {
-    const parts: string[] = [theme.fg("toolTitle", call.name ?? "tool")];
-    const argsText = expanded ? (call.args ?? "") : truncateDisplay(call.args ?? "", COLLAPSED_ARGS_CHARS, "...");
-    if (argsText) parts.push(theme.fg("muted", argsText));
-    row = `${glyph} ${parts.join(" ")}${suffix}`;
-  }
+  let row =
+    header !== undefined ? headerRow(glyph, header, suffix, width) : argsRow(glyph, call, theme, suffix, expanded);
   if (expanded && call.error?.trim()) {
     row += `\n    ${theme.fg("error", call.error.split("\n").join("\n    "))}`;
   }
@@ -153,6 +162,21 @@ function settledCounts(details: CodemodeDetails | undefined): { settled: number;
   return { settled, total: calls.length };
 }
 
+function shownCalls(calls: CodemodeCall[], expanded: boolean, isPartial: boolean): CodemodeCall[] {
+  return expanded || isPartial ? calls : calls.slice(-COLLAPSED_CALL_COUNT);
+}
+
+function hiddenCallsRow(hidden: number, theme: Theme, width: number): string {
+  return truncateToWidth(
+    theme.fg(
+      "muted",
+      `... (${hidden} earlier call${hidden !== 1 ? "s" : ""}, ${keyText("app.tools.expand")} to expand)`,
+    ),
+    width,
+    "…",
+  );
+}
+
 function callRows(
   details: CodemodeDetails | undefined,
   theme: Theme,
@@ -164,19 +188,9 @@ function callRows(
   const calls = details?.calls;
   if (!Array.isArray(calls) || calls.length === 0) return [];
   const rows: string[] = [];
-  const shown = expanded || isPartial ? calls : calls.slice(-COLLAPSED_CALL_COUNT);
+  const shown = shownCalls(calls, expanded, isPartial);
   if (shown.length < calls.length) {
-    const hidden = calls.length - shown.length;
-    rows.push(
-      truncateToWidth(
-        theme.fg(
-          "muted",
-          `... (${hidden} earlier call${hidden !== 1 ? "s" : ""}, ${keyText("app.tools.expand")} to expand)`,
-        ),
-        width,
-        "…",
-      ),
-    );
+    rows.push(hiddenCallsRow(calls.length - shown.length, theme, width));
   }
   for (const call of shown) {
     rows.push(formatCallRow(theme, call, isPartial, spinAt, expanded, width));

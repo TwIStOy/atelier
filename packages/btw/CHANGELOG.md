@@ -4,6 +4,7 @@
 
 ### Changed
 
+- Behavior-preserving refactor of the `/btw` overlay renderer: `buildNaturalLines` split into history, answer, and footer helpers.
 - Message text extraction reuses `userMessageText` from `@htwang-contrib/common`; overlay up/down scrolling uses `scrollKeyOffset`.
 
 ## [0.7.0] - 2026-10-30

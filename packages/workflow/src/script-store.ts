@@ -50,26 +50,45 @@ function loadSavedWorkflowFile(file: string, scope: SavedWorkflowScope): SavedWo
   };
 }
 
+function readDirEntries(dir: string): string[] {
+  try {
+    return fs.readdirSync(dir);
+  } catch {
+    return [];
+  }
+}
+
+function isWorkflowFile(file: string): boolean {
+  try {
+    return fs.statSync(file).isFile();
+  } catch {
+    return false;
+  }
+}
+
+function considerEntry(
+  dir: string,
+  entry: string,
+  scope: SavedWorkflowScope,
+  byName: Map<string, SavedWorkflow>,
+): void {
+  if (!entry.endsWith(".js")) return;
+  const file = path.join(dir, entry);
+  if (!isWorkflowFile(file)) return;
+  const saved = loadSavedWorkflowFile(file, scope);
+  if (saved) byName.set(saved.name, saved);
+}
+
+function collectDirWorkflows(dir: string, scope: SavedWorkflowScope, byName: Map<string, SavedWorkflow>): void {
+  for (const entry of readDirEntries(dir)) {
+    considerEntry(dir, entry, scope, byName);
+  }
+}
+
 export function listSavedWorkflows(cwd: string, home?: string): SavedWorkflow[] {
   const byName = new Map<string, SavedWorkflow>();
   for (const { dir, scope } of savedWorkflowDirs(cwd, home)) {
-    let entries: string[] = [];
-    try {
-      entries = fs.readdirSync(dir);
-    } catch {
-      continue;
-    }
-    for (const entry of entries) {
-      if (!entry.endsWith(".js")) continue;
-      const file = path.join(dir, entry);
-      try {
-        if (!fs.statSync(file).isFile()) continue;
-      } catch {
-        continue;
-      }
-      const saved = loadSavedWorkflowFile(file, scope);
-      if (saved) byName.set(saved.name, saved);
-    }
+    collectDirWorkflows(dir, scope, byName);
   }
   return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
 }

@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Refactored complex internals for the static-complexity gate: split `parsePatch`/`seekSequence`/`replaceChunks`/`countPatchChanges` in `patch.ts` and the tool's `execute` into small single-purpose helpers with identical behavior and public API.
+
 ### Removed
 
 - Dead exports found by static analysis: `normalizeApplyPatchArguments`, `ApplyPatchError.hasPartialSuccess()`.

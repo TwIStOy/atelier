@@ -1,7 +1,8 @@
 import { Type } from "@sinclair/typebox";
-import { diffLines } from "diff";
+import { type Change, diffLines } from "diff";
 import { runHat } from "../cli-runner.js";
 import { jsonError, jsonResult } from "../tool-result.js";
+import { pushDefined, pushTruthy } from "./cli-args.js";
 
 export const memoryUpdate = {
   name: "memory-update",
@@ -33,39 +34,57 @@ export const memoryUpdate = {
   }),
   execute: async (_id: string, args: Record<string, unknown>, signal?: AbortSignal) => {
     try {
-      const cliArgs = ["memory", "update", args.uri as string];
-      if (args.old_string !== undefined) cliArgs.push("--old-string", args.old_string as string);
-      if (args.new_string !== undefined) cliArgs.push("--new-string", args.new_string as string);
-      if (args.append) cliArgs.push("--append", args.append as string);
-      if (args.priority !== undefined) cliArgs.push("--priority", String(args.priority));
-      if (args.disclosure !== undefined) cliArgs.push("--disclosure", args.disclosure as string);
-      const result = await runHat(cliArgs, { signal });
-
-      const details: Record<string, unknown> = { uri: args.uri };
-      if (args.old_string !== undefined && args.new_string !== undefined) {
-        const changes = diffLines(args.old_string as string, args.new_string as string);
-        let additions = 0;
-        let removals = 0;
-        for (const change of changes) {
-          if (change.added) additions += change.count ?? 0;
-          if (change.removed) removals += change.count ?? 0;
-        }
-        details.mode = "patch";
-        details.diff_adds = additions;
-        details.diff_removes = removals;
-        details.old_string = args.old_string;
-        details.new_string = args.new_string;
-      } else if (args.append !== undefined) {
-        details.mode = "append";
-      } else {
-        details.mode = "meta";
-      }
-      if (args.priority !== undefined) details.priority = args.priority;
-      if (args.disclosure !== undefined) details.disclosure = args.disclosure;
-
-      return jsonResult(result, details);
+      const result = await runHat(buildUpdateCliArgs(args), { signal });
+      return jsonResult(result, buildUpdateDetails(args));
     } catch (e) {
       return jsonError(e);
     }
   },
 };
+
+function buildUpdateCliArgs(args: Record<string, unknown>): string[] {
+  const cliArgs = ["memory", "update", args.uri as string];
+  pushDefined(cliArgs, "--old-string", args.old_string);
+  pushDefined(cliArgs, "--new-string", args.new_string);
+  pushTruthy(cliArgs, "--append", args.append);
+  pushDefined(cliArgs, "--priority", args.priority);
+  pushDefined(cliArgs, "--disclosure", args.disclosure);
+  return cliArgs;
+}
+
+function updateMode(args: Record<string, unknown>): "patch" | "append" | "meta" {
+  if (args.old_string !== undefined && args.new_string !== undefined) return "patch";
+  return args.append !== undefined ? "append" : "meta";
+}
+
+function sumLines(changes: Change[], pick: (change: Change) => boolean): number {
+  return changes.filter(pick).reduce((sum, change) => sum + (change.count ?? 0), 0);
+}
+
+function diffLineCounts(oldString: string, newString: string): { additions: number; removals: number } {
+  const changes = diffLines(oldString, newString);
+  return {
+    additions: sumLines(changes, (change) => change.added),
+    removals: sumLines(changes, (change) => change.removed),
+  };
+}
+
+function patchDetails(args: Record<string, unknown>): Record<string, unknown> {
+  const counts = diffLineCounts(args.old_string as string, args.new_string as string);
+  return {
+    diff_adds: counts.additions,
+    diff_removes: counts.removals,
+    old_string: args.old_string,
+    new_string: args.new_string,
+  };
+}
+
+function buildUpdateDetails(args: Record<string, unknown>): Record<string, unknown> {
+  const details: Record<string, unknown> = { uri: args.uri };
+  const mode = updateMode(args);
+  details.mode = mode;
+  if (mode === "patch") Object.assign(details, patchDetails(args));
+  if (args.priority !== undefined) details.priority = args.priority;
+  if (args.disclosure !== undefined) details.disclosure = args.disclosure;
+  return details;
+}

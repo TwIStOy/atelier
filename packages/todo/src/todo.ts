@@ -1,7 +1,8 @@
 import type { ExtensionAPI, ToolAnnotations } from "@earendil-works/pi-coding-agent";
 import type { TObject } from "@sinclair/typebox";
 import { loadConfig } from "./config.ts";
-import { selectTasksByStatus, selectTodoCounts, selectVisibleTasks } from "./state/selectors.ts";
+import { selectTasksByStatus, selectTodoCounts, selectVisibleTasks, type TodoCounts } from "./state/selectors.ts";
+import type { TaskState } from "./state/state.ts";
 import { applyTaskMutation } from "./state/state-reducer.ts";
 import { commitState, getState } from "./state/store.ts";
 import { buildToolResult } from "./tool/response-envelope.ts";
@@ -16,6 +17,7 @@ import {
   ListTodoOutputSchema,
   ListTodoSchema,
   MSG_NO_TODOS,
+  type Task,
   type TaskAction,
   type TaskMutationParams,
   TODO_CLEAR,
@@ -31,6 +33,35 @@ import { formatCommandTaskLine, statusGlyph } from "./view/format.ts";
 const SECTION_PENDING = "── Pending ──";
 const SECTION_IN_PROGRESS = "── In Progress ──";
 const SECTION_COMPLETED = "── Completed ──";
+
+function todoCommandLines(state: TaskState): string[] {
+  const groups = selectTasksByStatus(state);
+  const counts = selectTodoCounts(state);
+  const lines: string[] = [todoCommandHeader(counts)];
+  pushTodoSection(lines, groups.pending, SECTION_PENDING, "pending");
+  pushTodoSection(lines, groups.inProgress, SECTION_IN_PROGRESS, "in_progress");
+  pushTodoSection(lines, groups.completed, SECTION_COMPLETED, "completed");
+  return lines;
+}
+
+function todoCommandHeader(counts: TodoCounts): string {
+  const header: string[] = [];
+  if (counts.completed > 0) header.push(`${counts.completed}/${counts.total} completed`);
+  if (counts.inProgress > 0) header.push(`${counts.inProgress} in_progress`);
+  if (counts.pending > 0) header.push(`${counts.pending} pending`);
+  return header.join(" · ");
+}
+
+function pushTodoSection(
+  lines: string[],
+  tasks: readonly Task[],
+  section: string,
+  status: "pending" | "in_progress" | "completed",
+): void {
+  if (tasks.length === 0) return;
+  lines.push(section);
+  for (const task of tasks) lines.push(formatCommandTaskLine(task, statusGlyph(status)));
+}
 
 interface TodoToolSpec {
   action: TaskAction;
@@ -151,29 +182,7 @@ export function registerTodosCommand(pi: ExtensionAPI): void {
         ctx.ui.notify(MSG_NO_TODOS, "info");
         return;
       }
-      const groups = selectTasksByStatus(state);
-      const counts = selectTodoCounts(state);
-
-      const header: string[] = [];
-      if (counts.completed > 0) header.push(`${counts.completed}/${counts.total} completed`);
-      if (counts.inProgress > 0) header.push(`${counts.inProgress} in_progress`);
-      if (counts.pending > 0) header.push(`${counts.pending} pending`);
-
-      const lines: string[] = [header.join(" · ")];
-      if (groups.pending.length > 0) {
-        lines.push(SECTION_PENDING);
-        for (const task of groups.pending) lines.push(formatCommandTaskLine(task, statusGlyph("pending")));
-      }
-      if (groups.inProgress.length > 0) {
-        lines.push(SECTION_IN_PROGRESS);
-        for (const task of groups.inProgress) lines.push(formatCommandTaskLine(task, statusGlyph("in_progress")));
-      }
-      if (groups.completed.length > 0) {
-        lines.push(SECTION_COMPLETED);
-        for (const task of groups.completed) lines.push(formatCommandTaskLine(task, statusGlyph("completed")));
-      }
-
-      ctx.ui.notify(lines.join("\n"), "info");
+      ctx.ui.notify(todoCommandLines(state).join("\n"), "info");
     },
   });
 }

@@ -54,38 +54,86 @@ export class MultiSelectView implements StatefulView<MultiSelectViewProps> {
 
   invalidate(): void {}
 
+  /** Option + projected row pair for index `i`, or undefined when either is absent. */
+  private optionRowPair(
+    i: number,
+  ): { opt: QuestionData["options"][number]; row: MultiSelectViewProps["rows"][number] } | undefined {
+    const opt = this.question.options[i];
+    const r = this.props.rows[i];
+    if (!opt || !r) return undefined;
+    return { opt, row: r };
+  }
+
+  private renderOptionRow(
+    opt: QuestionData["options"][number],
+    row: MultiSelectViewProps["rows"][number],
+    i: number,
+    contentWidth: number,
+    width: number,
+    numberWidth: number,
+  ): string[] {
+    const pointer = row.active ? this.theme.fg("accent", ACTIVE_POINTER) : INACTIVE_POINTER;
+    // Checked uses the same `accent` hue as the active-row label so checked rows read
+    // as "selected" rather than "success" — matches the visual rhythm of the rest of
+    // the dialog (active pointer, label, picker rows are all accent).
+    const box = row.checked ? this.theme.fg("accent", CHECKED) : this.theme.fg("muted", UNCHECKED);
+    const label = truncateToWidth(opt.label, contentWidth, "…");
+    const styledLabel = row.active ? this.theme.fg("accent", this.theme.bold(label)) : label;
+    const num = String(i + 1).padStart(numberWidth, " ");
+    const line = `${pointer}${num}${NUMBER_SEPARATOR}${box}${BOX_LABEL_GAP}${styledLabel}`;
+    return [truncateToWidth(line, width, ""), ...this.renderOptionDescription(opt.description, contentWidth)];
+  }
+
+  private renderOptionDescription(description: string | undefined, contentWidth: number): string[] {
+    if (!description) return [];
+    const wrapped = wrapTextWithAnsi(description, contentWidth);
+    const out: string[] = [];
+    for (const segment of wrapped) {
+      out.push(CONTINUATION_INDENT + this.theme.fg("muted", segment));
+    }
+    return out;
+  }
+
+  private renderNextRow(width: number): string {
+    const nextPointer = this.props.nextActive ? this.theme.fg("accent", ACTIVE_POINTER) : INACTIVE_POINTER;
+    const nextLabel = this.props.nextActive
+      ? this.theme.fg("accent", this.theme.bold(this.props.nextLabel))
+      : this.props.nextLabel;
+    return truncateToWidth(`${nextPointer}${nextLabel}`, width, "");
+  }
+
   render(width: number): string[] {
     const lines: string[] = [];
     const prefixWidth = this.prefixVisibleWidth();
     const contentWidth = Math.max(1, width - prefixWidth);
     const numberWidth = String(Math.max(1, this.question.options.length)).length;
     for (let i = 0; i < this.question.options.length; i++) {
-      const opt = this.question.options[i];
-      const row = this.props.rows[i];
-      if (!opt || !row) continue;
-      const pointer = row.active ? this.theme.fg("accent", ACTIVE_POINTER) : INACTIVE_POINTER;
-      // Checked uses the same `accent` hue as the active-row label so checked rows read
-      // as "selected" rather than "success" — matches the visual rhythm of the rest of
-      // the dialog (active pointer, label, picker rows are all accent).
-      const box = row.checked ? this.theme.fg("accent", CHECKED) : this.theme.fg("muted", UNCHECKED);
-      const label = truncateToWidth(opt.label, contentWidth, "…");
-      const styledLabel = row.active ? this.theme.fg("accent", this.theme.bold(label)) : label;
-      const num = String(i + 1).padStart(numberWidth, " ");
-      const line = `${pointer}${num}${NUMBER_SEPARATOR}${box}${BOX_LABEL_GAP}${styledLabel}`;
-      lines.push(truncateToWidth(line, width, ""));
-      if (opt.description) {
-        const wrapped = wrapTextWithAnsi(opt.description, contentWidth);
-        for (const segment of wrapped) {
-          lines.push(CONTINUATION_INDENT + this.theme.fg("muted", segment));
-        }
-      }
+      const pair = this.optionRowPair(i);
+      if (!pair) continue;
+      lines.push(...this.renderOptionRow(pair.opt, pair.row, i, contentWidth, width, numberWidth));
     }
-    const nextPointer = this.props.nextActive ? this.theme.fg("accent", ACTIVE_POINTER) : INACTIVE_POINTER;
-    const nextLabel = this.props.nextActive
-      ? this.theme.fg("accent", this.theme.bold(this.props.nextLabel))
-      : this.props.nextLabel;
-    lines.push(truncateToWidth(`${nextPointer}${nextLabel}`, width, ""));
+    lines.push(this.renderNextRow(width));
     return lines;
+  }
+
+  /** Rendered row count for one option — the label line plus wrapped description lines. */
+  private optionItemHeight(opt: QuestionData["options"][number], contentWidth: number): number {
+    if (!opt.description) return 1;
+    return 1 + wrapTextWithAnsi(opt.description, contentWidth).length;
+  }
+
+  private scanForActiveRow(contentWidth: number): { row: number; range: [number, number] | undefined } {
+    let row = 0;
+    for (let i = 0; i < this.question.options.length; i++) {
+      const pair = this.optionRowPair(i);
+      if (!pair) continue;
+      const itemHeight = this.optionItemHeight(pair.opt, contentWidth);
+      if (pair.row.active) {
+        return { row, range: [row, row + itemHeight] };
+      }
+      row += itemHeight;
+    }
+    return { row, range: undefined };
   }
 
   /**
@@ -93,21 +141,11 @@ export class MultiSelectView implements StatefulView<MultiSelectViewProps> {
    * `render(width)`. Labels are always 1 row (truncated); descriptions wrap.
    */
   focusedItemRowRange(width: number): [number, number] {
-    const prefixWidth = this.prefixVisibleWidth();
-    const contentWidth = Math.max(1, width - prefixWidth);
-    let row = 0;
-    for (let i = 0; i < this.question.options.length; i++) {
-      const opt = this.question.options[i];
-      const r = this.props.rows[i];
-      if (!opt || !r) continue;
-      const itemHeight = 1 + (opt.description ? wrapTextWithAnsi(opt.description, contentWidth).length : 0);
-      if (r.active) {
-        return [row, row + itemHeight];
-      }
-      row += itemHeight;
-    }
+    const contentWidth = Math.max(1, width - this.prefixVisibleWidth());
+    const scan = this.scanForActiveRow(contentWidth);
+    if (scan.range) return scan.range;
     if (this.props.nextActive) {
-      return [row, row + 1];
+      return [scan.row, scan.row + 1];
     }
     return [0, 0];
   }

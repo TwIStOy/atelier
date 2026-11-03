@@ -1,4 +1,4 @@
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext, SessionStartEvent } from "@earendil-works/pi-coding-agent";
 import { isExtensionDisabled } from "@htwang-contrib/common";
 import { loadRecapConfig, registerRecapConfigItems, setCachedModels } from "./config.ts";
 import { IdleListener } from "./idle.ts";
@@ -31,13 +31,20 @@ export default function recapExtension(pi: ExtensionAPI): void {
   pi.on("session_start", (event, ctx) => {
     if (ctx.mode !== "tui") return;
 
+    cacheSessionModels(ctx);
+    startIdleListener(event.reason, ctx);
+  });
+
+  function cacheSessionModels(ctx: ExtensionContext): void {
     setCachedModels(
       ctx.modelRegistry.getAvailable().map((m) => ({
         label: `${m.provider}/${m.id}`,
         value: `${m.provider}/${m.id}`,
       })),
     );
+  }
 
+  function startIdleListener(reason: SessionStartEvent["reason"], ctx: ExtensionContext): void {
     recapManager = createRecapManager(pi);
     if (!recapManager) return;
 
@@ -48,10 +55,10 @@ export default function recapExtension(pi: ExtensionAPI): void {
     idleListener.on("enter", (c) => recapManager?.run(c));
     idleListener.on("wake", (c) => recapManager?.clear(c));
 
-    if (event.reason === "resume" || event.reason === "fork") {
+    if (reason === "resume" || reason === "fork") {
       idleListener.watch(ctx);
     }
-  });
+  }
 
   pi.on("input", (_event, ctx) => idleListener?.wake(ctx));
   pi.on("user_bash", (_event, ctx) => idleListener?.wake(ctx));

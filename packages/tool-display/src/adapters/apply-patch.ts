@@ -1,7 +1,7 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { visibleWidth } from "@earendil-works/pi-tui";
 import { countPatchChanges, extractPatchedPaths, parsePatch } from "@htwang-contrib/apply-patch/patch";
-import type { ApplyPatchToolDetails } from "@htwang-contrib/apply-patch/preview";
+import type { ApplyPatchPreviewFile, ApplyPatchToolDetails } from "@htwang-contrib/apply-patch/preview";
 import { shortenPath } from "@htwang-contrib/common";
 import { loadConfig } from "../config.ts";
 import type { ToolDisplayAdapter } from "../types.ts";
@@ -55,32 +55,82 @@ function formatPatchStats(
   isPartial: boolean | undefined,
 ): string {
   const d = toDetails(details);
-  const preview = d?.preview;
-  const counts =
-    preview !== undefined ? { added: preview.added, removed: preview.removed } : patchCounts(args?.input ?? "");
-  const added = counts?.added ?? 0;
-  const removed = counts?.removed ?? 0;
-  const fileCount = preview?.files.length ?? patchedPaths(args?.input ?? "").length;
-
-  const parts: string[] = [];
-  if (isPartial && d?.progress) {
-    parts.push(theme.fg("muted", `${d.progress.applied + d.progress.failed}/${d.progress.total}`));
-  }
-  if (added > 0) parts.push(theme.fg("success", `+${added}`));
-  if (removed > 0) parts.push(theme.fg("error", `-${removed}`));
-  if (counts !== null && width !== undefined) {
-    parts.push(theme.fg("muted", resolveIsSplit(width) ? "side-by-side" : "unified"));
-  }
-  if (fileCount > 1) {
-    parts.push(theme.fg("muted", `· ${fileCount} files`));
-  }
-  if (d?.result && d.result.failures.length > 0) {
-    parts.push(theme.fg("error", `✗ ${d.result.failures.length} failed`));
-  }
-  if (added > 0 || removed > 0) {
-    parts.push(renderChangeBar(added, removed, theme));
-  }
+  const counts = patchStatsCounts(args, d);
+  const fileCount = patchFileCount(args, d);
+  const parts = [
+    progressPart(theme, d, isPartial),
+    counts.added > 0 ? theme.fg("success", `+${counts.added}`) : "",
+    counts.removed > 0 ? theme.fg("error", `-${counts.removed}`) : "",
+    diffModePart(theme, counts.known, width),
+    fileCount > 1 ? theme.fg("muted", `· ${fileCount} files`) : "",
+    failuresPart(theme, d),
+    counts.added > 0 || counts.removed > 0 ? renderChangeBar(counts.added, counts.removed, theme) : "",
+  ].filter((part) => part !== "");
   return parts.join(" ");
+}
+
+function patchStatsCounts(
+  args: ApplyPatchArgs,
+  d: ApplyPatchToolDetails | undefined,
+): { added: number; removed: number; known: boolean } {
+  const preview = d?.preview;
+  if (preview !== undefined) return { added: preview.added, removed: preview.removed, known: true };
+  const counts = patchCounts(args?.input ?? "");
+  return { added: counts?.added ?? 0, removed: counts?.removed ?? 0, known: counts !== null };
+}
+
+function patchFileCount(args: ApplyPatchArgs, d: ApplyPatchToolDetails | undefined): number {
+  return d?.preview?.files.length ?? patchedPaths(args?.input ?? "").length;
+}
+
+function progressPart(theme: Theme, d: ApplyPatchToolDetails | undefined, isPartial: boolean | undefined): string {
+  if (!isPartial || !d?.progress) return "";
+  return theme.fg("muted", `${d.progress.applied + d.progress.failed}/${d.progress.total}`);
+}
+
+function diffModePart(theme: Theme, known: boolean, width: number | undefined): string {
+  if (!known || width === undefined) return "";
+  return theme.fg("muted", resolveIsSplit(width) ? "side-by-side" : "unified");
+}
+
+function failuresPart(theme: Theme, d: ApplyPatchToolDetails | undefined): string {
+  if (!d?.result || d.result.failures.length === 0) return "";
+  return theme.fg("error", `✗ ${d.result.failures.length} failed`);
+}
+
+function singleFilePatchLines(file: ApplyPatchPreviewFile | undefined, theme: Theme, width: number): string[] {
+  if (!file) return [];
+  if (file.diff) return renderWithDelta(file.diff, width, theme);
+  const target = file.movePath ? ` → ${shortenPath(file.movePath)}` : "";
+  return [theme.fg("muted", `└ ${file.operation} ${shortenPath(file.filePath)}${target}`)];
+}
+
+function multiFilePatchLines(files: ApplyPatchPreviewFile[], theme: Theme, width: number): string[] {
+  const lines: string[] = [];
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    if (!file) continue;
+    lines.push(multiFileHeader(file, i === files.length - 1, theme));
+    if (file.diff) {
+      lines.push(...renderWithDelta(file.diff, width, theme));
+    }
+  }
+  return lines;
+}
+
+function appendStatsSuffix(header: string, suffix: string, width: number | undefined): string {
+  if (!suffix) return header;
+  if (width !== undefined && visibleWidth(header) + 1 + visibleWidth(suffix) > width) return header;
+  return `${header} ${suffix}`;
+}
+
+function multiFileHeader(file: ApplyPatchPreviewFile, isLast: boolean, theme: Theme): string {
+  const branch = isLast ? "└" : "├";
+  const header = `${theme.fg("muted", branch)} ${theme.fg("accent", formatPatchPath(file.filePath, file.movePath))}`;
+  const stats: string[] = [];
+  if (file.added > 0) stats.push(theme.fg("success", `+${file.added}`));
+  if (file.removed > 0) stats.push(theme.fg("error", `-${file.removed}`));
+  return stats.length > 0 ? `${header} ${stats.join(" ")}` : header;
 }
 
 export const applyPatchAdapter: ToolDisplayAdapter<ApplyPatchArgs> = {
@@ -99,9 +149,7 @@ export const applyPatchAdapter: ToolDisplayAdapter<ApplyPatchArgs> = {
     if (loadConfig().applyPatchStyle !== "single-line") return header;
 
     const suffix = formatPatchStats(args, theme, width, details, isPartial);
-    if (!suffix) return header;
-    if (width !== undefined && visibleWidth(header) + 1 + visibleWidth(suffix) > width) return header;
-    return `${header} ${suffix}`;
+    return appendStatsSuffix(header, suffix, width);
   },
 
   formatCollapsedContent(args, _output, theme, width, details?: unknown, isPartial?: boolean) {
@@ -115,44 +163,29 @@ export const applyPatchAdapter: ToolDisplayAdapter<ApplyPatchArgs> = {
     const d = toDetails(details);
     const preview = d?.preview;
 
-    if (!preview || preview.files.length === 0) {
-      const input = args?.input ?? "";
-      if (!input.trim()) return [];
-      return formatExpandedToolOutputLines(input, theme, width);
-    }
+    if (!preview || preview.files.length === 0) return rawInputLines(args, theme, width);
 
-    const lines: string[] = [];
-    if (preview.files.length === 1) {
-      const file = preview.files[0];
-      if (file) {
-        if (file.diff) {
-          lines.push(...renderWithDelta(file.diff, width, theme));
-        } else {
-          const target = file.movePath ? ` → ${shortenPath(file.movePath)}` : "";
-          lines.push(theme.fg("muted", `└ ${file.operation} ${shortenPath(file.filePath)}${target}`));
-        }
-      }
-    } else {
-      for (let i = 0; i < preview.files.length; i++) {
-        const file = preview.files[i];
-        if (!file) continue;
-        const branch = i === preview.files.length - 1 ? "└" : "├";
-        const header = `${theme.fg("muted", branch)} ${theme.fg("accent", formatPatchPath(file.filePath, file.movePath))}`;
-        const stats: string[] = [];
-        if (file.added > 0) stats.push(theme.fg("success", `+${file.added}`));
-        if (file.removed > 0) stats.push(theme.fg("error", `-${file.removed}`));
-        lines.push(stats.length > 0 ? `${header} ${stats.join(" ")}` : header);
-        if (file.diff) {
-          lines.push(...renderWithDelta(file.diff, width, theme));
-        }
-      }
-    }
-
-    for (const failure of d?.result?.failures ?? []) {
-      const message = failure.message.split("\n")[0] ?? failure.message;
-      lines.push(theme.fg("error", `✗ ${failure.filePath} (${failure.operation}): ${message}`));
-    }
+    const lines =
+      preview.files.length === 1
+        ? singleFilePatchLines(preview.files[0], theme, width)
+        : multiFilePatchLines(preview.files, theme, width);
+    lines.push(...failureLines(d, theme));
 
     return lines;
   },
 };
+
+function rawInputLines(args: ApplyPatchArgs, theme: Theme, width: number): string[] {
+  const input = args?.input ?? "";
+  if (!input.trim()) return [];
+  return formatExpandedToolOutputLines(input, theme, width);
+}
+
+function failureLines(d: ApplyPatchToolDetails | undefined, theme: Theme): string[] {
+  const lines: string[] = [];
+  for (const failure of d?.result?.failures ?? []) {
+    const message = failure.message.split("\n")[0] ?? failure.message;
+    lines.push(theme.fg("error", `✗ ${failure.filePath} (${failure.operation}): ${message}`));
+  }
+  return lines;
+}

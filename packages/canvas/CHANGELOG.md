@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Refactored `externalIPv4Addresses` in `src/server.ts` into smaller predicates to clear a `fallow health` complexity finding; behavior is unchanged.
+
 ## [0.7.0] - 2026-10-30
 
 ### Added

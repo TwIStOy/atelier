@@ -3,7 +3,7 @@ import { visibleWidth } from "@earendil-works/pi-tui";
 import { trimTrailingEmpty } from "@htwang-contrib/common";
 import { loadConfig } from "../config.ts";
 import type { ToolDisplayAdapter } from "../types.ts";
-import { filePathDisplay, formatLineCount, renderContentWithLineNumbers } from "./shared.ts";
+import { filePathDisplay, formatLineCount, rawPathOf, renderContentWithLineNumbers } from "./shared.ts";
 
 interface WriteArgs {
   path?: string;
@@ -38,8 +38,7 @@ export const writeAdapter: ToolDisplayAdapter<WriteArgs> = {
   },
 
   formatExpandedContent(args, _output, theme, width, _details?: unknown) {
-    const rawPath = args?.file_path ?? args?.path ?? "";
     const content = args?.content ?? "";
-    return renderContentWithLineNumbers(content, 1, rawPath, theme, width);
+    return renderContentWithLineNumbers(content, 1, rawPathOf(args), theme, width);
   },
 };

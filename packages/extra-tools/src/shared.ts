@@ -11,6 +11,30 @@ function expandUser(p: string): string {
   return p;
 }
 
+function shouldKillForCap(collected: number, cap: number, killed: boolean): boolean {
+  return collected >= cap && !killed;
+}
+
+function rgFailureMessage(stderr: string, code: number): string {
+  return stderr.trim() || `ripgrep exited with code ${code}`;
+}
+
+function rgExitError(killedForCap: boolean, code: number, stderr: string): Error | undefined {
+  if (killedForCap) return undefined;
+  if (code !== 0 && code !== 1) return new Error(rgFailureMessage(stderr, code));
+  return undefined;
+}
+
+function rgCloseError(
+  aborted: boolean | undefined,
+  killedForCap: boolean,
+  code: number | null,
+  stderr: string,
+): Error | undefined {
+  if (aborted) return new Error("Operation aborted");
+  return rgExitError(killedForCap, code ?? 0, stderr);
+}
+
 export function resolveSearchPath(raw: string | undefined, cwd: string): string {
   const p = (raw?.trim() || ".").trim() || ".";
   const expanded = expandUser(p);
@@ -70,7 +94,7 @@ export function runRg<T>(
       const parsed = parseLine(line);
       if (parsed === undefined) return;
       results.push(parsed);
-      if (results.length >= maxCollect && !child.killed) {
+      if (shouldKillForCap(results.length, maxCollect, child.killed)) {
         child.kill("SIGTERM");
       }
     });
@@ -90,15 +114,9 @@ export function runRg<T>(
     child.on("close", (code) => {
       rl.close();
       if (signal) signal.removeEventListener("abort", onAbort);
-      if (signal?.aborted) {
-        settle(() => reject(new Error("Operation aborted")));
-        return;
-      }
-      const killedForCap = results.length >= maxCollect;
-      const c = code ?? 0;
-      if (!killedForCap && c !== 0 && c !== 1) {
-        const msg = stderr.trim() || `ripgrep exited with code ${c}`;
-        settle(() => reject(new Error(msg)));
+      const failure = rgCloseError(signal?.aborted, results.length >= maxCollect, code, stderr);
+      if (failure) {
+        settle(() => reject(failure));
         return;
       }
       settle(() => resolve(results));

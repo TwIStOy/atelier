@@ -4,10 +4,9 @@
 
 ### Changed
 
-### Changed
-
-- `web_search` tries the next configured provider after any failure, not only rate limits, and stops at the first provider that returns. Cancelling the tool aborts the chain. If every provider fails, the error lists each one.
+- `web_search` tries the next configured provider after any failure, not only rate limits, and stops at the first provider that returns. Cancelling the tool aborts the chain. If every provider fails, the error lists each one. The provider chain (`searchProviderChain`) is split into per-attempt helpers.
 - Providers share `providers/http.ts` helpers (`throwIfMissingApiKey`, `requestJson`, `requireContent`), and the GitHub interceptor wraps `gh api` calls through one `ghQuery` helper — identical error messages, less duplicated plumbing.
+- Split the most complex functions (`fetchGitHub`, `generateCloneContent`, `fetchViaApi`, `parseGitHubUrl`, tool `execute` handlers, provider `fetch` paths, `createSearchProvider`) into small single-purpose helpers to clear all `fallow health` complexity findings; behavior and public APIs unchanged.
 
 ### Fixed
 

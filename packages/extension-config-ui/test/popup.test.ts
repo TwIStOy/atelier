@@ -10,6 +10,18 @@ import { DEFAULT_MAX_HEIGHT_PCT } from "../src/types.ts";
 
 const ABSOLUTE_CAP = 26;
 
+function typeText(component: Component, text: string): void {
+  for (const char of text) component.handleInput?.(char);
+}
+
+function pressKey(component: Component, key: string): void {
+  component.handleInput?.(key);
+}
+
+function renderedText(component: Component): string {
+  return component.render(90).join("\n");
+}
+
 describe("computeLayout", () => {
   test("bodyRows never exceeds the max-height percentage of the terminal", () => {
     for (let rows = 20; rows <= 120; rows += 1) {
@@ -90,23 +102,23 @@ describe("model selection with fuzzy search", () => {
         ) => {
           const tui = { terminal: { rows: 50 }, requestRender: vi.fn() } as unknown as TUI;
           const component = await factory(tui, theme, {}, () => {});
-          for (const char of "summdl") component.handleInput?.(char);
-          expect(component.render(90).join("\n")).toContain("Summary Model");
-          component.handleInput?.("\r");
-          for (const char of "dsv4f toori") component.handleInput?.(char);
-          const rendered = component.render(90).join("\n");
+          typeText(component, "summdl");
+          expect(renderedText(component)).toContain("Summary Model");
+          pressKey(component, "\r");
+          typeText(component, "dsv4f toori");
+          const rendered = renderedText(component);
           expect(rendered).toContain("toori/deepseek-v4.1-flash");
           expect(rendered).not.toContain("toori/gpt-6");
           expect(rendered).not.toContain("other/deepseek-v4.1-flash");
-          component.handleInput?.("\r");
+          pressKey(component, "\r");
           expect(readRawConfig(configId)?.summaryModel).toBe("toori/deepseek-v4.1-flash");
-          component.handleInput?.("\r");
-          for (const char of "no-match") component.handleInput?.(char);
-          expect(component.render(90).join("\n")).toContain("No matching options.");
-          component.handleInput?.("\r");
+          pressKey(component, "\r");
+          typeText(component, "no-match");
+          expect(renderedText(component)).toContain("No matching options.");
+          pressKey(component, "\r");
           expect(readRawConfig(configId)?.summaryModel).toBe("toori/deepseek-v4.1-flash");
-          component.handleInput?.("\x1b");
-          component.handleInput?.("\r");
+          pressKey(component, "\x1b");
+          pressKey(component, "\r");
           expect(readRawConfig(configId)?.summaryModel).toBe("");
         },
       },

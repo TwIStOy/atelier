@@ -59,6 +59,70 @@ function failureText(result: ApplyPatchResult): string {
     .join("\n");
 }
 
+function tryParsePatch(input: string): ParsedPatch[] | undefined {
+  try {
+    return parseNonEmptyPatch(input);
+  } catch {
+    // Keep invalid patch text flowing; the apply step reports the parse error.
+  }
+  return undefined;
+}
+
+async function tryCreatePreview(
+  cwd: string,
+  parsedHunks: ParsedPatch[] | undefined,
+  input: string,
+): Promise<ApplyPatchPreview | undefined> {
+  try {
+    const hunks = parsedHunks ?? parsePatch(input);
+    if (hunks.length > 0) {
+      return await createPatchPreview(cwd, hunks);
+    }
+  } catch {
+    // Missing files or context mismatches surface through the apply result.
+  }
+  return undefined;
+}
+
+function initialApplyProgress(parsedHunks: ParsedPatch[] | undefined): ApplyPatchProgress | undefined {
+  const totalOperations = parsedHunks?.length ?? 0;
+  return totalOperations > 0 ? { applied: 0, failed: 0, total: totalOperations } : undefined;
+}
+
+function progressUpdate(
+  preview: ApplyPatchPreview | undefined,
+  progress: ApplyPatchProgress | undefined,
+): AgentToolResult<ApplyPatchToolDetails> {
+  return {
+    content: [{ type: "text", text: pendingText(progress) }],
+    details: { preview, ...(progress ? { progress } : {}) },
+  };
+}
+
+function hunksToApply(parsedHunks: ParsedPatch[] | undefined, input: string): ParsedPatch[] {
+  return parsedHunks ?? parseNonEmptyPatch(input);
+}
+
+function resultDetails(preview: ApplyPatchPreview | undefined, result: ApplyPatchResult): ApplyPatchToolDetails {
+  return { ...(preview ? { preview } : {}), result };
+}
+
+function patchToolResult(
+  result: ApplyPatchResult,
+  preview: ApplyPatchPreview | undefined,
+): AgentToolResult<ApplyPatchToolDetails> {
+  if (result.failures.length > 0) {
+    return {
+      content: [{ type: "text", text: failureText(result) }],
+      details: resultDetails(preview, result),
+    };
+  }
+  return {
+    content: [{ type: "text", text: result.summaries.join("\n") }],
+    details: resultDetails(preview, result),
+  };
+}
+
 export function createApplyPatchTool(): ToolDefinition<typeof APPLY_PATCH_PARAMS, ApplyPatchToolDetails> {
   return {
     name: "apply_patch",
@@ -82,52 +146,19 @@ export function createApplyPatchTool(): ToolDefinition<typeof APPLY_PATCH_PARAMS
         throw new Error("input is required");
       }
 
-      let parsedHunks: ParsedPatch[] | undefined;
-      try {
-        parsedHunks = parseNonEmptyPatch(normalizedParams.input);
-      } catch {
-        // Keep invalid patch text flowing; the apply step reports the parse error.
-      }
-
-      let preview: ApplyPatchPreview | undefined;
-      try {
-        const hunks = parsedHunks ?? parsePatch(normalizedParams.input);
-        if (hunks.length > 0) {
-          preview = await createPatchPreview(ctx.cwd, hunks);
-        }
-      } catch {
-        // Missing files or context mismatches surface through the apply result.
-      }
-
-      const totalOperations = parsedHunks?.length ?? 0;
-      const initialProgress = totalOperations > 0 ? { applied: 0, failed: 0, total: totalOperations } : undefined;
-      onUpdate?.({
-        content: [{ type: "text", text: pendingText(initialProgress) }],
-        details: { preview, ...(initialProgress ? { progress: initialProgress } : {}) },
-      });
+      const parsedHunks = tryParsePatch(normalizedParams.input);
+      const preview = await tryCreatePreview(ctx.cwd, parsedHunks, normalizedParams.input);
+      onUpdate?.(progressUpdate(preview, initialApplyProgress(parsedHunks)));
 
       const result = await applyParsedPatchDetailed(
         ctx.cwd,
-        parsedHunks ?? parseNonEmptyPatch(normalizedParams.input),
+        hunksToApply(parsedHunks, normalizedParams.input),
         (progress) => {
-          onUpdate?.({
-            content: [{ type: "text", text: pendingText(progress) }],
-            details: { preview, progress },
-          });
+          onUpdate?.(progressUpdate(preview, progress));
         },
       );
 
-      if (result.failures.length > 0) {
-        return {
-          content: [{ type: "text", text: failureText(result) }],
-          details: { ...(preview ? { preview } : {}), result },
-        };
-      }
-
-      return {
-        content: [{ type: "text", text: result.summaries.join("\n") }],
-        details: { ...(preview ? { preview } : {}), result },
-      };
+      return patchToolResult(result, preview);
     },
   };
 }

@@ -9,13 +9,21 @@ export interface ThemeFn {
   fg(color: string, text: string): string;
 }
 
+export type StatusSetter = (key: string, text: string | undefined) => void;
+
+export type WidgetSetter = (
+  key: string,
+  lines: string[] | undefined,
+  options?: { placement?: "aboveEditor" | "belowEditor" },
+) => void;
+
 export interface UiSurface {
   hasUI: boolean;
   cwd: string;
   ui?: {
     theme?: ThemeFn;
-    setStatus?(key: string, text: string | undefined): void;
-    setWidget?(key: string, lines: string[] | undefined, options?: { placement?: "aboveEditor" | "belowEditor" }): void;
+    setStatus?: StatusSetter;
+    setWidget?: WidgetSetter;
     notify?(message: string, level?: "info" | "warn" | "warning" | "error"): void;
   };
 }
@@ -27,16 +35,17 @@ export interface InjectedFileMeta {
 }
 
 export function updateStatus(ctx: UiSurface, cache: InjectionCache, sessionKey: string, hasErrors: boolean): void {
-  if (!ctx.hasUI || !ctx.ui?.setStatus) return;
-  const count = cache.getCacheSize(sessionKey);
-  if (count === 0) {
-    ctx.ui.setStatus(STATUS_KEY, undefined);
-    return;
-  }
-  const theme = ctx.ui.theme ?? identityTheme;
-  let text = theme.fg("dim", `◆ ${count}`);
-  if (hasErrors) text += theme.fg("warning", " \u26A0");
-  ctx.ui.setStatus(STATUS_KEY, text);
+  const setStatus = ctx.hasUI ? ctx.ui?.setStatus : undefined;
+  if (!setStatus) return;
+  setStatus(STATUS_KEY, statusText(ctx.ui?.theme, cache.getCacheSize(sessionKey), hasErrors));
+}
+
+function statusText(theme: ThemeFn | undefined, count: number, hasErrors: boolean): string | undefined {
+  if (count === 0) return undefined;
+  const fg = (theme ?? identityTheme).fg;
+  let text = fg("dim", `◆ ${count}`);
+  if (hasErrors) text += fg("warning", " \u26A0");
+  return text;
 }
 
 export function clearStatus(ctx: UiSurface): void {
@@ -45,20 +54,28 @@ export function clearStatus(ctx: UiSurface): void {
 }
 
 export function updateWidget(ctx: UiSurface, visible: boolean, files: InjectedFileMeta[]): void {
-  if (!ctx.hasUI || !ctx.ui?.setWidget) return;
+  const setWidget = ctx.hasUI ? ctx.ui?.setWidget : undefined;
+  if (!setWidget) return;
   if (!visible || files.length === 0) {
-    ctx.ui.setWidget(WIDGET_KEY, undefined);
+    setWidget(WIDGET_KEY, undefined);
     return;
   }
-  const theme = ctx.ui.theme ?? identityTheme;
+  setWidget(WIDGET_KEY, widgetLines(ctx, files), { placement: "aboveEditor" });
+}
+
+function widgetLines(ctx: UiSurface, files: InjectedFileMeta[]): string[] {
+  const theme = ctx.ui?.theme ?? identityTheme;
   const lines = [theme.fg("accent", "Agents Mirror Context:")];
   for (const file of files) {
-    const display = displayPath(ctx.cwd, file.absolutePath);
-    const tag = file.source === "mirror" ? "[mirror] " : "";
-    const text = file.truncated ? `  ${tag}${display} (truncated)` : `  ${tag}${display}`;
-    lines.push(theme.fg(file.truncated ? "warning" : "dim", text));
+    lines.push(widgetLine(theme, file, displayPath(ctx.cwd, file.absolutePath)));
   }
-  ctx.ui.setWidget(WIDGET_KEY, lines, { placement: "aboveEditor" });
+  return lines;
+}
+
+function widgetLine(theme: ThemeFn, file: InjectedFileMeta, display: string): string {
+  const tag = file.source === "mirror" ? "[mirror] " : "";
+  const text = file.truncated ? `  ${tag}${display} (truncated)` : `  ${tag}${display}`;
+  return theme.fg(file.truncated ? "warning" : "dim", text);
 }
 
 export function clearWidget(ctx: UiSurface): void {

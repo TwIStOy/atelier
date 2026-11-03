@@ -19,6 +19,20 @@ function formatLineRange(args: ReadArgs, theme: Theme): string {
   return theme.fg("warning", `:${startLine}${endLine ? `-${endLine}` : ""}`);
 }
 
+function appendReadLineSuffix(
+  base: string,
+  output: string | undefined,
+  theme: Theme,
+  width: number | undefined,
+): string {
+  if (!output) return base;
+  const count = trimTrailingEmpty(output.split("\n")).length;
+  if (count === 0) return base;
+  const suffix = theme.fg("dim", `· ${count} line${count !== 1 ? "s" : ""}`);
+  if (width !== undefined && visibleWidth(base) + 1 + visibleWidth(suffix) > width) return base;
+  return `${base} ${suffix}`;
+}
+
 export const readAdapter: ToolDisplayAdapter<ReadArgs> = {
   formatCallHeader(
     args,
@@ -36,13 +50,7 @@ export const readAdapter: ToolDisplayAdapter<ReadArgs> = {
     const base = `${theme.fg("toolTitle", theme.bold(verb))} ${pathDisplay}${formatLineRange(args, theme)}`;
 
     if (loadConfig().readStyle !== "single-line") return base;
-
-    if (!output) return base;
-    const count = trimTrailingEmpty(output.split("\n")).length;
-    if (count === 0) return base;
-    const suffix = theme.fg("dim", `· ${count} line${count !== 1 ? "s" : ""}`);
-    if (width !== undefined && visibleWidth(base) + 1 + visibleWidth(suffix) > width) return base;
-    return `${base} ${suffix}`;
+    return appendReadLineSuffix(base, output, theme, width);
   },
 
   formatCollapsedContent(_args, output, theme, _width, _details?: unknown, _isPartial?: boolean, _spinAt?: number) {

@@ -38,6 +38,18 @@ function normalizeFirecrawlResults(results: FirecrawlSearchResult[]): SearchResu
   }));
 }
 
+function firecrawlTitle(raw: FirecrawlScrapeResponse): string | undefined {
+  return raw.data?.metadata?.title || undefined;
+}
+
+function firecrawlFetchResponse(label: string, url: string, raw: FirecrawlScrapeResponse): FetchResponse {
+  return {
+    text: requireContent(label, url, raw.data?.markdown),
+    title: firecrawlTitle(raw),
+    contentType: "text/markdown",
+  };
+}
+
 export class FirecrawlProvider implements FullProvider {
   readonly name = "firecrawl";
   readonly label = "Firecrawl";
@@ -83,12 +95,6 @@ export class FirecrawlProvider implements FullProvider {
     if (!raw.success) {
       throw new Error(`${this.label} Fetch API error: ${raw.error ?? "scrape failed"}`);
     }
-    const text = requireContent(this.label, url, raw.data?.markdown);
-
-    return {
-      text,
-      title: raw.data?.metadata?.title || undefined,
-      contentType: "text/markdown",
-    };
+    return firecrawlFetchResponse(this.label, url, raw);
   }
 }

@@ -15,7 +15,7 @@ import { Type } from "typebox";
 import { instantiateProviders, isRateLimitError } from "../config.ts";
 import { buildInterceptors, getInterceptors } from "../interceptors/index.ts";
 import { fetchViaGenericHtml, parseAndAssertHttpUrl } from "../providers/fetch-helpers.ts";
-import type { FetchResponse } from "../providers/types.ts";
+import type { FetchResponse, FullProvider } from "../providers/types.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fetchToolDescription = readFileSync(join(__dirname, "prompt.txt"), "utf-8").trim();
@@ -28,6 +28,13 @@ interface FetchDetails {
   truncation?: TruncationResult;
   fullOutputPath?: string;
   backend?: string;
+}
+
+type ProviderEntries = ReturnType<typeof instantiateProviders>["providers"];
+
+interface ProviderFetchOutcome {
+  response: FetchResponse;
+  providerName: string;
 }
 
 async function spillFullContentToTempFile(content: string): Promise<string> {
@@ -53,6 +60,84 @@ function formatFetchHeader(url: string, title: string | undefined, contentType: 
   if (title) lines.push(`**Title:** ${title}`);
   if (contentType) lines.push(`**Content-Type:** ${contentType}`);
   return `${lines.join("\n")}\n\n`;
+}
+
+// Level 1: URL interceptor chain
+async function fetchViaInterceptors(
+  url: string,
+  raw: boolean,
+  signal: AbortSignal | undefined,
+): Promise<FetchResponse | undefined> {
+  if (getInterceptors().length === 0) {
+    buildInterceptors();
+  }
+  for (const interceptor of getInterceptors()) {
+    const intercepted = await interceptor.intercept(url, {
+      raw,
+      signal,
+    });
+    if (intercepted) return intercepted;
+  }
+  return undefined;
+}
+
+async function tryProviderFetch(
+  provider: FullProvider,
+  url: string,
+  raw: boolean,
+  signal: AbortSignal | undefined,
+): Promise<FetchResponse | undefined> {
+  try {
+    return await provider.fetch(url, raw, signal);
+  } catch (err: unknown) {
+    if (!isRateLimitError(err)) throw err;
+    return undefined;
+  }
+}
+
+// Level 2: Provider native fetch (with fallback chain)
+async function fetchViaProviders(
+  url: string,
+  raw: boolean,
+  signal: AbortSignal | undefined,
+  providers: ProviderEntries,
+): Promise<ProviderFetchOutcome | undefined> {
+  for (const { name, provider } of providers) {
+    if ("fetch" in provider) {
+      const response = await tryProviderFetch(provider, url, raw, signal);
+      if (response) return { response, providerName: name };
+    }
+  }
+  return undefined;
+}
+
+async function resolveFetchResponse(
+  url: string,
+  raw: boolean,
+  signal: AbortSignal | undefined,
+  providers: ProviderEntries,
+): Promise<{ response: FetchResponse; backend?: string }> {
+  const intercepted = await fetchViaInterceptors(url, raw, signal);
+  if (intercepted) return { response: intercepted };
+
+  const viaProvider = await fetchViaProviders(url, raw, signal, providers);
+  if (viaProvider) return { response: viaProvider.response, backend: viaProvider.providerName };
+
+  // Level 3: Generic HTML pipeline
+  return { response: await fetchViaGenericHtml(url, raw, signal) };
+}
+
+async function applyTruncation(details: FetchDetails, bodyText: string): Promise<string> {
+  const truncation = truncateHead(bodyText, {
+    maxLines: DEFAULT_MAX_LINES,
+    maxBytes: DEFAULT_MAX_BYTES,
+  });
+  if (!truncation.truncated) return truncation.content;
+
+  const tempFile = await spillFullContentToTempFile(bodyText);
+  details.truncation = truncation;
+  details.fullOutputPath = tempFile;
+  return truncation.content + formatTruncationFooter(truncation, tempFile);
 }
 
 const fetchParams = Type.Object({
@@ -86,74 +171,23 @@ export function registerWebFetchTool(pi: ExtensionAPI): void {
       });
 
       const { providers } = instantiateProviders();
-
-      let fetchResponse: FetchResponse | undefined;
-
-      // Level 1: URL interceptor chain
-      if (getInterceptors().length === 0) {
-        buildInterceptors();
-      }
-      for (const interceptor of getInterceptors()) {
-        const intercepted = await interceptor.intercept(url, {
-          raw,
-          signal,
-        });
-        if (intercepted) {
-          fetchResponse = intercepted;
-          break;
-        }
-      }
-
-      // Level 2: Provider native fetch (with fallback chain)
-      let usedProviderName: string | undefined;
-      if (!fetchResponse) {
-        for (const { name, provider } of providers) {
-          if (!("fetch" in provider)) continue;
-          try {
-            fetchResponse = await provider.fetch(url, raw, signal);
-            if (fetchResponse) {
-              usedProviderName = name;
-              break;
-            }
-          } catch (err: unknown) {
-            if (!isRateLimitError(err)) throw err;
-          }
-        }
-      }
-
-      // Level 3: Generic HTML pipeline
-      if (!fetchResponse) {
-        fetchResponse = await fetchViaGenericHtml(url, raw, signal);
-      }
-
-      const { text: bodyText, title, contentType, contentLength } = fetchResponse;
-
-      const truncation = truncateHead(bodyText, {
-        maxLines: DEFAULT_MAX_LINES,
-        maxBytes: DEFAULT_MAX_BYTES,
-      });
+      const { response, backend } = await resolveFetchResponse(url, raw, signal, providers);
 
       const details: FetchDetails = {
         url,
-        title,
-        contentType,
-        contentLength,
-        backend: usedProviderName,
+        title: response.title,
+        contentType: response.contentType,
+        contentLength: response.contentLength,
+        backend,
       };
 
-      let output = truncation.content;
-      if (truncation.truncated) {
-        const tempFile = await spillFullContentToTempFile(bodyText);
-        details.truncation = truncation;
-        details.fullOutputPath = tempFile;
-        output += formatTruncationFooter(truncation, tempFile);
-      }
+      const output = await applyTruncation(details, response.text);
 
       return {
         content: [
           {
             type: "text",
-            text: formatFetchHeader(url, title, contentType) + output,
+            text: formatFetchHeader(url, response.title, response.contentType) + output,
           },
         ],
         details,

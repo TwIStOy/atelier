@@ -4,6 +4,10 @@ Releases before this consolidation describe the former `user-input-history` pack
 
 ## [Unreleased]
 
+### Changed
+
+- Split history payload parsing, disk/memory merging, and skim search/filtering internals into smaller helpers to clear `fallow health` complexity findings; behavior is unchanged.
+
 ## [0.7.0] - 2026-10-30
 
 ### Breaking Changes

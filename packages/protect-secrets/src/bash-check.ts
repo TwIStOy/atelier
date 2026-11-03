@@ -1,4 +1,16 @@
-import type { Command, CommandExpansionPart, Node, Pipeline, Script, Statement, Word, WordPart } from "unbash";
+import type {
+  AssignmentPrefix,
+  Command,
+  CommandExpansionPart,
+  DoubleQuotedPart,
+  Node,
+  Pipeline,
+  Redirect,
+  Script,
+  Statement,
+  Word,
+  WordPart,
+} from "unbash";
 import { parse } from "unbash";
 
 export const DEFAULT_PROTECTED_PATHS: readonly string[] = ["/run/agenix"];
@@ -81,8 +93,24 @@ function isStdoutRedirect(op: string): boolean {
   return [">", ">>", "&>", "&>>", ">|"].includes(op);
 }
 
+function redirectsToStdout(redirects: readonly Redirect[] | undefined): boolean {
+  return redirects?.some((r) => isStdoutRedirect(r.operator)) ?? false;
+}
+
 function getCmdName(cmd: Command): string | null {
   return cmd.name?.text ?? null;
+}
+
+function isFileReadCmd(name: string | null): boolean {
+  return name !== null && FILE_READ_CMDS.has(name);
+}
+
+function isOutputCmd(name: string | null): boolean {
+  return name !== null && OUTPUT_CMDS.has(name);
+}
+
+function isSafeCmd(name: string | null): boolean {
+  return name !== null && SAFE_CMDS.has(name);
 }
 
 type BashChecker = (command: string) => string | null;
@@ -97,10 +125,12 @@ function createBashChecker(protectedPaths: readonly string[]): BashChecker {
 
   function partHas(p: WordPart): boolean {
     if (has(p.text)) return true;
-    if (p.type === "DoubleQuoted") {
-      return p.parts?.some((pp) => partHas(pp as WordPart)) ?? false;
-    }
-    return false;
+    if (p.type !== "DoubleQuoted") return false;
+    return doubleQuotedHas(p);
+  }
+
+  function doubleQuotedHas(p: DoubleQuotedPart): boolean {
+    return p.parts?.some((pp) => partHas(pp as WordPart)) ?? false;
   }
 
   function expansionReadsProtected(w: Word): boolean {
@@ -110,15 +140,21 @@ function createBashChecker(protectedPaths: readonly string[]): BashChecker {
   function expansionPartReads(p: WordPart): boolean {
     switch (p.type) {
       case "DoubleQuoted":
-        return p.parts?.some((pp) => expansionPartReads(pp as WordPart)) ?? false;
-      case "CommandExpansion": {
-        const ce = p as CommandExpansionPart;
-        if (ce.script) return scriptReadsProtected(ce.script);
-        return has(ce.text);
-      }
+        return expansionDoubleQuotedReads(p);
+      case "CommandExpansion":
+        return commandExpansionReads(p as CommandExpansionPart);
       default:
         return false;
     }
+  }
+
+  function expansionDoubleQuotedReads(p: DoubleQuotedPart): boolean {
+    return p.parts?.some((pp) => expansionPartReads(pp as WordPart)) ?? false;
+  }
+
+  function commandExpansionReads(ce: CommandExpansionPart): boolean {
+    if (ce.script) return scriptReadsProtected(ce.script);
+    return has(ce.text);
   }
 
   function scriptReadsProtected(script: Script): boolean {
@@ -130,60 +166,106 @@ function createBashChecker(protectedPaths: readonly string[]): BashChecker {
       case "Command":
         return cmdReadsProtected(node);
       case "Pipeline":
-        return (node as Pipeline).commands.some((c) => nodeReadsProtected(c));
+        return pipelineReadsProtected(node);
       case "AndOr":
-        return ((node as unknown as { commands: Node[] }).commands ?? []).some((c) => nodeReadsProtected(c));
+        return andOrReadsProtected(node);
+      default:
+        return controlFlowReadsProtected(node);
+    }
+  }
+
+  function pipelineReadsProtected(pipe: Pipeline): boolean {
+    return pipe.commands.some((c) => nodeReadsProtected(c));
+  }
+
+  function andOrReadsProtected(node: Node): boolean {
+    return ((node as unknown as { commands: Node[] }).commands ?? []).some((c) => nodeReadsProtected(c));
+  }
+
+  function controlFlowReadsProtected(node: Node): boolean {
+    switch (node.type) {
       case "Statement":
         return nodeReadsProtected((node as Statement).command);
-      case "If": {
-        const n = node as unknown as {
-          clause: unknown;
-          then: unknown;
-          else: unknown;
-        };
-        return [n.clause, n.then, n.else].some((l) => l != null && listReadsProtected(l));
-      }
+      case "If":
+        return ifReadsProtected(node);
+      default:
+        return loopReadsProtected(node);
+    }
+  }
+
+  function ifReadsProtected(node: Node): boolean {
+    const n = node as unknown as {
+      clause: unknown;
+      then: unknown;
+      else: unknown;
+    };
+    return [n.clause, n.then, n.else].some((l) => l != null && listReadsProtected(l));
+  }
+
+  function loopReadsProtected(node: Node): boolean {
+    switch (node.type) {
       case "For":
       case "Select":
         return listReadsProtected((node as unknown as { body: unknown }).body);
-      case "While": {
-        const n = node as unknown as { clause: unknown; body: unknown };
-        return [n.clause, n.body].some((l) => l != null && listReadsProtected(l));
-      }
+      case "While":
+        return whileReadsProtected(node);
+      default:
+        return scopeReadsProtected(node);
+    }
+  }
+
+  function whileReadsProtected(node: Node): boolean {
+    const n = node as unknown as { clause: unknown; body: unknown };
+    return [n.clause, n.body].some((l) => l != null && listReadsProtected(l));
+  }
+
+  function scopeReadsProtected(node: Node): boolean {
+    switch (node.type) {
       case "Subshell":
       case "BraceGroup":
         return listReadsProtected((node as unknown as { body: unknown }).body);
       case "Function":
         return nodeReadsProtected((node as unknown as { body: Node }).body);
-      case "CompoundList":
-        return listReadsProtected(node);
       default:
-        return false;
+        return compoundListReadsProtected(node);
     }
+  }
+
+  function compoundListReadsProtected(node: Node): boolean {
+    if (node.type === "CompoundList") {
+      return listReadsProtected(node);
+    }
+    return false;
+  }
+
+  function stmtListReadsProtected(stmts: readonly Statement[] | undefined): boolean {
+    return stmts?.some((s) => nodeReadsProtected(s)) ?? false;
   }
 
   function listReadsProtected(list: unknown): boolean {
     if (list == null) return false;
     const l = list as { type?: string; commands?: Statement[] };
-    if (l.type === "CompoundList") {
-      return l.commands?.some((s) => nodeReadsProtected(s)) ?? false;
-    }
-    return nodeReadsProtected(list as Node);
+    if (l.type !== "CompoundList") return nodeReadsProtected(list as Node);
+    return stmtListReadsProtected(l.commands);
   }
 
-  function cmdReadsProtected(cmd: Command): boolean {
-    const name = getCmdName(cmd);
+  function fileCmdMentionsProtected(cmd: Command): boolean {
+    if (cmd.suffix?.some((w) => wordHas(w))) return true;
+    return cmd.name !== undefined && wordHas(cmd.name);
+  }
 
-    if (name && FILE_READ_CMDS.has(name)) {
-      if (cmd.suffix?.some((w) => wordHas(w))) return true;
-      if (cmd.name && wordHas(cmd.name)) return true;
-    }
-
+  function cmdSuffixReadsProtected(cmd: Command): boolean {
     for (const w of cmd.suffix ?? []) {
       if (expansionReadsProtected(w)) return true;
     }
-
     return false;
+  }
+
+  function cmdReadsProtected(cmd: Command): boolean {
+    if (isFileReadCmd(getCmdName(cmd))) {
+      if (fileCmdMentionsProtected(cmd)) return true;
+    }
+    return cmdSuffixReadsProtected(cmd);
   }
 
   function analyzeScript(script: Script, exposed: boolean): string | null {
@@ -195,7 +277,7 @@ function createBashChecker(protectedPaths: readonly string[]): BashChecker {
   }
 
   function analyzeStmt(stmt: Statement, exposed: boolean): string | null {
-    const redirected = stmt.redirects?.some((r) => isStdoutRedirect(r.operator)) ?? false;
+    const redirected = redirectsToStdout(stmt.redirects);
     return analyzeNode(stmt.command, redirected ? false : exposed);
   }
 
@@ -205,128 +287,206 @@ function createBashChecker(protectedPaths: readonly string[]): BashChecker {
         return analyzeCmd(node, exposed);
       case "Pipeline":
         return analyzePipe(node, exposed);
-      case "AndOr": {
-        const cmds = (node as unknown as { commands: Node[] }).commands ?? [];
-        for (const c of cmds) {
-          const r = analyzeNode(c, exposed);
-          if (r) return r;
-        }
-        return null;
-      }
+      case "AndOr":
+        return analyzeAndOr(node, exposed);
+      default:
+        return analyzeControlFlowNode(node, exposed);
+    }
+  }
+
+  function analyzeAndOr(node: Node, exposed: boolean): string | null {
+    const cmds = (node as unknown as { commands: Node[] }).commands ?? [];
+    for (const c of cmds) {
+      const r = analyzeNode(c, exposed);
+      if (r) return r;
+    }
+    return null;
+  }
+
+  function analyzeControlFlowNode(node: Node, exposed: boolean): string | null {
+    switch (node.type) {
       case "Statement":
         return analyzeStmt(node, exposed);
-      case "If": {
-        const n = node as unknown as {
-          clause: unknown;
-          then: unknown;
-          else: unknown;
-        };
-        for (const l of [n.clause, n.then, n.else]) {
-          if (l) {
-            const r = analyzeList(l, exposed);
-            if (r) return r;
-          }
-        }
-        return null;
+      case "If":
+        return analyzeIf(node, exposed);
+      default:
+        return analyzeLoopNode(node, exposed);
+    }
+  }
+
+  function analyzeIf(node: Node, exposed: boolean): string | null {
+    const n = node as unknown as {
+      clause: unknown;
+      then: unknown;
+      else: unknown;
+    };
+    for (const l of [n.clause, n.then, n.else]) {
+      if (l) {
+        const r = analyzeList(l, exposed);
+        if (r) return r;
       }
+    }
+    return null;
+  }
+
+  function analyzeLoopNode(node: Node, exposed: boolean): string | null {
+    switch (node.type) {
       case "For":
       case "Select":
         return analyzeList((node as unknown as { body: unknown }).body, exposed);
-      case "While": {
-        const n = node as unknown as { clause: unknown; body: unknown };
-        for (const l of [n.clause, n.body]) {
-          if (l) {
-            const r = analyzeList(l, exposed);
-            if (r) return r;
-          }
-        }
-        return null;
+      case "While":
+        return analyzeWhile(node, exposed);
+      default:
+        return analyzeScopeNode(node, exposed);
+    }
+  }
+
+  function analyzeWhile(node: Node, exposed: boolean): string | null {
+    const n = node as unknown as { clause: unknown; body: unknown };
+    for (const l of [n.clause, n.body]) {
+      if (l) {
+        const r = analyzeList(l, exposed);
+        if (r) return r;
       }
+    }
+    return null;
+  }
+
+  function analyzeScopeNode(node: Node, exposed: boolean): string | null {
+    switch (node.type) {
       case "Subshell":
       case "BraceGroup":
         return analyzeList((node as unknown as { body: unknown }).body, exposed);
       case "Function":
         return analyzeNode((node as unknown as { body: Node }).body, exposed);
-      case "CompoundList":
-        return analyzeList(node, exposed);
       default:
-        return null;
+        return analyzeCompoundListNode(node, exposed);
     }
+  }
+
+  function analyzeCompoundListNode(node: Node, exposed: boolean): string | null {
+    if (node.type === "CompoundList") {
+      return analyzeList(node, exposed);
+    }
+    return null;
+  }
+
+  function analyzeStmtList(stmts: readonly Statement[] | undefined, exposed: boolean): string | null {
+    for (const s of stmts ?? []) {
+      const r = analyzeStmt(s, exposed);
+      if (r) return r;
+    }
+    return null;
   }
 
   function analyzeList(list: unknown, exposed: boolean): string | null {
     if (list == null) return null;
     const l = list as { type?: string; commands?: Statement[] };
-    if (l.type === "CompoundList") {
-      for (const s of l.commands ?? []) {
-        const r = analyzeStmt(s, exposed);
-        if (r) return r;
-      }
-    }
-    return null;
+    if (l.type !== "CompoundList") return null;
+    return analyzeStmtList(l.commands, exposed);
   }
 
   function analyzePipe(pipe: Pipeline, exposed: boolean): string | null {
     const anyReads = pipe.commands.some((c) => nodeReadsProtected(c));
 
     if (anyReads && exposed) {
-      const last = pipe.commands[pipe.commands.length - 1];
-      let lastRedirected = false;
-      if (last.type === "Command") {
-        lastRedirected = (last as Command).redirects?.some((r) => isStdoutRedirect(r.operator)) ?? false;
-      } else if (last.type === "Statement") {
-        lastRedirected = (last as Statement).redirects?.some((r) => isStdoutRedirect(r.operator)) ?? false;
-      }
-      if (!lastRedirected) {
+      if (!pipeLastRedirected(pipe)) {
         return "Pipeline reads from protected path and output reaches stdout";
       }
     }
 
+    return analyzePipeExpansions(pipe);
+  }
+
+  function pipeLastRedirected(pipe: Pipeline): boolean {
+    const last = pipe.commands[pipe.commands.length - 1];
+    if (last.type === "Command") {
+      return redirectsToStdout((last as Command).redirects);
+    }
+    if (last.type === "Statement") {
+      return redirectsToStdout((last as Statement).redirects);
+    }
+    return false;
+  }
+
+  function analyzePipeExpansions(pipe: Pipeline): string | null {
     for (const c of pipe.commands) {
       const r = analyzeNodeExpansions(c);
       if (r) return r;
     }
-
     return null;
   }
 
   function analyzeCmd(cmd: Command, exposed: boolean): string | null {
-    const name = getCmdName(cmd);
-
-    const redirected = cmd.redirects?.some((r) => isStdoutRedirect(r.operator)) ?? false;
+    const redirected = redirectsToStdout(cmd.redirects);
     const eff = redirected ? false : exposed;
+    return analyzeCmdBody(cmd, eff);
+  }
 
-    for (const prefix of cmd.prefix ?? []) {
-      if (prefix.value) {
-        const r = analyzeWordSubs(prefix.value, false);
-        if (r) return r;
-      }
-    }
+  function analyzeCmdBody(cmd: Command, eff: boolean): string | null {
+    const r = analyzePrefixSubs(cmd);
+    if (r) return r;
+    return analyzeCmdTail(cmd, getCmdName(cmd), eff);
+  }
 
-    if (name && SAFE_CMDS.has(name)) {
+  function analyzeCmdTail(cmd: Command, name: string | null, eff: boolean): string | null {
+    if (isSafeCmd(name)) {
       return analyzeSuffixSubs(cmd, eff);
     }
-
-    if (name && FILE_READ_CMDS.has(name)) {
-      const argsRef = cmd.suffix?.some((w) => wordHas(w)) ?? false;
-      const nameRef = cmd.name ? wordHas(cmd.name) : false;
-      if ((argsRef || nameRef) && eff) {
-        return `Command "${name}" would output content from protected path`;
-      }
-    }
-
-    if (name && OUTPUT_CMDS.has(name)) {
-      for (const w of cmd.suffix ?? []) {
-        if (expansionReadsProtected(w) && eff) {
-          return `Command "${name}" would output secret content`;
-        }
-        if (wordHas(w) && eff) {
-          return `Command "${name}" references protected path in arguments`;
-        }
-      }
-    }
-
+    const finding = analyzeCmdFindings(cmd, name, eff);
+    if (finding) return finding;
     return analyzeSuffixSubs(cmd, eff);
+  }
+
+  function analyzeCmdFindings(cmd: Command, name: string | null, eff: boolean): string | null {
+    const fileFinding = fileCmdFinding(cmd, name, eff);
+    if (fileFinding) return fileFinding;
+    return outputCmdFinding(cmd, name, eff);
+  }
+
+  function fileCmdFinding(cmd: Command, name: string | null, eff: boolean): string | null {
+    if (!isFileReadCmd(name)) return null;
+    if (fileCmdMentionsProtected(cmd) && eff) {
+      return `Command "${name}" would output content from protected path`;
+    }
+    return null;
+  }
+
+  function outputCmdFinding(cmd: Command, name: string | null, eff: boolean): string | null {
+    if (!isOutputCmd(name)) return null;
+    return outputSuffixFinding(cmd, name, eff);
+  }
+
+  function outputSuffixFinding(cmd: Command, name: string | null, eff: boolean): string | null {
+    for (const w of cmd.suffix ?? []) {
+      const r = outputWordFinding(w, name, eff);
+      if (r) return r;
+    }
+    return null;
+  }
+
+  function outputWordFinding(w: Word, name: string | null, eff: boolean): string | null {
+    if (!eff) return null;
+    if (expansionReadsProtected(w)) {
+      return `Command "${name}" would output secret content`;
+    }
+    if (wordHas(w)) {
+      return `Command "${name}" references protected path in arguments`;
+    }
+    return null;
+  }
+
+  function analyzePrefixSubs(cmd: Command): string | null {
+    for (const prefix of cmd.prefix ?? []) {
+      const r = analyzeAssignmentSubs(prefix);
+      if (r) return r;
+    }
+    return null;
+  }
+
+  function analyzeAssignmentSubs(prefix: AssignmentPrefix): string | null {
+    if (!prefix.value) return null;
+    return analyzeWordSubs(prefix.value, false);
   }
 
   function analyzeSuffixSubs(cmd: Command, exposed: boolean): string | null {
@@ -348,22 +508,27 @@ function createBashChecker(protectedPaths: readonly string[]): BashChecker {
   function analyzePartSubs(p: WordPart): string | null {
     switch (p.type) {
       case "DoubleQuoted":
-        for (const pp of p.parts ?? []) {
-          const r = analyzePartSubs(pp as WordPart);
-          if (r) return r;
-        }
-        return null;
-      case "CommandExpansion": {
-        const ce = p as CommandExpansionPart;
-        if (ce.script) {
-          const r = analyzeScript(ce.script, false);
-          if (r) return r;
-        }
-        return null;
-      }
+        return analyzeDoubleQuotedSubs(p);
+      case "CommandExpansion":
+        return analyzeCommandExpansionSubs(p as CommandExpansionPart);
       default:
         return null;
     }
+  }
+
+  function analyzeDoubleQuotedSubs(p: DoubleQuotedPart): string | null {
+    for (const pp of p.parts ?? []) {
+      const r = analyzePartSubs(pp as WordPart);
+      if (r) return r;
+    }
+    return null;
+  }
+
+  function analyzeCommandExpansionSubs(ce: CommandExpansionPart): string | null {
+    if (ce.script) {
+      return analyzeScript(ce.script, false);
+    }
+    return null;
   }
 
   function analyzeNodeExpansions(node: Node): string | null {
@@ -373,28 +538,24 @@ function createBashChecker(protectedPaths: readonly string[]): BashChecker {
       case "Statement":
         return analyzeNodeExpansions((node as Statement).command);
       case "Pipeline":
-        for (const c of (node as Pipeline).commands) {
-          const r = analyzeNodeExpansions(c);
-          if (r) return r;
-        }
-        return null;
+        return analyzePipelineExpansions(node);
       default:
         return null;
     }
   }
 
-  function analyzeCmdExpansions(cmd: Command): string | null {
-    for (const prefix of cmd.prefix ?? []) {
-      if (prefix.value) {
-        const r = analyzeWordSubs(prefix.value, false);
-        if (r) return r;
-      }
-    }
-    for (const w of cmd.suffix ?? []) {
-      const r = analyzeWordSubs(w, false);
+  function analyzePipelineExpansions(pipe: Pipeline): string | null {
+    for (const c of pipe.commands) {
+      const r = analyzeNodeExpansions(c);
       if (r) return r;
     }
     return null;
+  }
+
+  function analyzeCmdExpansions(cmd: Command): string | null {
+    const r = analyzePrefixSubs(cmd);
+    if (r) return r;
+    return analyzeSuffixSubs(cmd, false);
   }
 
   return (command: string): string | null => {

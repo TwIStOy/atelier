@@ -1,4 +1,9 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type {
+  ExtensionAPI,
+  ExtensionCommandContext,
+  ToolCallEvent,
+  ToolCallEventResult,
+} from "@earendil-works/pi-coding-agent";
 import { isToolCallEventType } from "@earendil-works/pi-coding-agent";
 import { isExtensionDisabled } from "@htwang-contrib/common";
 import { buildReadRows, renderReadTrackerTable, summarizeRows } from "./display.ts";
@@ -11,24 +16,54 @@ function extractPath(input: Record<string, unknown>): string | null {
   return typeof candidate === "string" ? candidate : null;
 }
 
+function recordReadEvent(tracker: ReadTracker, event: ToolCallEvent): boolean {
+  if (!isToolCallEventType("read", event)) return false;
+  tracker.record(event.input.path);
+  return true;
+}
+
+function checkWriteLikeTool(tracker: ReadTracker, event: ToolCallEvent): ToolCallEventResult | undefined {
+  if (!WRITE_LIKE_TOOLS.has(event.toolName)) return undefined;
+  const p = extractPath(event.input);
+  if (p === null) return undefined;
+  const result = tracker.check(p);
+  if (result) return { block: true, reason: result.reason };
+  return undefined;
+}
+
+function normalizeCommandArgs(args: string | undefined): string {
+  return (args ?? "").trim().toLowerCase();
+}
+
+function clearTrackedFiles(tracker: ReadTracker, ctx: ExtensionCommandContext): void {
+  const n = tracker.paths().length;
+  tracker.clear();
+  ctx.ui.notify(`Cleared ${n} tracked file${n === 1 ? "" : "s"}.`, "info");
+}
+
+function showTrackedCount(tracker: ReadTracker, ctx: ExtensionCommandContext): void {
+  const { total } = summarizeRows(buildReadRows(tracker.entries()));
+  ctx.ui.notify(`${total} tracked file${total === 1 ? "" : "s"}.`, "info");
+}
+
+function showTrackedTable(tracker: ReadTracker, ctx: ExtensionCommandContext): void {
+  const rows = buildReadRows(tracker.entries());
+  const { total, stale } = summarizeRows(rows);
+  const body = renderReadTrackerTable(rows);
+  ctx.ui.notify(
+    `${total} tracked file${total === 1 ? "" : "s"}${stale > 0 ? ` · ${stale} stale (⚠ > 1h old read)` : ""}`,
+    "info",
+  );
+  ctx.ui.setWidget("read-tracker", body.split("\n"));
+}
+
 export default function (pi: ExtensionAPI) {
   if (isExtensionDisabled("read-tracker")) return;
   const tracker = new ReadTracker();
 
   pi.on("tool_call", async (event) => {
-    if (isToolCallEventType("read", event)) {
-      tracker.record(event.input.path);
-      return;
-    }
-    if (WRITE_LIKE_TOOLS.has(event.toolName)) {
-      const p = extractPath(event.input);
-      if (p === null) return;
-      const result = tracker.check(p);
-      if (result) {
-        return { block: true, reason: result.reason };
-      }
-    }
-    return;
+    if (recordReadEvent(tracker, event)) return;
+    return checkWriteLikeTool(tracker, event);
   });
 
   pi.on("tool_result", async (event) => {
@@ -48,30 +83,20 @@ export default function (pi: ExtensionAPI) {
   pi.registerCommand("read-tracker", {
     description: "List files tracked by read-tracker (read op time, size, mtime). Args: clear|count",
     handler: async (args, ctx) => {
-      const trimmed = (args ?? "").trim().toLowerCase();
+      const trimmed = normalizeCommandArgs(args);
       if (trimmed === "clear") {
-        const n = tracker.paths().length;
-        tracker.clear();
-        ctx.ui.notify(`Cleared ${n} tracked file${n === 1 ? "" : "s"}.`, "info");
+        clearTrackedFiles(tracker, ctx);
         return;
       }
       if (trimmed === "count") {
-        const { total } = summarizeRows(buildReadRows(tracker.entries()));
-        ctx.ui.notify(`${total} tracked file${total === 1 ? "" : "s"}.`, "info");
+        showTrackedCount(tracker, ctx);
         return;
       }
       if (trimmed !== "") {
         ctx.ui.notify(`Unknown argument: ${args}. Usage: /read-tracker [clear|count]`, "warning");
         return;
       }
-      const rows = buildReadRows(tracker.entries());
-      const { total, stale } = summarizeRows(rows);
-      const body = renderReadTrackerTable(rows);
-      ctx.ui.notify(
-        `${total} tracked file${total === 1 ? "" : "s"}${stale > 0 ? ` · ${stale} stale (⚠ > 1h old read)` : ""}`,
-        "info",
-      );
-      ctx.ui.setWidget("read-tracker", body.split("\n"));
+      showTrackedTable(tracker, ctx);
     },
   });
 }

@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Behavior-preserving refactor: the `tool_result` handler splits text collection and offload error handling into helpers.
+
 ## [0.4.0] - 2026-07-31
 
 ### Changed

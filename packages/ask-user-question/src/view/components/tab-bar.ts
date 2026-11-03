@@ -31,24 +31,32 @@ export class TabBar implements StatefulView<TabBarProps> {
 
   invalidate(): void {}
 
+  private tabSegment(tab: TabBarProps["tabs"][number]): string {
+    const box = tab.answered ? "■" : "□";
+    const rawSeg = ` ${box} ${tab.label} `;
+    if (tab.active) {
+      return this.theme.bg("selectedBg", this.theme.fg("text", rawSeg));
+    }
+    return this.theme.fg(tab.answered ? "success" : "muted", rawSeg);
+  }
+
+  private submitSegment(): string {
+    const submitText = " ✓ Submit ";
+    if (this.props.submit.active) {
+      return this.theme.bg("selectedBg", this.theme.fg("text", submitText));
+    }
+    return this.theme.fg(this.props.submit.allAnswered ? "success" : "dim", submitText);
+  }
+
   render(width: number): string[] {
     const pieces: string[] = [" ← "];
 
     for (const tab of this.props.tabs) {
-      const box = tab.answered ? "■" : "□";
-      const rawSeg = ` ${box} ${tab.label} `;
-      const styled = tab.active
-        ? this.theme.bg("selectedBg", this.theme.fg("text", rawSeg))
-        : this.theme.fg(tab.answered ? "success" : "muted", rawSeg);
-      pieces.push(styled);
+      pieces.push(this.tabSegment(tab));
       pieces.push(" ");
     }
 
-    const submitText = " ✓ Submit ";
-    const submitStyled = this.props.submit.active
-      ? this.theme.bg("selectedBg", this.theme.fg("text", submitText))
-      : this.theme.fg(this.props.submit.allAnswered ? "success" : "dim", submitText);
-    pieces.push(submitStyled);
+    pieces.push(this.submitSegment());
     pieces.push(" →");
 
     const tabLine = truncateToWidth(pieces.join(""), width, "");

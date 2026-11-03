@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
-import { networkInterfaces } from "node:os";
+import { type NetworkInterfaceInfo, networkInterfaces } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { CanvasPage, PageStore } from "./store.ts";
@@ -122,16 +122,15 @@ ${liveReloadSnippet(null)}
 </html>`;
 }
 
+function isExternalIPv4(info: NetworkInterfaceInfo): boolean {
+  return info.family === "IPv4" && !info.internal;
+}
+
 export function externalIPv4Addresses(): string[] {
-  const result: string[] = [];
-  for (const infos of Object.values(networkInterfaces())) {
-    for (const info of infos ?? []) {
-      if (info.family === "IPv4" && !info.internal) {
-        result.push(info.address);
-      }
-    }
-  }
-  return result;
+  return Object.values(networkInterfaces())
+    .flatMap((infos) => infos ?? [])
+    .filter(isExternalIPv4)
+    .map((info) => info.address);
 }
 
 export class CanvasServer {

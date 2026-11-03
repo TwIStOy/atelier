@@ -14,6 +14,12 @@ import { registerJournalTools, registerMemoryTools } from "./tools/index.js";
 
 const INSTALL_GUARD = Symbol.for("pi.memory.installed");
 
+function notifyUi(ctx: ExtensionCommandContext, message: string, level: "info" | "warning"): void {
+  if (ctx.hasUI) {
+    ctx.ui.notify(message, level);
+  }
+}
+
 export default function initMemory(pi: ExtensionAPI): void {
   if (isExtensionDisabled("memory")) return;
   const guard = pi as unknown as Record<symbol, boolean>;
@@ -37,19 +43,16 @@ export default function initMemory(pi: ExtensionAPI): void {
     description: "Reflect on the current session, identify learnings, persist to memory/journal, and improve skills",
     handler: async (args: string, ctx: ExtensionCommandContext) => {
       if (!ctx.isIdle()) {
-        if (ctx.hasUI) {
-          ctx.ui.notify("Agent is busy. Wait for the current turn to finish, then run /self-improve again.", "warning");
-        }
+        notifyUi(ctx, "Agent is busy. Wait for the current turn to finish, then run /self-improve again.", "warning");
         return;
       }
 
       if (!isMemoryEnabled(ctx)) {
-        if (ctx.hasUI) {
-          ctx.ui.notify(
-            "memory tools are disabled (settings or DOTPI_MEMORY). Reflection can continue, but memory-* and journal-* writes may fail until enabled.",
-            "warning",
-          );
-        }
+        notifyUi(
+          ctx,
+          "memory tools are disabled (settings or DOTPI_MEMORY). Reflection can continue, but memory-* and journal-* writes may fail until enabled.",
+          "warning",
+        );
       }
 
       setSessionNamespace(getNamespace(ctx));
@@ -62,19 +65,16 @@ export default function initMemory(pi: ExtensionAPI): void {
       "Audit the full memory tree — fix domain placement, parent relationships, groupings, priorities, and triggers",
     handler: async (args: string, ctx: ExtensionCommandContext) => {
       if (!ctx.isIdle()) {
-        if (ctx.hasUI) {
-          ctx.ui.notify(
-            "Agent is busy. Wait for the current turn to finish, then run /reorganize-memory again.",
-            "warning",
-          );
-        }
+        notifyUi(
+          ctx,
+          "Agent is busy. Wait for the current turn to finish, then run /reorganize-memory again.",
+          "warning",
+        );
         return;
       }
 
       if (!isMemoryEnabled(ctx)) {
-        if (ctx.hasUI) {
-          ctx.ui.notify("memory tools are disabled. Enable memory tools before reorganizing the graph.", "warning");
-        }
+        notifyUi(ctx, "memory tools are disabled. Enable memory tools before reorganizing the graph.", "warning");
         return;
       }
 

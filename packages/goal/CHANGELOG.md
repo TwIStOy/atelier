@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Split the `/goal` command handler into per-subcommand functions, `agent_end` into usage/error/continuation phases, and the verifier into session-setup/turn-limiter/verdict-loop helpers; no behavior change.
+
 ## [0.7.0] - 2026-10-30
 
 ### Added

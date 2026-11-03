@@ -74,16 +74,22 @@ function normalizeKey(text: string): string {
   return text.trim();
 }
 
+function finiteAt(at: number): number {
+  return Number.isFinite(at) ? at : 0;
+}
+
+function entriesFromMap(byText: Map<string, number>): HistoryEntry[] {
+  return Array.from(byText.entries()).map(([text, at]) => ({ text, at }));
+}
+
 function normalizeEntries(entries: HistoryEntry[]): HistoryEntry[] {
   const byText = new Map<string, number>();
   for (const e of entries) {
     const key = normalizeKey(e.text);
     if (!key) continue;
-    const at = Number.isFinite(e.at) ? e.at : 0;
-    byText.set(key, Math.max(byText.get(key) ?? 0, at));
+    byText.set(key, Math.max(byText.get(key) ?? 0, finiteAt(e.at)));
   }
-  return Array.from(byText.entries())
-    .map(([text, at]) => ({ text, at }))
+  return entriesFromMap(byText)
     .sort((a, b) => b.at - a.at)
     .slice(0, MAX_ENTRIES);
 }
@@ -99,6 +105,44 @@ function migrateStringList(rows: string[]): HistoryEntry[] {
   return normalizeEntries(out);
 }
 
+function coerceNumberAt(atRaw: unknown): number | undefined {
+  if (typeof atRaw === "number" && Number.isFinite(atRaw)) return atRaw;
+  return undefined;
+}
+
+function coerceStringAt(atRaw: unknown): number | undefined {
+  if (typeof atRaw === "string" && Number.isFinite(Number(atRaw))) return Number(atRaw);
+  return undefined;
+}
+
+function coerceAt(atRaw: unknown): number {
+  return coerceNumberAt(atRaw) ?? coerceStringAt(atRaw) ?? Date.now();
+}
+
+function isRecordObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function parseEntryText(rec: Record<string, unknown>): string {
+  return typeof rec.text === "string" ? normalizeKey(rec.text) : "";
+}
+
+function parseRecordEntry(row: unknown): HistoryEntry | undefined {
+  if (!isRecordObject(row)) return undefined;
+  const text = parseEntryText(row);
+  if (!text) return undefined;
+  return { text, at: coerceAt(row.at) };
+}
+
+function parseRowEntries(data: unknown[]): HistoryEntry[] {
+  const out: HistoryEntry[] = [];
+  for (const row of data) {
+    const entry = parseRecordEntry(row);
+    if (entry) out.push(entry);
+  }
+  return out;
+}
+
 function parseHistoryPayload(raw: string): HistoryEntry[] {
   try {
     const data = JSON.parse(raw) as unknown;
@@ -106,23 +150,7 @@ function parseHistoryPayload(raw: string): HistoryEntry[] {
     if (data.every((x) => typeof x === "string")) {
       return migrateStringList(data as string[]);
     }
-    const out: HistoryEntry[] = [];
-    for (const row of data) {
-      if (typeof row === "object" && row !== null && !Array.isArray(row)) {
-        const rec = row as Record<string, unknown>;
-        const text = typeof rec.text === "string" ? normalizeKey(rec.text) : "";
-        if (!text) continue;
-        const atRaw = rec.at;
-        const at =
-          typeof atRaw === "number" && Number.isFinite(atRaw)
-            ? atRaw
-            : typeof atRaw === "string" && Number.isFinite(Number(atRaw))
-              ? Number(atRaw)
-              : Date.now();
-        out.push({ text, at });
-      }
-    }
-    return normalizeEntries(out);
+    return normalizeEntries(parseRowEntries(data));
   } catch {
     return [];
   }
@@ -138,20 +166,31 @@ function readHistoryFromDisk(): HistoryEntry[] {
   }
 }
 
-function mergeDiskWithMemory(disk: HistoryEntry[], memory: string[]): HistoryEntry[] {
-  const byText = new Map<string, number>();
+function bumpTimestamp(byText: Map<string, number>, key: string, at: number): void {
+  byText.set(key, Math.max(byText.get(key) ?? 0, at));
+}
+
+function absorbDiskEntries(byText: Map<string, number>, disk: HistoryEntry[]): void {
   for (const e of disk) {
     const key = normalizeKey(e.text);
     if (!key) continue;
-    byText.set(key, Math.max(byText.get(key) ?? 0, e.at));
+    bumpTimestamp(byText, key, e.at);
   }
-  const now = Date.now();
+}
+
+function absorbMemoryEntries(byText: Map<string, number>, memory: string[], now: number): void {
   for (let i = 0; i < memory.length; i++) {
     const key = normalizeKey(memory[i] ?? "");
     if (!key) continue;
-    byText.set(key, Math.max(byText.get(key) ?? 0, now - i));
+    bumpTimestamp(byText, key, now - i);
   }
-  return normalizeEntries(Array.from(byText.entries()).map(([text, at]) => ({ text, at })));
+}
+
+function mergeDiskWithMemory(disk: HistoryEntry[], memory: string[]): HistoryEntry[] {
+  const byText = new Map<string, number>();
+  absorbDiskEntries(byText, disk);
+  absorbMemoryEntries(byText, memory, Date.now());
+  return normalizeEntries(entriesFromMap(byText));
 }
 
 function writeHistoryAtomic(path: string, entries: HistoryEntry[]): void {

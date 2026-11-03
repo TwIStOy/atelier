@@ -29,11 +29,15 @@ export default function (pi: ExtensionAPI) {
   let matchedRules: ModelPromptRule[] = [];
   let lastTarget: string | null = null;
 
+  function resolveMatchedRules(target: string | null): ModelPromptRule[] {
+    return target === null ? [] : resolveModelPrompts(target);
+  }
+
   function applyModel(model: ModelLike | undefined, ctx: ExtensionContext): void {
     const target = model ? modelTarget(model) : null;
     if (target === lastTarget) return;
     lastTarget = target;
-    matchedRules = target === null ? [] : resolveModelPrompts(target);
+    matchedRules = resolveMatchedRules(target);
     if (matchedRules.length === 0) return;
     const names = matchedRules.map((rule) => `"${rule.name}"`).join(", ");
     notifySafely(ctx, `inject-prompt-by-model: applied ${names} for ${target}`);

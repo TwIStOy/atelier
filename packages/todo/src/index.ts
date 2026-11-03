@@ -1,7 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { isExtensionDisabled, isStaleCtxError } from "@htwang-contrib/common";
 import { registerTodoAggregateRules } from "./aggregate-rules.ts";
-import { loadConfig, registerConfig } from "./config.ts";
+import { loadConfig, registerConfig, type TodoConfig } from "./config.ts";
 import {
   createReminderCadence,
   drainReminderForContext,
@@ -17,6 +17,14 @@ import { getState, replaceState } from "./state/store.ts";
 import { registerTodosCommand, registerTodoTools } from "./todo.ts";
 import { TodoOverlay } from "./todo-overlay.ts";
 import { isTodoToolName } from "./tool/types.ts";
+
+function reminderSuppressed(cadence: ReminderCadenceState, config: TodoConfig): boolean {
+  return cadence.currentTurn - cadence.lastTodoToolUseTurn < config.reminderInterval || cadence.reminderDue;
+}
+
+function hasVisibleTodoTasks(isTodoTool: boolean): boolean {
+  return isTodoTool ? false : selectVisibleTasks(getState()).length > 0;
+}
 
 export default function (pi: ExtensionAPI) {
   if (isExtensionDisabled("todo")) return;
@@ -81,9 +89,8 @@ export default function (pi: ExtensionAPI) {
     const config = loadConfig();
     if (!config.reminderEnabled) return;
     const isTodoTool = isTodoToolName(event.toolName);
-    if (!isTodoTool && cadence.currentTurn - cadence.lastTodoToolUseTurn < config.reminderInterval) return;
-    if (!isTodoTool && cadence.reminderDue) return;
-    const hasVisibleTasks = isTodoTool ? false : selectVisibleTasks(getState()).length > 0;
+    if (!isTodoTool && reminderSuppressed(cadence, config)) return;
+    const hasVisibleTasks = hasVisibleTodoTasks(isTodoTool);
     evaluateToolResult(cadence, isTodoTool, hasVisibleTasks, config.reminderInterval);
   });
 

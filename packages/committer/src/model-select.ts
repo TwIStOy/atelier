@@ -49,29 +49,40 @@ export async function selectModel(ctx: ExtensionCommandContext): Promise<AnyMode
   }
 
   const sessionModel = ctx.model as AnyModel | undefined;
-  const config = loadConfig();
-  const configuredModel = config.model ? (resolveModel(models, config.model) as AnyModel | undefined) : undefined;
-  const effectiveDefault = configuredModel ?? sessionModel;
+  const effectiveDefault = effectiveDefaultModel(models as AnyModel[], sessionModel);
 
   const modelEntries = buildModelEntries(models as AnyModel[]);
-
-  let defaultIdx = 0;
-  if (effectiveDefault) {
-    const idx = modelEntries.findIndex(
-      (e) => e.model.provider === effectiveDefault.provider && e.model.id === effectiveDefault.id,
-    );
-    if (idx >= 0) defaultIdx = idx;
-  }
+  const defaultIdx = defaultModelIndex(modelEntries, effectiveDefault);
 
   const result = await ModelSelectController.show(ctx, modelEntries, sessionModel, defaultIdx);
-
   if (result === undefined) return undefined;
 
-  if (result) {
-    saveConfig({ model: `${result.provider}/${result.id}` });
-    ctx.ui.notify(`Commit model: ${result.provider}/${result.id}`, "info");
-  }
+  saveSelectedModel(ctx, result);
   return result;
+}
+
+function effectiveDefaultModel(models: AnyModel[], sessionModel: AnyModel | undefined): AnyModel | undefined {
+  const config = loadConfig();
+  const configuredModel = config.model ? (resolveModel(models, config.model) as AnyModel | undefined) : undefined;
+  return configuredModel ?? sessionModel;
+}
+
+function defaultModelIndex(
+  modelEntries: ReturnType<typeof buildModelEntries>,
+  effectiveDefault: AnyModel | undefined,
+): number {
+  let defaultIdx = 0;
+  if (!effectiveDefault) return defaultIdx;
+  const idx = modelEntries.findIndex(
+    (e) => e.model.provider === effectiveDefault.provider && e.model.id === effectiveDefault.id,
+  );
+  if (idx >= 0) defaultIdx = idx;
+  return defaultIdx;
+}
+
+function saveSelectedModel(ctx: ExtensionCommandContext, result: AnyModel): void {
+  saveConfig({ model: `${result.provider}/${result.id}` });
+  ctx.ui.notify(`Commit model: ${result.provider}/${result.id}`, "info");
 }
 
 export function resolveCommitModel(ctx: ExtensionContext): AnyModel | undefined {

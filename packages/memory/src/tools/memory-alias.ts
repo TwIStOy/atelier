@@ -1,6 +1,7 @@
 import { Type } from "@sinclair/typebox";
 import { runHat } from "../cli-runner.js";
 import { jsonError, jsonResult } from "../tool-result.js";
+import { pushDefined, pushTruthy } from "./cli-args.js";
 
 export const memoryAlias = {
   name: "memory-alias",
@@ -37,36 +38,42 @@ export const memoryAlias = {
   }),
   execute: async (_id: string, args: Record<string, unknown>, signal?: AbortSignal) => {
     try {
-      if (args.remove_uri) {
-        const result = await runHat(["memory", "alias", "--remove-uri", args.remove_uri as string], { signal });
-        return jsonResult(result, {
-          is_remove: true,
-          uri: args.remove_uri,
-        });
-      }
-      if (!args.new_uri || !args.target_uri) {
+      const mode = aliasMode(args);
+      if (mode === "remove") return removeAlias(args, signal);
+      if (mode === "invalid") {
         return jsonResult({
           error: "Provide new_uri + target_uri to create, or remove_uri to delete.",
         });
       }
-      const cliArgs = [
-        "memory",
-        "alias",
-        "--new-uri",
-        args.new_uri as string,
-        "--target-uri",
-        args.target_uri as string,
-      ];
-      if (args.priority !== undefined) cliArgs.push("--priority", String(args.priority));
-      if (args.disclosure) cliArgs.push("--disclosure", args.disclosure as string);
-      const result = await runHat(cliArgs, { signal });
-      return jsonResult(result, {
-        is_remove: false,
-        uri: args.new_uri,
-        target_uri: args.target_uri,
-      });
+      return createAlias(args, signal);
     } catch (e) {
       return jsonError(e);
     }
   },
 };
+
+function aliasMode(args: Record<string, unknown>): "remove" | "create" | "invalid" {
+  if (args.remove_uri) return "remove";
+  if (!args.new_uri || !args.target_uri) return "invalid";
+  return "create";
+}
+
+async function removeAlias(args: Record<string, unknown>, signal?: AbortSignal) {
+  const result = await runHat(["memory", "alias", "--remove-uri", args.remove_uri as string], { signal });
+  return jsonResult(result, {
+    is_remove: true,
+    uri: args.remove_uri,
+  });
+}
+
+async function createAlias(args: Record<string, unknown>, signal?: AbortSignal) {
+  const cliArgs = ["memory", "alias", "--new-uri", args.new_uri as string, "--target-uri", args.target_uri as string];
+  pushDefined(cliArgs, "--priority", args.priority);
+  pushTruthy(cliArgs, "--disclosure", args.disclosure);
+  const result = await runHat(cliArgs, { signal });
+  return jsonResult(result, {
+    is_remove: false,
+    uri: args.new_uri,
+    target_uri: args.target_uri,
+  });
+}

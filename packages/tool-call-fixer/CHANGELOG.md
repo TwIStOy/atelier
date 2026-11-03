@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Behavior-preserving refactor of `findMatching`, `callFromJsonObject`, and the `tool_call` / `message_end` handlers to reduce complexity; extracted quote-scan, name-resolution, and notify helpers.
+
 ### Removed
 
 - Dead exports found by static analysis: `TOOL_SCHEMAS`, `STRING_ARG_TOOLS`, the `GrammarRepairMode` / `GrammarRepairResult` / `RecoveredToolCall` re-exports.

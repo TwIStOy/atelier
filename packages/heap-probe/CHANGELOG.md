@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Behavior-preserving refactor: the `/heap-probe` handler split into release-check and inflate helpers.
+
 ## [0.5.0] - 2026-08-12
 
 ### Added

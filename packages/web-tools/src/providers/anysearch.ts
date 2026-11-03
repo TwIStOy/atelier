@@ -44,63 +44,103 @@ function extractUrlFromMarkdownTitle(line: string): string | undefined {
   return rawUrl?.[1];
 }
 
-function parseSearchMarkdown(text: string): SearchResult[] {
-  if (text.trim().startsWith("{") || text.trim().startsWith("[")) {
-    const list = parseListResponse(text);
-    if (list.length > 0) {
-      return list.map((r) => ({
-        title: r.title ?? "",
-        url: r.url ?? "",
-        snippet: r.snippet ?? "",
-      }));
-    }
-  }
+function fromJsonList(list: AnySearchSearchResult[]): SearchResult[] {
+  return list.map((r) => ({
+    title: r.title ?? "",
+    url: r.url ?? "",
+    snippet: r.snippet ?? "",
+  }));
+}
 
+function parseJsonSearchResults(text: string): SearchResult[] {
+  const trimmed = text.trim();
+  if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) return [];
+  return fromJsonList(parseListResponse(text));
+}
+
+function firstLine(lines: string[]): string {
+  return lines[0]?.trim() ?? "";
+}
+
+function findUrlLine(lines: string[]): string | undefined {
+  return lines.slice(1, 4).find((l) => /^\s*[-*]\s*\*?\*?URL\*?\*?:/i.test(l));
+}
+
+function urlLineValue(urlLine: string | undefined): string {
+  const urlMatch = urlLine?.match(/:\s*(.+)$/);
+  if (!urlMatch) return "";
+  return urlMatch[1].trim().replace(/[)\]]+$/, "");
+}
+
+function resolveBlockUrl(urlLine: string | undefined, title: string, titleLine: string): string {
+  const url = urlLineValue(urlLine);
+  if (url || !title) return url;
+  return extractUrlFromMarkdownTitle(titleLine) ?? url;
+}
+
+function parseBlockSnippet(lines: string[]): string {
+  const snippetLines = lines
+    .slice(1)
+    .filter((l) => !/^\s*[-*]\s*\*?\*?URL\*?\*?:/i.test(l))
+    .map((l) => l.replace(/^\s*[-*]\s+/, "").trim())
+    .filter(Boolean);
+  return snippetLines.join(" ").trim();
+}
+
+function parseMarkdownBlock(block: string): SearchResult | null {
+  const lines = block.split(/\r?\n/);
+  const titleLine = firstLine(lines);
+  const title = titleLine.replace(/^\s*[-*]\s*/, "").trim();
+  const url = resolveBlockUrl(findUrlLine(lines), title, titleLine);
+  if (!title && !url) return null;
+  return { title, url, snippet: parseBlockSnippet(lines) };
+}
+
+function parseMarkdownSearchBlocks(text: string): SearchResult[] {
   const results: SearchResult[] = [];
   const blocks = text.split(/^### \d+\./m).slice(1);
 
   for (const block of blocks) {
-    const lines = block.split(/\r?\n/);
-    const titleLine = lines[0]?.trim() ?? "";
-    const title = titleLine.replace(/^\s*[-*]\s*/, "").trim();
-
-    const urlLine = lines.slice(1, 4).find((l) => /^\s*[-*]\s*\*?\*?URL\*?\*?:/i.test(l));
-    let url = "";
-    let snippet = "";
-
-    if (urlLine) {
-      const urlMatch = urlLine.match(/:\s*(.+)$/);
-      if (urlMatch) {
-        url = urlMatch[1].trim().replace(/[)\]]+$/, "");
-      }
-    }
-
-    const snippetLines = lines
-      .slice(1)
-      .filter((l) => !/^\s*[-*]\s*\*?\*?URL\*?\*?:/i.test(l))
-      .map((l) => l.replace(/^\s*[-*]\s+/, "").trim())
-      .filter(Boolean);
-    snippet = snippetLines.join(" ").trim();
-
-    if (!url && title) {
-      const extracted = extractUrlFromMarkdownTitle(titleLine);
-      if (extracted) {
-        url = extracted;
-      }
-    }
-
-    if (title || url) {
-      results.push({ title, url, snippet });
-    }
+    const parsed = parseMarkdownBlock(block);
+    if (parsed) results.push(parsed);
   }
 
   return results;
+}
+
+function parseSearchMarkdown(text: string): SearchResult[] {
+  const jsonResults = parseJsonSearchResults(text);
+  if (jsonResults.length > 0) return jsonResults;
+  return parseMarkdownSearchBlocks(text);
 }
 
 function extractTitleFromMarkdown(text: string): string | undefined {
   const match = text.match(/^#\s+(.+)$/m);
   if (!match) return undefined;
   return match[1].trim();
+}
+
+function anysearchHeaders(apiKey: string): Record<string, string> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (apiKey) {
+    headers.Authorization = `Bearer ${apiKey}`;
+  }
+  return headers;
+}
+
+function throwIfMcpError(name: string, data: McpResponse): void {
+  if (data.error) {
+    throw new ProviderError(name, 500, data.error.message ?? JSON.stringify(data.error));
+  }
+}
+
+function findMcpTextItem(content: McpContent[] | undefined): McpContent | undefined {
+  return content?.find((c) => c.type === "text");
+}
+
+function extractMcpText(data: McpResponse): string {
+  const textItem = findMcpTextItem(data.result?.content);
+  return textItem?.text ?? "";
 }
 
 export class AnySearchProvider implements FullProvider {
@@ -111,14 +151,9 @@ export class AnySearchProvider implements FullProvider {
   constructor(private readonly apiKey: string) {}
 
   private async callMcp(toolName: string, args: Record<string, unknown>, signal?: AbortSignal): Promise<string> {
-    const headers: Record<string, string> = { "Content-Type": "application/json" };
-    if (this.apiKey) {
-      headers.Authorization = `Bearer ${this.apiKey}`;
-    }
-
     const res = await fetch(ANYSEARCH_ENDPOINT, {
       method: "POST",
-      headers,
+      headers: anysearchHeaders(this.apiKey),
       body: JSON.stringify({
         jsonrpc: "2.0",
         id: 1,
@@ -134,14 +169,8 @@ export class AnySearchProvider implements FullProvider {
     }
 
     const data = (await res.json()) as McpResponse;
-
-    if (data.error) {
-      throw new ProviderError(this.name, 500, data.error.message ?? JSON.stringify(data.error));
-    }
-
-    const content = data.result?.content ?? [];
-    const textItem = content.find((c) => c.type === "text");
-    return textItem?.text ?? "";
+    throwIfMcpError(this.name, data);
+    return extractMcpText(data);
   }
 
   async search(query: string, maxResults: number, signal?: AbortSignal): Promise<SearchResponse> {

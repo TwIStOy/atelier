@@ -1,6 +1,6 @@
 import { Type } from "@sinclair/typebox";
 import { runHat } from "../cli-runner.js";
-import { jsonError, jsonResult } from "../tool-result.js";
+import { contentLines, jsonError, jsonResult, textContent } from "../tool-result.js";
 
 export const journalRead = {
   name: "journal-read",
@@ -20,17 +20,11 @@ export const journalRead = {
           error: `Journal entry "${args.id}" not found.`,
         });
       }
-      const content =
-        result &&
-        typeof result === "object" &&
-        "content" in result &&
-        typeof (result as { content?: string }).content === "string"
-          ? (result as { content: string }).content
-          : "";
+      const content = textContent(result);
       return jsonResult(result, {
         id: args.id,
         content_preview: content.slice(0, 200),
-        content_lines: content ? content.split("\n").length : 0,
+        content_lines: contentLines(content),
       });
     } catch (e) {
       return jsonError(e);

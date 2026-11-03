@@ -21,8 +21,17 @@ export function formatGoalForTool(goal: Goal): string {
 }
 
 export function formatGoalToolResponse(goal: Goal): Record<string, unknown> {
-  const remainingTokens = goal.tokenBudget ? Math.max(0, goal.tokenBudget - goal.tokensUsed) : null;
-  const result: Record<string, unknown> = {
+  const result = goalResultFields(goal);
+  appendBudgetFields(result, goal);
+  appendTimestampFields(result, goal);
+  return {
+    ...result,
+    completionBudgetReport: budgetReportLine(goal),
+  };
+}
+
+function goalResultFields(goal: Goal): Record<string, unknown> {
+  return {
     id: goal.id,
     objective: goal.objective,
     status: goal.status,
@@ -31,20 +40,21 @@ export function formatGoalToolResponse(goal: Goal): Record<string, unknown> {
     createdAt: goal.createdAt,
     updatedAt: goal.updatedAt,
   };
-  if (goal.tokenBudget !== null) {
-    result.tokenBudget = goal.tokenBudget;
-    result.remainingTokens = remainingTokens;
-  }
+}
+
+function appendBudgetFields(result: Record<string, unknown>, goal: Goal): void {
+  if (goal.tokenBudget === null) return;
+  result.tokenBudget = goal.tokenBudget;
+  result.remainingTokens = Math.max(0, goal.tokenBudget - goal.tokensUsed);
+}
+
+function appendTimestampFields(result: Record<string, unknown>, goal: Goal): void {
   if (goal.lastStartedAt) result.lastStartedAt = goal.lastStartedAt;
   if (goal.completedAt) result.completedAt = goal.completedAt;
+}
 
-  const budgetReport =
-    goal.tokenBudget !== null
-      ? `Tokens: ${formatTokens(goal.tokensUsed)} / ${formatTokens(goal.tokenBudget)} used (${formatTokens(remainingTokens!)} remaining)`
-      : undefined;
-
-  return {
-    ...result,
-    completionBudgetReport: budgetReport ?? "No token budget set",
-  };
+function budgetReportLine(goal: Goal): string {
+  if (goal.tokenBudget === null) return "No token budget set";
+  const remaining = Math.max(0, goal.tokenBudget - goal.tokensUsed);
+  return `Tokens: ${formatTokens(goal.tokensUsed)} / ${formatTokens(goal.tokenBudget)} used (${formatTokens(remaining)} remaining)`;
 }

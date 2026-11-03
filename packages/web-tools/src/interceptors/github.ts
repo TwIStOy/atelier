@@ -8,6 +8,7 @@ import {
   readSync,
   realpathSync,
   rmSync,
+  type Stats,
   statSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -144,55 +145,70 @@ export interface GitHubUrlInfo {
   type: "root" | "blob" | "tree";
 }
 
-function parseGitHubUrl(url: string): GitHubUrlInfo | null {
-  let parsed: URL;
+function tryParseUrl(url: string): URL | null {
   try {
-    parsed = new URL(url);
+    return new URL(url);
   } catch {
     return null;
   }
+}
 
-  const host = parsed.hostname.toLowerCase();
-  if (host !== "github.com" && host !== "www.github.com") return null;
+function isGitHubHost(hostname: string): boolean {
+  const host = hostname.toLowerCase();
+  return host === "github.com" || host === "www.github.com";
+}
 
-  const segments = parsed.pathname
-    .split("/")
-    .filter(Boolean)
-    .map((s) => {
-      try {
-        return decodeURIComponent(s);
-      } catch {
-        return s;
-      }
-    });
-  if (segments.length < 2) return null;
-
-  const owner = segments[0]!;
-  const repo = segments[1]!.replace(/\.git$/, "");
-
-  if (NON_CODE_SEGMENTS.has(segments[2]?.toLowerCase())) return null;
-
-  if (segments.length === 2) {
-    return { owner, repo, refIsFullSha: false, type: "root" };
+function decodeSegment(segment: string): string {
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    return segment;
   }
+}
 
+function decodeUrlSegments(pathname: string): string[] {
+  return pathname.split("/").filter(Boolean).map(decodeSegment);
+}
+
+function isNoiseSegment(segment: string | undefined): boolean {
+  return segment !== undefined && NON_CODE_SEGMENTS.has(segment.toLowerCase());
+}
+
+function joinPathParts(pathParts: string[]): string {
+  return pathParts.length > 0 ? pathParts.join("/") : "";
+}
+
+function parseBlobOrTreeInfo(owner: string, repo: string, segments: string[]): GitHubUrlInfo | null {
   const action = segments[2];
   if (action !== "blob" && action !== "tree") return null;
   if (segments.length < 4) return null;
-
   const ref = segments[3]!;
-  const refIsFullSha = /^[0-9a-f]{40}$/.test(ref);
-  const pathParts = segments.slice(4);
-  const path = pathParts.length > 0 ? pathParts.join("/") : "";
-
   return {
     owner,
     repo,
     ref,
-    refIsFullSha,
-    path,
+    refIsFullSha: /^[0-9a-f]{40}$/.test(ref),
+    path: joinPathParts(segments.slice(4)),
     type: action as "blob" | "tree",
   };
+}
+
+function parseRepoUrlInfo(segments: string[]): GitHubUrlInfo | null {
+  if (segments.length < 2) return null;
+  const owner = segments[0]!;
+  const repo = segments[1]!.replace(/\.git$/, "");
+  if (isNoiseSegment(segments[2])) return null;
+  if (segments.length === 2) {
+    return { owner, repo, refIsFullSha: false, type: "root" };
+  }
+  return parseBlobOrTreeInfo(owner, repo, segments);
+}
+
+function parseGitHubUrl(url: string): GitHubUrlInfo | null {
+  const parsed = tryParseUrl(url);
+  if (!parsed) return null;
+  if (!isGitHubHost(parsed.hostname)) return null;
+  return parseRepoUrlInfo(decodeUrlSegments(parsed.pathname));
 }
 
 export interface GitHubInterceptorOptions {
@@ -230,6 +246,74 @@ function cloneDir(clonePath: string, owner: string, repo: string, ref?: string):
   return join(clonePath, owner, dirName);
 }
 
+function isAborted(signal: AbortSignal | undefined): boolean {
+  return signal?.aborted === true;
+}
+
+function withDefault<T>(value: T | undefined, fallback: T): T {
+  return value ?? fallback;
+}
+
+function resolveGitHubOptions(opts: GitHubInterceptorOptions): ResolvedGitHubOptions {
+  return {
+    enabled: withDefault(opts.enabled, GITHUB_INTERCEPTOR_DEFAULTS.enabled),
+    maxRepoSizeMB: withDefault(opts.maxRepoSizeMB, GITHUB_INTERCEPTOR_DEFAULTS.maxRepoSizeMB),
+    cloneTimeoutSeconds: withDefault(opts.cloneTimeoutSeconds, GITHUB_INTERCEPTOR_DEFAULTS.cloneTimeoutSeconds),
+    clonePath: withDefault(opts.clonePath, GITHUB_INTERCEPTOR_DEFAULTS.clonePath),
+  };
+}
+
+function removeDir(path: string): void {
+  try {
+    rmSync(path, { recursive: true, force: true });
+  } catch {
+    // ignore
+  }
+}
+
+function ghCloneArgs(owner: string, repo: string, localPath: string, ref: string | undefined): string[] {
+  const args = ["gh", "repo", "clone", `${owner}/${repo}`, localPath, "--", "--depth", "1", "--single-branch"];
+  if (ref) args.push("--branch", ref);
+  return args;
+}
+
+function gitCloneArgs(owner: string, repo: string, localPath: string, ref: string | undefined): string[] {
+  const gitUrl = `https://github.com/${owner}/${repo}.git`;
+  const args = ["git", "clone", "--depth", "1", "--single-branch"];
+  if (ref) args.push("--branch", ref);
+  args.push(gitUrl, localPath);
+  return args;
+}
+
+function apiViewHeaderLines(sizeNote: string | undefined): string[] {
+  if (!sizeNote) return [];
+  return [sizeNote, ""];
+}
+
+function apiFileContentLines(content: string): string[] {
+  if (content.length > MAX_INLINE_FILE_CHARS) {
+    return [content.slice(0, MAX_INLINE_FILE_CHARS), "\n[File truncated at 100K chars]"];
+  }
+  return [content];
+}
+
+function pushOptionalSection(lines: string[], heading: string, value: string | null): void {
+  if (!value) return;
+  lines.push(heading);
+  lines.push(value);
+  lines.push("");
+}
+
+function repoTitle(owner: string, repo: string, path: string | undefined): string {
+  return path ? `${owner}/${repo} - ${path}` : `${owner}/${repo}`;
+}
+
+function cloneContentResponse(localPath: string, owner: string, repo: string, info: GitHubUrlInfo): FetchResponse {
+  const text = generateCloneContent(localPath, info);
+  const title = repoTitle(owner, repo, info.path);
+  return { text, title, contentType: "text/plain" };
+}
+
 export class GitHubInterceptor implements UrlInterceptor {
   readonly name = "github";
 
@@ -244,12 +328,7 @@ export class GitHubInterceptor implements UrlInterceptor {
     } = {},
   ) {
     const { cloneCache, ...rest } = opts;
-    this.options = {
-      enabled: rest.enabled ?? GITHUB_INTERCEPTOR_DEFAULTS.enabled,
-      maxRepoSizeMB: rest.maxRepoSizeMB ?? GITHUB_INTERCEPTOR_DEFAULTS.maxRepoSizeMB,
-      cloneTimeoutSeconds: rest.cloneTimeoutSeconds ?? GITHUB_INTERCEPTOR_DEFAULTS.cloneTimeoutSeconds,
-      clonePath: rest.clonePath ?? GITHUB_INTERCEPTOR_DEFAULTS.clonePath,
-    };
+    this.options = resolveGitHubOptions(rest);
     this.cloneCache = cloneCache ?? new Map();
   }
 
@@ -343,37 +422,34 @@ export class GitHubInterceptor implements UrlInterceptor {
     );
   }
 
-  private async fetchViaApi(
+  private async resolveApiRef(owner: string, repo: string, info: GitHubUrlInfo): Promise<string | null> {
+    return info.ref || (await this.getDefaultBranch(owner, repo));
+  }
+
+  private async fetchBlobViaApi(
+    owner: string,
+    repo: string,
+    path: string,
+    ref: string,
+    lines: string[],
+  ): Promise<FetchResponse | null> {
+    const content = await this.fetchFileViaApi(owner, repo, path, ref);
+    if (!content) return null;
+
+    lines.push(`## ${path}`);
+    lines.push(...apiFileContentLines(content));
+
+    const title = `${owner}/${repo} - ${path}`;
+    return { text: lines.join("\n"), title, contentType: "text/plain" };
+  }
+
+  private async fetchRepoOverviewViaApi(
     owner: string,
     repo: string,
     info: GitHubUrlInfo,
-    sizeNote?: string,
+    ref: string,
+    lines: string[],
   ): Promise<FetchResponse | null> {
-    const ref = info.ref || (await this.getDefaultBranch(owner, repo));
-    if (!ref) return null;
-
-    const lines: string[] = [];
-    if (sizeNote) {
-      lines.push(sizeNote);
-      lines.push("");
-    }
-
-    if (info.type === "blob" && info.path) {
-      const content = await this.fetchFileViaApi(owner, repo, info.path, ref);
-      if (!content) return null;
-
-      lines.push(`## ${info.path}`);
-      if (content.length > MAX_INLINE_FILE_CHARS) {
-        lines.push(content.slice(0, MAX_INLINE_FILE_CHARS));
-        lines.push("\n[File truncated at 100K chars]");
-      } else {
-        lines.push(content);
-      }
-
-      const title = `${owner}/${repo} - ${info.path}`;
-      return { text: lines.join("\n"), title, contentType: "text/plain" };
-    }
-
     const [tree, readme] = await Promise.all([
       this.fetchTreeViaApi(owner, repo, ref),
       this.fetchReadmeViaApi(owner, repo, ref),
@@ -381,20 +457,30 @@ export class GitHubInterceptor implements UrlInterceptor {
 
     if (!tree && !readme) return null;
 
-    if (tree) {
-      lines.push("## Structure");
-      lines.push(tree);
-      lines.push("");
-    }
-    if (readme) {
-      lines.push("## README.md");
-      lines.push(readme);
-      lines.push("");
-    }
+    pushOptionalSection(lines, "## Structure", tree);
+    pushOptionalSection(lines, "## README.md", readme);
     lines.push("This is an API-only view. Clone the repo or use `read`/`bash` for deeper exploration.");
 
-    const title = info.path ? `${owner}/${repo} - ${info.path}` : `${owner}/${repo}`;
+    const title = repoTitle(owner, repo, info.path);
     return { text: lines.join("\n"), title, contentType: "text/plain" };
+  }
+
+  private async fetchViaApi(
+    owner: string,
+    repo: string,
+    info: GitHubUrlInfo,
+    sizeNote?: string,
+  ): Promise<FetchResponse | null> {
+    const ref = await this.resolveApiRef(owner, repo, info);
+    if (!ref) return null;
+
+    const lines = apiViewHeaderLines(sizeNote);
+
+    if (info.type === "blob" && info.path) {
+      return this.fetchBlobViaApi(owner, repo, info.path, ref, lines);
+    }
+
+    return this.fetchRepoOverviewViaApi(owner, repo, info, ref, lines);
   }
 
   private execClone(
@@ -431,27 +517,16 @@ export class GitHubInterceptor implements UrlInterceptor {
     signal?: AbortSignal,
   ): Promise<string | null> {
     const localPath = cloneDir(this.options.clonePath, owner, repo, ref);
-    try {
-      rmSync(localPath, { recursive: true, force: true });
-    } catch {
-      // ignore
-    }
+    removeDir(localPath);
 
     const timeoutMs = this.options.cloneTimeoutSeconds * 1000;
-    const hasGh = await this.checkGhAvailable();
 
-    if (hasGh) {
-      const args = ["gh", "repo", "clone", `${owner}/${repo}`, localPath, "--", "--depth", "1", "--single-branch"];
-      if (ref) args.push("--branch", ref);
-      return this.execClone(args, localPath, timeoutMs, signal);
+    if (await this.checkGhAvailable()) {
+      return this.execClone(ghCloneArgs(owner, repo, localPath, ref), localPath, timeoutMs, signal);
     }
 
     this.showGhHint();
-    const gitUrl = `https://github.com/${owner}/${repo}.git`;
-    const args = ["git", "clone", "--depth", "1", "--single-branch"];
-    if (ref) args.push("--branch", ref);
-    args.push(gitUrl, localPath);
-    return this.execClone(args, localPath, timeoutMs, signal);
+    return this.execClone(gitCloneArgs(owner, repo, localPath, ref), localPath, timeoutMs, signal);
   }
 
   private async awaitCachedClone(
@@ -461,78 +536,145 @@ export class GitHubInterceptor implements UrlInterceptor {
     info: GitHubUrlInfo,
     signal?: AbortSignal,
   ): Promise<FetchResponse | null> {
-    if (signal?.aborted) return null;
+    if (isAborted(signal)) return null;
     const result = await cached.clonePromise;
-    if (signal?.aborted) return null;
+    if (isAborted(signal)) return null;
     if (result) {
-      const text = generateCloneContent(result, info);
-      const title = info.path ? `${owner}/${repo} - ${info.path}` : `${owner}/${repo}`;
-      return { text, title, contentType: "text/plain" };
+      return cloneContentResponse(result, owner, repo, info);
     }
     return this.fetchViaApi(owner, repo, info);
   }
 
-  private async fetchGitHub(url: string, signal?: AbortSignal): Promise<FetchResponse | null> {
-    const info = parseGitHubUrl(url);
-    if (!info) return null;
-    if (signal?.aborted) return null;
-    if (!this.options.enabled) return null;
+  private async fetchShaViaApi(
+    owner: string,
+    repo: string,
+    info: GitHubUrlInfo,
+    signal?: AbortSignal,
+  ): Promise<FetchResponse | null> {
+    if (isAborted(signal)) return null;
+    const sizeNote = "Note: Commit SHA URLs use the GitHub API instead of cloning.";
+    return this.fetchViaApi(owner, repo, info, sizeNote);
+  }
 
-    const { owner, repo } = info;
-    const key = cacheKey(owner, repo, info.ref);
-
+  private async fetchRepo(
+    owner: string,
+    repo: string,
+    info: GitHubUrlInfo,
+    key: string,
+    signal?: AbortSignal,
+  ): Promise<FetchResponse | null> {
     const cached = this.cloneCache.get(key);
     if (cached) {
       return this.awaitCachedClone(cached, owner, repo, info, signal);
     }
-
     if (info.refIsFullSha) {
-      if (signal?.aborted) return null;
-      const sizeNote = "Note: Commit SHA URLs use the GitHub API instead of cloning.";
-      return this.fetchViaApi(owner, repo, info, sizeNote);
+      return this.fetchShaViaApi(owner, repo, info, signal);
     }
+    return this.fetchRepoByClone(owner, repo, info, key, signal);
+  }
 
+  private oversizedRepoSizeMB(sizeKB: number | null): number | null {
+    if (sizeKB === null) return null;
+    const sizeMB = sizeKB / 1024;
+    return sizeMB > this.options.maxRepoSizeMB ? sizeMB : null;
+  }
+
+  private async fetchOversizedRepoViaApi(
+    owner: string,
+    repo: string,
+    info: GitHubUrlInfo,
+    sizeMB: number,
+    signal?: AbortSignal,
+  ): Promise<FetchResponse | null> {
+    if (isAborted(signal)) return null;
+    const sizeNote =
+      `Note: Repository is ${Math.round(sizeMB)}MB (threshold: ${this.options.maxRepoSizeMB}MB). ` +
+      `Showing API-fetched content instead of full clone.`;
+    return this.fetchViaApi(owner, repo, info, sizeNote);
+  }
+
+  private async fetchRepoByClone(
+    owner: string,
+    repo: string,
+    info: GitHubUrlInfo,
+    key: string,
+    signal?: AbortSignal,
+  ): Promise<FetchResponse | null> {
     const sizeKB = await this.checkRepoSize(owner, repo);
-    if (signal?.aborted) return null;
-    if (sizeKB !== null) {
-      const sizeMB = sizeKB / 1024;
-      if (sizeMB > this.options.maxRepoSizeMB) {
-        if (signal?.aborted) return null;
-        const sizeNote =
-          `Note: Repository is ${Math.round(sizeMB)}MB (threshold: ${this.options.maxRepoSizeMB}MB). ` +
-          `Showing API-fetched content instead of full clone.`;
-        const apiView = await this.fetchViaApi(owner, repo, info, sizeNote);
-        if (apiView) return apiView;
-        return null;
-      }
+    if (isAborted(signal)) return null;
+    const oversizedMB = this.oversizedRepoSizeMB(sizeKB);
+    if (oversizedMB !== null) {
+      return this.fetchOversizedRepoViaApi(owner, repo, info, oversizedMB, signal);
     }
+    if (isAborted(signal)) return null;
+    return this.fetchViaClone(owner, repo, info, key, signal);
+  }
 
-    if (signal?.aborted) return null;
+  private async startClone(
+    owner: string,
+    repo: string,
+    info: GitHubUrlInfo,
+    key: string,
+    signal?: AbortSignal,
+  ): Promise<string | null> {
+    const clonePromise = this.cloneRepo(owner, repo, info.ref, signal);
+    const localPath = cloneDir(this.options.clonePath, owner, repo, info.ref);
+    this.cloneCache.set(key, { localPath, clonePromise });
+    return clonePromise;
+  }
 
+  private async cloneFailedResponse(
+    owner: string,
+    repo: string,
+    info: GitHubUrlInfo,
+    key: string,
+    signal?: AbortSignal,
+  ): Promise<FetchResponse | null> {
+    this.cloneCache.delete(key);
+    if (isAborted(signal)) return null;
+    return this.fetchViaApi(owner, repo, info);
+  }
+
+  private async settleCloneResult(
+    result: string | null,
+    owner: string,
+    repo: string,
+    info: GitHubUrlInfo,
+    key: string,
+    signal?: AbortSignal,
+  ): Promise<FetchResponse | null> {
+    if (isAborted(signal)) {
+      if (!result) this.cloneCache.delete(key);
+      return null;
+    }
+    if (!result) {
+      return this.cloneFailedResponse(owner, repo, info, key, signal);
+    }
+    return cloneContentResponse(result, owner, repo, info);
+  }
+
+  private async fetchViaClone(
+    owner: string,
+    repo: string,
+    info: GitHubUrlInfo,
+    key: string,
+    signal?: AbortSignal,
+  ): Promise<FetchResponse | null> {
     const cachedAfterCheck = this.cloneCache.get(key);
     if (cachedAfterCheck) {
       return this.awaitCachedClone(cachedAfterCheck, owner, repo, info, signal);
     }
+    const result = await this.startClone(owner, repo, info, key, signal);
+    return this.settleCloneResult(result, owner, repo, info, key, signal);
+  }
 
-    const clonePromise = this.cloneRepo(owner, repo, info.ref, signal);
-    const localPath = cloneDir(this.options.clonePath, owner, repo, info.ref);
-    this.cloneCache.set(key, { localPath, clonePromise });
+  private async fetchGitHub(url: string, signal?: AbortSignal): Promise<FetchResponse | null> {
+    const info = parseGitHubUrl(url);
+    if (!info || isAborted(signal) || !this.options.enabled) return null;
 
-    const result = await clonePromise;
-    if (signal?.aborted) {
-      if (!result) this.cloneCache.delete(key);
-      return null;
-    }
-
-    if (!result) {
-      this.cloneCache.delete(key);
-      if (signal?.aborted) return null;
-      return this.fetchViaApi(owner, repo, info);
-    }
-
-    const text = generateCloneContent(result, info);
-    const title = info.path ? `${owner}/${repo} - ${info.path}` : `${owner}/${repo}`;
-    return { text, title, contentType: "text/plain" };
+    const { owner, repo } = info;
+    const key = cacheKey(owner, repo, info.ref);
+    return this.fetchRepo(owner, repo, info, key, signal);
   }
 }
 
@@ -540,29 +682,49 @@ export class GitHubInterceptor implements UrlInterceptor {
 // Clone content generation (pure functions)
 // ---------------------------------------------------------------------------
 
-function isBinaryFile(filePath: string): boolean {
+function hasBinaryExtension(filePath: string): boolean {
   const ext = extname(filePath).toLowerCase();
-  if (BINARY_EXTENSIONS.has(ext)) return true;
+  return BINARY_EXTENSIONS.has(ext);
+}
 
-  let fd: number;
+function openReadOnly(filePath: string): number | null {
   try {
-    fd = openSync(filePath, "r");
+    return openSync(filePath, "r");
   } catch {
-    return false;
+    return null;
   }
+}
+
+function bufferHasNullByte(buf: Buffer, bytesRead: number): boolean {
+  for (let i = 0; i < bytesRead; i++) {
+    if (buf[i] === 0) return true;
+  }
+  return false;
+}
+
+function first512BytesContainNull(fd: number): boolean {
   try {
     const buf = Buffer.alloc(512);
     const bytesRead = readSync(fd, buf, 0, 512, 0);
-    for (let i = 0; i < bytesRead; i++) {
-      if (buf[i] === 0) return true;
-    }
+    return bufferHasNullByte(buf, bytesRead);
   } catch {
     return false;
+  }
+}
+
+function probeForNullByte(filePath: string): boolean {
+  const fd = openReadOnly(filePath);
+  if (fd === null) return false;
+  try {
+    return first512BytesContainNull(fd);
   } finally {
     closeSync(fd);
   }
+}
 
-  return false;
+function isBinaryFile(filePath: string): boolean {
+  if (hasBinaryExtension(filePath)) return true;
+  return probeForNullByte(filePath);
 }
 
 function formatFileSize(bytes: number): string {
@@ -571,20 +733,36 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function resolveWithinRepo(rootPath: string, relativePath: string): string | null {
-  const normalizedRoot = resolvePath(rootPath);
-  const candidate = resolvePath(normalizedRoot, relativePath);
-  if (candidate !== normalizedRoot) {
-    const rootPrefix = normalizedRoot.endsWith(pathSep) ? normalizedRoot : normalizedRoot + pathSep;
-    if (!candidate.startsWith(rootPrefix)) return null;
-  }
-  if (!existsSync(candidate)) return candidate;
+function pathPrefix(path: string): string {
+  return path.endsWith(pathSep) ? path : path + pathSep;
+}
+
+function isWithinPrefix(candidate: string, root: string): boolean {
+  return candidate === root || candidate.startsWith(pathPrefix(root));
+}
+
+function verifyRealPaths(normalizedRoot: string, candidate: string): string | null {
   try {
     const realRoot = realpathSync(normalizedRoot);
     const realCandidate = realpathSync(candidate);
     if (realCandidate === realRoot) return candidate;
-    const realRootPrefix = realRoot.endsWith(pathSep) ? realRoot : realRoot + pathSep;
-    return realCandidate.startsWith(realRootPrefix) ? candidate : null;
+    return isWithinPrefix(realCandidate, realRoot) ? candidate : null;
+  } catch {
+    return null;
+  }
+}
+
+function resolveWithinRepo(rootPath: string, relativePath: string): string | null {
+  const normalizedRoot = resolvePath(rootPath);
+  const candidate = resolvePath(normalizedRoot, relativePath);
+  if (!isWithinPrefix(candidate, normalizedRoot)) return null;
+  if (!existsSync(candidate)) return candidate;
+  return verifyRealPaths(normalizedRoot, candidate);
+}
+
+function readDirEntries(dir: string): string[] | null {
+  try {
+    return readdirSync(dir).sort();
   } catch {
     return null;
   }
@@ -593,40 +771,48 @@ function resolveWithinRepo(rootPath: string, relativePath: string): string | nul
 function buildTree(rootPath: string): string {
   const entries: string[] = [];
 
-  function walk(dir: string, relPath: string): void {
-    if (entries.length >= MAX_TREE_ENTRIES) return;
-    let items: string[];
+  function walkItems(items: string[], relPath: string): void {
+    for (const item of items) {
+      if (entries.length >= MAX_TREE_ENTRIES) return;
+      visit(item, relPath);
+    }
+  }
+
+  function visit(item: string, relPath: string): void {
+    if (item === ".git") return;
+    const rel = relPath ? `${relPath}/${item}` : item;
+    const safePath = resolveWithinRepo(rootPath, rel);
+    if (!safePath) {
+      entries.push(`${rel}  [outside repo skipped]`);
+      return;
+    }
+    visitSafeEntry(item, rel, safePath);
+  }
+
+  function visitSafeEntry(item: string, rel: string, safePath: string): void {
+    let stat: ReturnType<typeof statSync>;
     try {
-      items = readdirSync(dir).sort();
+      stat = statSync(safePath);
     } catch {
       return;
     }
-    for (const item of items) {
-      if (entries.length >= MAX_TREE_ENTRIES) return;
-      if (item === ".git") continue;
-      const rel = relPath ? `${relPath}/${item}` : item;
-      const safePath = resolveWithinRepo(rootPath, rel);
-      if (!safePath) {
-        entries.push(`${rel}  [outside repo skipped]`);
-        continue;
+    if (stat.isDirectory()) {
+      if (NOISE_DIRS.has(item)) {
+        entries.push(`${rel}/  [skipped]`);
+        return;
       }
-      let stat: ReturnType<typeof statSync>;
-      try {
-        stat = statSync(safePath);
-      } catch {
-        continue;
-      }
-      if (stat.isDirectory()) {
-        if (NOISE_DIRS.has(item)) {
-          entries.push(`${rel}/  [skipped]`);
-          continue;
-        }
-        entries.push(`${rel}/`);
-        walk(safePath, rel);
-      } else {
-        entries.push(rel);
-      }
+      entries.push(`${rel}/`);
+      walk(safePath, rel);
+      return;
     }
+    entries.push(rel);
+  }
+
+  function walk(dir: string, relPath: string): void {
+    if (entries.length >= MAX_TREE_ENTRIES) return;
+    const items = readDirEntries(dir);
+    if (items === null) return;
+    walkItems(items, relPath);
   }
 
   walk(rootPath, "");
@@ -636,118 +822,104 @@ function buildTree(rootPath: string): string {
   return entries.join("\n");
 }
 
+function describeSafeDirEntry(item: string, safePath: string): string {
+  try {
+    const stat = statSync(safePath);
+    return stat.isDirectory() ? `  ${item}/` : `  ${item}  (${formatFileSize(stat.size)})`;
+  } catch {
+    return `  ${item}  (unreadable)`;
+  }
+}
+
+function describeDirEntry(rootPath: string, subPath: string, item: string): string {
+  const rel = subPath ? `${subPath}/${item}` : item;
+  const safePath = resolveWithinRepo(rootPath, rel);
+  if (!safePath) return `  ${item}  (outside repo)`;
+  return describeSafeDirEntry(item, safePath);
+}
+
+function listDirEntries(rootPath: string, subPath: string, items: string[]): string[] {
+  const lines: string[] = [];
+  for (const item of items) {
+    if (item === ".git") continue;
+    lines.push(describeDirEntry(rootPath, subPath, item));
+  }
+  return lines;
+}
+
 function buildDirListing(rootPath: string, subPath: string): string {
   const targetPath = resolveWithinRepo(rootPath, subPath);
   if (!targetPath) return "(path escapes repository root)";
-  const lines: string[] = [];
-  let items: string[];
+  const items = readDirEntries(targetPath);
+  if (items === null) return "(directory not readable)";
+  return listDirEntries(rootPath, subPath, items).join("\n");
+}
+
+function readReadmeFile(readmePath: string): string | null {
+  if (!existsSync(readmePath)) return null;
   try {
-    items = readdirSync(targetPath).sort();
+    const content = readFileSync(readmePath, "utf-8");
+    return content.length > 8192 ? `${content.slice(0, 8192)}\n\n[README truncated at 8K chars]` : content;
   } catch {
-    return "(directory not readable)";
+    // skip
   }
-  for (const item of items) {
-    if (item === ".git") continue;
-    const rel = subPath ? `${subPath}/${item}` : item;
-    const safePath = resolveWithinRepo(rootPath, rel);
-    if (!safePath) {
-      lines.push(`  ${item}  (outside repo)`);
-      continue;
-    }
-    try {
-      const stat = statSync(safePath);
-      lines.push(stat.isDirectory() ? `  ${item}/` : `  ${item}  (${formatFileSize(stat.size)})`);
-    } catch {
-      lines.push(`  ${item}  (unreadable)`);
-    }
-  }
-  return lines.join("\n");
+  return null;
 }
 
 function readReadme(localPath: string): string | null {
   const candidates = ["README.md", "readme.md", "README", "README.txt", "README.rst"];
   for (const name of candidates) {
-    const readmePath = join(localPath, name);
-    if (existsSync(readmePath)) {
-      try {
-        const content = readFileSync(readmePath, "utf-8");
-        return content.length > 8192 ? `${content.slice(0, 8192)}\n\n[README truncated at 8K chars]` : content;
-      } catch {
-        // skip
-      }
-    }
+    const content = readReadmeFile(join(localPath, name));
+    if (content !== null) return content;
   }
   return null;
 }
 
-function generateCloneContent(localPath: string, info: GitHubUrlInfo): string {
-  const lines: string[] = [];
-  lines.push(`Repository cloned to: ${localPath}`);
+function pushExploreFurther(lines: string[]): void {
   lines.push("");
+  lines.push("Use `read` and `bash` tools at the path above to explore further.");
+}
 
-  if (info.type === "root") {
-    lines.push("## Structure");
-    lines.push(buildTree(localPath));
+function rootCloneContent(localPath: string, lines: string[]): string {
+  lines.push("## Structure");
+  lines.push(buildTree(localPath));
+  lines.push("");
+  const readme = readReadme(localPath);
+  if (readme) {
+    lines.push("## README.md");
+    lines.push(readme);
     lines.push("");
-    const readme = readReadme(localPath);
-    if (readme) {
-      lines.push("## README.md");
-      lines.push(readme);
-      lines.push("");
-    }
-    lines.push("Use `read` and `bash` tools at the path above to explore further.");
-    return lines.join("\n");
   }
+  lines.push("Use `read` and `bash` tools at the path above to explore further.");
+  return lines.join("\n");
+}
 
-  if (info.type === "tree") {
-    const dirPath = info.path || "";
-    const fullDirPath = resolveWithinRepo(localPath, dirPath);
-    if (!fullDirPath || !existsSync(fullDirPath)) {
-      lines.push(`Path \`${dirPath}\` not found in clone. Showing repository root instead.`);
-      lines.push("");
-      lines.push("## Structure");
-      lines.push(buildTree(localPath));
-    } else {
-      lines.push(`## ${dirPath || "/"}`);
-      lines.push(buildDirListing(localPath, dirPath));
-    }
-    lines.push("");
-    lines.push("Use `read` and `bash` tools at the path above to explore further.");
-    return lines.join("\n");
+function missingPathCloneContent(localPath: string, dirPath: string, lines: string[]): string {
+  lines.push(`Path \`${dirPath}\` not found in clone. Showing repository root instead.`);
+  lines.push("");
+  lines.push("## Structure");
+  lines.push(buildTree(localPath));
+  pushExploreFurther(lines);
+  return lines.join("\n");
+}
+
+function treeCloneContent(localPath: string, info: GitHubUrlInfo, lines: string[]): string {
+  const dirPath = info.path || "";
+  const fullDirPath = resolveWithinRepo(localPath, dirPath);
+  if (!fullDirPath || !existsSync(fullDirPath)) {
+    return missingPathCloneContent(localPath, dirPath, lines);
   }
+  lines.push(`## ${dirPath || "/"}`);
+  lines.push(buildDirListing(localPath, dirPath));
+  pushExploreFurther(lines);
+  return lines.join("\n");
+}
 
-  // blob
-  const filePath = info.path || "";
-  const fullFilePath = resolveWithinRepo(localPath, filePath);
-  if (!fullFilePath || !existsSync(fullFilePath)) {
-    lines.push(`Path \`${filePath}\` not found in clone. Showing repository root instead.`);
-    lines.push("");
-    lines.push("## Structure");
-    lines.push(buildTree(localPath));
-    lines.push("");
-    lines.push("Use `read` and `bash` tools at the path above to explore further.");
-    return lines.join("\n");
-  }
+function statErrorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
 
-  let stat: ReturnType<typeof statSync>;
-  try {
-    stat = statSync(fullFilePath);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    lines.push(`Could not inspect \`${filePath}\`: ${message}`);
-    lines.push("");
-    lines.push("Use `read` and `bash` tools at the path above to explore further.");
-    return lines.join("\n");
-  }
-
-  if (stat.isDirectory()) {
-    lines.push(`## ${filePath || "/"}`);
-    lines.push(buildDirListing(localPath, filePath));
-    lines.push("");
-    lines.push("Use `read` and `bash` tools at the path above to explore further.");
-    return lines.join("\n");
-  }
-
+function blobFileBytes(filePath: string, fullFilePath: string, stat: Stats, lines: string[]): string {
   if (isBinaryFile(fullFilePath)) {
     const ext = extname(filePath).replace(".", "");
     lines.push(`## ${filePath}`);
@@ -762,8 +934,7 @@ function generateCloneContent(localPath: string, info: GitHubUrlInfo): string {
     content = readFileSync(fullFilePath, "utf-8");
   } catch {
     lines.push(`Could not read \`${filePath}\` as UTF-8 text.`);
-    lines.push("");
-    lines.push("Use `read` and `bash` tools at the path above to explore further.");
+    pushExploreFurther(lines);
     return lines.join("\n");
   }
 
@@ -774,7 +945,52 @@ function generateCloneContent(localPath: string, info: GitHubUrlInfo): string {
   } else {
     lines.push(content);
   }
-  lines.push("");
-  lines.push("Use `read` and `bash` tools at the path above to explore further.");
+  pushExploreFurther(lines);
   return lines.join("\n");
+}
+
+function blobFileContent(localPath: string, filePath: string, fullFilePath: string, lines: string[]): string {
+  let stat: ReturnType<typeof statSync>;
+  try {
+    stat = statSync(fullFilePath);
+  } catch (err) {
+    lines.push(`Could not inspect \`${filePath}\`: ${statErrorMessage(err)}`);
+    pushExploreFurther(lines);
+    return lines.join("\n");
+  }
+
+  if (stat.isDirectory()) {
+    lines.push(`## ${filePath || "/"}`);
+    lines.push(buildDirListing(localPath, filePath));
+    pushExploreFurther(lines);
+    return lines.join("\n");
+  }
+
+  return blobFileBytes(filePath, fullFilePath, stat, lines);
+}
+
+function blobCloneContent(localPath: string, info: GitHubUrlInfo, lines: string[]): string {
+  const filePath = info.path || "";
+  const fullFilePath = resolveWithinRepo(localPath, filePath);
+  if (!fullFilePath || !existsSync(fullFilePath)) {
+    return missingPathCloneContent(localPath, filePath, lines);
+  }
+  return blobFileContent(localPath, filePath, fullFilePath, lines);
+}
+
+function generateCloneContent(localPath: string, info: GitHubUrlInfo): string {
+  const lines: string[] = [];
+  lines.push(`Repository cloned to: ${localPath}`);
+  lines.push("");
+
+  if (info.type === "root") {
+    return rootCloneContent(localPath, lines);
+  }
+
+  if (info.type === "tree") {
+    return treeCloneContent(localPath, info, lines);
+  }
+
+  // blob
+  return blobCloneContent(localPath, info, lines);
 }

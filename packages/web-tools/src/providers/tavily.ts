@@ -26,6 +26,17 @@ interface TavilyExtractResponse {
   failed_results?: Array<{ url?: string; error?: string }>;
 }
 
+function tavilyExtractionErrorMessage(label: string, url: string, failed: { url?: string; error?: string }): string {
+  return `${label} Fetch API error: extraction failed for ${failed.url ?? url}: ${failed.error ?? "unknown error"}`;
+}
+
+function throwIfTavilyExtractionFailed(label: string, url: string, data: TavilyExtractResponse): void {
+  const failed = data.failed_results?.[0];
+  if (failed) {
+    throw new Error(tavilyExtractionErrorMessage(label, url, failed));
+  }
+}
+
 function normalizeTavilyResults(results: TavilyRawResult[]): SearchResult[] {
   return results.map((r) => ({
     title: r.title ?? "",
@@ -78,12 +89,7 @@ export class TavilyProvider implements FullProvider {
       signal,
     );
 
-    if (data.failed_results && data.failed_results.length > 0) {
-      const failed = data.failed_results[0];
-      throw new Error(
-        `${this.label} Fetch API error: extraction failed for ${failed.url ?? url}: ${failed.error ?? "unknown error"}`,
-      );
-    }
+    throwIfTavilyExtractionFailed(this.label, url, data);
 
     const result = data.results?.[0];
     const text = requireContent(this.label, url, result?.raw_content);

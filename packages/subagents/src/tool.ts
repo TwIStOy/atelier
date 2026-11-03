@@ -1,4 +1,4 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { AgentToolUpdateCallback, ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { FALLBACK_PERSONA_ID } from "@htwang-contrib/common";
 import { mergeAbortWithTimeoutMs } from "./abort-timeout.ts";
 import { buildSubagentAgentCatalog, resolveDispatchAgentId, type SubagentAgentCatalog } from "./agent-catalog.ts";
@@ -7,10 +7,58 @@ import { backgroundJobStatusPayload, createBackgroundJob, subagentStatusToolDeta
 import { subagentDetails } from "./details.ts";
 import { type ParallelTaskRow, runParallelBatchSubagent } from "./orchestrate-batch.ts";
 import { runSingleSubagent } from "./orchestrate-single.ts";
+import type { SubagentRunDetails } from "./run-agent.ts";
 import { subagentParams, subagentStatusOutputSchema, subagentStatusParams } from "./schemas.ts";
 import { readSubagentSettings, type SubagentSettings } from "./settings.ts";
 import { drainBackgroundUsage, mergeUsage } from "./usage-report.ts";
-import { validateTaskShape } from "./validate.ts";
+import { type TaskShapeParams, validateTaskShape } from "./validate.ts";
+
+type SubagentParams = TaskShapeParams & {
+  background?: boolean;
+  model?: string;
+  thinking?: string;
+  inherit_context?: boolean;
+  isolated?: boolean;
+  max_turns?: number;
+  max_concurrent?: number;
+  max_total?: number;
+  timeout_ms?: number;
+};
+
+type ParentBase = {
+  parent_session_id: string;
+  parent_session_file: string;
+};
+
+type RunShared = {
+  parentBase: ParentBase;
+  parentSessionId: string;
+  catalog: SubagentAgentCatalog;
+  subagentSettings: SubagentSettings;
+  shape: { mode: "single" | "batch" };
+  isBackground: boolean;
+  baseRunSignal: AbortSignal | undefined;
+  runSignal: AbortSignal | undefined;
+  onUpdate: AgentToolUpdateCallback<SubagentRunDetails> | undefined;
+};
+
+function catalogAgentDescription(catalog: SubagentAgentCatalog, agentId: string): string {
+  return catalog.agents.get(agentId)?.fileOptions.description?.trim() ?? "";
+}
+
+function resolveBatchAgentId(
+  task: ParallelTaskRow,
+  globalAgentType: string | undefined,
+  catalog: SubagentAgentCatalog,
+  settings: SubagentSettings,
+): string {
+  const dispatch = resolveDispatchAgentId(task.agent_type ?? globalAgentType, catalog, settings);
+  return dispatch.ok ? dispatch.id : FALLBACK_PERSONA_ID;
+}
+
+function resolveBatchDescription(task: ParallelTaskRow, agentId: string, catalog: SubagentAgentCatalog): string {
+  return task.description?.trim() || catalogAgentDescription(catalog, agentId);
+}
 
 function fillBatchTaskDescriptions(
   tasks: ParallelTaskRow[],
@@ -19,11 +67,183 @@ function fillBatchTaskDescriptions(
   settings: SubagentSettings,
 ): ParallelTaskRow[] {
   return tasks.map((t) => {
-    const dispatch = resolveDispatchAgentId(t.agent_type ?? globalAgentType, catalog, settings);
-    const aid = dispatch.ok ? dispatch.id : FALLBACK_PERSONA_ID;
-    const description = t.description?.trim() || catalog.agents.get(aid)?.fileOptions.description?.trim() || "";
-    return { ...t, description };
+    const agentId = resolveBatchAgentId(t, globalAgentType, catalog, settings);
+    return { ...t, description: resolveBatchDescription(t, agentId, catalog) };
   });
+}
+
+function parentBaseOf(ctx: ExtensionContext): { parentBase: ParentBase; parentSessionId: string } {
+  const parentSessionId = ctx.sessionManager.getHeader()?.id ?? "unknown";
+  const parentSessionFile = ctx.sessionManager.getSessionFile() ?? "";
+  return {
+    parentSessionId,
+    parentBase: {
+      parent_session_id: parentSessionId,
+      parent_session_file: parentSessionFile,
+    },
+  };
+}
+
+function resolveRunSignals(
+  signal: AbortSignal | undefined,
+  ctxSignal: AbortSignal | undefined,
+  isBackground: boolean,
+  timeoutMs: number,
+): { baseRunSignal: AbortSignal | undefined; runSignal: AbortSignal | undefined } {
+  const merged = signal ? (ctxSignal ? AbortSignal.any([signal, ctxSignal]) : signal) : ctxSignal;
+  const baseRunSignal = isBackground ? ctxSignal : merged;
+  return { baseRunSignal, runSignal: mergeAbortWithTimeoutMs(baseRunSignal, timeoutMs) };
+}
+
+function noModelReply(parentBase: ParentBase) {
+  return {
+    content: [
+      {
+        type: "text" as const,
+        text: "subagent: parent session has no active model; select a model first.",
+      },
+    ],
+    details: subagentDetails({
+      ...parentBase,
+      tool_calls: 0,
+    }),
+  };
+}
+
+function batchLimitReply(parentBase: ParentBase, taskCount: number, maxTotal: number) {
+  return {
+    content: [
+      {
+        type: "text" as const,
+        text: `subagent: ${taskCount} tasks exceeds max_total (${maxTotal}). Raise max_total in ~/.agent/subagents/settings.json or pass max_total on this call.`,
+      },
+    ],
+    details: subagentDetails({
+      ...parentBase,
+      tool_calls: 0,
+      mode: "batch" as const,
+      batch: [],
+      ok: false,
+      error: `Too many tasks (${taskCount} > ${maxTotal}).`,
+    }),
+  };
+}
+
+function batchRunArgs(
+  params: SubagentParams,
+  shared: RunShared,
+  tasks: ParallelTaskRow[],
+  limits: { maxConcurrent: number; maxTotal: number },
+) {
+  return {
+    tasks,
+    parentBase: shared.parentBase,
+    merged: shared.baseRunSignal,
+    subagentSettings: shared.subagentSettings,
+    onUpdate: shared.onUpdate,
+    globalModel: params.model,
+    globalThinking: params.thinking,
+    globalInherit: params.inherit_context,
+    globalIsolated: params.isolated,
+    globalMaxTurns: params.max_turns,
+    globalAgentType: params.agent_type,
+    limits,
+  };
+}
+
+function startBackgroundBatch(
+  pi: ExtensionAPI,
+  ctx: ExtensionContext,
+  params: SubagentParams,
+  shared: RunShared,
+  tasks: ParallelTaskRow[],
+  limits: { maxConcurrent: number; maxTotal: number },
+) {
+  const label = `batch (${tasks.length} tasks)`;
+  const jobId = createBackgroundJob({ mode: "batch", label });
+  void runParallelBatchSubagent(ctx, batchRunArgs(params, shared, tasks, limits))
+    .then((r) => finalizeBackgroundSuccess(pi, ctx, jobId, label, "batch", r))
+    .catch((e) => finalizeBackgroundThrown(pi, ctx, jobId, label, "batch", e));
+  return backgroundStartedReply(shared.parentBase, shared.shape, jobId);
+}
+
+async function runBatchPhase(pi: ExtensionAPI, ctx: ExtensionContext, params: SubagentParams, shared: RunShared) {
+  const limits = {
+    maxConcurrent: shared.subagentSettings.maxConcurrent,
+    maxTotal: shared.subagentSettings.maxTotal,
+  };
+  const tasks = fillBatchTaskDescriptions(
+    params.tasks as ParallelTaskRow[],
+    shared.catalog,
+    params.agent_type,
+    shared.subagentSettings,
+  );
+  if (tasks.length > limits.maxTotal) {
+    return batchLimitReply(shared.parentBase, tasks.length, limits.maxTotal);
+  }
+
+  if (shared.isBackground) {
+    return startBackgroundBatch(pi, ctx, params, shared, tasks, limits);
+  }
+
+  const batchResult = await runParallelBatchSubagent(ctx, batchRunArgs(params, shared, tasks, limits));
+  const batchUsage = mergeUsage(batchResult.usage, drainBackgroundUsage(shared.parentSessionId));
+  return { ...batchResult, ...(batchUsage ? { usage: batchUsage } : {}) };
+}
+
+function singleRunArgs(params: SubagentParams, shared: RunShared, description: string, withUpdates: boolean) {
+  return {
+    task: params.task!.trim(),
+    description,
+    parentBase: shared.parentBase,
+    merged: shared.runSignal,
+    subagentSettings: shared.subagentSettings,
+    ...(withUpdates ? { onUpdate: shared.onUpdate } : {}),
+    globalModel: params.model,
+    globalThinking: params.thinking,
+    globalInherit: params.inherit_context,
+    globalIsolated: params.isolated,
+    globalMaxTurns: params.max_turns,
+    globalAgentType: params.agent_type,
+  };
+}
+
+function startBackgroundSingle(
+  pi: ExtensionAPI,
+  ctx: ExtensionContext,
+  params: SubagentParams,
+  shared: RunShared,
+  description: string,
+) {
+  const jobId = createBackgroundJob({
+    mode: "single",
+    label: description,
+  });
+  void runSingleSubagent(ctx, singleRunArgs(params, shared, description, false))
+    .then((r) => finalizeBackgroundSuccess(pi, ctx, jobId, description, "single", r))
+    .catch((e) => finalizeBackgroundThrown(pi, ctx, jobId, description, "single", e));
+  return backgroundStartedReply(shared.parentBase, shared.shape, jobId);
+}
+
+function resolveSingleDescription(
+  params: SubagentParams,
+  catalog: SubagentAgentCatalog,
+  settings: SubagentSettings,
+): string {
+  const dispatch = resolveDispatchAgentId(params.agent_type, catalog, settings);
+  const agentId = dispatch.ok ? dispatch.id : FALLBACK_PERSONA_ID;
+  return params.description?.trim() || catalogAgentDescription(catalog, agentId);
+}
+
+async function runSinglePhase(pi: ExtensionAPI, ctx: ExtensionContext, params: SubagentParams, shared: RunShared) {
+  const description = resolveSingleDescription(params, shared.catalog, shared.subagentSettings);
+  if (shared.isBackground) {
+    return startBackgroundSingle(pi, ctx, params, shared, description);
+  }
+
+  const singleResult = await runSingleSubagent(ctx, singleRunArgs(params, shared, description, true));
+  const singleUsage = mergeUsage(singleResult.usage, drainBackgroundUsage(shared.parentSessionId));
+  return { ...singleResult, ...(singleUsage ? { usage: singleUsage } : {}) };
 }
 
 export function registerSubagentStatusTool(pi: ExtensionAPI) {
@@ -61,12 +281,7 @@ export function registerSubagentTool(pi: ExtensionAPI) {
     parameters: subagentParams,
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     async execute(_toolCallId, params, signal, onUpdate, ctx) {
-      const parentSessionId = ctx.sessionManager.getHeader()?.id ?? "unknown";
-      const parentSessionFile = ctx.sessionManager.getSessionFile() ?? "";
-      const parentBase = {
-        parent_session_id: parentSessionId,
-        parent_session_file: parentSessionFile,
-      };
+      const { parentBase, parentSessionId } = parentBaseOf(ctx);
 
       const catalog = buildSubagentAgentCatalog(ctx.cwd);
       for (const warning of catalog.warnings) {
@@ -83,148 +298,32 @@ export function registerSubagentTool(pi: ExtensionAPI) {
       }
 
       if (!ctx.model) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: "subagent: parent session has no active model; select a model first.",
-            },
-          ],
-          details: subagentDetails({
-            ...parentBase,
-            tool_calls: 0,
-          }),
-        };
+        return noModelReply(parentBase);
       }
 
-      const merged = signal ? (ctx.signal ? AbortSignal.any([signal, ctx.signal]) : signal) : ctx.signal;
-
-      const bgSignal = ctx.signal;
       const isBackground = params.background === true;
-      const baseRunSignal = isBackground ? bgSignal : merged;
-
-      const runSignal = mergeAbortWithTimeoutMs(baseRunSignal, subagentSettings.timeoutMs);
-
-      const globalModel = params.model;
-      const globalThinking = params.thinking;
-      const globalInherit = params.inherit_context;
-      const globalIsolated = params.isolated;
-      const globalMaxTurns = params.max_turns;
-      const globalAgentType = params.agent_type;
+      const { baseRunSignal, runSignal } = resolveRunSignals(
+        signal,
+        ctx.signal,
+        isBackground,
+        subagentSettings.timeoutMs,
+      );
+      const shared: RunShared = {
+        parentBase,
+        parentSessionId,
+        catalog,
+        subagentSettings,
+        shape,
+        isBackground,
+        baseRunSignal,
+        runSignal,
+        onUpdate,
+      };
 
       if (shape.mode === "batch" && params.tasks) {
-        const limits = {
-          maxConcurrent: subagentSettings.maxConcurrent,
-          maxTotal: subagentSettings.maxTotal,
-        };
-        const tasks = fillBatchTaskDescriptions(
-          params.tasks as ParallelTaskRow[],
-          catalog,
-          params.agent_type,
-          subagentSettings,
-        );
-        if (tasks.length > limits.maxTotal) {
-          return {
-            content: [
-              {
-                type: "text",
-                text: `subagent: ${tasks.length} tasks exceeds max_total (${limits.maxTotal}). Raise max_total in ~/.agent/subagents/settings.json or pass max_total on this call.`,
-              },
-            ],
-            details: subagentDetails({
-              ...parentBase,
-              tool_calls: 0,
-              mode: "batch",
-              batch: [],
-              ok: false,
-              error: `Too many tasks (${tasks.length} > ${limits.maxTotal}).`,
-            }),
-          };
-        }
-
-        if (isBackground) {
-          const label = `batch (${tasks.length} tasks)`;
-          const jobId = createBackgroundJob({ mode: "batch", label });
-          void runParallelBatchSubagent(ctx, {
-            tasks,
-            parentBase,
-            merged: baseRunSignal,
-            subagentSettings,
-            onUpdate,
-            globalModel,
-            globalThinking,
-            globalInherit,
-            globalIsolated,
-            globalMaxTurns,
-            globalAgentType,
-            limits,
-          })
-            .then((r) => finalizeBackgroundSuccess(pi, ctx, jobId, label, "batch", r))
-            .catch((e) => finalizeBackgroundThrown(pi, ctx, jobId, label, "batch", e));
-          return backgroundStartedReply(parentBase, shape, jobId);
-        }
-
-        const batchResult = await runParallelBatchSubagent(ctx, {
-          tasks,
-          parentBase,
-          merged: baseRunSignal,
-          subagentSettings,
-          onUpdate,
-          globalModel,
-          globalThinking,
-          globalInherit,
-          globalIsolated,
-          globalMaxTurns,
-          globalAgentType,
-          limits,
-        });
-        const batchUsage = mergeUsage(batchResult.usage, drainBackgroundUsage(parentSessionId));
-        return { ...batchResult, ...(batchUsage ? { usage: batchUsage } : {}) };
+        return runBatchPhase(pi, ctx, params, shared);
       }
-
-      const singleDispatch = resolveDispatchAgentId(params.agent_type, catalog, subagentSettings);
-      const singleAgentId = singleDispatch.ok ? singleDispatch.id : FALLBACK_PERSONA_ID;
-      const singleDescription =
-        params.description?.trim() || catalog.agents.get(singleAgentId)?.fileOptions.description?.trim() || "";
-      if (isBackground) {
-        const jobId = createBackgroundJob({
-          mode: "single",
-          label: singleDescription,
-        });
-        void runSingleSubagent(ctx, {
-          task: params.task!.trim(),
-          description: singleDescription,
-          parentBase,
-          merged: runSignal,
-          subagentSettings,
-          globalModel,
-          globalThinking,
-          globalInherit,
-          globalIsolated,
-          globalMaxTurns,
-          globalAgentType,
-        })
-          .then((r) => finalizeBackgroundSuccess(pi, ctx, jobId, singleDescription, "single", r))
-          .catch((e) => finalizeBackgroundThrown(pi, ctx, jobId, singleDescription, "single", e));
-        return backgroundStartedReply(parentBase, shape, jobId);
-      }
-
-      const singleResult = await runSingleSubagent(ctx, {
-        task: params.task!.trim(),
-        description: singleDescription,
-        parentBase,
-        merged: runSignal,
-        subagentSettings,
-        onUpdate,
-        globalModel,
-        globalThinking,
-        globalInherit,
-        globalIsolated,
-        globalMaxTurns,
-        globalAgentType,
-      });
-      const singleUsage = mergeUsage(singleResult.usage, drainBackgroundUsage(parentSessionId));
-      return { ...singleResult, ...(singleUsage ? { usage: singleUsage } : {}) };
+      return runSinglePhase(pi, ctx, params, shared);
     },
   });
 }

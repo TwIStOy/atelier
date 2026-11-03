@@ -32,68 +32,116 @@ const EMPTY_RESULT: InjectionResult = Object.freeze({
   errors: [],
 });
 
-export async function injectDirectoryContext(input: InjectDirectoryContextInput): Promise<InjectionResult> {
-  const fileNames = input.fileNames ?? DEFAULT_FILE_NAMES;
-  const maxBytesPerFile = input.maxBytesPerFile ?? DEFAULT_MAX_BYTES_PER_FILE;
-  const maxBytesPerRead = input.maxBytesPerRead ?? DEFAULT_MAX_BYTES_PER_READ;
+interface ResolvedLimits {
+  fileNames: readonly string[];
+  maxBytesPerFile: number;
+  maxBytesPerRead: number;
+}
 
+interface InjectionAccumulator {
+  injectedFiles: InjectedFileInfo[];
+  errors: InjectionFileError[];
+  injectedText: string;
+  budget: number;
+}
+
+export async function injectDirectoryContext(input: InjectDirectoryContextInput): Promise<InjectionResult> {
+  const limits = resolveLimits(input);
   const contained = await resolveAndContain(input.filePath, input.projectRoot);
   if (!contained) return cloneEmpty();
+  const candidates = await collectCandidates(input, contained, limits.fileNames);
+  return injectCandidates(candidates, input, limits);
+}
 
+function resolveLimits(input: InjectDirectoryContextInput): ResolvedLimits {
+  return {
+    fileNames: input.fileNames ?? DEFAULT_FILE_NAMES,
+    maxBytesPerFile: input.maxBytesPerFile ?? DEFAULT_MAX_BYTES_PER_FILE,
+    maxBytesPerRead: input.maxBytesPerRead ?? DEFAULT_MAX_BYTES_PER_READ,
+  };
+}
+
+async function collectCandidates(
+  input: InjectDirectoryContextInput,
+  contained: ContainedFile,
+  fileNames: readonly string[],
+): Promise<Candidate[]> {
   const projectCandidates = await findAgentsMdUp(contained.fileDir, contained.canonicalRoot, fileNames, "project");
+  const mirrorCandidates = await collectMirrorCandidates(input, contained, fileNames);
+  return [...projectCandidates, ...mirrorCandidates];
+}
 
-  let mirrorCandidates: Candidate[] = [];
-  if (input.mirrorRoot) {
-    const canonicalMirrorRoot = await realpathSafe(input.mirrorRoot);
-    if (canonicalMirrorRoot) {
-      const rel = relative(contained.canonicalRoot, contained.canonicalPath);
-      mirrorCandidates = await findMirrorAgentsMdUp(canonicalMirrorRoot, contained.canonicalRoot, rel, fileNames);
-    }
+async function collectMirrorCandidates(
+  input: InjectDirectoryContextInput,
+  contained: ContainedFile,
+  fileNames: readonly string[],
+): Promise<Candidate[]> {
+  if (!input.mirrorRoot) return [];
+  const canonicalMirrorRoot = await realpathSafe(input.mirrorRoot);
+  if (!canonicalMirrorRoot) return [];
+  const rel = relative(contained.canonicalRoot, contained.canonicalPath);
+  return findMirrorAgentsMdUp(canonicalMirrorRoot, contained.canonicalRoot, rel, fileNames);
+}
+
+async function injectCandidates(
+  candidates: readonly Candidate[],
+  input: InjectDirectoryContextInput,
+  limits: ResolvedLimits,
+): Promise<InjectionResult> {
+  const acc: InjectionAccumulator = {
+    injectedFiles: [],
+    errors: [],
+    injectedText: "",
+    budget: limits.maxBytesPerRead,
+  };
+  for (const candidate of candidates) {
+    if (acc.budget <= 0) break;
+    await injectCandidate(candidate, input, limits.maxBytesPerFile, acc);
+  }
+  return { injectedText: acc.injectedText, injectedFiles: acc.injectedFiles, errors: acc.errors };
+}
+
+async function injectCandidate(
+  candidate: Candidate,
+  input: InjectDirectoryContextInput,
+  maxBytesPerFile: number,
+  acc: InjectionAccumulator,
+): Promise<void> {
+  if (input.cache.hasInjected(input.sessionKey, candidate.directory)) return;
+
+  let content: string;
+  try {
+    content = await fsPromises.readFile(candidate.path, "utf-8");
+  } catch (error) {
+    acc.errors.push({ path: candidate.path, error: toInjectionError(error) });
+    return;
   }
 
-  const allCandidates = [...projectCandidates, ...mirrorCandidates];
+  const perFileCap = Math.min(maxBytesPerFile, acc.budget);
+  const truncated = truncateBytes(content, perFileCap);
 
-  const injectedFiles: InjectedFileInfo[] = [];
-  const errors: InjectionFileError[] = [];
-  let injectedText = "";
-  let budget = maxBytesPerRead;
+  acc.injectedFiles.push({
+    absolutePath: candidate.path,
+    directory: candidate.directory,
+    source: candidate.source,
+    truncated: truncated.truncated,
+    originalBytes: truncated.originalBytes,
+    injectedBytes: truncated.resultBytes,
+  });
 
-  for (const candidate of allCandidates) {
-    if (input.cache.hasInjected(input.sessionKey, candidate.directory)) continue;
-    if (budget <= 0) break;
+  acc.injectedText += formatDirectoryContext({
+    directory: candidate.appliesTo,
+    absolutePath: candidate.path,
+    content: truncated.result,
+    truncated: truncated.truncated,
+  });
 
-    let content: string;
-    try {
-      content = await fsPromises.readFile(candidate.path, "utf-8");
-    } catch (error) {
-      errors.push({ path: candidate.path, error: error instanceof Error ? error : new Error(String(error)) });
-      continue;
-    }
+  input.cache.markInjected(input.sessionKey, candidate.directory);
+  acc.budget -= truncated.resultBytes;
+}
 
-    const perFileCap = Math.min(maxBytesPerFile, budget);
-    const truncated = truncateBytes(content, perFileCap);
-
-    injectedFiles.push({
-      absolutePath: candidate.path,
-      directory: candidate.directory,
-      source: candidate.source,
-      truncated: truncated.truncated,
-      originalBytes: truncated.originalBytes,
-      injectedBytes: truncated.resultBytes,
-    });
-
-    injectedText += formatDirectoryContext({
-      directory: candidate.appliesTo,
-      absolutePath: candidate.path,
-      content: truncated.result,
-      truncated: truncated.truncated,
-    });
-
-    input.cache.markInjected(input.sessionKey, candidate.directory);
-    budget -= truncated.resultBytes;
-  }
-
-  return { injectedText, injectedFiles, errors };
+function toInjectionError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
 }
 
 interface Candidate {

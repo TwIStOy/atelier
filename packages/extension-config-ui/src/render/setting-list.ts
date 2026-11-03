@@ -34,51 +34,58 @@ function colorFg(hex: string, text: string): string {
   return `\x1b[38;2;${r};${g};${b}m${text}\x1b[39m`;
 }
 
+function resolveItemOptions(item: SelectConfigItem | MultiSelectConfigItem | ReorderableConfigItem) {
+  const raw = item.options;
+  return typeof raw === "function" ? raw() : raw;
+}
+
+function formatSelectValue(item: ConfigItem, value: unknown): string {
+  const opts = resolveItemOptions(item as SelectConfigItem);
+  const matched = opts.find((o) => JSON.stringify(o.value) === JSON.stringify(value));
+  return matched?.label ?? String(value);
+}
+
+function formatMultiSelectValue(item: ConfigItem, value: unknown): string {
+  const opts = resolveItemOptions(item as MultiSelectConfigItem);
+  const vals = value as unknown[];
+  if (!Array.isArray(vals) || vals.length === 0) return "(none)";
+  const labels = vals
+    .map((v) => {
+      const opt = opts.find((o) => JSON.stringify(o.value) === JSON.stringify(v));
+      return opt?.label ?? String(v);
+    })
+    .join(", ");
+  return truncateToWidth(labels, 40, "…");
+}
+
+function formatReorderableValue(item: ConfigItem, value: unknown): string {
+  const opts = resolveItemOptions(item as ReorderableConfigItem);
+  const vals = value as unknown[];
+  if (!Array.isArray(vals) || vals.length === 0) return "(none)";
+  const labels = vals
+    .map((v, i) => {
+      const opt = opts.find((o) => JSON.stringify(o.value) === JSON.stringify(v));
+      return `${i + 1}. ${opt?.label ?? String(v)}`;
+    })
+    .join(", ");
+  return truncateToWidth(labels, 50, "…");
+}
+
+type SettingValueFormatter = (item: ConfigItem, value: unknown, colorBlock?: string) => string;
+
+const SETTING_VALUE_FORMATTERS: Record<string, SettingValueFormatter> = {
+  boolean: (_item, value) => (value ? "true" : "false"),
+  select: formatSelectValue,
+  multiselect: formatMultiSelectValue,
+  reorderable: formatReorderableValue,
+  color: (_item, value, colorBlock) => `${colorBlock ?? "██"} ${String(value)}`,
+};
+
 function formatSettingValue(item: ConfigItem, value: unknown, colorBlock?: string): string {
   if (value === undefined || value === null) return "(unset)";
   if (item.secret) return "••••••";
-  switch (item.type) {
-    case "boolean":
-      return value ? "true" : "false";
-    case "select": {
-      const selectItem = item as SelectConfigItem;
-      const opts = typeof selectItem.options === "function" ? selectItem.options() : selectItem.options;
-      const matched = opts.find((o) => JSON.stringify(o.value) === JSON.stringify(value));
-      return matched?.label ?? String(value);
-    }
-    case "multiselect": {
-      const msItem = item as MultiSelectConfigItem;
-      const opts = typeof msItem.options === "function" ? msItem.options() : msItem.options;
-      const vals = value as unknown[];
-      if (!Array.isArray(vals) || vals.length === 0) return "(none)";
-      const labels = vals
-        .map((v) => {
-          const opt = opts.find((o) => JSON.stringify(o.value) === JSON.stringify(v));
-          return opt?.label ?? String(v);
-        })
-        .join(", ");
-      return truncateToWidth(labels, 40, "…");
-    }
-    case "reorderable": {
-      const roItem = item as ReorderableConfigItem;
-      const opts = typeof roItem.options === "function" ? roItem.options() : roItem.options;
-      const vals = value as unknown[];
-      if (!Array.isArray(vals) || vals.length === 0) return "(none)";
-      const labels = vals
-        .map((v, i) => {
-          const opt = opts.find((o) => JSON.stringify(o.value) === JSON.stringify(v));
-          return `${i + 1}. ${opt?.label ?? String(v)}`;
-        })
-        .join(", ");
-      return truncateToWidth(labels, 50, "…");
-    }
-    case "color": {
-      const block = colorBlock ?? "██";
-      return `${block} ${String(value)}`;
-    }
-    default:
-      return String(value);
-  }
+  const formatter = SETTING_VALUE_FORMATTERS[item.type];
+  return formatter ? formatter(item, value, colorBlock) : String(value);
 }
 
 function valueColor(
@@ -96,6 +103,149 @@ function valueColor(
 export interface RenderedList {
   lines: string[];
   selectedVisible: boolean;
+}
+
+interface ListWalk {
+  lines: string[];
+  lastExtension: string;
+  lastVisibleIndex: number;
+  selectedVisible: boolean;
+}
+
+function rowColorBlock(row: SettingRow): string | undefined {
+  if (row.item.type !== "color" || !isValidColor(String(row.currentValue))) return undefined;
+  return colorFg(String(row.currentValue), "██");
+}
+
+function rowDisplayValue(row: SettingRow, isEditing: boolean, editing?: InlineEditState): string {
+  if (isEditing && editing) return renderInlineEditValue(editing);
+  return formatSettingValue(row.item, row.currentValue, rowColorBlock(row));
+}
+
+function renderSettingRowLine(
+  row: SettingRow,
+  isSelected: boolean,
+  isEditing: boolean,
+  editing: InlineEditState | undefined,
+  width: number,
+  theme: Theme,
+): string {
+  const labelText = row.item.label ?? row.item.key;
+  const label = isSelected
+    ? theme.fg("text", truncateToWidth(labelText, 34, "…"))
+    : truncateToWidth(labelText, 34, "…");
+  const displayValue = rowDisplayValue(row, isEditing, editing);
+  const valueText = valueColor(theme, isEditing, row.isExplicit, isSelected)(displayValue);
+  const itemPad = " ";
+  const gap = Math.max(1, 36 - visibleWidth(labelText));
+  const rowText = truncateToWidth(`${itemPad}${label}${" ".repeat(gap)}${valueText}`, width, "…");
+  return isSelected ? theme.bg("selectedBg", pad(rowText, width)) : rowText;
+}
+
+function pushDescriptionLines(
+  description: string,
+  width: number,
+  theme: Theme,
+  lines: string[],
+  contentBudget: number,
+): void {
+  for (const dl of wrapLine(description, Math.max(1, width - 4)).slice(0, 2)) {
+    if (lines.length >= contentBudget) break;
+    lines.push(theme.fg("muted", `    ${dl}`));
+  }
+}
+
+function pushRow(
+  row: SettingRow,
+  isSelected: boolean,
+  isEditing: boolean,
+  editing: InlineEditState | undefined,
+  walk: ListWalk,
+  width: number,
+  theme: Theme,
+  contentBudget: number,
+): void {
+  walk.lines.push(renderSettingRowLine(row, isSelected, isEditing, editing, width, theme));
+  if (!isSelected) return;
+  walk.selectedVisible = true;
+  if (!isEditing && row.item.description) {
+    pushDescriptionLines(row.item.description, width, theme, walk.lines, contentBudget);
+  }
+}
+
+function pushExtensionHeader(
+  label: string,
+  lastExtension: string,
+  lines: string[],
+  contentBudget: number,
+  theme: Theme,
+): boolean {
+  if (lastExtension && lines.length < contentBudget) lines.push("");
+  if (lines.length >= contentBudget) return false;
+  lines.push(theme.fg("accent", theme.bold(label)));
+  return true;
+}
+
+function maybePushHeader(row: SettingRow, walk: ListWalk, contentBudget: number, theme: Theme): boolean {
+  if (row.extensionLabel === walk.lastExtension) return true;
+  if (!pushExtensionHeader(row.extensionLabel, walk.lastExtension, walk.lines, contentBudget, theme)) return false;
+  walk.lastExtension = row.extensionLabel;
+  return true;
+}
+
+function appendRow(
+  i: number,
+  row: SettingRow,
+  selected: number,
+  editing: InlineEditState | undefined,
+  walk: ListWalk,
+  contentBudget: number,
+  width: number,
+  theme: Theme,
+): boolean {
+  if (walk.lines.length >= contentBudget) return false;
+  const isSelected = i === selected;
+  const isEditing = editing?.rowId === row.id;
+  pushRow(row, isSelected, isEditing, editing, walk, width, theme, contentBudget);
+  walk.lastVisibleIndex = i;
+  return true;
+}
+
+function processRow(
+  i: number,
+  rows: SettingRow[],
+  selected: number,
+  editing: InlineEditState | undefined,
+  walk: ListWalk,
+  contentBudget: number,
+  width: number,
+  theme: Theme,
+): boolean {
+  if (walk.lines.length >= contentBudget) return false;
+  if (!maybePushHeader(rows[i]!, walk, contentBudget, theme)) return false;
+  return appendRow(i, rows[i]!, selected, editing, walk, contentBudget, width, theme);
+}
+
+function pushScrollIndicatorLines(
+  moreBefore: string,
+  moreAfter: string,
+  lines: string[],
+  budget: number,
+  theme: Theme,
+): void {
+  lines.push("");
+  if (lines.length < budget) {
+    lines.push(theme.fg("dim", [moreBefore, moreAfter].filter(Boolean).join(glyphs().dot)));
+  }
+}
+
+function initWalk(rows: SettingRow[], scroll: number, lines: string[]): ListWalk {
+  return {
+    lines,
+    lastExtension: scroll > 0 ? (rows[scroll - 1]?.extensionLabel ?? "") : "",
+    lastVisibleIndex: scroll - 1,
+    selectedVisible: false,
+  };
 }
 
 export function renderSettingList(
@@ -117,71 +267,113 @@ export function renderSettingList(
     return { lines, selectedVisible: false };
   }
 
-  let lastExtension = scroll > 0 ? (rows[scroll - 1]?.extensionLabel ?? "") : "";
-  let lastVisibleIndex = scroll - 1;
-  let selectedVisible = false;
+  const walk = initWalk(rows, scroll, lines);
 
   for (let i = scroll; i < rows.length; i++) {
-    if (lines.length >= contentBudget) break;
-    const row = rows[i]!;
-    const isSelected = i === selected;
-    const isEditing = editing?.rowId === row.id;
-
-    if (row.extensionLabel !== lastExtension) {
-      if (lastExtension && lines.length < contentBudget) lines.push("");
-      if (lines.length < contentBudget) {
-        lines.push(theme.fg("accent", theme.bold(row.extensionLabel)));
-      } else {
-        break;
-      }
-      lastExtension = row.extensionLabel;
-    }
-
-    if (lines.length >= contentBudget) break;
-
-    const labelText = row.item.label ?? row.item.key;
-    const label = isSelected
-      ? theme.fg("text", truncateToWidth(labelText, 34, "…"))
-      : truncateToWidth(labelText, 34, "…");
-
-    const colorBlock =
-      row.item.type === "color" && isValidColor(String(row.currentValue))
-        ? colorFg(String(row.currentValue), "██")
-        : undefined;
-    const displayValue =
-      isEditing && editing
-        ? renderInlineEditValue(editing)
-        : formatSettingValue(row.item, row.currentValue, colorBlock);
-
-    const valueText = valueColor(theme, isEditing, row.isExplicit, isSelected)(displayValue);
-
-    const itemPad = " ";
-    const gap = Math.max(1, 36 - visibleWidth(labelText));
-    const rowText = truncateToWidth(`${itemPad}${label}${" ".repeat(gap)}${valueText}`, width, "…");
-
-    lines.push(isSelected ? theme.bg("selectedBg", pad(rowText, width)) : rowText);
-    lastVisibleIndex = i;
-    if (isSelected) selectedVisible = true;
-
-    if (isSelected && !isEditing && row.item.description) {
-      const descLines = wrapLine(row.item.description, Math.max(1, width - 4)).slice(0, 2);
-      for (const dl of descLines) {
-        if (lines.length < contentBudget) lines.push(theme.fg("muted", `    ${dl}`));
-        else break;
-      }
-    }
+    if (!processRow(i, rows, selected, editing, walk, contentBudget, width, theme)) break;
   }
 
   const moreBefore = scroll > 0 ? `↑ ${scroll}` : "";
-  const moreAfter = lastVisibleIndex < rows.length - 1 ? `↓ ${rows.length - 1 - lastVisibleIndex}` : "";
+  const moreAfter = walk.lastVisibleIndex < rows.length - 1 ? `↓ ${rows.length - 1 - walk.lastVisibleIndex}` : "";
   if ((moreBefore || moreAfter) && lines.length < budget) {
-    lines.push("");
-    if (lines.length < budget) {
-      lines.push(theme.fg("dim", [moreBefore, moreAfter].filter(Boolean).join(glyphs().dot)));
-    }
+    pushScrollIndicatorLines(moreBefore, moreAfter, lines, budget, theme);
   }
 
-  return { lines, selectedVisible };
+  return { lines, selectedVisible: walk.selectedVisible };
+}
+
+function pushSelectHeader(row: SettingRow, lines: string[], safeWidth: number, theme: Theme): void {
+  lines.push(truncateToWidth(theme.fg("accent", theme.bold(`  ${row.item.label ?? row.item.key}`)), safeWidth, "…"));
+  const desc = row.item.description;
+  if (desc) {
+    for (const dl of wrapLine(`    ${desc}`, safeWidth)) {
+      lines.push(theme.fg("muted", dl));
+    }
+  }
+  lines.push("");
+}
+
+function selectedValuesFor(row: SettingRow): unknown[] | undefined {
+  if (row.item.type === "reorderable") {
+    return Array.isArray(row.currentValue) ? (row.currentValue as unknown[]) : [];
+  }
+  return row.item.type === "multiselect" ? (row.currentValue as unknown[]) : undefined;
+}
+
+function isValueChecked(selectedValues: unknown[] | undefined, value: unknown): boolean {
+  return Array.isArray(selectedValues) && selectedValues.some((v) => JSON.stringify(v) === JSON.stringify(value));
+}
+
+function renderSelectOption(
+  opt: { label: string; value: unknown },
+  row: SettingRow,
+  isSelected: boolean,
+  safeWidth: number,
+  theme: Theme,
+): string {
+  const isCurrent = JSON.stringify(opt.value) === JSON.stringify(row.currentValue);
+  const marker = isCurrent ? "●" : "○";
+  return renderOptionLine(`  ${marker} ${opt.label}`, isSelected, safeWidth, theme);
+}
+
+function reorderableNumStr(orderNum: number): string {
+  return orderNum > 0 ? `${`${orderNum}.`.padStart(3)} ` : "    ";
+}
+
+function reorderGlyph(isSelected: boolean, isChecked: boolean): string {
+  return isSelected && isChecked ? " ↕" : "  ";
+}
+
+function renderReorderableOption(
+  opt: { label: string; value: unknown },
+  isSelected: boolean,
+  selectedValues: unknown[] | undefined,
+  reorderableOrder: Map<string, number>,
+  safeWidth: number,
+  theme: Theme,
+): string {
+  const isChecked = isValueChecked(selectedValues, opt.value);
+  const checkMarker = isChecked ? "\uDB80\uDD35" : "\uDB80\uDD31";
+  const numStr = reorderableNumStr(reorderableOrder.get(JSON.stringify(opt.value)) ?? 0);
+  const content = `  ${checkMarker} ${numStr}${opt.label}${reorderGlyph(isSelected, isChecked)}`;
+  return renderOptionLine(content, isSelected, safeWidth, theme);
+}
+
+function renderMultiSelectOption(
+  opt: { label: string; value: unknown },
+  isSelected: boolean,
+  selectedValues: unknown[] | undefined,
+  safeWidth: number,
+  theme: Theme,
+): string {
+  const marker = isValueChecked(selectedValues, opt.value) ? "\uDB80\uDD35" : "\uDB80\uDD31";
+  return renderOptionLine(`  ${marker} ${opt.label}`, isSelected, safeWidth, theme);
+}
+
+function renderSelectPageOption(
+  opt: { label: string; value: unknown },
+  i: number,
+  row: SettingRow,
+  selecting: SelectingState,
+  selectedValues: unknown[] | undefined,
+  reorderableOrder: Map<string, number>,
+  safeWidth: number,
+  theme: Theme,
+): string {
+  const isSelected = i === selecting.selectedOptionIndex;
+  if (row.item.type === "select") return renderSelectOption(opt, row, isSelected, safeWidth, theme);
+  if (row.item.type === "reorderable") {
+    return renderReorderableOption(opt, isSelected, selectedValues, reorderableOrder, safeWidth, theme);
+  }
+  return renderMultiSelectOption(opt, isSelected, selectedValues, safeWidth, theme);
+}
+
+function pushPreviewLines(preview: ConfigItemPreviewHandle, lines: string[], safeWidth: number, theme: Theme): void {
+  const previewLines = preview.render(safeWidth, theme);
+  if (previewLines.length === 0) return;
+  lines.push("");
+  lines.push(divider(safeWidth, theme));
+  lines.push(...previewLines);
 }
 
 export function renderSelectPage(
@@ -193,15 +385,7 @@ export function renderSelectPage(
 ): string[] {
   const safeWidth = Math.max(1, width);
   const lines: string[] = [];
-  lines.push(truncateToWidth(theme.fg("accent", theme.bold(`  ${row.item.label ?? row.item.key}`)), safeWidth, "…"));
-
-  const desc = row.item.description;
-  if (desc) {
-    for (const dl of wrapLine(`    ${desc}`, safeWidth)) {
-      lines.push(theme.fg("muted", dl));
-    }
-  }
-  lines.push("");
+  pushSelectHeader(row, lines, safeWidth, theme);
 
   const { options: displayOpts, reorderableOrder, canFilter } = buildSelectDisplayOptions(row, selecting.filter);
 
@@ -210,14 +394,7 @@ export function renderSelectPage(
     lines.push("");
   }
 
-  let selectedValues: unknown[] | undefined;
-
-  if (row.item.type === "reorderable") {
-    selectedValues = Array.isArray(row.currentValue) ? (row.currentValue as unknown[]) : [];
-  } else {
-    selectedValues = row.item.type === "multiselect" ? (row.currentValue as unknown[]) : undefined;
-  }
-
+  const selectedValues = selectedValuesFor(row);
   const pageSize = SELECT_PAGE_SIZE;
   const scrollStart = selecting.scroll;
   const scrollEnd = Math.min(scrollStart + pageSize, displayOpts.length);
@@ -231,43 +408,16 @@ export function renderSelectPage(
   }
 
   for (let i = scrollStart; i < scrollEnd; i++) {
-    const opt = displayOpts[i]!;
-    const isSelected = i === selecting.selectedOptionIndex;
-    if (row.item.type === "select") {
-      const isCurrent = JSON.stringify(opt.value) === JSON.stringify(row.currentValue);
-      const marker = isCurrent ? "●" : "○";
-      const content = `  ${marker} ${opt.label}`;
-      lines.push(renderOptionLine(content, isSelected, safeWidth, theme));
-    } else if (row.item.type === "reorderable") {
-      const isChecked =
-        Array.isArray(selectedValues) && selectedValues.some((v) => JSON.stringify(v) === JSON.stringify(opt.value));
-      const checkMarker = isChecked ? "\uDB80\uDD35" : "\uDB80\uDD31";
-      const orderNum = reorderableOrder.get(JSON.stringify(opt.value)) ?? 0;
-      const numStr = orderNum > 0 ? `${`${orderNum}.`.padStart(3)} ` : "    ";
-      const reorderGlyph = isSelected && isChecked ? " ↕" : "  ";
-      const content = `  ${checkMarker} ${numStr}${opt.label}${reorderGlyph}`;
-      lines.push(renderOptionLine(content, isSelected, safeWidth, theme));
-    } else {
-      const isChecked =
-        Array.isArray(selectedValues) && selectedValues.some((v) => JSON.stringify(v) === JSON.stringify(opt.value));
-      const marker = isChecked ? "\uDB80\uDD35" : "\uDB80\uDD31";
-      const content = `  ${marker} ${opt.label}`;
-      lines.push(renderOptionLine(content, isSelected, safeWidth, theme));
-    }
+    lines.push(
+      renderSelectPageOption(displayOpts[i]!, i, row, selecting, selectedValues, reorderableOrder, safeWidth, theme),
+    );
   }
 
   if (scrollEnd < displayOpts.length) {
     lines.push(truncateToWidth(theme.fg("dim", `  ↓ ${displayOpts.length - scrollEnd} more below`), safeWidth, ""));
   }
 
-  if (preview) {
-    const previewLines = preview.render(safeWidth, theme);
-    if (previewLines.length > 0) {
-      lines.push("");
-      lines.push(divider(safeWidth, theme));
-      lines.push(...previewLines);
-    }
-  }
+  if (preview) pushPreviewLines(preview, lines, safeWidth, theme);
 
   return lines;
 }

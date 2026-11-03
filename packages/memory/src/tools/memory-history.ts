@@ -1,6 +1,7 @@
 import { Type } from "@sinclair/typebox";
 import { runHat } from "../cli-runner.js";
 import { jsonError, jsonResult } from "../tool-result.js";
+import { pushDefined } from "./cli-args.js";
 import { parseListResult } from "./parse-list.js";
 
 export const memoryHistory = {
@@ -18,13 +19,9 @@ export const memoryHistory = {
   execute: async (_id: string, args: Record<string, unknown>, signal?: AbortSignal) => {
     try {
       const cliArgs = ["memory", "versions", args.uri as string];
-      if (args.limit !== undefined) cliArgs.push("--limit", String(args.limit));
+      pushDefined(cliArgs, "--limit", args.limit);
       const result = await runHat(cliArgs, { signal });
-      const items = parseListResult(result, "versions").map((v: Record<string, unknown>) => {
-        const action = v.action ?? v.type ?? "?";
-        const ts = v.timestamp ?? v.id ?? v.created_at ?? "";
-        return `${action} ${ts}`;
-      });
+      const items = parseListResult(result, "versions").map(historyItem);
       return jsonResult(result, {
         uri: args.uri,
         total: items.length,
@@ -35,3 +32,15 @@ export const memoryHistory = {
     }
   },
 };
+
+function historyAction(v: Record<string, unknown>): unknown {
+  return v.action ?? v.type ?? "?";
+}
+
+function historyTimestamp(v: Record<string, unknown>): unknown {
+  return v.timestamp ?? v.id ?? v.created_at ?? "";
+}
+
+function historyItem(v: Record<string, unknown>): string {
+  return `${historyAction(v)} ${historyTimestamp(v)}`;
+}

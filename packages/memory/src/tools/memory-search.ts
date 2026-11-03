@@ -1,6 +1,7 @@
 import { Type } from "@sinclair/typebox";
 import { runHat } from "../cli-runner.js";
 import { jsonError, jsonResult } from "../tool-result.js";
+import { pushDefined } from "./cli-args.js";
 import { parseListResult } from "./parse-list.js";
 
 export const memorySearch = {
@@ -18,14 +19,9 @@ export const memorySearch = {
   execute: async (_id: string, args: Record<string, unknown>, signal?: AbortSignal) => {
     try {
       const cliArgs = ["memory", "search", args.query as string];
-      if (args.limit !== undefined) cliArgs.push("--limit", String(args.limit));
+      pushDefined(cliArgs, "--limit", args.limit);
       const result = await runHat(cliArgs, { signal });
-      const items = parseListResult(result, "results").map((r: Record<string, unknown>) => ({
-        uri: r.uri ?? r.path ?? "",
-        snippet: String(r.snippet ?? r.content ?? "")
-          .split(/\r?\n/)[0]
-          ?.slice(0, 120),
-      }));
+      const items = parseListResult(result, "results").map(searchItem);
       return jsonResult(result, {
         query: args.query,
         total: items.length,
@@ -36,3 +32,22 @@ export const memorySearch = {
     }
   },
 };
+
+function searchItemUri(r: Record<string, unknown>): unknown {
+  return r.uri ?? r.path ?? "";
+}
+
+function searchSnippet(r: Record<string, unknown>): string {
+  return String(r.snippet ?? r.content ?? "");
+}
+
+function firstLine(text: string): string | undefined {
+  return text.split(/\r?\n/)[0]?.slice(0, 120);
+}
+
+function searchItem(r: Record<string, unknown>): { uri: unknown; snippet: string | undefined } {
+  return {
+    uri: searchItemUri(r),
+    snippet: firstLine(searchSnippet(r)),
+  };
+}

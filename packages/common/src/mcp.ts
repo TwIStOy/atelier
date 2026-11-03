@@ -42,6 +42,18 @@ export async function mcpInit(
   return { sessionId };
 }
 
+function parseMcpSsePayload(text: string): unknown {
+  const lines = text.split("\n");
+  for (const line of lines) {
+    if (line.startsWith("data:")) {
+      const json = JSON.parse(line.slice(5).trim());
+      if (json.error) throw new Error(`MCP: ${json.error.message}`);
+      return json.result;
+    }
+  }
+  throw new Error("MCP: no data in response");
+}
+
 export async function mcpCall<T = unknown>(
   url: string,
   session: McpSession,
@@ -65,14 +77,5 @@ export async function mcpCall<T = unknown>(
   if (!res.ok) {
     throw new Error(`MCP ${method} ${res.status}: ${(await res.text()).slice(0, 200)}`);
   }
-  const text = await res.text();
-  const lines = text.split("\n");
-  for (const line of lines) {
-    if (line.startsWith("data:")) {
-      const json = JSON.parse(line.slice(5).trim());
-      if (json.error) throw new Error(`MCP: ${json.error.message}`);
-      return json.result as T;
-    }
-  }
-  throw new Error("MCP: no data in response");
+  return parseMcpSsePayload(await res.text()) as T;
 }

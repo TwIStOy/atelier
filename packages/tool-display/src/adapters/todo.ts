@@ -1,4 +1,4 @@
-import type { ThemeColor } from "@earendil-works/pi-coding-agent";
+import type { Theme, ThemeColor } from "@earendil-works/pi-coding-agent";
 import { visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 import type { ToolDisplayAdapter } from "../types.ts";
 import { formatExpandedToolOutputLines } from "./shared.ts";
@@ -43,6 +43,55 @@ function attachSubject(core: string, styledSubject: string, width: number | unde
   return [core, ...wrapped].join("\n");
 }
 
+function idTaggedCore(core: string, args: TodoArgs, theme: Theme): string {
+  if (args.id !== undefined) return `${core} ${theme.fg("dim", `#${args.id}`)}`;
+  return core;
+}
+
+function idSubject(args: TodoArgs, details: unknown): string | null {
+  if (args.id !== undefined) return findSubjectById(details, args.id);
+  return null;
+}
+
+function listCore(core: string, args: TodoArgs, theme: Theme): string {
+  let out = core;
+  if (args.status) out += ` ${theme.fg("muted", args.status)}`;
+  if (args.includeDeleted) out += ` ${theme.fg("muted", "+deleted")}`;
+  return out;
+}
+
+function todoCore(
+  displayName: string,
+  toolName: string,
+  args: TodoArgs,
+  theme: Theme,
+  details: unknown,
+): { core: string; subject: string | null } {
+  let core = theme.fg("toolTitle", theme.bold(displayName));
+  let subject: string | null = null;
+
+  switch (toolName) {
+    case "todo_create":
+      subject = args.subject?.trim() || null;
+      break;
+    case "todo_update":
+      if (args.status) core += ` ${theme.fg(stateColor(args.status), `[${args.status}]`)}`;
+      core = idTaggedCore(core, args, theme);
+      subject = idSubject(args, details);
+      break;
+    case "todo_get":
+    case "todo_delete":
+      core = idTaggedCore(core, args, theme);
+      subject = idSubject(args, details);
+      break;
+    case "todo_list":
+      core = listCore(core, args, theme);
+      break;
+  }
+
+  return { core, subject };
+}
+
 export function createTodoAdapter(toolName: string): ToolDisplayAdapter<TodoArgs> {
   const displayName = toolName
     .split("_")
@@ -51,30 +100,7 @@ export function createTodoAdapter(toolName: string): ToolDisplayAdapter<TodoArgs
 
   return {
     formatCallHeader(args, theme, details, _isPartial, _expanded, width) {
-      const label = theme.fg("toolTitle", theme.bold(displayName));
-      let core = label;
-      let subject: string | null = null;
-
-      switch (toolName) {
-        case "todo_create":
-          subject = args.subject?.trim() || null;
-          break;
-        case "todo_update":
-          if (args.status) core += ` ${theme.fg(stateColor(args.status), `[${args.status}]`)}`;
-          if (args.id !== undefined) core += ` ${theme.fg("dim", `#${args.id}`)}`;
-          if (args.id !== undefined) subject = findSubjectById(details, args.id);
-          break;
-        case "todo_get":
-        case "todo_delete":
-          if (args.id !== undefined) core += ` ${theme.fg("dim", `#${args.id}`)}`;
-          if (args.id !== undefined) subject = findSubjectById(details, args.id);
-          break;
-        case "todo_list":
-          if (args.status) core += ` ${theme.fg("muted", args.status)}`;
-          if (args.includeDeleted) core += ` ${theme.fg("muted", "+deleted")}`;
-          break;
-      }
-
+      const { core, subject } = todoCore(displayName, toolName, args, theme, details);
       if (!subject) return core;
       return attachSubject(core, theme.fg("dim", subject), width);
     },

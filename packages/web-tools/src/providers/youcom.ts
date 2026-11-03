@@ -21,11 +21,15 @@ interface YouComContentsResponseItem {
   markdown?: string | null;
 }
 
+function youcomSnippet(r: YouComWebResult): string {
+  return r.snippets?.[0] ?? r.description ?? "";
+}
+
 function normalizeYouComResults(results: YouComWebResult[]): SearchResult[] {
   return results.map((r) => ({
     title: r.title ?? "",
     url: r.url ?? "",
-    snippet: r.snippets?.[0] ?? r.description ?? "",
+    snippet: youcomSnippet(r),
   }));
 }
 

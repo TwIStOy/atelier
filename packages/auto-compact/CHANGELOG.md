@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Behavior-preserving refactor of the `/auto-compact` status handler and context-window resolution into small helpers to reduce complexity.
+
 ## [0.7.0] - 2026-10-30
 
 ### Fixed

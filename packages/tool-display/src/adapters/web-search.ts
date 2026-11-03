@@ -6,6 +6,11 @@ interface WebSearchArgs {
   query?: string;
 }
 
+function resultSummary(count: number | undefined): string {
+  if (typeof count !== "number" || count <= 0) return "└ no results";
+  return `└ ${count} result${count !== 1 ? "s" : ""}`;
+}
+
 export const webSearchAdapter: ToolDisplayAdapter<WebSearchArgs> = {
   formatCallHeader(args, theme, _details?: unknown) {
     const query = typeof args.query === "string" ? args.query : "";
@@ -17,11 +22,7 @@ export const webSearchAdapter: ToolDisplayAdapter<WebSearchArgs> = {
     if (isPartial) return [theme.fg("muted", "└ searching…")];
     const error = stringField(details, "error");
     if (error) return [theme.fg("muted", truncateToWidth(`└ ${error}`, width, "…"))];
-    const count = numberField(details, "resultCount");
-    if (typeof count === "number" && count > 0) {
-      return [theme.fg("muted", `└ ${count} result${count !== 1 ? "s" : ""}`)];
-    }
-    return [theme.fg("muted", "└ no results")];
+    return [theme.fg("muted", resultSummary(numberField(details, "resultCount")))];
   },
 
   formatExpandedContent(_args, output, theme, width, _details?: unknown) {

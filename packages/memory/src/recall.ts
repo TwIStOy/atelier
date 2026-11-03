@@ -139,24 +139,31 @@ export function matchRecall(entries: RecallEntry[], cwd: string, prompt: string)
 
   for (const entry of entries) {
     if (seen.has(entry.uri)) continue;
-    const words = disclosureWords(entry.disclosure);
-
-    const cwdHits = [...words].filter((w) => cwdTokens.has(w));
-    if (cwdHits.length > 0) {
+    const match = matchEntry(entry, cwdTokens, promptTokens);
+    if (match) {
       seen.add(entry.uri);
-      out.push({ entry, hits: cwdHits, reason: "project" });
-      continue;
-    }
-
-    const promptHits = [...words].filter((w) => promptTokens.has(w));
-    if (promptHits.length >= 2) {
-      seen.add(entry.uri);
-      out.push({ entry, hits: promptHits, reason: "topic" });
+      out.push(match);
     }
   }
 
   out.sort((a, b) => a.entry.priority - b.entry.priority);
   return out.slice(0, MAX_INJECT);
+}
+
+function matchEntry(entry: RecallEntry, cwdTokens: Set<string>, promptTokens: Set<string>): MatchedRecall | undefined {
+  const words = disclosureWords(entry.disclosure);
+
+  const cwdHits = [...words].filter((w) => cwdTokens.has(w));
+  if (cwdHits.length > 0) {
+    return { entry, hits: cwdHits, reason: "project" };
+  }
+
+  const promptHits = [...words].filter((w) => promptTokens.has(w));
+  if (promptHits.length >= 2) {
+    return { entry, hits: promptHits, reason: "topic" };
+  }
+
+  return undefined;
 }
 
 function snippet(content: string): string {
@@ -184,9 +191,15 @@ export async function fetchRecallIndex(): Promise<RecallEntry[]> {
   const res = await runHat(["memory", "recall-index"]);
   if (Array.isArray(res)) return res as RecallEntry[];
   if (res && typeof res === "object") {
-    const r = res as Record<string, unknown>;
-    if (Array.isArray(r.results)) return r.results as RecallEntry[];
-    if (Array.isArray(r.data)) return r.data as RecallEntry[];
+    return recallEntriesFromRecord(res as Record<string, unknown>);
   }
   return [];
+}
+
+function recallArray(value: unknown): RecallEntry[] | undefined {
+  return Array.isArray(value) ? (value as RecallEntry[]) : undefined;
+}
+
+function recallEntriesFromRecord(record: Record<string, unknown>): RecallEntry[] {
+  return recallArray(record.results) ?? recallArray(record.data) ?? [];
 }

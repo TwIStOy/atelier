@@ -1,5 +1,5 @@
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ContextUsage, ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { estimateTokens } from "@earendil-works/pi-coding-agent";
 import {
   type ExtensionConfigSchema,
@@ -50,6 +50,30 @@ function loadConfig(): AutoCompactConfig {
 }
 
 const estimateMessageTokens = estimateTokens;
+
+function contextWindowOf(usage: ContextUsage | undefined, ctx: ExtensionContext): number {
+  if (usage) {
+    return usage.contextWindow;
+  }
+  return ctx.model?.contextWindow ?? 0;
+}
+
+function usagePercentOf(usage: ContextUsage | undefined, tokens: number, limit: number): number {
+  const fallback = limit > 0 ? (tokens / limit) * 100 : 0;
+  return usage?.percent ?? fallback;
+}
+
+function strategyLabelOf(strategy: CompactionStrategy): string {
+  return STRATEGY_OPTIONS.find((o) => o.value === strategy)?.label ?? strategy;
+}
+
+function formatIdleGapLabel(gapMs: number | null): string {
+  return gapMs !== null ? `${(gapMs / 60000).toFixed(1)} min` : "unknown";
+}
+
+function formatIdleThresholdLabel(minutes: number): string {
+  return minutes > 0 ? `${minutes} min` : "disabled";
+}
 
 function estimateTotalTokens(messages: AgentMessage[]): number {
   let total = 0;
@@ -260,7 +284,7 @@ export default function autoCompact(pi: ExtensionAPI): void {
   const getTokenUsage = (ctx: ExtensionContext): number => {
     const config = loadConfig();
     const usage = ctx.getContextUsage();
-    updateCachedLimits(config, usage?.contextWindow ?? ctx.model?.contextWindow ?? 0);
+    updateCachedLimits(config, contextWindowOf(usage, ctx));
     if (usage && usage.tokens !== null) {
       return usage.tokens;
     }
@@ -339,7 +363,7 @@ export default function autoCompact(pi: ExtensionAPI): void {
     const messages = event.messages;
     const estimatedTokens = estimateTotalTokens(messages);
     lastEstimatedTokens = estimatedTokens;
-    const cw = ctx.getContextUsage()?.contextWindow ?? ctx.model?.contextWindow ?? 0;
+    const cw = contextWindowOf(ctx.getContextUsage(), ctx);
     updateCachedLimits(config, cw);
 
     if (cachedAutoCompactLimit > 0 && estimatedTokens > cachedAutoCompactLimit && !pendingCompaction) {
@@ -399,7 +423,7 @@ export default function autoCompact(pi: ExtensionAPI): void {
 
   pi.on("model_select", async (_event, ctx) => {
     const config = loadConfig();
-    const cw = ctx.getContextUsage()?.contextWindow ?? ctx.model?.contextWindow ?? 0;
+    const cw = contextWindowOf(ctx.getContextUsage(), ctx);
     updateCachedLimits(config, cw);
   });
 
@@ -408,21 +432,21 @@ export default function autoCompact(pi: ExtensionAPI): void {
     handler: async (_args, ctx) => {
       const config = loadConfig();
       const usage = ctx.getContextUsage();
-      const cw = usage?.contextWindow ?? ctx.model?.contextWindow ?? 0;
+      const cw = contextWindowOf(usage, ctx);
       updateCachedLimits(config, cw);
 
       const tokens = usage?.tokens ?? lastEstimatedTokens;
-      const percent = usage?.percent ?? (cachedAutoCompactLimit > 0 ? (tokens / cachedAutoCompactLimit) * 100 : 0);
-      const strategyLabel = STRATEGY_OPTIONS.find((o) => o.value === config.strategy)?.label ?? config.strategy;
-      const idleGapMs = currentIdleGapMs(ctx, Date.now());
-      const idleGapLabel = idleGapMs !== null ? `${(idleGapMs / 60000).toFixed(1)} min` : "unknown";
+      const percent = usagePercentOf(usage, tokens, cachedAutoCompactLimit);
+      const strategyLabel = strategyLabelOf(config.strategy);
+      const idleGapLabel = formatIdleGapLabel(currentIdleGapMs(ctx, Date.now()));
+      const idleThresholdLabel = formatIdleThresholdLabel(config.idleCompactMinutes);
       ctx.ui.notify(
         `Auto-Compact Status:\n` +
           `  Current tokens: ~${Math.round(tokens / 1000)}K\n` +
           `  Limit: ${Math.round(cachedAutoCompactLimit / 1000)}K (${config.autoCompactPercent}% of ${Math.round(cachedContextWindow / 1000)}K)\n` +
           `  Usage: ${percent.toFixed(1)}%\n` +
           `  Strategy: ${strategyLabel}\n` +
-          `  Idle threshold: ${config.idleCompactMinutes > 0 ? `${config.idleCompactMinutes} min` : "disabled"}\n` +
+          `  Idle threshold: ${idleThresholdLabel}\n` +
           `  Idle gap: ${idleGapLabel}\n` +
           `  Pending compaction: ${pendingCompaction}\n` +
           `  Truncation this turn: ${truncationAppliedThisTurn}`,

@@ -104,73 +104,125 @@ export class SubagentViewerOverlay implements Component {
   }
 
   handleInput(data: string): void {
-    if (matchesKey(data, Key.escape) || matchesKey(data, Key.ctrl("c"))) {
-      this.finish("done");
+    if (this.handleActionKey(data)) return;
+    if (this.params.runs.length === 0) {
+      this.handleEmptyRunsKey(data);
       return;
     }
-    if (matchesKey(data, Key.tab) || matchesKey(data, "shift+tab")) {
-      this.finish("picker");
-      return;
-    }
+    this.handleRunKey(data);
+  }
+
+  private handleActionKey(data: string): boolean {
+    return this.handleExitKey(data) || this.handlePickerKey(data) || this.handleToggleKey(data);
+  }
+
+  private handleExitKey(data: string): boolean {
+    if (!matchesKey(data, Key.escape) && !matchesKey(data, Key.ctrl("c"))) return false;
+    this.finish("done");
+    return true;
+  }
+
+  private handlePickerKey(data: string): boolean {
+    if (!matchesKey(data, Key.tab) && !matchesKey(data, "shift+tab")) return false;
+    this.finish("picker");
+    return true;
+  }
+
+  private handleToggleKey(data: string): boolean {
     if (matchesKey(data, "t")) {
       this.params.renderOptions.hideThinkingBlock = !this.params.renderOptions.hideThinkingBlock;
       this.rebuildAndInvalidate();
-      return;
+      return true;
     }
     if (matchesKey(data, "e")) {
       this.params.renderOptions.expanded = !this.params.renderOptions.expanded;
       this.rebuildAndInvalidate();
-      return;
+      return true;
     }
-    if (this.params.runs.length === 0) {
-      if (matchesKey(data, Key.up) || matchesKey(data, Key.down)) {
-        this.invalidate();
-      }
-      return;
+    return false;
+  }
+
+  private handleEmptyRunsKey(data: string): void {
+    if (matchesKey(data, Key.up) || matchesKey(data, Key.down)) {
+      this.invalidate();
     }
+  }
+
+  private handleRunKey(data: string): void {
+    if (this.handleShiftKey(data)) return;
+    if (this.handleScrollKey(data)) return;
+    this.handleJumpKey(data);
+  }
+
+  private handleShiftKey(data: string): boolean {
     if (matchesKey(data, Key.left)) {
       this.shift(-1);
-      return;
+      return true;
     }
     if (matchesKey(data, Key.right)) {
       this.shift(1);
-      return;
+      return true;
     }
+    return false;
+  }
+
+  private handleScrollKey(data: string): boolean {
+    return this.handleLineScrollKey(data) || this.handlePageScrollKey(data);
+  }
+
+  private handleLineScrollKey(data: string): boolean {
     if (matchesKey(data, Key.up)) {
-      this.stickToBottom = false;
-      this.scrollOffset = Math.max(0, this.scrollOffset - 1);
-      this.invalidate();
-      return;
+      this.scrollUpBy(1);
+      return true;
     }
     if (matchesKey(data, Key.down)) {
-      this.scrollOffset += 1;
-      this.syncStickFromOffset();
-      this.invalidate();
-      return;
+      this.scrollDownBy(1);
+      return true;
     }
+    return false;
+  }
+
+  private handlePageScrollKey(data: string): boolean {
     if (matchesKey(data, Key.pageUp)) {
-      this.stickToBottom = false;
-      this.scrollOffset = Math.max(0, this.scrollOffset - 10);
-      this.invalidate();
-      return;
+      this.scrollUpBy(10);
+      return true;
     }
     if (matchesKey(data, Key.pageDown)) {
-      this.scrollOffset += 10;
-      this.syncStickFromOffset();
-      this.invalidate();
-      return;
+      this.scrollDownBy(10);
+      return true;
     }
-    if (matchesKey(data, Key.home)) {
-      this.stickToBottom = false;
-      this.scrollOffset = 0;
-      this.invalidate();
-      return;
-    }
-    if (matchesKey(data, Key.end) || data === "g" || data === "G") {
-      this.stickToBottom = true;
-      this.invalidate();
-      return;
-    }
+    return false;
+  }
+
+  private scrollUpBy(lines: number): void {
+    this.stickToBottom = false;
+    this.scrollOffset = Math.max(0, this.scrollOffset - lines);
+    this.invalidate();
+  }
+
+  private scrollDownBy(lines: number): void {
+    this.scrollOffset += lines;
+    this.syncStickFromOffset();
+    this.invalidate();
+  }
+
+  private handleJumpKey(data: string): void {
+    if (this.handleHomeKey(data)) return;
+    this.handleBottomKey(data);
+  }
+
+  private handleHomeKey(data: string): boolean {
+    if (!matchesKey(data, Key.home)) return false;
+    this.stickToBottom = false;
+    this.scrollOffset = 0;
+    this.invalidate();
+    return true;
+  }
+
+  private handleBottomKey(data: string): void {
+    if (!matchesKey(data, Key.end) && data !== "g" && data !== "G") return;
+    this.stickToBottom = true;
+    this.invalidate();
   }
 
   /** After a downward scroll, re-enable stick if we reached (or passed) the bottom. */

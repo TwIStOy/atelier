@@ -159,21 +159,26 @@ interface RenderLinesEntry {
 const renderLinesCache = new WeakMap<object, RenderLinesEntry>();
 
 function renderLinesKeyEquals(a: RenderLinesKey, b: RenderLinesKey): boolean {
+  return layoutKeyEquals(a, b) && stateKeyEquals(a, b) && envKeyEquals(a, b);
+}
+
+function layoutKeyEquals(a: RenderLinesKey, b: RenderLinesKey): boolean {
+  return a.width === b.width && a.probed === b.probed && a.stateVersion === b.stateVersion && a.hovered === b.hovered;
+}
+
+function stateKeyEquals(a: RenderLinesKey, b: RenderLinesKey): boolean {
   return (
-    a.width === b.width &&
-    a.probed === b.probed &&
-    a.stateVersion === b.stateVersion &&
-    a.hovered === b.hovered &&
     a.headerAnnotation === b.headerAnnotation &&
     a.roleSummary === b.roleSummary &&
     a.prevIsTool === b.prevIsTool &&
     a.prevHasRailTail === b.prevHasRailTail &&
     a.spinTick === b.spinTick &&
-    a.timerLabel === b.timerLabel &&
-    a.theme === b.theme &&
-    a.envVersion === b.envVersion &&
-    a.configVersion === b.configVersion
+    a.timerLabel === b.timerLabel
   );
+}
+
+function envKeyEquals(a: RenderLinesKey, b: RenderLinesKey): boolean {
+  return a.theme === b.theme && a.envVersion === b.envVersion && a.configVersion === b.configVersion;
 }
 
 // Renders reached through componentRendersLines probes run with the probe-depth

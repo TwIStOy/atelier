@@ -188,9 +188,17 @@ export function buildSelectDisplayOptions(row: SettingRow, query: string): Selec
   };
 }
 
+function isUnsetValue(value: unknown): boolean {
+  return value === undefined || value === null;
+}
+
+function stringifyBoolean(value: boolean): string {
+  return value ? "true" : "false";
+}
+
 export function stringifyValue(value: unknown): string {
-  if (value === undefined || value === null) return "";
-  if (typeof value === "boolean") return value ? "true" : "false";
+  if (isUnsetValue(value)) return "";
+  if (typeof value === "boolean") return stringifyBoolean(value);
   if (typeof value === "object") return JSON.stringify(value);
   return String(value);
 }

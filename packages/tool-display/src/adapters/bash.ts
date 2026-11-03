@@ -36,6 +36,58 @@ function outputLineSuffix(output: string | undefined, theme: Theme): string {
   return theme.fg("dim", `· ${count} line${count !== 1 ? "s" : ""}`);
 }
 
+function composeCommandHeader(
+  args: BashArgs,
+  theme: Theme,
+  title: string,
+  cwd: string,
+  width: number | undefined,
+  desc: string,
+): string {
+  const cmd = args?.command ?? "";
+  const titlePart = `${theme.fg("toolTitle", theme.bold(title))} `;
+  const cwdPart = cwd ? ` ${theme.fg("dim", `in ${shortenPath(cwd)}`)}` : "";
+  if (desc) return `${titlePart}${theme.fg("accent", desc)}${cwdPart}`;
+  if (width === undefined || visibleWidth(cmd) <= singleLineBudget(title, cwd, width)) {
+    return `${titlePart}${theme.fg("muted", cmd)}${cwdPart}`;
+  }
+  const wrapWidth = continuationWrapWidth(title, cwd, width);
+  const lines = wrapTextWithAnsi(cmd, wrapWidth).map((line) => theme.fg("muted", line));
+  if (lines.length === 1) return `${titlePart}${lines[0]}${cwdPart}`;
+  return [`${titlePart}${lines[0]}`, ...lines.slice(1, -1), `${lines[lines.length - 1]}${cwdPart}`].join("\n");
+}
+
+function applyAnnotationSuffix(
+  header: string,
+  headerAnnotation: string | undefined,
+  lineCount: string,
+  desc: string,
+  width: number | undefined,
+  theme: Theme,
+): string | undefined {
+  if (!headerAnnotation) return undefined;
+  const annotation = theme.fg("muted", `· ${headerAnnotation}`);
+  const suffix = [lineCount, annotation].filter(Boolean).join(" ");
+  if (width !== undefined && visibleWidth(suffix) + 5 > width) return undefined;
+  const headerLines = header.split("\n");
+  const last = headerLines.at(-1) ?? "";
+  if (!desc && width !== undefined && visibleWidth(last) + 1 + visibleWidth(suffix) > width) {
+    return [...headerLines, suffix].join("\n");
+  }
+  const label = width === undefined ? last : truncateToWidth(last, width - visibleWidth(suffix) - 1, "…");
+  headerLines[headerLines.length - 1] = `${label} ${suffix}`;
+  return headerLines.join("\n");
+}
+
+function applyLineCountSuffix(header: string, suffix: string, width: number | undefined): string {
+  if (!suffix || width === undefined) return header;
+  const headerLines = header.split("\n");
+  const last = headerLines[headerLines.length - 1] ?? "";
+  if (visibleWidth(last) + 1 + visibleWidth(suffix) > width) return header;
+  headerLines[headerLines.length - 1] = `${last} ${suffix}`;
+  return headerLines.join("\n");
+}
+
 export const bashAdapter: ToolDisplayAdapter<BashArgs> = {
   formatCallHeader(
     args,
@@ -47,63 +99,15 @@ export const bashAdapter: ToolDisplayAdapter<BashArgs> = {
     output?: string,
     headerAnnotation?: string,
   ) {
-    const cmd = args?.command ?? "";
     const desc = args?.description ?? "";
     const cwd = args?.workdir ?? "";
-
     const title = isPartial ? PARTIAL_TITLE : SETTLED_TITLE;
-    const titlePart = `${theme.fg("toolTitle", theme.bold(title))} `;
-    const cwdPart = cwd ? ` ${theme.fg("dim", `in ${shortenPath(cwd)}`)}` : "";
 
-    let header: string;
-    let lastLineBudget: number | undefined;
-
-    if (desc) {
-      header = `${titlePart}${theme.fg("accent", desc)}${cwdPart}`;
-      if (width !== undefined) lastLineBudget = width;
-    } else if (width === undefined || visibleWidth(cmd) <= singleLineBudget(title, cwd, width)) {
-      header = `${titlePart}${theme.fg("muted", cmd)}${cwdPart}`;
-      if (width !== undefined) lastLineBudget = width;
-    } else {
-      const wrapWidth = continuationWrapWidth(title, cwd, width);
-      const lines = wrapTextWithAnsi(cmd, wrapWidth).map((line) => theme.fg("muted", line));
-
-      if (lines.length === 1) {
-        header = `${titlePart}${lines[0]}${cwdPart}`;
-        lastLineBudget = width;
-      } else {
-        header = [`${titlePart}${lines[0]}`, ...lines.slice(1, -1), `${lines[lines.length - 1]}${cwdPart}`].join("\n");
-        lastLineBudget = width;
-      }
-    }
-
+    const header = composeCommandHeader(args, theme, title, cwd, width, desc);
     const lineCount = outputLineSuffix(output, theme);
-    if (headerAnnotation) {
-      const annotation = theme.fg("muted", `· ${headerAnnotation}`);
-      const suffix = [lineCount, annotation].filter(Boolean).join(" ");
-      if (width === undefined || visibleWidth(suffix) + 5 <= width) {
-        const headerLines = header.split("\n");
-        const last = headerLines.at(-1) ?? "";
-        if (!desc && width !== undefined && visibleWidth(last) + 1 + visibleWidth(suffix) > width) {
-          return [...headerLines, suffix].join("\n");
-        }
-        const label = width === undefined ? last : truncateToWidth(last, width - visibleWidth(suffix) - 1, "…");
-        headerLines[headerLines.length - 1] = `${label} ${suffix}`;
-        return headerLines.join("\n");
-      }
-    }
-
-    const suffix = lineCount;
-    if (suffix && lastLineBudget !== undefined) {
-      const headerLines = header.split("\n");
-      const last = headerLines[headerLines.length - 1] ?? "";
-      if (visibleWidth(last) + 1 + visibleWidth(suffix) <= lastLineBudget) {
-        headerLines[headerLines.length - 1] = `${last} ${suffix}`;
-        header = headerLines.join("\n");
-      }
-    }
-
-    return header;
+    const annotated = applyAnnotationSuffix(header, headerAnnotation, lineCount, desc, width, theme);
+    if (annotated !== undefined) return annotated;
+    return applyLineCountSuffix(header, lineCount, width);
   },
 
   formatCollapsedContent() {

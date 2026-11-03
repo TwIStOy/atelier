@@ -19,38 +19,63 @@ type SubagentLinkRecord = {
   status?: "running" | "done" | "error";
 };
 
-function readLinkRecords(parentSessionId: string): SubagentLinkRecord[] {
-  const file = childSessionIndexPath(parentSessionId);
-  if (!fs.existsSync(file)) return [];
-  let text: string;
+function readIndexText(file: string): string | null {
+  if (!fs.existsSync(file)) return null;
   try {
-    text = fs.readFileSync(file, "utf8");
+    return fs.readFileSync(file, "utf8");
   } catch {
-    return [];
+    return null;
   }
+}
+
+function asRecord(parsed: unknown): Record<string, unknown> | null {
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+  return parsed as Record<string, unknown>;
+}
+
+function strOr(v: unknown, fallback: string): string {
+  return typeof v === "string" ? v : fallback;
+}
+
+function parseStatus(v: unknown): "running" | "done" | "error" | undefined {
+  return v === "running" || v === "done" || v === "error" ? v : undefined;
+}
+
+function toLinkRecord(r: Record<string, unknown>, parentSessionId: string): SubagentLinkRecord | null {
+  const sub = strOr(r.sub_session_file, "");
+  if (!sub) return null;
+  return {
+    parent_session_id: strOr(r.parent_session_id, parentSessionId),
+    parent_session_file: strOr(r.parent_session_file, ""),
+    sub_session_file: sub,
+    tool_calls: typeof r.tool_calls === "number" ? r.tool_calls : 0,
+    ended_at: strOr(r.ended_at, ""),
+    started_at: strOr(r.started_at, ""),
+    status: parseStatus(r.status),
+  };
+}
+
+function parseLinkLine(line: string, parentSessionId: string): SubagentLinkRecord | null {
+  const s = line.trim();
+  if (!s) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(s);
+  } catch {
+    return null;
+  }
+  const r = asRecord(parsed);
+  if (!r) return null;
+  return toLinkRecord(r, parentSessionId);
+}
+
+function readLinkRecords(parentSessionId: string): SubagentLinkRecord[] {
+  const text = readIndexText(childSessionIndexPath(parentSessionId));
+  if (text === null) return [];
   const records: SubagentLinkRecord[] = [];
   for (const line of text.split("\n")) {
-    const s = line.trim();
-    if (!s) continue;
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(s);
-    } catch {
-      continue;
-    }
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) continue;
-    const r = parsed as Record<string, unknown>;
-    const sub = typeof r.sub_session_file === "string" ? r.sub_session_file : "";
-    if (!sub) continue;
-    records.push({
-      parent_session_id: typeof r.parent_session_id === "string" ? r.parent_session_id : parentSessionId,
-      parent_session_file: typeof r.parent_session_file === "string" ? r.parent_session_file : "",
-      sub_session_file: sub,
-      tool_calls: typeof r.tool_calls === "number" ? r.tool_calls : 0,
-      ended_at: typeof r.ended_at === "string" ? r.ended_at : "",
-      started_at: typeof r.started_at === "string" ? r.started_at : "",
-      status: r.status === "running" || r.status === "done" || r.status === "error" ? r.status : undefined,
-    });
+    const rec = parseLinkLine(line, parentSessionId);
+    if (rec) records.push(rec);
   }
   return records;
 }
@@ -115,6 +140,54 @@ function trimLabel(text: string, max: number): string {
   return `${clean.slice(0, Math.max(0, max - 1))}…`;
 }
 
+function modelThinkingOf(entries: SessionEntry[]): { model: string; thinking: string } {
+  let model = "";
+  let thinking = "";
+  for (const e of entries) {
+    if (e.type === "model_change") {
+      model = `${e.provider}/${e.modelId}`;
+    } else if (e.type === "thinking_level_change") {
+      thinking = e.thinkingLevel;
+    }
+  }
+  return { model, thinking };
+}
+
+function startedAtOf(rec: SubagentLinkRecord, parsed: ReturnType<typeof parseChildSession>): string {
+  return rec.started_at || parsed.header?.timestamp || rec.ended_at;
+}
+
+function summarizeRecord(rec: SubagentLinkRecord): SubagentRunSummary | null {
+  const parsed = parseChildSession(rec.sub_session_file);
+  if (parsed.messages.length === 0) return null;
+  const { model, thinking } = modelThinkingOf(parsed.entries);
+  const firstUserText = extractFirstUserText(parsed.messages);
+  return {
+    id: path.basename(rec.sub_session_file).replace(/\.jsonl$/i, ""),
+    subSessionFile: rec.sub_session_file,
+    toolCalls: rec.tool_calls,
+    endedAt: rec.ended_at,
+    startedAt: startedAtOf(rec, parsed),
+    model,
+    thinking,
+    cwd: parsed.header?.cwd ?? "",
+    firstUserText,
+    label: trimLabel(firstUserText, 64),
+    running: rec.status === "running",
+  };
+}
+
+function runStartedKey(run: SubagentRunSummary): string {
+  return run.startedAt || run.endedAt || "";
+}
+
+function compareRuns(a: SubagentRunSummary, b: SubagentRunSummary): number {
+  const ta = runStartedKey(a);
+  const tb = runStartedKey(b);
+  if (ta !== tb) return tb.localeCompare(ta);
+  return b.subSessionFile.localeCompare(a.subSessionFile);
+}
+
 export function loadSubagentRuns(parentSessionId: string): SubagentRunSummary[] {
   const records = readLinkRecords(parentSessionId);
   const latestByFile = new Map<string, SubagentLinkRecord>();
@@ -123,42 +196,10 @@ export function loadSubagentRuns(parentSessionId: string): SubagentRunSummary[] 
   }
   const out: SubagentRunSummary[] = [];
   for (const rec of latestByFile.values()) {
-    const parsed = parseChildSession(rec.sub_session_file);
-    if (parsed.messages.length === 0) continue;
-
-    let model = "";
-    let thinking = "";
-    for (const e of parsed.entries) {
-      if (e.type === "model_change") {
-        model = `${e.provider}/${e.modelId}`;
-      } else if (e.type === "thinking_level_change") {
-        thinking = e.thinkingLevel;
-      }
-    }
-
-    const firstUserText = extractFirstUserText(parsed.messages);
-    const label = trimLabel(firstUserText, 64);
-
-    out.push({
-      id: path.basename(rec.sub_session_file).replace(/\.jsonl$/i, ""),
-      subSessionFile: rec.sub_session_file,
-      toolCalls: rec.tool_calls,
-      endedAt: rec.ended_at,
-      startedAt: rec.started_at || parsed.header?.timestamp || rec.ended_at,
-      model,
-      thinking,
-      cwd: parsed.header?.cwd ?? "",
-      firstUserText,
-      label,
-      running: rec.status === "running",
-    });
+    const summary = summarizeRecord(rec);
+    if (summary) out.push(summary);
   }
-  out.sort((a, b) => {
-    const ta = a.startedAt || a.endedAt || "";
-    const tb = b.startedAt || b.endedAt || "";
-    if (ta !== tb) return tb.localeCompare(ta);
-    return b.subSessionFile.localeCompare(a.subSessionFile);
-  });
+  out.sort(compareRuns);
   return out;
 }
 

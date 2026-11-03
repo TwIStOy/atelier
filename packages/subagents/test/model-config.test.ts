@@ -4,6 +4,7 @@ import { join } from "node:path";
 import * as codingAgent from "@earendil-works/pi-coding-agent";
 import {
   buildAgentPersonaCatalog,
+  type ConfigItem,
   clearConfigItems,
   getConfigItems,
   loadSubagentModelConfig,
@@ -35,6 +36,17 @@ const models = ["parent", "small-v1", "small-v2", "medium", "large", "cheap"].ma
   (id) =>
     ({ id, name: id, provider: "test", contextWindow: 10000 }) as NonNullable<codingAgent.ExtensionContext["model"]>,
 );
+
+function lazySelectOptions(item: ConfigItem): unknown[] {
+  if (item.type !== "select" || typeof item.options !== "function") throw new Error("missing model selector");
+  return item.options();
+}
+
+function expectTierOptions(tierItems: ConfigItem[], expected: unknown[]): void {
+  for (const item of tierItems) {
+    expect(lazySelectOptions(item)).toEqual(expected);
+  }
+}
 
 describe("subagent model configuration", () => {
   let dir: string;
@@ -168,27 +180,18 @@ describe("subagent model configuration", () => {
     registerSubagentModelConfig(buildAgentPersonaCatalog(dir), ctx.modelRegistry);
     const tierItems = getConfigItems("subagents").filter((item) => item.key.startsWith("modelTiers."));
     expect(tierItems).toHaveLength(3);
-    for (const item of tierItems) {
-      if (item.type !== "select" || typeof item.options !== "function") throw new Error("missing model selector");
-      expect(item.options()).toEqual([
-        { label: "Current session", value: "" },
-        { label: "test/small-v1", value: "test/small-v1" },
-        { label: "test/medium", value: "test/medium" },
-      ]);
-    }
+    expectTierOptions(tierItems, [
+      { label: "Current session", value: "" },
+      { label: "test/small-v1", value: "test/small-v1" },
+      { label: "test/medium", value: "test/medium" },
+    ]);
     available.mockReturnValue([models[2]]);
-    for (const item of tierItems) {
-      if (item.type !== "select" || typeof item.options !== "function") throw new Error("missing model selector");
-      expect(item.options()).toEqual([
-        { label: "Current session", value: "" },
-        { label: "test/small-v2", value: "test/small-v2" },
-      ]);
-    }
+    expectTierOptions(tierItems, [
+      { label: "Current session", value: "" },
+      { label: "test/small-v2", value: "test/small-v2" },
+    ]);
     available.mockReturnValue([]);
-    for (const item of tierItems) {
-      if (item.type !== "select" || typeof item.options !== "function") throw new Error("missing model selector");
-      expect(item.options()).toEqual([{ label: "Current session", value: "" }]);
-    }
+    expectTierOptions(tierItems, [{ label: "Current session", value: "" }]);
   });
 
   it("keeps single and batch orchestration from masking configured persona models", async () => {

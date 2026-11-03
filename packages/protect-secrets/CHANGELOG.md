@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Split the bash command analyzer, tool-call handler, and config parser into small single-purpose helpers to clear static-analysis complexity findings; no behavior changes.
+
 ### Removed
 
 - Dead exports found by static analysis: `BashChecker`, `ProjectConfigLocation`, `createBashChecker`, `findProjectConfig`.

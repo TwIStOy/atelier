@@ -6,6 +6,7 @@
 
 - Split the memory instructions injected into the system prompt: the always-on `<memory_instructions>` block now carries only policy (initialization sequence, recall triggers, write triggers and self-checks, pre-flight invariants, priority caps summary) at ~5.9k characters, down from ~19.7k. The mechanics (three-layer architecture, tool catalog, URI grammar, create/update decision tables, behavior-anchor record format, priority slotting and cap-cascade flow, disclosure and alias rules, merge/dedup/split rules, audit procedures) moved to `src/prompts/memory-reference.md`, injected by absolute-path pointer and read on demand before the first write of a session, structural operations, and audits.
 - The four list tools share `src/tools/parse-list.ts` for normalizing `hat` list output (bare array / keyed wrapper / `data` wrapper) instead of four private copies.
+- Cleared all `fallow health` complexity findings with behavior-preserving refactors: oversized functions (`memory-update` execute, `memory-status` formatters, `runHat`, `parseListResult`, settings/recall helpers, list/search tool handlers, command handlers) were split into small single-purpose helpers, with shared CLI-flag pushers in `src/tools/cli-args.ts` and shared `textContent`/`contentLines` in `src/tool-result.ts`.
 
 ### Removed
 
