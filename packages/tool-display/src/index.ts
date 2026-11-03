@@ -61,7 +61,7 @@ export {
 } from "./tool-call-display.ts";
 export type { ContentRenderer, ToolDisplayAdapter } from "./types.ts";
 
-import type { ExtensionAPI, Theme } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, KeybindingHints, Theme } from "@earendil-works/pi-coding-agent";
 import { ToolExecutionComponent } from "@earendil-works/pi-coding-agent";
 import { Container, Editor, type TUI } from "@earendil-works/pi-tui";
 import {
@@ -94,6 +94,7 @@ import {
 import { assessBashCommand, type BashAssessment, formatBashAssessment } from "./bash-assessment.ts";
 import { loadConfig, registerToolDisplayConfigItems } from "./config.ts";
 import { formatDuration, TIMER_MIN_ELAPSED_MS } from "./format.ts";
+import { useHostKeyText } from "./key-text.ts";
 import { isMcpTool, MCP_STATUS_EVENT, mcpDisplayName, refreshMcpTools } from "./mcp.ts";
 import { globalToolDisplayRegistry } from "./registry.ts";
 import {
@@ -480,6 +481,10 @@ function patchToolExecutionRender(
   proto.__tdGetTheme = getTheme;
   proto.__tdRegistry = registry;
   proto.__tdGetHeaderAnnotation = getHeaderAnnotation;
+
+  // The host injects its configured keybindings into each tool row's render
+  // context; capture it once so collapsed/expanded hints show the real key.
+  useHostKeyText((proto.getRenderContext?.call({}) as { keyText?: KeybindingHints["keyText"] } | undefined)?.keyText);
 
   installHoverLeavePatches();
 

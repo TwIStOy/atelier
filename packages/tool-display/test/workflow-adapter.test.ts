@@ -1,6 +1,10 @@
-import type { Theme } from "@earendil-works/pi-coding-agent";
+import { initTheme, type Theme } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it } from "vitest";
 import { workflowAdapter } from "../src/adapters/workflow.ts";
+
+initTheme("dark", false);
+
+const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, "");
 
 const theme: Theme = {
   fg: (_color: string, text: string) => text,
@@ -96,7 +100,7 @@ describe("workflowAdapter.formatCollapsedContent", () => {
 
 describe("workflowAdapter.formatExpandedContent", () => {
   it("renders the full script with line numbers", () => {
-    const lines = workflowAdapter.formatExpandedContent({ script: SCRIPT }, "", theme, 100);
+    const lines = workflowAdapter.formatExpandedContent({ script: SCRIPT }, "", theme, 100).map(stripAnsi);
     expect(lines.some((l) => l.includes("export const meta"))).toBe(true);
     expect(lines.some((l) => l.includes('phase("collect")'))).toBe(true);
     expect(lines.some((l) => l.includes("return a;"))).toBe(true);

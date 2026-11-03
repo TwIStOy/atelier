@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- `<key> to expand` / `<key> to collapse` hints now resolve through the host-injected `keyText()` captured from the pi-owned `ToolExecutionComponent` render context, instead of a module import that can bind to the extension's own `@earendil-works/pi-coding-agent` copy and format `app.*` ids as `""` because that copy never sees pi's configured keybindings. The import stays as a fallback when no host render context is available (pre-1.5.0 or test harnesses).
+
 ## [0.7.0] - 2026-10-30
 
 ### Added

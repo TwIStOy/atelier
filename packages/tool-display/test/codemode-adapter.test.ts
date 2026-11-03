@@ -1,7 +1,11 @@
 import "../src/registry.ts";
-import type { Theme } from "@earendil-works/pi-coding-agent";
+import { initTheme, type Theme } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it } from "vitest";
 import { codemodeAdapter } from "../src/adapters/codemode.ts";
+
+initTheme("dark", false);
+
+const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, "");
 
 const theme: Theme = {
   fg: (_color: string, text: string) => text,
@@ -128,7 +132,7 @@ describe("codemodeAdapter.formatCollapsedContent", () => {
 
 describe("codemodeAdapter.formatExpandedContent", () => {
   it("renders the full script with line numbers", () => {
-    const lines = codemodeAdapter.formatExpandedContent({ code: CODE }, "", theme, 100);
+    const lines = codemodeAdapter.formatExpandedContent({ code: CODE }, "", theme, 100).map(stripAnsi);
     expect(lines.some((l) => l.includes("Promise.allSettled"))).toBe(true);
     expect(lines[0]).toMatch(/1 │/);
   });

@@ -1,4 +1,4 @@
-import { keyText, type Theme, truncateToVisualLines } from "@earendil-works/pi-coding-agent";
+import { type Theme, truncateToVisualLines } from "@earendil-works/pi-coding-agent";
 import { Container, truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 import {
   type RailSpec,
@@ -11,6 +11,7 @@ import {
 import { formatExpandedToolOutputLines } from "./adapters/shared.ts";
 import { loadConfig } from "./config.ts";
 import { formatDuration, spinnerGlyph, TIMER_MIN_ELAPSED_MS } from "./format.ts";
+import { keyText } from "./key-text.ts";
 import type { ContentRenderer, ToolDisplayAdapter } from "./types.ts";
 
 export type { ContentRenderer, ToolDisplayAdapter };
