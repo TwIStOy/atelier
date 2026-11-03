@@ -62,13 +62,21 @@
       "skills/write-a-skill"
     ],
     "themes": [
+      "themes/aura.json",
       "themes/ayu-dark.json",
       "themes/ayu-light.json",
       "themes/ayu-mirage.json",
-      "themes/catppuccin-mocha.json",
       "themes/catppuccin-latte.json",
+      "themes/catppuccin-mocha.json",
       "themes/github-dark-default.json",
-      "themes/github-light-default.json"
+      "themes/github-light-default.json",
+      "themes/neon-green-light.json",
+      "themes/neon-green.json",
+      "themes/omarchy.json",
+      "themes/opencode.json",
+      "themes/synthwave-84.json",
+      "themes/zed-dark.json",
+      "themes/zed-light.json"
     ],
     "prompts": [
       "prompts"
