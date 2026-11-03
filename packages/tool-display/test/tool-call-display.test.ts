@@ -118,6 +118,27 @@ describe("renderToolCall collapsed error reason", () => {
     expect(iconCount).toBe(1);
     expect(body[0].includes("\ue654")).toBe(true);
   });
+
+  it("shows the web_search failure reason when collapsed", () => {
+    const reason = "fetch failed: getaddrinfo ENOTFOUND api.search.brave.com";
+    const lines = renderToolCall(
+      {
+        toolName: "web_search",
+        args: { query: "video editors" },
+        output: `Search error: ${reason}`,
+        details: { error: reason, query: "video editors" },
+        expanded: false,
+        isPartial: false,
+        isError: true,
+        registry: globalToolDisplayRegistry,
+      },
+      PLAIN_THEME,
+    ).render(120);
+    const joined = lines.join("\n");
+    expect(joined).toContain(`└ ${reason}`);
+    expect(joined).not.toContain("no results");
+    expect(joined).not.toContain("Search error:");
+  });
 });
 
 describe("file tool verb tense", () => {

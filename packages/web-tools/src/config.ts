@@ -62,7 +62,7 @@ export function registerWebToolsConfigItems(): void {
       type: "reorderable",
       label: "Search Providers",
       value: () => loadConfig().providers,
-      description: "Ordered provider chain. On rate limit, falls through to the next provider.",
+      description: "Ordered provider chain. Search tries the next provider when one fails.",
       extensionLabel: "Web Tools",
       order: 0,
       options: () =>

@@ -3,8 +3,9 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { instantiateProviders, isRateLimitError } from "../config.ts";
-import type { SearchResult } from "../providers/types.ts";
+import { instantiateProviders } from "../config.ts";
+import { describeError } from "../providers/errors.ts";
+import type { SearchResponse, SearchResult } from "../providers/types.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const searchToolDescription = readFileSync(join(__dirname, "prompt.txt"), "utf-8").trim();
@@ -28,6 +29,52 @@ const searchOutputSchema = Type.Object({
 function clampSearchResultCount(requested: number | undefined): number {
   const value = requested ?? DEFAULT_SEARCH_RESULTS;
   return Math.min(Math.max(value, MIN_SEARCH_RESULTS), MAX_SEARCH_RESULTS);
+}
+
+export interface SearchAttemptProvider {
+  name: string;
+  label: string;
+  search: (query: string, maxResults: number, signal?: AbortSignal) => Promise<SearchResponse>;
+}
+
+export type SearchChainResult =
+  | { ok: true; providerName: string; response: SearchResponse }
+  | { ok: false; reason: string };
+
+function isAbortError(err: unknown): boolean {
+  return err instanceof Error && err.name === "AbortError";
+}
+
+function abortedError(signal: AbortSignal): Error {
+  if (signal.reason instanceof Error) return signal.reason;
+  const err = new Error("The operation was aborted.");
+  err.name = "AbortError";
+  return err;
+}
+
+export async function searchProviderChain(
+  providers: ReadonlyArray<SearchAttemptProvider>,
+  query: string,
+  maxResults: number,
+  signal: AbortSignal | undefined,
+  onAttempt?: (provider: SearchAttemptProvider) => void,
+): Promise<SearchChainResult> {
+  const failures: string[] = [];
+  for (const provider of providers) {
+    if (signal?.aborted) throw abortedError(signal);
+    onAttempt?.(provider);
+    try {
+      const response = await provider.search(query, maxResults, signal);
+      return { ok: true, providerName: provider.name, response };
+    } catch (err: unknown) {
+      if (signal?.aborted || isAbortError(err)) {
+        if (err instanceof Error) throw err;
+        throw signal ? abortedError(signal) : new Error(String(err));
+      }
+      failures.push(`${provider.label}: ${describeError(err)}`);
+    }
+  }
+  return { ok: false, reason: failures.length > 0 ? failures.join("; ") : "all providers failed" };
 }
 
 function formatSearchResultsBody(response: { query: string; results: SearchResult[] }): string {
@@ -65,14 +112,52 @@ export function registerWebSearchTool(pi: ExtensionAPI): void {
     async execute(_toolCallId, params, signal, onUpdate, _ctx) {
       const maxResults = clampSearchResultCount(params.max_results);
       const { providers } = instantiateProviders();
+      const outcome = await searchProviderChain(
+        providers.map(({ name, provider }) => ({
+          name,
+          label: provider.label,
+          search: (query, count, abort) => provider.search(query, count, abort),
+        })),
+        params.query,
+        maxResults,
+        signal,
+        (provider) => {
+          onUpdate?.({
+            content: [
+              {
+                type: "text",
+                text: `Searching ${provider.label} for: "${params.query}"...`,
+              },
+            ],
+            details: {
+              query: params.query,
+              backend: provider.name,
+              resultCount: 0,
+            },
+          });
+        },
+      );
 
-      let lastError: Error | undefined;
-      for (const { name: providerName, provider } of providers) {
-        onUpdate?.({
+      if (!outcome.ok) {
+        return {
           content: [
             {
               type: "text",
-              text: `Searching ${provider.label} for: "${params.query}"...`,
+              text: `Search error: ${outcome.reason}`,
+            },
+          ],
+          details: { error: outcome.reason, query: params.query },
+          isError: true,
+        };
+      }
+
+      const { providerName, response } = outcome;
+      if (response.results.length === 0) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `No results found for "${params.query}".`,
             },
           ],
           details: {
@@ -80,53 +165,19 @@ export function registerWebSearchTool(pi: ExtensionAPI): void {
             backend: providerName,
             resultCount: 0,
           },
-        });
-
-        try {
-          const response = await provider.search(params.query, maxResults, signal);
-
-          if (response.results.length === 0) {
-            return {
-              content: [
-                {
-                  type: "text",
-                  text: `No results found for "${params.query}".`,
-                },
-              ],
-              details: {
-                query: params.query,
-                backend: providerName,
-                resultCount: 0,
-              },
-              structuredContent: { query: params.query, backend: providerName, results: [] },
-            };
-          }
-
-          return {
-            content: [{ type: "text", text: formatSearchResultsBody(response) }],
-            details: {
-              query: params.query,
-              backend: providerName,
-              resultCount: response.results.length,
-              results: response.results,
-            },
-            structuredContent: { query: params.query, backend: providerName, results: response.results },
-          };
-        } catch (err: unknown) {
-          lastError = err instanceof Error ? err : new Error(String(err));
-          if (!isRateLimitError(err)) break;
-        }
+          structuredContent: { query: params.query, backend: providerName, results: [] },
+        };
       }
 
       return {
-        content: [
-          {
-            type: "text",
-            text: `Search error: ${lastError?.message ?? "all providers failed"}`,
-          },
-        ],
-        details: { error: lastError?.message, query: params.query },
-        isError: true,
+        content: [{ type: "text", text: formatSearchResultsBody(response) }],
+        details: {
+          query: params.query,
+          backend: providerName,
+          resultCount: response.results.length,
+          results: response.results,
+        },
+        structuredContent: { query: params.query, backend: providerName, results: response.results },
       };
     },
   });

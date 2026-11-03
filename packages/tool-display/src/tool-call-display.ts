@@ -247,6 +247,15 @@ export function renderToolCall(
 
       const out = opts.output ?? "";
       const hasTextOutput = Boolean(out);
+      const detailsRecord =
+        opts.details != null && typeof opts.details === "object"
+          ? (opts.details as Record<string, unknown>)
+          : undefined;
+      const collapsedWebSearchError =
+        opts.toolName === "web_search" &&
+        !opts.expanded &&
+        typeof detailsRecord?.error === "string" &&
+        detailsRecord.error.length > 0;
       const detailsOnlyCollapsed =
         opts.toolName === "subagent" && !opts.expanded && !opts.isPartial && opts.details !== undefined;
 
@@ -260,6 +269,7 @@ export function renderToolCall(
         adapter &&
         (opts.expanded ||
           hasTextOutput ||
+          collapsedWebSearchError ||
           detailsOnlyCollapsed ||
           grepCollapsedPartial ||
           globCollapsedPartial ||
@@ -270,7 +280,12 @@ export function renderToolCall(
 
       // A failed codemode script returns its output plus a "Script error:" section as
       // text; the adapter splits and styles those instead of the squashed one-liner.
-      const erroredReason = opts.isError && !opts.isPartial && out.trim().length > 0 && opts.toolName !== "codemode";
+      const erroredReason =
+        opts.isError &&
+        !opts.isPartial &&
+        out.trim().length > 0 &&
+        opts.toolName !== "codemode" &&
+        !collapsedWebSearchError;
 
       if (erroredReason) {
         const reason = out.replace(/\n+/g, " ").trim();

@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Changed
+
+- `web_search` tries the next configured provider after any failure, not only rate limits, and stops at the first provider that returns. Cancelling the tool aborts the chain. If every provider fails, the error lists each one.
+
+### Fixed
+
+- `web_search` failure text and `details.error` now include the `error.cause` chain. Node's `fetch` reports only `fetch failed` on `.message`, so the tool row had no actionable reason.
+
 ## [0.7.0] - 2026-10-30
 
 ### Added
