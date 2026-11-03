@@ -9,7 +9,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { childSessionIndexPath } from "@htwang-contrib/common";
 
-export type SubagentLinkRecord = {
+type SubagentLinkRecord = {
   parent_session_id: string;
   parent_session_file: string;
   sub_session_file: string;

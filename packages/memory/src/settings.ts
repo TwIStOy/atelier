@@ -1,8 +1,8 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 
-export const MEMORY_SETTINGS_KEY = "memory";
+const MEMORY_SETTINGS_KEY = "memory";
 
-export type MemorySettings = {
+type MemorySettings = {
   enabled?: boolean;
   namespace?: string;
 };

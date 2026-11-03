@@ -1,4 +1,4 @@
-import { throwIfApiError } from "./errors.ts";
+import { requestJson, throwIfMissingApiKey } from "./http.ts";
 import type { SearchProvider, SearchResponse, SearchResult } from "./types.ts";
 
 const SERPER_API_URL = "https://google.serper.dev/search";
@@ -30,26 +30,21 @@ export class SerperProvider implements SearchProvider {
   constructor(private readonly apiKey: string) {}
 
   async search(query: string, maxResults: number, signal?: AbortSignal): Promise<SearchResponse> {
-    if (!this.apiKey) {
-      throw new Error(`${this.envVar} is not set. Use /config to set the API key, or export the env var.`);
-    }
+    throwIfMissingApiKey(this.envVar, this.apiKey);
 
-    const res = await fetch(SERPER_API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-API-KEY": this.apiKey,
+    const raw = await requestJson<SerperRawResponse>(
+      this.name,
+      SERPER_API_URL,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-API-KEY": this.apiKey,
+        },
+        body: JSON.stringify({ q: query, num: maxResults }),
       },
-      body: JSON.stringify({ q: query, num: maxResults }),
       signal,
-    });
-
-    if (!res.ok) {
-      const text = await res.text();
-      throwIfApiError(this.name, res.status, text);
-    }
-
-    const raw = (await res.json()) as SerperRawResponse;
+    );
     return { query, results: normalizeSerperResults(raw.organic ?? []) };
   }
 }

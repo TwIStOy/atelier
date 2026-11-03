@@ -4,11 +4,18 @@
 
 ### Changed
 
+### Changed
+
 - `web_search` tries the next configured provider after any failure, not only rate limits, and stops at the first provider that returns. Cancelling the tool aborts the chain. If every provider fails, the error lists each one.
+- Providers share `providers/http.ts` helpers (`throwIfMissingApiKey`, `requestJson`, `requireContent`), and the GitHub interceptor wraps `gh api` calls through one `ghQuery` helper — identical error messages, less duplicated plumbing.
 
 ### Fixed
 
 - `web_search` failure text and `details.error` now include the `error.cause` chain. Node's `fetch` reports only `fetch failed` on `.message`, so the tool row had no actionable reason.
+
+### Removed
+
+- Dead exports: `GITHUB_TOKEN_ENV_VAR`, `GitHubInterceptor.reset()`, and the unused `GITHUB_INTERCEPTOR_DEFAULTS` / `parseGitHubUrl` / `ResolvedGitHubOptions` re-exports from the interceptors barrel. Unused `@earendil-works/pi-tui` peer/dev dependency declarations (no imports).
 
 ## [0.7.0] - 2026-10-30
 

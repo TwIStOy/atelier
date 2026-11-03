@@ -15,7 +15,7 @@ const CONFIG_SCHEMA: ExtensionConfigSchema<ExtraToolsConfig> = {
   },
 };
 
-export function loadExtendedBash(): boolean {
+function loadExtendedBash(): boolean {
   return readConfig(CONFIG_ID, CONFIG_SCHEMA).extendedBash;
 }
 

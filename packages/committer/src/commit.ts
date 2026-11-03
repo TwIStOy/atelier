@@ -111,6 +111,33 @@ export async function handleCommit(args: string, ctx: ExtensionCommandContext): 
   await overlayPromise;
 }
 
+async function commitTracked(
+  cwd: string,
+  message: string,
+  signal: AbortSignal,
+  progress: CommitterProgress,
+  ctrl: CommitterOverlayController,
+  failureLabel: string,
+): Promise<boolean> {
+  try {
+    const hash = await commit(cwd, message, signal);
+    progress.commitLog.push({ hash, message, success: true });
+    return true;
+  } catch (err) {
+    if (signal.aborted) {
+      progress.phase = "cancelled";
+      ctrl.invalidate();
+      return false;
+    }
+    const errMsg = err instanceof Error ? err.message : String(err);
+    progress.commitLog.push({ hash: "", message, success: false });
+    progress.phase = "error";
+    progress.errorMessage = `${failureLabel}: ${errMsg}`;
+    ctrl.invalidate();
+    return false;
+  }
+}
+
 async function commitSingle(
   cwd: string,
   diffText: string,
@@ -161,23 +188,8 @@ async function commitSingle(
     return;
   }
 
-  try {
-    const hash = await commit(cwd, message, signal);
-    progress.commitLog.push({ hash, message, success: true });
-    progress.commitsCompleted = 1;
-  } catch (err) {
-    if (signal.aborted) {
-      progress.phase = "cancelled";
-      ctrl.invalidate();
-      return;
-    }
-    const errMsg = err instanceof Error ? err.message : String(err);
-    progress.commitLog.push({ hash: "", message, success: false });
-    progress.phase = "error";
-    progress.errorMessage = `git commit failed: ${errMsg}`;
-    ctrl.invalidate();
-    return;
-  }
+  if (!(await commitTracked(cwd, message, signal, progress, ctrl, "git commit failed"))) return;
+  progress.commitsCompleted = 1;
 
   progress.phase = "done";
   ctrl.invalidate();
@@ -244,28 +256,7 @@ async function commitGrouped(
       return;
     }
 
-    try {
-      const hash = await commit(cwd, group.message, signal);
-      progress.commitLog.push({
-        hash,
-        message: group.message,
-        success: true,
-      });
-    } catch (err) {
-      if (signal.aborted) {
-        progress.phase = "cancelled";
-        ctrl.invalidate();
-        return;
-      }
-      const errMsg = err instanceof Error ? err.message : String(err);
-      progress.commitLog.push({
-        hash: "",
-        message: group.message,
-        success: false,
-      });
-      progress.phase = "error";
-      progress.errorMessage = `git commit failed on group ${i + 1}: ${errMsg}`;
-      ctrl.invalidate();
+    if (!(await commitTracked(cwd, group.message, signal, progress, ctrl, `git commit failed on group ${i + 1}`))) {
       return;
     }
 

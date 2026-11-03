@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Removed
+
+- Dead `above-widget`, `below-widget`, `context-usage`, `model-info`, and `path` components plus `src/utils.ts` left over from the `src/` restructure; the footer renders all live segments.
+
 ## [0.7.0] - 2026-10-30
 
 ### Breaking Changes

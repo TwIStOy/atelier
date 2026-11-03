@@ -1,5 +1,6 @@
-import type { Api, ModelsStoreEntry, RefreshModelsContext } from "@earendil-works/pi-ai";
+import type { Api, RefreshModelsContext } from "@earendil-works/pi-ai";
 import type { ProviderModelConfig } from "@earendil-works/pi-coding-agent";
+import { fetchGatewayModels, refreshModelsCatalog } from "@htwang-contrib/common";
 
 type ChatModelConfig = Extract<ProviderModelConfig, { type?: "chat" }>;
 
@@ -326,40 +327,11 @@ export async function fetchCatalog(
   const headers: Record<string, string> = { accept: "application/json" };
   if (apiKey) headers.authorization = `Bearer ${apiKey}`;
 
-  const url = new URL("models", baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`).toString();
-  const response = await fetch(url, { headers, signal: context.signal });
-  if (!response.ok) {
-    throw new Error(`Failed to fetch ${url}: ${response.status}`);
-  }
-  const payload = (await response.json()) as GatewayModelsResponse;
+  const payload = await fetchGatewayModels<GatewayModelsResponse>(baseUrl, headers, context.signal);
   const entries = payload.data ?? [];
   return entries.map(toModelConfig);
 }
 
-const REFRESH_INTERVAL_MS = 4 * 60 * 60 * 1000;
-
 export async function refreshCatalog(context: RefreshModelsContext): Promise<ProviderModelConfig[]> {
-  if (!context.allowNetwork || context.signal?.aborted) {
-    return storedAsConfig(context.stored);
-  }
-  if (
-    !context.force &&
-    context.stored?.checkedAt !== undefined &&
-    Date.now() - context.stored.checkedAt < REFRESH_INTERVAL_MS
-  ) {
-    return storedAsConfig(context.stored);
-  }
-  const refreshed = await fetchCatalog(context);
-  if (context.signal?.aborted) return storedAsConfig(context.stored);
-  await context.publish({
-    persist: {
-      models: refreshed as unknown as ModelsStoreEntry["models"],
-      checkedAt: Date.now(),
-    },
-  });
-  return refreshed;
-}
-
-function storedAsConfig(stored: { models: readonly ProviderModelConfig[] } | undefined): ProviderModelConfig[] {
-  return [...(stored?.models ?? [])] as ProviderModelConfig[];
+  return refreshModelsCatalog(context, fetchCatalog);
 }

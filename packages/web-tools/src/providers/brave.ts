@@ -1,4 +1,4 @@
-import { throwIfApiError } from "./errors.ts";
+import { requestJson, throwIfMissingApiKey } from "./http.ts";
 import type { SearchProvider, SearchResponse, SearchResult } from "./types.ts";
 
 const BRAVE_SEARCH_API_URL = "https://api.search.brave.com/res/v1/web/search";
@@ -25,30 +25,25 @@ export class BraveProvider implements SearchProvider {
   constructor(private readonly apiKey: string) {}
 
   async search(query: string, maxResults: number, signal?: AbortSignal): Promise<SearchResponse> {
-    if (!this.apiKey) {
-      throw new Error(`${this.envVar} is not set. Use /config to set the API key, or export the env var.`);
-    }
+    throwIfMissingApiKey(this.envVar, this.apiKey);
 
     const url = new URL(BRAVE_SEARCH_API_URL);
     url.searchParams.set("q", query);
     url.searchParams.set("count", String(maxResults));
 
-    const res = await fetch(url.toString(), {
-      method: "GET",
-      headers: {
-        Accept: "application/json",
-        "Accept-Encoding": "gzip",
-        "X-Subscription-Token": this.apiKey,
+    const raw = await requestJson<BraveRawResponse>(
+      this.name,
+      url.toString(),
+      {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          "Accept-Encoding": "gzip",
+          "X-Subscription-Token": this.apiKey,
+        },
       },
       signal,
-    });
-
-    if (!res.ok) {
-      const text = await res.text();
-      throwIfApiError(this.name, res.status, text);
-    }
-
-    const raw = (await res.json()) as BraveRawResponse;
+    );
     return { query, results: normalizeBraveResults(raw) };
   }
 }

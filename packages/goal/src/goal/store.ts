@@ -51,7 +51,7 @@ export function readGoal(ref: GoalStoreRef): Goal | null {
   return file?.goal ?? null;
 }
 
-export function writeGoal(ref: GoalStoreRef, goal: Goal): void {
+function writeGoal(ref: GoalStoreRef, goal: Goal): void {
   const filePath = goalFilePath(ref);
   const file: GoalFile = { version: CURRENT_VERSION, goal };
   writeFile(filePath, file);

@@ -34,7 +34,7 @@ function saveConfig(patch: Partial<CommitterConfig>): CommitterConfig {
   return updateConfig(CONFIG_NAME, CONFIG_SCHEMA, patch);
 }
 
-export function getConfiguredModel(ctx: ExtensionContext): AnyModel | undefined {
+function getConfiguredModel(ctx: ExtensionContext): AnyModel | undefined {
   const config = loadConfig();
   if (!config.model) return undefined;
   const models = ctx.modelRegistry.getAvailable();

@@ -7,7 +7,7 @@ export interface SchemaField {
 
 export type ToolSchema = Readonly<Record<string, SchemaField>>;
 
-export const TOOL_SCHEMAS: Readonly<Record<string, ToolSchema>> = {
+const TOOL_SCHEMAS: Readonly<Record<string, ToolSchema>> = {
   read: {
     path: { type: "string", required: true },
     offset: { type: "number" },

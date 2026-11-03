@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Removed
+
+- Dead exports and unused devDependency declarations found by static analysis: `normalizeMaxTimeoutSeconds`, `@earendil-works/pi-ai`, `@earendil-works/pi-tui`.
+
 ## [0.7.0] - 2026-10-30
 
 ### Added

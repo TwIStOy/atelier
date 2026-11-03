@@ -164,6 +164,41 @@ function stopUiTicker(state: TickerState): void {
   state.interval = undefined;
 }
 
+/** Coalesces snapshot pushes to one per MIN_UPDATE_INTERVAL_MS with a trailing timer. */
+class ThrottledPush {
+  private lastPush = 0;
+  private trailing: ReturnType<typeof setTimeout> | undefined;
+
+  constructor(private readonly emit: (snapshot: WorkflowSnapshot) => void) {}
+
+  push(snapshot: WorkflowSnapshot): void {
+    this.emit(snapshot);
+    this.lastPush = Date.now();
+  }
+
+  throttled(snapshot: WorkflowSnapshot, latest: () => WorkflowSnapshot | undefined): void {
+    if (this.trailing !== undefined) return;
+    const since = Date.now() - this.lastPush;
+    if (since >= MIN_UPDATE_INTERVAL_MS) {
+      this.push(snapshot);
+      return;
+    }
+    this.trailing = setTimeout(() => {
+      this.trailing = undefined;
+      const current = latest();
+      if (current) this.push(current);
+    }, MIN_UPDATE_INTERVAL_MS - since);
+    if (typeof this.trailing.unref === "function") this.trailing.unref();
+  }
+
+  cancelPending(): void {
+    if (this.trailing !== undefined) {
+      clearTimeout(this.trailing);
+      this.trailing = undefined;
+    }
+  }
+}
+
 type WidgetContent = ((tui: TUI, theme: Theme) => Component & { dispose?(): void }) | undefined;
 
 type WidgetUi = {
@@ -173,15 +208,13 @@ type WidgetUi = {
 const WIDGET_OPTIONS = { placement: "aboveEditor" as const };
 
 export function createWidgetWorkflowDisplay(ui: WidgetUi, key = "workflow"): WorkflowDisplay {
-  let lastPush = 0;
-  let trailing: ReturnType<typeof setTimeout> | undefined;
   let clearer: ReturnType<typeof setTimeout> | undefined;
   const ticker: TickerState = { interval: undefined, latest: undefined };
 
-  const push = (snapshot: WorkflowSnapshot) => {
+  const throttled = new ThrottledPush((snapshot) => {
     ui.setWidget(key, (_tui, theme) => new Text(renderWorkflowLinesThemed(snapshot, theme).join("\n")), WIDGET_OPTIONS);
-    lastPush = Date.now();
-  };
+  });
+  const push = (snapshot: WorkflowSnapshot) => throttled.push(snapshot);
 
   const cancelClearer = () => {
     if (clearer !== undefined) {
@@ -195,25 +228,12 @@ export function createWidgetWorkflowDisplay(ui: WidgetUi, key = "workflow"): Wor
       cancelClearer();
       ticker.latest = snapshot;
       startUiTicker(ticker, push, UI_TICK_INTERVAL_MS);
-      if (trailing !== undefined) return;
-      const since = Date.now() - lastPush;
-      if (since >= MIN_UPDATE_INTERVAL_MS) {
-        push(snapshot);
-        return;
-      }
-      trailing = setTimeout(() => {
-        trailing = undefined;
-        if (ticker.latest) push(ticker.latest);
-      }, MIN_UPDATE_INTERVAL_MS - since);
-      if (typeof trailing.unref === "function") trailing.unref();
+      throttled.throttled(snapshot, () => ticker.latest);
     },
     finish(snapshot) {
       cancelClearer();
       stopUiTicker(ticker);
-      if (trailing !== undefined) {
-        clearTimeout(trailing);
-        trailing = undefined;
-      }
+      throttled.cancelPending();
       push(snapshot);
       clearer = setTimeout(() => {
         ui.setWidget(key, undefined);
@@ -227,41 +247,26 @@ export function createWidgetWorkflowDisplay(ui: WidgetUi, key = "workflow"): Wor
 export function createStreamingWorkflowDisplay(
   onUpdate: ((partial: AgentToolResult<unknown>) => void) | undefined,
 ): WorkflowDisplay {
-  let lastPush = 0;
-  let trailing: ReturnType<typeof setTimeout> | undefined;
   const ticker: TickerState = { interval: undefined, latest: undefined };
 
-  const push = (snapshot: WorkflowSnapshot) => {
+  const throttled = new ThrottledPush((snapshot) => {
     onUpdate?.({
       content: [{ type: "text", text: renderWorkflowLines(snapshot).join("\n") }],
       details: { workflow: snapshot },
     });
-    lastPush = Date.now();
-  };
+  });
+  const push = (snapshot: WorkflowSnapshot) => throttled.push(snapshot);
 
   return {
     update(snapshot) {
       if (!onUpdate) return;
       ticker.latest = snapshot;
       startUiTicker(ticker, push, STREAM_TICK_INTERVAL_MS);
-      if (trailing !== undefined) return;
-      const since = Date.now() - lastPush;
-      if (since >= MIN_UPDATE_INTERVAL_MS) {
-        push(snapshot);
-        return;
-      }
-      trailing = setTimeout(() => {
-        trailing = undefined;
-        if (ticker.latest) push(ticker.latest);
-      }, MIN_UPDATE_INTERVAL_MS - since);
-      if (typeof trailing.unref === "function") trailing.unref();
+      throttled.throttled(snapshot, () => ticker.latest);
     },
     finish(_snapshot) {
       stopUiTicker(ticker);
-      if (trailing !== undefined) {
-        clearTimeout(trailing);
-        trailing = undefined;
-      }
+      throttled.cancelPending();
     },
   };
 }

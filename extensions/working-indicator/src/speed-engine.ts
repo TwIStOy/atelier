@@ -1,6 +1,6 @@
 export type CountStrategy = "estimate" | "direct";
 
-export type TokenEvent = { time: number; tokens: number };
+type TokenEvent = { time: number; tokens: number };
 
 export type SpeedConfig = {
   slidingWindowMs: number;
@@ -41,10 +41,6 @@ export class TokenSpeedEngine {
 
   updateConfig(config: SpeedConfig): void {
     this._config = config;
-  }
-
-  get config(): SpeedConfig {
-    return this._config;
   }
 
   get isStreaming(): boolean {

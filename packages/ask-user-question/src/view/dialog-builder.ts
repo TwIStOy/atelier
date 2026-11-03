@@ -1,39 +1,16 @@
 import { DynamicBorder, type Theme } from "@earendil-works/pi-coding-agent";
 import { type Component, Container, type Input, Spacer } from "@earendil-works/pi-tui";
-import type { QuestionnaireState } from "../state/state.ts";
 import type { QuestionData } from "../tool/types.ts";
 import type { PreviewPaneProps } from "./components/preview/preview-pane.ts";
 import type { TabBar } from "./components/tab-bar.ts";
+import type { DialogState } from "./dialog-text.ts";
 import type { StatefulView } from "./stateful-view.ts";
 import type { TabComponents } from "./tab-components.ts";
 import { QuestionTabStrategy, SubmitTabStrategy, type TabContentStrategy } from "./tab-content-strategy.ts";
 
-export const HINT_PART_ENTER = "Enter to select";
-export const HINT_PART_NAV = "↑/↓ to navigate";
-export const HINT_PART_TOGGLE = "Space to toggle";
-export const HINT_PART_NOTES = "n to add notes";
-export const HINT_PART_EDIT = "Ctrl+G to edit in external editor";
-export const HINT_PART_TAB = "Tab to switch questions";
-export const HINT_PART_CANCEL = "Esc to cancel";
-export const HINT_PART_NEW_LINE = "Shift+Enter for newline";
-export const HINT_PART_CLEAR = "Ctrl+U to clear";
-/**
- * `HINT_SINGLE` / `HINT_MULTI` describe the CORE hint that must always be visible on
- * narrow terminals; trailing segments may clip with `…` (`OneLineClippedText`).
- */
-export const HINT_SINGLE = [HINT_PART_ENTER, HINT_PART_NAV, HINT_PART_CANCEL].join(" · ");
-export const HINT_MULTI = [HINT_PART_ENTER, HINT_PART_NAV, HINT_PART_TAB, HINT_PART_CANCEL].join(" · ");
-export const HINT_MULTISELECT_SUFFIX = ` · ${HINT_PART_TOGGLE}`;
-export const HINT_NOTES_SUFFIX = ` · ${HINT_PART_NOTES}`;
-export const REVIEW_HEADING = "Review your answers";
-export const READY_PROMPT = "Ready to submit your answers?";
-export const INCOMPLETE_WARNING_PREFIX = "⚠ Answer remaining questions before submitting:";
-
 const OVERFLOW_UP = "↑";
 const OVERFLOW_DOWN = "↓";
 const OVERFLOW_BOTH = "↕";
-
-export type DialogState = QuestionnaireState;
 
 /** Per-tick projection of dialog state. Written by the adapter; read by the strategy thunk. */
 export interface DialogProps {

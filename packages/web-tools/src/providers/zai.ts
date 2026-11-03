@@ -1,5 +1,6 @@
 import { mcpCall, mcpInit } from "@htwang-contrib/common";
 import { ProviderError } from "./errors.ts";
+import { throwIfMissingApiKey } from "./http.ts";
 import type { FetchResponse, FullProvider, SearchResponse, SearchResult } from "./types.ts";
 
 const ZAI_SEARCH_MCP_URL = "https://api.z.ai/api/mcp/web_search_prime/mcp";
@@ -54,27 +55,40 @@ export class ZaiProvider implements FullProvider {
 
   constructor(private readonly apiKey: string) {}
 
-  async search(query: string, maxResults: number, signal?: AbortSignal): Promise<SearchResponse> {
-    if (!this.apiKey) {
-      throw new Error(`${this.envVar} is not set. Use /config to set the API key, or export the env var.`);
-    }
-
-    let text: string | undefined;
+  private async callTool(
+    mcpUrl: string,
+    client: { name: string; version: string },
+    toolName: string,
+    args: Record<string, unknown>,
+    signal?: AbortSignal,
+  ): Promise<string | undefined> {
     try {
-      const session = await mcpInit(ZAI_SEARCH_MCP_URL, this.apiKey, signal, ZAI_SEARCH_CLIENT);
+      const session = await mcpInit(mcpUrl, this.apiKey, signal, client);
       const result = (await mcpCall(
-        ZAI_SEARCH_MCP_URL,
+        mcpUrl,
         session,
         this.apiKey,
         "tools/call",
-        { name: "web_search_prime", arguments: { search_query: query } },
+        { name: toolName, arguments: args },
         2,
         signal,
       )) as { content?: Array<{ text?: string }> };
-      text = result?.content?.[0]?.text;
+      return result?.content?.[0]?.text;
     } catch (err: unknown) {
       rewriteMcpError(this.name, err);
     }
+  }
+
+  async search(query: string, maxResults: number, signal?: AbortSignal): Promise<SearchResponse> {
+    throwIfMissingApiKey(this.envVar, this.apiKey);
+
+    const text = await this.callTool(
+      ZAI_SEARCH_MCP_URL,
+      ZAI_SEARCH_CLIENT,
+      "web_search_prime",
+      { search_query: query },
+      signal,
+    );
 
     if (!text) return { query, results: [] };
 
@@ -92,26 +106,9 @@ export class ZaiProvider implements FullProvider {
   }
 
   async fetch(url: string, _raw: boolean, signal?: AbortSignal): Promise<FetchResponse> {
-    if (!this.apiKey) {
-      throw new Error(`${this.envVar} is not set. Use /config to set the API key, or export the env var.`);
-    }
+    throwIfMissingApiKey(this.envVar, this.apiKey);
 
-    let text: string | undefined;
-    try {
-      const session = await mcpInit(ZAI_READER_MCP_URL, this.apiKey, signal, ZAI_READER_CLIENT);
-      const result = (await mcpCall(
-        ZAI_READER_MCP_URL,
-        session,
-        this.apiKey,
-        "tools/call",
-        { name: "webReader", arguments: { url } },
-        2,
-        signal,
-      )) as { content?: Array<{ text?: string }> };
-      text = result?.content?.[0]?.text;
-    } catch (err: unknown) {
-      rewriteMcpError(this.name, err);
-    }
+    const text = await this.callTool(ZAI_READER_MCP_URL, ZAI_READER_CLIENT, "webReader", { url }, signal);
 
     if (!text) {
       throw new Error(`Z.AI Fetch error: no content returned for ${url}`);

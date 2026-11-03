@@ -1,4 +1,4 @@
-import { throwIfApiError } from "./errors.ts";
+import { requestJson, requireContent, throwIfMissingApiKey } from "./http.ts";
 import type { FetchResponse, FullProvider, SearchResponse, SearchResult } from "./types.ts";
 
 const EXA_API_URL = "https://api.exa.ai/search";
@@ -33,63 +33,53 @@ export class ExaProvider implements FullProvider {
   constructor(private readonly apiKey: string) {}
 
   async search(query: string, maxResults: number, signal?: AbortSignal): Promise<SearchResponse> {
-    if (!this.apiKey) {
-      throw new Error(`${this.envVar} is not set. Use /config to set the API key, or export the env var.`);
-    }
+    throwIfMissingApiKey(this.envVar, this.apiKey);
 
-    const res = await fetch(EXA_API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": this.apiKey,
+    const raw = await requestJson<ExaRawResponse>(
+      this.name,
+      EXA_API_URL,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": this.apiKey,
+        },
+        body: JSON.stringify({
+          query,
+          numResults: maxResults,
+          contents: { text: { maxCharacters: EXA_MAX_SNIPPET_CHARACTERS } },
+        }),
       },
-      body: JSON.stringify({
-        query,
-        numResults: maxResults,
-        contents: { text: { maxCharacters: EXA_MAX_SNIPPET_CHARACTERS } },
-      }),
       signal,
-    });
-
-    if (!res.ok) {
-      throwIfApiError(this.name, res.status, await res.text());
-    }
-
-    const raw = (await res.json()) as ExaRawResponse;
+    );
     return { query, results: normalizeExaResults(raw.results ?? []) };
   }
 
   async fetch(url: string, _raw: boolean, signal?: AbortSignal): Promise<FetchResponse> {
-    if (!this.apiKey) {
-      throw new Error(`${this.envVar} is not set. Use /config to set the API key, or export the env var.`);
-    }
+    throwIfMissingApiKey(this.envVar, this.apiKey);
 
-    const res = await fetch(EXA_CONTENTS_API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": this.apiKey,
+    const data = await requestJson<ExaRawResponse>(
+      this.name,
+      EXA_CONTENTS_API_URL,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": this.apiKey,
+        },
+        body: JSON.stringify({
+          ids: [url],
+          text: { maxCharacters: EXA_MAX_FETCH_CHARACTERS },
+        }),
       },
-      body: JSON.stringify({
-        ids: [url],
-        text: { maxCharacters: EXA_MAX_FETCH_CHARACTERS },
-      }),
       signal,
-    });
-
-    if (!res.ok) {
-      throwIfApiError(this.name, res.status, await res.text());
-    }
-
-    const data = (await res.json()) as ExaRawResponse;
+    );
     const result = data.results?.[0];
-    if (!result?.text) {
-      throw new Error(`${this.label} Fetch API error: no content returned for ${url}`);
-    }
+    const text = requireContent(this.label, url, result?.text);
 
     return {
-      text: result.text,
-      title: result.title || undefined,
+      text,
+      title: result?.title || undefined,
       contentType: "text/plain",
     };
   }

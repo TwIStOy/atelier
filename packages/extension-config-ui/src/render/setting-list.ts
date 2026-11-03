@@ -15,11 +15,11 @@ import { glyphs } from "./glyphs.ts";
 
 const HEX_COLOR_RE = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 
-export function isValidColor(value: string): boolean {
+function isValidColor(value: string): boolean {
   return HEX_COLOR_RE.test(value.trim());
 }
 
-export function colorFg(hex: string, text: string): string {
+function colorFg(hex: string, text: string): string {
   const trimmed = hex.trim();
   let r: number, g: number, b: number;
   if (trimmed.length === 4) {
@@ -34,7 +34,7 @@ export function colorFg(hex: string, text: string): string {
   return `\x1b[38;2;${r};${g};${b}m${text}\x1b[39m`;
 }
 
-export function formatSettingValue(item: ConfigItem, value: unknown, colorBlock?: string): string {
+function formatSettingValue(item: ConfigItem, value: unknown, colorBlock?: string): string {
   if (value === undefined || value === null) return "(unset)";
   if (item.secret) return "••••••";
   switch (item.type) {
@@ -290,5 +290,3 @@ function renderInlineEditValue(editing: InlineEditState): string {
   const cursor = Math.max(0, Math.min(editing.cursor, editing.buffer.length));
   return `${editing.buffer.slice(0, cursor)}█${editing.buffer.slice(cursor)}`;
 }
-
-export { renderInlineEditValue };

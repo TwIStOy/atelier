@@ -14,7 +14,7 @@ export interface GlyphSet {
   fail: string;
 }
 
-export const GLYPHS: Record<"unicode" | "ascii", GlyphSet> = {
+const GLYPHS: Record<"unicode" | "ascii", GlyphSet> = {
   unicode: {
     frame: { tl: "┏", tr: "┓", bl: "┗", br: "┛", h: "━", v: "┃" },
     line: "─",
@@ -35,8 +35,4 @@ export const GLYPHS: Record<"unicode" | "ascii", GlyphSet> = {
 
 export function glyphs(): GlyphSet {
   return GLYPHS.unicode;
-}
-
-export function frameGlyphs(): GlyphSet["frame"] {
-  return glyphs().frame;
 }

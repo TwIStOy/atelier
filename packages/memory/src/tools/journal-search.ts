@@ -1,15 +1,7 @@
 import { Type } from "@sinclair/typebox";
 import { runHat } from "../cli-runner.js";
 import { jsonError, jsonResult } from "../tool-result.js";
-
-function parseListResult(result: unknown): Record<string, unknown>[] {
-  if (!result || typeof result !== "object") return [];
-  if (Array.isArray(result)) return result as Record<string, unknown>[];
-  const r = result as Record<string, unknown>;
-  if (Array.isArray(r.results)) return r.results as Record<string, unknown>[];
-  if (Array.isArray(r.data)) return r.data as Record<string, unknown>[];
-  return [];
-}
+import { parseListResult } from "./parse-list.js";
 
 export const journalSearch = {
   name: "journal-search",
@@ -46,7 +38,7 @@ export const journalSearch = {
       if (args.limit !== undefined) cliArgs.push("--limit", String(args.limit));
       if (args.offset !== undefined) cliArgs.push("--offset", String(args.offset));
       const result = await runHat(cliArgs, { signal });
-      const items = parseListResult(result).map((e: Record<string, unknown>) => ({
+      const items = parseListResult(result, "results").map((e: Record<string, unknown>) => ({
         id: String(e.id ?? e.timestamp ?? ""),
         title: String(e.title ?? ""),
       }));

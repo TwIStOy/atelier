@@ -21,7 +21,7 @@ const CONFIG_SCHEMA: ExtensionConfigSchema<ToolTimeoutConfig> = {
   defaults: { ...DEFAULT_CONFIG, exemptRules: [] },
 };
 
-export function normalizeMaxTimeoutSeconds(value: unknown): number {
+function normalizeMaxTimeoutSeconds(value: unknown): number {
   if (typeof value !== "number" || !Number.isFinite(value)) return DEFAULT_CONFIG.maxTimeoutSeconds;
   return Math.max(0, Math.floor(value));
 }

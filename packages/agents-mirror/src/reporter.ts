@@ -2,8 +2,8 @@ import { isAbsolute, relative } from "node:path";
 import type { InjectionCache } from "./cache.ts";
 import type { AgentsSource } from "./types.ts";
 
-export const STATUS_KEY = "ext:agents-mirror:status";
-export const WIDGET_KEY = "ext:agents-mirror:widget";
+const STATUS_KEY = "ext:agents-mirror:status";
+const WIDGET_KEY = "ext:agents-mirror:widget";
 
 export interface ThemeFn {
   fg(color: string, text: string): string;

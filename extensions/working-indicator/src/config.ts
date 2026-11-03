@@ -15,16 +15,16 @@ export interface WorkingIndicatorConfig {
   narrowWidthSpinner: string;
 }
 
-export const CONFIG_ID = "working-indicator";
+const CONFIG_ID = "working-indicator";
 
-export const DEFAULT_CONFIG: WorkingIndicatorConfig = {
+const DEFAULT_CONFIG: WorkingIndicatorConfig = {
   spinner: DEFAULT_SPINNER,
   narrowWidthEnabled: true,
   narrowWidthThreshold: DEFAULT_NARROW_WIDTH_THRESHOLD,
   narrowWidthSpinner: DEFAULT_NARROW_WIDTH_SPINNER,
 };
 
-export const CONFIG_SCHEMA: ExtensionConfigSchema<WorkingIndicatorConfig> = {
+const CONFIG_SCHEMA: ExtensionConfigSchema<WorkingIndicatorConfig> = {
   defaults: { ...DEFAULT_CONFIG },
 };
 

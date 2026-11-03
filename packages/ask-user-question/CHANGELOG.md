@@ -10,6 +10,7 @@
 ### Removed
 
 - The paired `ask_user_question:blocked` emit around the questionnaire, after removal of its only consumer, the `moshi-hooks-extra` extension. The modal is still bracketed by `MODAL_ACTIVE_EVENT` with `true`/`false`, including cancel and UI-throw paths.
+- Dead code found by static analysis: the unused `SentinelKind`/`SentinelLabel`/`ReservedLabel` type aliases and `LABELS_BY_KIND` re-export, `HINT_SINGLE`/`HINT_MULTI` constants, the `isQuestionnaireResult` guard, the `QuestionnaireKeybindings` interface, unused event re-exports, and the unused re-export facade on `preview-pane.ts` (only `PreviewBlockRenderer` remains; the duplicated `SentinelKind` export now lives solely in `state/row-intent.ts`).
 
 ## [0.7.0] - 2026-10-30
 

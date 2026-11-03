@@ -1,4 +1,4 @@
-import { throwIfApiError } from "./errors.ts";
+import { requestJson, throwIfMissingApiKey } from "./http.ts";
 import type { SearchProvider, SearchResponse, SearchResult } from "./types.ts";
 
 const PERPLEXITY_API_URL = "https://api.perplexity.ai/search";
@@ -33,26 +33,21 @@ export class PerplexityProvider implements SearchProvider {
   constructor(private readonly apiKey: string) {}
 
   async search(query: string, maxResults: number, signal?: AbortSignal): Promise<SearchResponse> {
-    if (!this.apiKey) {
-      throw new Error(`${this.envVar} is not set. Use /config to set the API key, or export the env var.`);
-    }
+    throwIfMissingApiKey(this.envVar, this.apiKey);
 
-    const res = await fetch(PERPLEXITY_API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${this.apiKey}`,
+    const raw = await requestJson<PerplexityRawResponse>(
+      this.name,
+      PERPLEXITY_API_URL,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${this.apiKey}`,
+        },
+        body: JSON.stringify({ query, max_results: maxResults }),
       },
-      body: JSON.stringify({ query, max_results: maxResults }),
       signal,
-    });
-
-    if (!res.ok) {
-      const text = await res.text();
-      throwIfApiError(this.name, res.status, text);
-    }
-
-    const raw = (await res.json()) as PerplexityRawResponse;
+    );
     return { query, results: normalizePerplexityResults(raw.results ?? []) };
   }
 }

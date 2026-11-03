@@ -1,15 +1,7 @@
 import { Type } from "@sinclair/typebox";
 import { runHat } from "../cli-runner.js";
 import { jsonError, jsonResult } from "../tool-result.js";
-
-function parseListResult(result: unknown): Record<string, unknown>[] {
-  if (!result || typeof result !== "object") return [];
-  if (Array.isArray(result)) return result as Record<string, unknown>[];
-  const r = result as Record<string, unknown>;
-  if (Array.isArray(r.versions)) return r.versions as Record<string, unknown>[];
-  if (Array.isArray(r.data)) return r.data as Record<string, unknown>[];
-  return [];
-}
+import { parseListResult } from "./parse-list.js";
 
 export const memoryHistory = {
   name: "memory-history",
@@ -28,7 +20,7 @@ export const memoryHistory = {
       const cliArgs = ["memory", "versions", args.uri as string];
       if (args.limit !== undefined) cliArgs.push("--limit", String(args.limit));
       const result = await runHat(cliArgs, { signal });
-      const items = parseListResult(result).map((v: Record<string, unknown>) => {
+      const items = parseListResult(result, "versions").map((v: Record<string, unknown>) => {
         const action = v.action ?? v.type ?? "?";
         const ts = v.timestamp ?? v.id ?? v.created_at ?? "";
         return `${action} ${ts}`;

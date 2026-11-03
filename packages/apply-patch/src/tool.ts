@@ -18,7 +18,7 @@ type ApplyPatchParams = {
   input: string;
 };
 
-export function normalizeApplyPatchArguments(args: unknown): ApplyPatchParams {
+function normalizeApplyPatchArguments(args: unknown): ApplyPatchParams {
   if (typeof args === "string") {
     return { input: args };
   }

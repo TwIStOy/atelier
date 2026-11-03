@@ -2,11 +2,6 @@ import { realpathSync } from "node:fs";
 import { isAbsolute, resolve } from "node:path";
 import type { MirrorMappings } from "./types.ts";
 
-export interface MirrorResolution {
-  cwd: string;
-  mirrorRoot: string | null;
-}
-
 export function resolveMirrorRoot(mappings: MirrorMappings, cwd: string): string | null {
   const canonicalCwd = realpathSafe(cwd);
   if (canonicalCwd === null) return null;

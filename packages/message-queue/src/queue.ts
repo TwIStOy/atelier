@@ -17,14 +17,6 @@ export class MessageQueue {
     return this._items.shift();
   }
 
-  peek(): QueuedMessage | undefined {
-    return this._items[0];
-  }
-
-  get length(): number {
-    return this._items.length;
-  }
-
   get isEmpty(): boolean {
     return this._items.length === 0;
   }

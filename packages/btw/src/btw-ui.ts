@@ -9,6 +9,7 @@ import {
   truncateToWidth,
   wrapTextWithAnsi,
 } from "@earendil-works/pi-tui";
+import { scrollKeyOffset, userMessageText } from "@htwang-contrib/common";
 import { SpinnerTimer, spinnerGlyph } from "@htwang-contrib/tool-display";
 
 const BTW_OVERLAY_OPTIONS: OverlayOptions = {
@@ -93,13 +94,9 @@ export class BtwOverlayController implements Component {
       this.done();
       return;
     }
-    if (matchesKey(data, Key.up)) {
-      this.scrollOffset = Math.max(0, this.scrollOffset - 1);
-      this.invalidate();
-      return;
-    }
-    if (matchesKey(data, Key.down)) {
-      this.scrollOffset += 1;
+    const nextOffset = scrollKeyOffset(data, this.scrollOffset);
+    if (nextOffset !== undefined) {
+      this.scrollOffset = nextOffset;
       this.invalidate();
       return;
     }
@@ -196,15 +193,6 @@ export function showBtwOverlay(params: BtwOverlayParams): BtwOverlayResult {
 }
 
 function extractShort(msg: UserMessage): string {
-  const text = typeof msg.content === "string" ? msg.content : extractMessageText(msg.content);
-  const firstLine = text.split("\n")[0] ?? "";
+  const firstLine = userMessageText(msg).split("\n")[0] ?? "";
   return firstLine.length > 60 ? `${firstLine.slice(0, 57)}…` : firstLine;
-}
-
-function extractMessageText(content: UserMessage["content"]): string {
-  if (typeof content === "string") return content;
-  return content
-    .filter((c): c is { type: "text"; text: string } => c.type === "text")
-    .map((c) => c.text)
-    .join("\n");
 }

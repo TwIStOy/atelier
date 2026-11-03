@@ -100,7 +100,7 @@ export function parseAndAssertHttpUrl(raw: string): URL {
   return parsed;
 }
 
-export function buildFetchRequestInit(signal: AbortSignal | undefined): RequestInit {
+function buildFetchRequestInit(signal: AbortSignal | undefined): RequestInit {
   return {
     signal,
     redirect: "follow",
@@ -116,7 +116,7 @@ export async function fetchUrlOrThrow(url: string, signal: AbortSignal | undefin
   return res;
 }
 
-export async function extractBodyAsText(
+async function extractBodyAsText(
   res: Response,
   contentType: string,
   raw: boolean,

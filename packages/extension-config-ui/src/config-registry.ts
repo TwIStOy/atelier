@@ -10,7 +10,7 @@ import { deleteConfigKey, getConfigItems, readRawConfig, setConfigKey } from "@h
 import type { SettingRow, TabDef } from "./types.ts";
 import { PACKAGE_TAB_PREFIX, TAB_ALL } from "./types.ts";
 
-export function resolveOptions<T>(
+function resolveOptions<T>(
   options: ConfigItemSelectOption<T>[] | (() => ConfigItemSelectOption<T>[]),
 ): ConfigItemSelectOption<T>[] {
   return typeof options === "function" ? options() : options;

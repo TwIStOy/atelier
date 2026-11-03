@@ -1,0 +1,39 @@
+{
+  "$schema": "./node_modules/fallow/schema.json",
+  // pi loads extension entries from each package's "pi.extensions" field and the
+  // root manifest, which fallow does not read; seed them as manual entries.
+  "entry": [
+    "packages/*/index.ts",
+    "extensions/*/index.ts",
+    "packages/common/src/log-warning.ts",
+    "scripts/*.mjs"
+  ],
+  // Vendored browser assets served at runtime by canvas/src/server.ts via /lib/*.
+  "ignorePatterns": ["packages/canvas/src/lib/**"],
+  // Reviewed: interface-driven structure, not copy-paste — SearchProvider method
+  // signatures across web-tools providers and the pi.registerTool scaffold in
+  // extra-tools. Re-reported automatically if content or occurrence count changes.
+  "duplicates": {
+    "ignoredClones": [
+      "dup:0936571c:6",
+      "dup:47b7d895:2",
+      "dup:288da6cb:2",
+      "dup:3fdde2ee:2",
+      "dup:f4e68633:2"
+    ]
+  },
+  // Not a published typed library: exported helpers legitimately return
+  // file-private types, and exporting them would trip unused-type instead.
+  "rules": { "private-type-leak": "off" },
+  // Semantic pass resolves interface-implemented members (SearchProvider.search,
+  // Component.invalidate) that the syntactic graph reports as unused.
+  "typeAware": { "enabled": true },
+  // pi-tui calls these Component/Focusable members dynamically on focused
+  // components; the calls live in node_modules and are invisible to the graph.
+  "usedClassMembers": ["handleInput", "focused", "dispose"],
+  // Intentional public API barrels for packages consumed outside this graph.
+  "ignoreExports": [
+    { "file": "packages/web-tools/src/providers/index.ts", "exports": ["*"] },
+    { "file": "packages/web-tools/src/interceptors/index.ts", "exports": ["*"] }
+  ]
+}

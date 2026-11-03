@@ -7,7 +7,7 @@ import { stripFenceMarkers } from "./preview-box-renderer.ts";
 export const MAX_PREVIEW_HEIGHT_SIDE_BY_SIDE = 20;
 /** Preserves narrow-terminal protection in stacked layout. */
 export const MAX_PREVIEW_HEIGHT_STACKED = 15;
-export const NO_PREVIEW_TEXT = "No preview available";
+const NO_PREVIEW_TEXT = "No preview available";
 /** 1 blank separator + 1 affordance text row reserved when `hasAnyPreview` (height stability of the affordance row's offset relative to the box). */
 export const NOTES_AFFORDANCE_OVERHEAD = 2;
 

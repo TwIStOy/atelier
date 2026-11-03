@@ -230,11 +230,6 @@ export class TurnTelemetryTracker {
     if (finalized) this.turns.push(finalized);
   }
 
-  /** Finalize the current turn without recording it (e.g. on abort/error). */
-  discardCurrentTurn(): void {
-    this.current = null;
-  }
-
   endAgent(): TurnTelemetry | undefined {
     const start = this.agentStartMs;
     if (start === null) return undefined;

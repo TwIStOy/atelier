@@ -125,10 +125,6 @@ export class RuncatIndicatorEngine {
     return this.running;
   }
 
-  hasFrames(): boolean {
-    return this.frames.length > 0;
-  }
-
   get targetIntervalMs(): number {
     return this.stationaryIntervalMs;
   }

@@ -23,21 +23,7 @@ const OK = "ok";
 
 export type CheckOutcome = "new file" | "unread" | "stale" | "ok";
 
-export interface CheckVerbose {
-  outcome: CheckOutcome;
-  reason: string;
-}
-
-export function isBlockReason(v: unknown): v is BlockReason {
-  return (
-    typeof v === "object" &&
-    v !== null &&
-    (v as { block?: unknown }).block === true &&
-    typeof (v as { reason?: unknown }).reason === "string"
-  );
-}
-
-export function checkOutcomeToReason(outcome: CheckOutcome): string {
+function checkOutcomeToReason(outcome: CheckOutcome): string {
   switch (outcome) {
     case UNREAD:
       return "Read the file before editing it. (run /read-tracker to see tracked files)";
@@ -46,12 +32,6 @@ export function checkOutcomeToReason(outcome: CheckOutcome): string {
     default:
       return "";
   }
-}
-
-export function outcomeFromReason(reason: string): CheckOutcome {
-  if (reason.includes("modified since")) return STALE;
-  if (reason.includes("Read the file before")) return UNREAD;
-  return OK;
 }
 
 export class ReadTracker {
@@ -124,9 +104,5 @@ export class ReadTracker {
 
   entries(): ReadonlyArray<readonly [string, ReadEntry]> {
     return Array.from(this.log.entries());
-  }
-
-  entry(canonicalPath: string): Readonly<ReadEntry> | undefined {
-    return this.log.get(canonicalPath);
   }
 }

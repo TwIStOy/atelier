@@ -2,9 +2,14 @@
 
 ## [Unreleased]
 
+### Added
+
+- `gateway-provider.ts`: shared refresh-command handler factory (`makeRefreshCommandHandler`), cached-refresh skeleton (`refreshModelsCatalog`), and gateway models fetch (`fetchGatewayModels`) used by the magpie and toori providers; `scroll-keys.ts` with `scrollKeyOffset` for overlay up/down scrolling (btw, committer).
+
 ### Removed
 
 - `ASK_USER_BLOCKED_EVENT` (`"ask_user_question:blocked"`) and `AskUserBlockedPayload`, whose only consumer was the removed `moshi-hooks-extra` extension. `MODAL_ACTIVE_EVENT` and `ASK_USER_PROMPT_EVENT` are unchanged.
+- `TurnTelemetryTracker.discardCurrentTurn()` — designed for abort wiring that never landed.
 
 ## [0.7.0] - 2026-10-30
 

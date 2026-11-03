@@ -1,13 +1,10 @@
-import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { stat as fsStat } from "node:fs/promises";
-import { homedir } from "node:os";
 import path from "node:path";
-import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { DEFAULT_MAX_BYTES, formatSize, truncateHead } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
+import { resolveSearchPath, runRg, truncateOutput } from "../shared.ts";
 
 const grepDir = path.dirname(fileURLToPath(import.meta.url));
 const grepToolDescription = readFileSync(path.join(grepDir, "grep.txt"), "utf-8").trim();
@@ -31,118 +28,28 @@ const grepParams = Type.Object({
   ),
 });
 
-function expandUser(p: string): string {
-  if (p === "~" || p.startsWith("~/")) {
-    return path.join(homedir(), p === "~" ? "" : p.slice(2));
-  }
-  return p;
-}
-
-function resolveSearchPath(raw: string | undefined, cwd: string): string {
-  const p = (raw?.trim() || ".").trim() || ".";
-  const expanded = expandUser(p);
-  if (path.isAbsolute(expanded)) return path.normalize(expanded);
-  return path.resolve(cwd, expanded);
-}
-
 type MatchRow = { absPath: string; line: number; text: string };
 
-function runRipgrep(
-  args: string[],
-  execCwd: string,
-  signal: AbortSignal | undefined,
-  maxMatches: number,
-): Promise<MatchRow[]> {
-  return new Promise((resolve, reject) => {
-    const matches: MatchRow[] = [];
-    const child = spawn("rg", args, {
-      cwd: execCwd,
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-
-    let stderr = "";
-    let settled = false;
-    const settle = (fn: () => void) => {
-      if (!settled) {
-        settled = true;
-        fn();
-      }
-    };
-
-    const onAbort = () => {
-      if (!child.killed) child.kill("SIGTERM");
-    };
-    if (signal) {
-      if (signal.aborted) onAbort();
-      else signal.addEventListener("abort", onAbort, { once: true });
-    }
-
-    child.stderr?.on("data", (c) => {
-      stderr += c.toString();
-    });
-
-    const stdout = child.stdout;
-    if (!stdout) {
-      settle(() => reject(new Error("ripgrep: no stdout")));
-      return;
-    }
-
-    const rl = createInterface({ input: stdout });
-    rl.on("line", (line) => {
-      if (!line.trim() || matches.length >= maxMatches) return;
-      let event: { type?: string; data?: Record<string, unknown> };
-      try {
-        event = JSON.parse(line) as typeof event;
-      } catch {
-        return;
-      }
-      if (event.type !== "match") return;
-      const d = event.data;
-      const pathObj = d?.path as { text?: string } | undefined;
-      const lineNum = d?.line_number;
-      const linesObj = d?.lines as { text?: string } | undefined;
-      const pathText = pathObj?.text;
-      if (!pathText || typeof lineNum !== "number") return;
-      const absPath = path.isAbsolute(pathText) ? path.normalize(pathText) : path.resolve(execCwd, pathText);
-      const text =
-        typeof linesObj?.text === "string"
-          ? linesObj.text.replace(/\r\n/g, "\n").replace(/\r/g, "").replace(/\n$/, "")
-          : "";
-      matches.push({ absPath, line: lineNum, text });
-      if (matches.length >= maxMatches && !child.killed) {
-        child.kill("SIGTERM");
-      }
-    });
-
-    child.on("error", (err) => {
-      rl.close();
-      if (signal) signal.removeEventListener("abort", onAbort);
-      settle(() =>
-        reject(
-          new Error(
-            `ripgrep (rg) not found or failed to start: ${err.message}. Install ripgrep and ensure it is on PATH.`,
-          ),
-        ),
-      );
-    });
-
-    child.on("close", (code) => {
-      rl.close();
-      if (signal) signal.removeEventListener("abort", onAbort);
-      if (signal?.aborted) {
-        settle(() => reject(new Error("Operation aborted")));
-        return;
-      }
-      const killedForCap = matches.length >= maxMatches;
-      const c = code ?? 0;
-      if (!killedForCap && c !== 0 && c !== 1) {
-        const msg = stderr.trim() || `ripgrep exited with code ${c}`;
-        settle(() => reject(new Error(msg)));
-        return;
-      }
-      settle(() => resolve(matches));
-    });
-  });
+function parseMatchEvent(execCwd: string, line: string): MatchRow | undefined {
+  let event: { type?: string; data?: Record<string, unknown> };
+  try {
+    event = JSON.parse(line) as typeof event;
+  } catch {
+    return undefined;
+  }
+  if (event.type !== "match") return undefined;
+  const d = event.data;
+  const pathObj = d?.path as { text?: string } | undefined;
+  const lineNum = d?.line_number;
+  const linesObj = d?.lines as { text?: string } | undefined;
+  const pathText = pathObj?.text;
+  if (!pathText || typeof lineNum !== "number") return undefined;
+  const absPath = path.isAbsolute(pathText) ? path.normalize(pathText) : path.resolve(execCwd, pathText);
+  const text =
+    typeof linesObj?.text === "string"
+      ? linesObj.text.replace(/\r\n/g, "\n").replace(/\r/g, "").replace(/\n$/, "")
+      : "";
+  return { absPath, line: lineNum, text };
 }
 
 export function registerGrepTool(pi: ExtensionAPI) {
@@ -172,7 +79,7 @@ export function registerGrepTool(pi: ExtensionAPI) {
       }
       args.push("--", pattern, searchPath);
 
-      const rows = await runRipgrep(args, ctx.cwd, signal, MATCH_LIMIT);
+      const rows = await runRg(args, ctx.cwd, signal, MATCH_LIMIT, (line) => parseMatchEvent(ctx.cwd, line));
 
       if (rows.length === 0) {
         return {
@@ -239,22 +146,14 @@ export function registerGrepTool(pi: ExtensionAPI) {
         );
       }
 
-      let textOut = outLines.join("\n");
-      const truncation = truncateHead(textOut, {
-        maxLines: Number.MAX_SAFE_INTEGER,
-        maxBytes: DEFAULT_MAX_BYTES,
-      });
-      textOut = truncation.content;
-      if (truncation.truncated) {
-        textOut += `\n\n[Output truncated: ${truncation.outputLines} of ${truncation.totalLines} lines (${formatSize(truncation.outputBytes)} of ${formatSize(truncation.totalBytes)}).]`;
-      }
+      const output = truncateOutput(outLines.join("\n"));
 
       return {
-        content: [{ type: "text", text: textOut }],
+        content: [{ type: "text", text: output.text }],
         details: {
           matches: total,
           truncated,
-          bytesTruncated: truncation.truncated,
+          bytesTruncated: output.truncated,
         },
       };
     },

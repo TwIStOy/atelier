@@ -1,4 +1,4 @@
-import type { Task, TaskStatus } from "../tool/types.ts";
+import type { Task } from "../tool/types.ts";
 import type { TaskState } from "./state.ts";
 
 export function selectVisibleTasks(state: TaskState): readonly Task[] {
@@ -39,10 +39,6 @@ export function selectShowTaskIds(state: TaskState): boolean {
   return selectVisibleTasks(state).some((t) => t.blockedBy && t.blockedBy.length > 0);
 }
 
-export function selectTaskSubjectById(state: TaskState, id: number): string | undefined {
-  return state.tasks.find((t) => t.id === id)?.subject;
-}
-
 export interface OverlayLayout {
   visible: readonly Task[];
   hiddenCompleted: number;
@@ -78,5 +74,3 @@ export function selectOverlayLayout(state: TaskState, budget: number): OverlayLa
 export function selectHasActive(state: TaskState): boolean {
   return selectVisibleTasks(state).some((t) => t.status === "in_progress" || t.status === "pending");
 }
-
-export const ACTIVE_STATUSES: ReadonlySet<TaskStatus> = new Set(["pending", "in_progress"]);

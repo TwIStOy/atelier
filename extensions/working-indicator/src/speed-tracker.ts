@@ -20,10 +20,6 @@ export class SpeedTracker {
     this.engine = new TokenSpeedEngine(config);
   }
 
-  updateConfig(config: SpeedConfig): void {
-    this.engine.updateConfig(config);
-  }
-
   get isStreaming(): boolean {
     return this.engine.isStreaming;
   }

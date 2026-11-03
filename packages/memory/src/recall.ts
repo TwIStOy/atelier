@@ -1,3 +1,5 @@
+// fallow-ignore-file unused-file
+// Disabled helpers kept for a future opt-in auto-recall (see commit 5d128fe).
 import { runHat } from "./cli-runner.js";
 
 export interface RecallEntry {

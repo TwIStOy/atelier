@@ -17,7 +17,7 @@ import {
   INCOMPLETE_WARNING_PREFIX,
   READY_PROMPT,
   REVIEW_HEADING,
-} from "./dialog-builder.ts";
+} from "./dialog-text.ts";
 import type { StatefulView } from "./stateful-view.ts";
 import type { TabComponents } from "./tab-components.ts";
 

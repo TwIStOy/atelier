@@ -1,5 +1,6 @@
 import { truncateToWidth } from "@earendil-works/pi-tui";
 import type { ToolDisplayAdapter } from "../types.ts";
+import { formatDimPreviewLines, listLines } from "./shared.ts";
 
 interface JournalWriteArgs {
   title?: string;
@@ -50,17 +51,7 @@ export const journalReadAdapter: ToolDisplayAdapter<JournalReadArgs> = {
 
   formatExpandedContent(_args, _output, theme, width, details) {
     const d = details as JournalReadDetails | undefined;
-    const content = d?.content_preview ?? "";
-    if (!content) return [];
-    const allLines = content.split(/\r?\n/);
-    const limit = 20;
-    const lines = allLines
-      .slice(0, limit)
-      .map((line) => truncateToWidth(theme.fg("dim", line), Math.max(1, width), "…"));
-    if (allLines.length > limit) {
-      lines.push(theme.fg("muted", `└ … ${allLines.length - limit} more line(s)`));
-    }
-    return lines;
+    return formatDimPreviewLines(d?.content_preview ?? "", theme, width);
   },
 };
 
@@ -105,20 +96,11 @@ export const journalSearchAdapter: ToolDisplayAdapter<JournalSearchArgs> = {
 
   formatExpandedContent(_args, _output, theme, _width, details) {
     const d = details as JournalSearchDetails | undefined;
-    const items = d?.items ?? [];
-    const total = d?.total ?? 0;
-    const limit = 10;
-    const lines: string[] = [];
-    for (let i = 0; i < Math.min(limit, items.length); i++) {
-      const item = items[i]!;
+    return listLines(d?.items ?? [], d?.total ?? 0, 10, "result", theme, (item) => {
       const idLine =
         theme.fg("dim", item.id) +
         (item.title ? ` ${theme.fg("dim", item.title.length > 100 ? `${item.title.slice(0, 99)}…` : item.title)}` : "");
-      lines.push(theme.fg("accent", idLine));
-    }
-    if (total > limit) {
-      lines.push(theme.fg("muted", `└ … ${total - limit} more result${total - limit === 1 ? "" : "s"}`));
-    }
-    return lines;
+      return [theme.fg("accent", idLine)];
+    });
   },
 };

@@ -12,31 +12,8 @@ import {
   STACKED_GAP_ROWS,
 } from "./preview-layout-decider.ts";
 
-// ----- Re-exports for test imports — keep `./preview-pane.js` as the public surface -----
-export {
-  MAX_PREVIEW_HEIGHT_SIDE_BY_SIDE,
-  MAX_PREVIEW_HEIGHT_STACKED,
-  NO_PREVIEW_TEXT,
-  NOTES_AFFORDANCE_OVERHEAD,
-} from "./markdown-content-cache.ts";
-export {
-  NOTES_AFFORDANCE_TEXT,
-  PreviewBlockRenderer,
-} from "./preview-block-renderer.ts";
-export {
-  BORDER_HORIZONTAL_OVERHEAD,
-  BORDER_INNER_PADDING_HORIZONTAL,
-  BORDER_VERTICAL_OVERHEAD,
-  BOX_MIN_CONTENT_WIDTH,
-  renderBorderedBox,
-  stripFenceMarkers,
-} from "./preview-box-renderer.ts";
-export {
-  PREVIEW_COLUMN_GAP,
-  PREVIEW_MIN_WIDTH,
-  PREVIEW_PADDING_LEFT,
-  STACKED_GAP_ROWS,
-} from "./preview-layout-decider.ts";
+// Tests construct `PreviewBlockRenderer` through this facade — keep it stable.
+export { PreviewBlockRenderer } from "./preview-block-renderer.ts";
 
 /**
  * Per-tick projection of PreviewPane state. Replaces the prior
@@ -147,31 +124,32 @@ export class PreviewPane implements StatefulView<PreviewPaneProps>, Component {
   }
 
   naturalHeight(width: number): number {
-    if (this.question.multiSelect === true) return this.optionListView.render(width).length;
-    if (!this.previewBlock.hasAnyPreview()) return this.optionListView.render(width).length;
-    const mode = decideLayout(this.getTerminalWidth(), width);
-    const adaptiveLeft = this.getAdaptiveLeft(width);
-    const { optionsWidth, previewWidth } = bodyWidths(width, mode, adaptiveLeft);
-    const optionsHeight = this.optionListView.render(optionsWidth).length;
-    const previewBlockHeight = this.previewBlock.blockHeight(previewWidth, this.props.selectedIndex, mode);
-    if (mode === "side-by-side") return Math.max(optionsHeight, previewBlockHeight);
-    return optionsHeight + STACKED_GAP_ROWS + previewBlockHeight;
+    return this.bodyHeight(width, (previewWidth, mode) =>
+      this.previewBlock.blockHeight(previewWidth, this.props.selectedIndex, mode),
+    );
   }
 
   maxNaturalHeight(width: number): number {
+    return this.bodyHeight(width, (previewWidth, mode) => {
+      let maxPreviewBlock = 0;
+      for (let i = 0; i < this.question.options.length; i++) {
+        const h = this.previewBlock.blockHeight(previewWidth, i, mode);
+        if (h > maxPreviewBlock) maxPreviewBlock = h;
+      }
+      return maxPreviewBlock;
+    });
+  }
+
+  private bodyHeight(width: number, previewHeight: (previewWidth: number, mode: PreviewLayoutMode) => number): number {
     if (this.question.multiSelect === true) return this.optionListView.render(width).length;
     if (!this.previewBlock.hasAnyPreview()) return this.optionListView.render(width).length;
     const mode = decideLayout(this.getTerminalWidth(), width);
     const adaptiveLeft = this.getAdaptiveLeft(width);
     const { optionsWidth, previewWidth } = bodyWidths(width, mode, adaptiveLeft);
     const optionsHeight = this.optionListView.render(optionsWidth).length;
-    let maxPreviewBlock = 0;
-    for (let i = 0; i < this.question.options.length; i++) {
-      const h = this.previewBlock.blockHeight(previewWidth, i, mode);
-      if (h > maxPreviewBlock) maxPreviewBlock = h;
-    }
-    if (mode === "side-by-side") return Math.max(optionsHeight, maxPreviewBlock);
-    return optionsHeight + STACKED_GAP_ROWS + maxPreviewBlock;
+    const previewBlockHeight = previewHeight(previewWidth, mode);
+    if (mode === "side-by-side") return Math.max(optionsHeight, previewBlockHeight);
+    return optionsHeight + STACKED_GAP_ROWS + previewBlockHeight;
   }
 
   private renderSideBySide(width: number, mode: PreviewLayoutMode): string[] {

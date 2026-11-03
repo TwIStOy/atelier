@@ -24,10 +24,4 @@ export interface InjectionResult {
   errors: InjectionFileError[];
 }
 
-export interface InjectionConfig {
-  fileNames: readonly string[];
-  maxBytesPerFile: number;
-  maxBytesPerRead: number;
-}
-
 export type MirrorMappings = Record<string, string>;

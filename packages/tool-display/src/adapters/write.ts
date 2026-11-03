@@ -1,9 +1,9 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { visibleWidth } from "@earendil-works/pi-tui";
-import { shortenPath, trimTrailingEmpty } from "@htwang-contrib/common";
+import { trimTrailingEmpty } from "@htwang-contrib/common";
 import { loadConfig } from "../config.ts";
 import type { ToolDisplayAdapter } from "../types.ts";
-import { formatLineCount, renderContentWithLineNumbers } from "./shared.ts";
+import { filePathDisplay, formatLineCount, renderContentWithLineNumbers } from "./shared.ts";
 
 interface WriteArgs {
   path?: string;
@@ -19,11 +19,8 @@ function buildLineCountSuffix(args: WriteArgs, theme: Theme): string {
 
 export const writeAdapter: ToolDisplayAdapter<WriteArgs> = {
   formatCallHeader(args, theme, _details?: unknown, isPartial?: boolean, _expanded?: boolean, width?: number) {
-    const rawPath = args?.file_path ?? args?.path ?? "";
-    const path = shortenPath(rawPath);
-    const pathDisplay = path ? theme.fg("accent", path) : theme.fg("toolOutput", "...");
     const verb = isPartial ? "Writing" : "Wrote";
-    const base = `${theme.fg("toolTitle", theme.bold(verb))} ${pathDisplay}`;
+    const base = `${theme.fg("toolTitle", theme.bold(verb))} ${filePathDisplay(args, theme)}`;
 
     if (loadConfig().writeStyle !== "single-line") return base;
 

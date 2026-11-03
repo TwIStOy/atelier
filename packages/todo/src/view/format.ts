@@ -14,7 +14,7 @@ export function statusGlyph(status: TaskStatus): string {
   }
 }
 
-export function overlayStatusGlyph(status: TaskStatus, theme: Theme): string {
+function overlayStatusGlyph(status: TaskStatus, theme: Theme): string {
   switch (status) {
     case "pending":
       return theme.fg("dim", statusGlyph(status));

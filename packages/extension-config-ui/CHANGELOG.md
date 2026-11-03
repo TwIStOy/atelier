@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Reorderable alt+up / alt+down moves go through one shared helper; unused exports removed (`DEFAULT_WIDTH_PERCENT`, `DEFAULT_MAX_HEIGHT`, `isValidColor`, `colorFg`, `formatSettingValue`, `renderInlineEditValue`, `GLYPHS`, `frameGlyphs`, `resolveOptions`).
+
 ## [0.7.0] - 2026-10-30
 
 ### Changed

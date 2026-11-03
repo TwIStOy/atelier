@@ -20,7 +20,7 @@ import type { PreviewLayoutMode } from "./preview-layout-decider.ts";
  * Affordance text shown below the bordered preview when focused on a preview-bearing option.
  * Re-exported by `preview-pane.ts` for the existing test surface.
  */
-export const NOTES_AFFORDANCE_TEXT = "Notes: press n to add notes";
+const NOTES_AFFORDANCE_TEXT = "Notes: press n to add notes";
 
 export interface PreviewBlockRendererConfig {
   question: QuestionData;
@@ -49,10 +49,6 @@ export class PreviewBlockRenderer {
 
   hasAnyPreview(): boolean {
     return this.cache.hasAnyPreview();
-  }
-
-  has(optionIndex: number): boolean {
-    return this.cache.has(optionIndex);
   }
 
   invalidate(): void {

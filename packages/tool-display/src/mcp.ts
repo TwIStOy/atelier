@@ -35,10 +35,6 @@ export function isMcpTool(toolName: string, label?: string): boolean {
   return label === MCP_LABEL_PREFIX || label?.startsWith(`${MCP_LABEL_PREFIX}: `) === true;
 }
 
-export function clearMcpTools(): void {
-  mcpToolNames.clear();
-}
-
 export function mcpDisplayName(toolName: string, label?: string): string {
   const suffix = label?.startsWith(`${MCP_LABEL_PREFIX}: `) ? label.slice(MCP_LABEL_PREFIX.length + 2).trim() : "";
   if (suffix) return `${MCP_DISPLAY_PREFIX}${snakeToCamelCase(suffix)}`;

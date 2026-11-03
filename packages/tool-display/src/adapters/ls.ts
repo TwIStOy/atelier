@@ -1,6 +1,6 @@
 import { shortenPath } from "@htwang-contrib/common";
 import type { ToolDisplayAdapter } from "../types.ts";
-import { formatExpandedToolOutputLines, formatLineCount } from "./shared.ts";
+import { outputContentMethods } from "./shared.ts";
 
 interface LsArgs {
   path?: string;
@@ -25,18 +25,9 @@ export const lsAdapter: ToolDisplayAdapter<LsArgs> = {
     return header;
   },
 
-  formatCollapsedContent(_args, output, theme, _width, details?: unknown, isPartial?: boolean, _spinAt?: number) {
-    if (isPartial) return [];
+  ...outputContentMethods((details) => {
     const n = entryCountFromDetails(details);
-    if (typeof n === "number") {
-      const msg = n === 0 ? "empty directory" : `${n} ${n === 1 ? "entry" : "entries"}`;
-      return [theme.fg("muted", `└ ${msg}`)];
-    }
-    if (!output) return [];
-    return formatLineCount(output, theme);
-  },
-
-  formatExpandedContent(_args, output, theme, width, _details?: unknown) {
-    return formatExpandedToolOutputLines(output ?? "", theme, width);
-  },
+    if (typeof n !== "number") return undefined;
+    return n === 0 ? "empty directory" : `${n} ${n === 1 ? "entry" : "entries"}`;
+  }),
 };

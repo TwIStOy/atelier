@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Removed
+
+- Dead exports found by static analysis: `TOOL_SCHEMAS`, `STRING_ARG_TOOLS`, the `GrammarRepairMode` / `GrammarRepairResult` / `RecoveredToolCall` re-exports.
+
 ## [0.7.0] - 2026-10-30
 
 ### Changed

@@ -377,5 +377,3 @@ function padToWidth(line: string, target: number): string {
   if (w >= target) return line;
   return line + " ".repeat(target - w);
 }
-
-export type { Component };

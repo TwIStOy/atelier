@@ -27,7 +27,7 @@ export type WorkflowRunRecord = {
 
 const MAX_KEPT_RUNS = 20;
 
-export function workflowRunsDir(home: string = homedir()): string {
+function workflowRunsDir(home: string = homedir()): string {
   return path.join(home, ".agent", "workflow", "runs");
 }
 

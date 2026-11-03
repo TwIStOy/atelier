@@ -3,12 +3,9 @@ import { GitHubInterceptor } from "./github.ts";
 import type { UrlInterceptor } from "./types.ts";
 
 export {
-  GITHUB_INTERCEPTOR_DEFAULTS,
   GitHubInterceptor,
   type GitHubInterceptorOptions,
   type GitHubUrlInfo,
-  parseGitHubUrl,
-  type ResolvedGitHubOptions,
 } from "./github.ts";
 export type { UrlInterceptor } from "./types.ts";
 

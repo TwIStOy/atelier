@@ -5,7 +5,7 @@ import { formatDuration, spinnerGlyph } from "../format.ts";
 import { keyText } from "../key-text.ts";
 import { activeRegistryRef } from "../tool-call-display.ts";
 import type { ToolDisplayAdapter } from "../types.ts";
-import { formatExpandedToolOutputLines, renderContentWithLineNumbers } from "./shared.ts";
+import { batchHeader, formatExpandedToolOutputLines, renderContentWithLineNumbers } from "./shared.ts";
 
 interface CodemodeArgs {
   code?: string;
@@ -199,18 +199,7 @@ function collapsedErrorLines(error: string, theme: Theme, width: number): string
 
 export const codemodeAdapter: ToolDisplayAdapter<CodemodeArgs> = {
   formatCallHeader(args, theme, details, _isPartial, _expanded, width) {
-    const title = `${theme.fg("toolTitle", theme.bold(TITLE))} `;
-    const label = theme.fg("accent", scriptLabel(args ?? {}));
-    let stats = "";
-    const counts = settledCounts(asDetails(details));
-    if (counts) {
-      stats = theme.fg("muted", ` · ${counts.settled}/${counts.total} calls`);
-    }
-    const header = title + label + stats;
-    if (width !== undefined && visibleWidth(header) > width) {
-      return truncateToWidth(header, width, "…");
-    }
-    return header;
+    return batchHeader(theme, TITLE, scriptLabel(args ?? {}), settledCounts(asDetails(details)), "calls", width);
   },
 
   formatCollapsedContent(_args, output, theme, width, details, isPartial, spinAt = Date.now()) {

@@ -10,7 +10,7 @@ export type RunHatOptions = {
   signal?: AbortSignal;
 };
 
-export function buildHatArgv(args: string[], options?: RunHatOptions): string[] {
+function buildHatArgv(args: string[], options?: RunHatOptions): string[] {
   const ns = options?.namespace !== undefined ? sanitizeNamespace(options.namespace) : getSessionNamespace();
   return ["--json", ...(ns ? ["--namespace", ns] : []), ...args];
 }

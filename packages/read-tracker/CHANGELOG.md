@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Removed
+
+- Dead exports found by static analysis: `isBlockReason`, `outcomeFromReason`, `CheckVerbose`, `terminalWidth` import, `ReadTracker.entry()`.
+
 ## [0.4.0] - 2026-07-31
 
 ### Changed

@@ -1,6 +1,6 @@
 import { shortenPath } from "@htwang-contrib/common";
 import type { ToolDisplayAdapter } from "../types.ts";
-import { formatExpandedToolOutputLines, formatLineCount } from "./shared.ts";
+import { outputContentMethods } from "./shared.ts";
 
 interface GlobArgs {
   pattern?: string;
@@ -25,18 +25,9 @@ export const globAdapter: ToolDisplayAdapter<GlobArgs> = {
     return header;
   },
 
-  formatCollapsedContent(_args, output, theme, _width, details?: unknown, isPartial?: boolean, _spinAt?: number) {
-    if (isPartial) return [];
+  ...outputContentMethods((details) => {
     const count = fileCountFromDetails(details);
-    if (typeof count === "number") {
-      const msg = count === 0 ? "no files" : `${count} file${count !== 1 ? "s" : ""}`;
-      return [theme.fg("muted", `└ ${msg}`)];
-    }
-    if (!output) return [];
-    return formatLineCount(output, theme);
-  },
-
-  formatExpandedContent(_args, output, theme, width, _details?: unknown) {
-    return formatExpandedToolOutputLines(output ?? "", theme, width);
-  },
+    if (typeof count !== "number") return undefined;
+    return count === 0 ? "no files" : `${count} file${count !== 1 ? "s" : ""}`;
+  }),
 };

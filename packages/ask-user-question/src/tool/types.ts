@@ -1,23 +1,11 @@
 import { type Static, Type } from "typebox";
-import { LABELS_BY_KIND, ROW_INTENT_META } from "../state/row-intent.ts";
+import { ROW_INTENT_META } from "../state/row-intent.ts";
 
 export const MAX_QUESTIONS = 4;
 export const MIN_OPTIONS = 2;
 export const MAX_OPTIONS = 4;
-export const MAX_HEADER_LENGTH = 16;
-export const MAX_LABEL_LENGTH = 60;
-
-/**
- * User-facing labels for the three runtime sentinel rows, keyed by their
- * `WrappingSelectItem.kind` discriminator. Sourced from
- * `ROW_INTENT_META` via `LABELS_BY_KIND` (`row-intent.ts`) — single source of
- * truth. Adding a new sentinel requires extending the `WrappingSelectItem`
- * union AND adding an entry to `ROW_INTENT_META`; this map then auto-extends.
- */
-export const SENTINEL_LABELS = LABELS_BY_KIND;
-
-export type SentinelKind = keyof typeof SENTINEL_LABELS;
-export type SentinelLabel = (typeof SENTINEL_LABELS)[SentinelKind];
+const MAX_HEADER_LENGTH = 16;
+const MAX_LABEL_LENGTH = 60;
 
 /**
  * Labels reserved for Pi-internal sentinels — authoring an option with any
@@ -31,9 +19,8 @@ export type SentinelLabel = (typeof SENTINEL_LABELS)[SentinelKind];
  * even though the runtime sentinel is suppressed there.
  */
 export const RESERVED_LABELS = ["Other", ROW_INTENT_META.other.label, ROW_INTENT_META.next.label] as const;
-export type ReservedLabel = (typeof RESERVED_LABELS)[number];
 
-export const OptionSchema = Type.Object({
+const OptionSchema = Type.Object({
   label: Type.String({
     maxLength: MAX_LABEL_LENGTH,
     description: `MAX ${MAX_LABEL_LENGTH} CHARACTERS — hard limit, requests over the limit are rejected. The display text for this option that the user will see and select. Should be concise (1-5 words) and clearly describe the choice.`,
@@ -50,7 +37,7 @@ export const OptionSchema = Type.Object({
   ),
 });
 
-export const QuestionSchema = Type.Object({
+const QuestionSchema = Type.Object({
   question: Type.String({
     description:
       'The complete question to ask the user. Should be clear, specific, and end with a question mark. Example: "Which library should we use for date formatting?" If multiSelect is true, phrase it accordingly, e.g. "Which features do you want to enable?"',
@@ -74,7 +61,7 @@ export const QuestionSchema = Type.Object({
   ),
 });
 
-export const QuestionsSchema = Type.Array(QuestionSchema, {
+const QuestionsSchema = Type.Array(QuestionSchema, {
   minItems: 1,
   maxItems: MAX_QUESTIONS,
   description: "Questions to ask the user (1-4 questions)",
@@ -130,10 +117,4 @@ export interface QuestionnaireResult {
   answers: QuestionAnswer[];
   cancelled: boolean;
   error?: QuestionnaireError;
-}
-
-export function isQuestionnaireResult(value: unknown): value is QuestionnaireResult {
-  if (!value || typeof value !== "object") return false;
-  const v = value as Record<string, unknown>;
-  return Array.isArray(v.answers) && typeof v.cancelled === "boolean";
 }

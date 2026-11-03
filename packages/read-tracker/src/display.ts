@@ -1,5 +1,5 @@
 import { formatSize } from "@earendil-works/pi-coding-agent";
-import { fitColWidths, formatElapsedSeconds, makeTable, shortenPath, terminalWidth } from "@htwang-contrib/common";
+import { fitColWidths, formatElapsedSeconds, makeTable, shortenPath } from "@htwang-contrib/common";
 import type { ReadEntry } from "./read-tracker.ts";
 
 export interface ReadDisplayRow {
@@ -50,5 +50,3 @@ export function summarizeRows(rows: ReadDisplayRow[]): {
   }
   return { total: rows.length, stale };
 }
-
-export { terminalWidth };

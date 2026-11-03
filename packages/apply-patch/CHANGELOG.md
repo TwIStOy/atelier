@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Removed
+
+- Dead exports found by static analysis: `normalizeApplyPatchArguments`, `ApplyPatchError.hasPartialSuccess()`.
+
 ## [0.7.0] - 2026-10-30
 
 ### Added

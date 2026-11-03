@@ -39,10 +39,6 @@ export class ApplyPatchError extends Error {
     this.failures = result.failures;
     this.result = result;
   }
-
-  hasPartialSuccess(): boolean {
-    return this.result.hasPartialSuccess;
-  }
 }
 
 export type ApplyPatchProgress = {

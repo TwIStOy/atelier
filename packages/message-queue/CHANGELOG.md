@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Removed
+
+- Dead `Queue.peek()` and `Queue.length` accessors, found by static analysis.
+
 ## [0.7.0] - 2026-10-30
 
 ### Changed

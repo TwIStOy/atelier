@@ -2,7 +2,7 @@
  * `/self-improve` user-message template.
  */
 
-export const SELF_IMPROVE_TEMPLATE = `Reflect on the current session, identify what was learned, persist improvements to memory and journal, and update relevant skill files.
+const SELF_IMPROVE_TEMPLATE = `Reflect on the current session, identify what was learned, persist improvements to memory and journal, and update relevant skill files.
 
 ## Arguments
 

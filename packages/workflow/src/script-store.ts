@@ -14,17 +14,14 @@ export type SavedWorkflow = {
   scope: SavedWorkflowScope;
 };
 
-export function savedWorkflowDirs(
-  cwd: string,
-  home: string = homedir(),
-): Array<{ dir: string; scope: SavedWorkflowScope }> {
+function savedWorkflowDirs(cwd: string, home: string = homedir()): Array<{ dir: string; scope: SavedWorkflowScope }> {
   return [
     { dir: path.join(home, ".config", "pi", "workflows"), scope: "user" },
     { dir: path.join(cwd, ".pi", "workflows"), scope: "project" },
   ];
 }
 
-export function savedWorkflowDirForScope(cwd: string, scope: SavedWorkflowScope, home: string = homedir()): string {
+function savedWorkflowDirForScope(cwd: string, scope: SavedWorkflowScope, home: string = homedir()): string {
   return scope === "project" ? path.join(cwd, ".pi", "workflows") : path.join(home, ".config", "pi", "workflows");
 }
 

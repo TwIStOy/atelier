@@ -57,10 +57,6 @@ export function updateBackgroundJob(
   });
 }
 
-export function getBackgroundJob(id: string): BackgroundJobSnapshot | undefined {
-  return jobs.get(id);
-}
-
 export type SubagentStatusPayload = {
   status: string;
   id: string;

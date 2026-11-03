@@ -3,7 +3,7 @@ import type { QuestionAnswer, QuestionnaireResult, QuestionParams } from "./type
 
 export const DECLINE_MESSAGE = "User declined to answer questions";
 export const ENVELOPE_PREFIX = "User has answered your questions:";
-export const ENVELOPE_SUFFIX = "You can now continue with the user's answers in mind.";
+const ENVELOPE_SUFFIX = "You can now continue with the user's answers in mind.";
 
 /**
  * Map a `QuestionnaireResult` (or null/cancelled) to the LLM-facing tool envelope.
@@ -35,7 +35,7 @@ export function buildQuestionnaireResponse(result: QuestionnaireResult | null | 
  * Format a single answer segment for the envelope. Pure of `a`. The `"Q"="A"` shape and
  * the optional `selected preview:` / `user notes:` suffixes are pinned by envelope tests.
  */
-export function buildAnswerSegment(a: QuestionAnswer): string {
+function buildAnswerSegment(a: QuestionAnswer): string {
   const parts: string[] = [`"${a.question}"="${formatAnswerScalar(a)}"`];
   if (a.preview && a.preview.length > 0) parts.push(`selected preview: ${a.preview}`);
   if (a.notes && a.notes.length > 0) parts.push(`user notes: ${a.notes}`);

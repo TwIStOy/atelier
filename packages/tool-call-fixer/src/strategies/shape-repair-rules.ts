@@ -65,7 +65,7 @@ export const REPAIR_RULES: readonly RepairRule[] = [
   wrapBareStringAsArray,
 ];
 
-export const STRING_ARG_TOOLS: Readonly<Record<string, string>> = {
+const STRING_ARG_TOOLS: Readonly<Record<string, string>> = {
   read: "path",
   bash: "command",
   grep: "pattern",

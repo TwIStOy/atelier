@@ -20,7 +20,7 @@ const logger = createLogger("better-editor");
 
 export const MAX_ENTRIES = 1000;
 
-export type HistoryEntry = {
+type HistoryEntry = {
   text: string;
   at: number;
 };
@@ -163,7 +163,7 @@ function writeHistoryAtomic(path: string, entries: HistoryEntry[]): void {
   renameSync(tmp, path);
 }
 
-export function loadHistory(): HistoryEntry[] {
+function loadHistory(): HistoryEntry[] {
   return readHistoryFromDisk();
 }
 

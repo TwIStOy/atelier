@@ -4,10 +4,10 @@ import { join } from "node:path";
 import { type ExtensionConfigSchema, readConfig, registerConfigItems } from "@htwang-contrib/common";
 import type { MirrorMappings } from "./types.ts";
 
-export const CONFIG_ID = "agents-mirror";
+const CONFIG_ID = "agents-mirror";
 const FILE = "agents-mirror.json";
 
-export function defaultConfigPath(): string {
+function defaultConfigPath(): string {
   const xdg = process.env.XDG_CONFIG_HOME;
   const base = xdg ? join(xdg, "pi") : join(homedir(), ".config", "pi");
   return join(base, FILE);

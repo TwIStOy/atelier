@@ -4,7 +4,7 @@ import type { QuestionAnswer } from "./types.ts";
  * Placeholder for empty / null answer text. Used uniformly — the earlier `(no answer)`
  * fallback in the dialog summary was accidental drift; tests pin `(no input)` only.
  */
-export const NO_INPUT_PLACEHOLDER = "(no input)";
+const NO_INPUT_PLACEHOLDER = "(no input)";
 
 /**
  * Format a `QuestionAnswer` to its scalar string form. Switch is exhaustive — non-`void`

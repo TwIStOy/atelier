@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Single and grouped commit flows share one `commitTracked` helper (identical log entries, cancel/error handling); overlay scrolling uses `scrollKeyOffset`.
+
+### Removed
+
+- Dead exports found by static analysis: `getBranchName`, `getLastCommitLog`, `GitStatus`, `getConfiguredModel`.
+
 ## [0.7.0] - 2026-10-30
 
 ### Fixed

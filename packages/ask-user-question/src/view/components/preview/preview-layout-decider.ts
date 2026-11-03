@@ -20,7 +20,7 @@ export const MAX_LEFT_RATIO = 0.5;
 export const MIN_PREVIEW_WIDTH = 45;
 /** visibleWidth(" ✔") = 2 (space + ✔ codepoint). Reserved on the longest-label measurement
  *  so a confirmed row never gets truncated when MIN_LEFT clamps the column. */
-export const CONFIRMED_OVERHEAD = 2;
+const CONFIRMED_OVERHEAD = 2;
 
 export type PreviewLayoutMode = "side-by-side" | "stacked";
 
@@ -98,7 +98,7 @@ export function crossTabMaxLeftWidth(
  *
  * Pure function — O(total chars) per question; no Markdown invocation, no cache interaction.
  */
-export function previewSourceWidth(question: QuestionData): number {
+function previewSourceWidth(question: QuestionData): number {
   let max = 0;
   for (const option of question.options) {
     const text = option.preview;

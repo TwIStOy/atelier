@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Removed
+
+- Dead exports found by static analysis: the `SubagentAgentFileOptions` / `SubagentAgentEntry` / `SubagentAgentType` aliases, `SUBAGENT_FALLBACK_AGENT_ID`, `normalizeSubagentAgentId`, `subagentSystemPromptFromCatalog`, `getBackgroundJob`, `readSubagentConcurrencyLimits`, `SUBAGENT_TOOL_UI_TICK_MS`, and the redundant `export type { Component }` re-exports in `viewer/`.
+
 ## [0.7.0] - 2026-10-30
 
 ### Added

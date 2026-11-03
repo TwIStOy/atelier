@@ -1,6 +1,6 @@
 import { readConfig, registerConfigItems } from "@htwang-contrib/common";
 
-export const CONFIG_ID = "todo";
+const CONFIG_ID = "todo";
 
 export interface GuidanceFields {
   promptSnippet?: string;
@@ -13,7 +13,7 @@ export interface TodoConfig {
   reminderInterval: number;
 }
 
-export const DEFAULT_CONFIG = {
+const DEFAULT_CONFIG = {
   reminderEnabled: true,
   reminderInterval: 4,
 } satisfies Partial<TodoConfig>;

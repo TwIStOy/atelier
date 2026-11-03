@@ -1,15 +1,7 @@
 import { Type } from "@sinclair/typebox";
 import { runHat } from "../cli-runner.js";
 import { jsonError, jsonResult } from "../tool-result.js";
-
-function parseListResult(result: unknown): unknown[] {
-  if (!result || typeof result !== "object") return [];
-  if (Array.isArray(result)) return result;
-  const r = result as Record<string, unknown>;
-  if (Array.isArray(r.domains)) return r.domains;
-  if (Array.isArray(r.data)) return r.data;
-  return [];
-}
+import { parseListResult } from "./parse-list.js";
 
 export const memoryDomains = {
   name: "memory-domains",
@@ -20,7 +12,7 @@ export const memoryDomains = {
   execute: async (_id: string, _args: Record<string, unknown>, signal?: AbortSignal) => {
     try {
       const result = await runHat(["memory", "domains"], { signal });
-      const items = parseListResult(result).map((d: unknown) => {
+      const items = (parseListResult(result, "domains") as unknown[]).map((d: unknown) => {
         if (typeof d === "string") return d;
         const item = d as Record<string, unknown>;
         const name = item.name ?? item.domain ?? item.id ?? "?";

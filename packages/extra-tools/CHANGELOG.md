@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- `glob` / `grep` / `ls` share `src/shared.ts` (path resolution, the ripgrep line-stream runner with abort/cap handling, and output truncation) instead of three copies of the same plumbing.
+
 ## [0.7.0] - 2026-10-30
 
 ### Added

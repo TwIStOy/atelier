@@ -1,4 +1,5 @@
 import { throwIfApiError } from "./errors.ts";
+import { requestJson, requireContent, throwIfMissingApiKey } from "./http.ts";
 import type { FetchResponse, FullProvider, SearchResponse, SearchResult } from "./types.ts";
 
 const JINA_SEARCH_API_URL = "https://s.jina.ai/";
@@ -36,35 +37,29 @@ export class JinaProvider implements FullProvider {
   constructor(private readonly apiKey: string) {}
 
   async search(query: string, maxResults: number, signal?: AbortSignal): Promise<SearchResponse> {
-    if (!this.apiKey) {
-      throw new Error(`${this.envVar} is not set. Use /config to set the API key, or export the env var.`);
-    }
+    throwIfMissingApiKey(this.envVar, this.apiKey);
 
     const url = new URL(`${JINA_SEARCH_API_URL}${encodeURIComponent(query)}`);
     url.searchParams.set("num", String(maxResults));
 
-    const res = await fetch(url.toString(), {
-      method: "GET",
-      headers: {
-        Accept: "application/json",
-        Authorization: `Bearer ${this.apiKey}`,
+    const raw = await requestJson<JinaSearchResponse>(
+      this.name,
+      url.toString(),
+      {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          Authorization: `Bearer ${this.apiKey}`,
+        },
       },
       signal,
-    });
-
-    if (!res.ok) {
-      throwIfApiError(this.name, res.status, await res.text());
-    }
-
-    const raw = (await res.json()) as JinaSearchResponse;
+    );
     const results = normalizeJinaResults(raw.data?.results ?? []).slice(0, maxResults);
     return { query, results };
   }
 
   async fetch(url: string, _raw: boolean, signal?: AbortSignal): Promise<FetchResponse> {
-    if (!this.apiKey) {
-      throw new Error(`${this.envVar} is not set. Use /config to set the API key, or export the env var.`);
-    }
+    throwIfMissingApiKey(this.envVar, this.apiKey);
 
     const res = await fetch(`${JINA_READER_API_URL}${url}`, {
       method: "GET",
@@ -77,9 +72,7 @@ export class JinaProvider implements FullProvider {
     }
 
     const text = await res.text();
-    if (!text.trim()) {
-      throw new Error(`${this.label} Fetch API error: no content returned for ${url}`);
-    }
+    requireContent(this.label, url, text.trim());
     return { text, contentType: "text/markdown" };
   }
 }

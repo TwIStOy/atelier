@@ -8,7 +8,7 @@ export interface ExperienceConfig {
   hiddenRules: string[];
 }
 
-export const DEFAULT_CONFIG: ExperienceConfig = {
+const DEFAULT_CONFIG: ExperienceConfig = {
   enabled: true,
   hiddenRules: [],
 };
@@ -28,12 +28,12 @@ export interface RuleChangeResult {
   matched: boolean;
 }
 
-export function addHiddenRule(raw: string): RuleChangeResult {
+function mutateHiddenRules(mutate: (rules: string[], canonical: string) => string[], raw: string): RuleChangeResult {
   const parsed = parseTarget(raw);
   if (!parsed) return { rules: loadConfig().hiddenRules, changed: false, canonical: null, matched: false };
   const canonical = canonicalRule(parsed);
   const cfg = loadConfig();
-  const rules = addRule(cfg.hiddenRules, canonical);
+  const rules = mutate(cfg.hiddenRules, canonical);
   if (rules.length === cfg.hiddenRules.length) {
     return { rules, changed: false, canonical, matched: true };
   }
@@ -41,15 +41,10 @@ export function addHiddenRule(raw: string): RuleChangeResult {
   return { rules, changed: true, canonical, matched: true };
 }
 
+export function addHiddenRule(raw: string): RuleChangeResult {
+  return mutateHiddenRules(addRule, raw);
+}
+
 export function removeHiddenRule(raw: string): RuleChangeResult {
-  const parsed = parseTarget(raw);
-  if (!parsed) return { rules: loadConfig().hiddenRules, changed: false, canonical: null, matched: false };
-  const canonical = canonicalRule(parsed);
-  const cfg = loadConfig();
-  const rules = removeRule(cfg.hiddenRules, canonical);
-  if (rules.length === cfg.hiddenRules.length) {
-    return { rules, changed: false, canonical, matched: true };
-  }
-  updateConfig(CONFIG_ID, CONFIG_SCHEMA, { hiddenRules: rules });
-  return { rules, changed: true, canonical, matched: true };
+  return mutateHiddenRules(removeRule, raw);
 }

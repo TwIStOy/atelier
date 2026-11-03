@@ -147,6 +147,12 @@ export {
   usagePercentStressLevel,
 } from "./format.ts";
 export {
+  fetchGatewayModels,
+  makeRefreshCommandHandler,
+  type RefreshCommandContext,
+  refreshModelsCatalog,
+} from "./gateway-provider.ts";
+export {
   clearGlobalState,
   getGlobalState,
 } from "./global-state.ts";
@@ -169,6 +175,7 @@ export type { ResolvableModel } from "./model-resolve.ts";
 export { resolveModel } from "./model-resolve.ts";
 export type { RexContext, RexPaneOptions } from "./rex.ts";
 export { getLocalRexContext, openRexPane } from "./rex.ts";
+export { scrollKeyOffset } from "./scroll-keys.ts";
 export type { SessionCache } from "./session-cache.ts";
 export {
   branchToMessages,

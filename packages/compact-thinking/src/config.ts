@@ -1,9 +1,9 @@
 import { type ExtensionConfigSchema, readConfig, registerConfigItems } from "@htwang-contrib/common";
 import type { CompactThinkingConfig } from "./types.ts";
 
-export const CONFIG_ID = "compact-thinking";
+const CONFIG_ID = "compact-thinking";
 
-export const DEFAULT_CONFIG: CompactThinkingConfig = {
+const DEFAULT_CONFIG: CompactThinkingConfig = {
   previewLines: 3,
   animationIntervalMs: 45,
   blockSpacing: 0,
@@ -12,7 +12,7 @@ export const DEFAULT_CONFIG: CompactThinkingConfig = {
   summaryMinChars: 2000,
 };
 
-export const CONFIG_SCHEMA: ExtensionConfigSchema<CompactThinkingConfig> = {
+const CONFIG_SCHEMA: ExtensionConfigSchema<CompactThinkingConfig> = {
   defaults: { ...DEFAULT_CONFIG },
 };
 

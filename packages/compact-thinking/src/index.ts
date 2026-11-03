@@ -222,6 +222,77 @@ export default function compactThinking(pi: ExtensionAPI) {
     return needsSeparatorAbove(this, width) ? ["", ...lines] : lines;
   }
 
+  /**
+   * ThoughtMember eligibility: finished, collapsed, text-free. The component
+   * keeps building its heading row; tool-display's verb-group claims eligible
+   * members by stamping them, and only claimed members render zero lines (see
+   * patchedRender). The claim is cleared on every content rebuild so a stale
+   * fold never survives a message change.
+   */
+  function computeThoughtMembership(
+    component: AssistantMessageComponent,
+    message: AssistantMessage,
+    items: RenderedItem[],
+  ): { streaming: boolean; eligible: boolean; transparent: boolean } {
+    const streaming = activeThinking?.messageTimestamp === message.timestamp;
+    const hasExpandedRun = (expandedRuns.get(component)?.size ?? 0) > 0;
+    const hasTextItem = items.some((item) => item.kind === "text");
+    const hasNotice =
+      message.stopReason === "length" || message.stopReason === "aborted" || message.stopReason === "error";
+    const eligible = !streaming && !hasExpandedRun && !hasTextItem && !hasNotice && items.length > 0;
+    const transparent = !eligible && (streaming || hasExpandedRun) && !hasTextItem && !hasNotice && items.length > 0;
+    return { streaming, eligible, transparent };
+  }
+
+  /** Terminal error/abort notices; returns whether any notice was appended. */
+  function appendStopReasonNotices(
+    self: AssistantInternals,
+    message: AssistantMessage,
+    hasToolCalls: boolean,
+  ): boolean {
+    if (message.stopReason === "length") {
+      self.contentContainer.addChild(new Spacer(1));
+      self.contentContainer.addChild(
+        new Text(
+          activeTheme
+            ? activeTheme.fg(
+                "error",
+                "Error: Model stopped because it reached the maximum output token limit. The response may be incomplete.",
+              )
+            : "Error: Model stopped because it reached the maximum output token limit. The response may be incomplete.",
+          self.outputPad,
+          0,
+        ),
+      );
+      return true;
+    }
+    if (hasToolCalls) return false;
+    if (message.stopReason === "aborted") {
+      const abortMessage =
+        message.errorMessage && message.errorMessage !== "Request was aborted"
+          ? message.errorMessage
+          : "Operation aborted";
+      self.contentContainer.addChild(new Spacer(1));
+      self.contentContainer.addChild(
+        new Text(activeTheme ? activeTheme.fg("error", abortMessage) : abortMessage, self.outputPad, 0),
+      );
+      return true;
+    }
+    if (message.stopReason === "error") {
+      const errorMessage = message.errorMessage || "Unknown error";
+      self.contentContainer.addChild(new Spacer(1));
+      self.contentContainer.addChild(
+        new Text(
+          activeTheme ? activeTheme.fg("error", `Error: ${errorMessage}`) : `Error: ${errorMessage}`,
+          self.outputPad,
+          0,
+        ),
+      );
+      return true;
+    }
+    return false;
+  }
+
   function patchedUpdateContent(this: AssistantMessageComponent, message: AssistantMessage) {
     const component = this as AssistantMessageComponent;
     const self = this as unknown as AssistantInternals;
@@ -255,22 +326,11 @@ export default function compactThinking(pi: ExtensionAPI) {
     const spacing = currentBlockSpacing();
     const items = collectRenderedItems(message, activeThinking);
 
-    // ThoughtMember eligibility: finished, collapsed, text-free. The component
-    // keeps building its heading row; tool-display's verb-group claims eligible
-    // members by stamping them, and only claimed members render zero lines (see
-    // patchedRender). The claim is cleared here on every content rebuild so a
-    // stale fold never survives a message change.
-    const streaming = activeThinking?.messageTimestamp === message.timestamp;
-    const hasExpandedRun = (expandedRuns.get(component)?.size ?? 0) > 0;
-    const hasTextItem = items.some((item) => item.kind === "text");
-    const hasNotice =
-      message.stopReason === "length" || message.stopReason === "aborted" || message.stopReason === "error";
-    const eligible = !streaming && !hasExpandedRun && !hasTextItem && !hasNotice && items.length > 0;
-    const transparent = !eligible && (streaming || hasExpandedRun) && !hasTextItem && !hasNotice && items.length > 0;
-    setThoughtMember(component, eligible);
+    const membership = computeThoughtMembership(component, message, items);
+    setThoughtMember(component, membership.eligible);
     setThoughtMemberClaimed(component, false);
-    setThoughtTransparent(component, transparent);
-    if (!eligible && !transparent) setThoughtGroupExpanded(component, false);
+    setThoughtTransparent(component, membership.transparent);
+    if (!membership.eligible && !membership.transparent) setThoughtGroupExpanded(component, false);
 
     const droppedLeadingBlank = items.length > 0 && items[0].kind === "thinking" && spacing === 0;
     if (droppedLeadingBlank) leadingBlankDropped.add(component);
@@ -368,46 +428,7 @@ export default function compactThinking(pi: ExtensionAPI) {
     const hasToolCalls = message.content.some((content) => content.type === "toolCall");
     self.hasToolCalls = hasToolCalls;
 
-    let noticeAppended = false;
-    if (message.stopReason === "length") {
-      noticeAppended = true;
-      self.contentContainer.addChild(new Spacer(1));
-      self.contentContainer.addChild(
-        new Text(
-          activeTheme
-            ? activeTheme.fg(
-                "error",
-                "Error: Model stopped because it reached the maximum output token limit. The response may be incomplete.",
-              )
-            : "Error: Model stopped because it reached the maximum output token limit. The response may be incomplete.",
-          self.outputPad,
-          0,
-        ),
-      );
-    } else if (!hasToolCalls) {
-      if (message.stopReason === "aborted") {
-        noticeAppended = true;
-        const abortMessage =
-          message.errorMessage && message.errorMessage !== "Request was aborted"
-            ? message.errorMessage
-            : "Operation aborted";
-        self.contentContainer.addChild(new Spacer(1));
-        self.contentContainer.addChild(
-          new Text(activeTheme ? activeTheme.fg("error", abortMessage) : abortMessage, self.outputPad, 0),
-        );
-      } else if (message.stopReason === "error") {
-        noticeAppended = true;
-        const errorMessage = message.errorMessage || "Unknown error";
-        self.contentContainer.addChild(new Spacer(1));
-        self.contentContainer.addChild(
-          new Text(
-            activeTheme ? activeTheme.fg("error", `Error: ${errorMessage}`) : `Error: ${errorMessage}`,
-            self.outputPad,
-            0,
-          ),
-        );
-      }
-    }
+    const noticeAppended = appendStopReasonNotices(self, message, hasToolCalls);
 
     if (!noticeAppended && items[items.length - 1]?.kind === "thinking") {
       setRailTailSpacing(component, spacing);

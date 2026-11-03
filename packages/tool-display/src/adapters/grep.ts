@@ -1,6 +1,6 @@
 import { shortenPath } from "@htwang-contrib/common";
 import type { ToolDisplayAdapter } from "../types.ts";
-import { formatExpandedToolOutputLines, formatLineCount } from "./shared.ts";
+import { outputContentMethods } from "./shared.ts";
 
 interface GrepArgs {
   pattern?: string;
@@ -33,18 +33,9 @@ export const grepAdapter: ToolDisplayAdapter<GrepArgs> = {
     return header;
   },
 
-  formatCollapsedContent(_args, output, theme, _width, details?: unknown, isPartial?: boolean, _spinAt?: number) {
-    if (isPartial) return [];
+  ...outputContentMethods((details) => {
     const matches = matchCountFromDetails(details);
-    if (typeof matches === "number") {
-      const msg = `${matches} match${matches !== 1 ? "es" : ""}`;
-      return [theme.fg("muted", `└ ${msg}`)];
-    }
-    if (!output) return [];
-    return formatLineCount(output, theme);
-  },
-
-  formatExpandedContent(_args, output, theme, width, _details?: unknown) {
-    return formatExpandedToolOutputLines(output ?? "", theme, width);
-  },
+    if (typeof matches !== "number") return undefined;
+    return `${matches} match${matches !== 1 ? "es" : ""}`;
+  }),
 };

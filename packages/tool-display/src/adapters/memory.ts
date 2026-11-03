@@ -3,7 +3,7 @@ import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { diffLines } from "diff";
 import { loadConfig } from "../config.ts";
 import type { ToolDisplayAdapter } from "../types.ts";
-import { formatExpandedToolOutputLines } from "./shared.ts";
+import { countFirstSummary, formatDimPreviewLines, formatExpandedToolOutputLines, listLines } from "./shared.ts";
 
 function isSingleLine(): boolean {
   return loadConfig().memoryStyle === "single-line";
@@ -60,16 +60,7 @@ export const memoryCreateAdapter: ToolDisplayAdapter<MemoryCreateArgs> = {
   },
 
   formatExpandedContent(args, _output, theme, width) {
-    const content = args?.content ?? "";
-    const allLines = content.split(/\r?\n/);
-    const limit = 20;
-    const lines = allLines
-      .slice(0, limit)
-      .map((line) => truncateToWidth(theme.fg("dim", line), Math.max(1, width), "…"));
-    if (allLines.length > limit) {
-      lines.push(theme.fg("muted", `… ${allLines.length - limit} more line(s)`));
-    }
-    return lines;
+    return formatDimPreviewLines(args?.content ?? "", theme, width);
   },
 };
 
@@ -111,17 +102,7 @@ export const memoryReadAdapter: ToolDisplayAdapter<MemoryReadArgs> = {
 
   formatExpandedContent(_args, _output, theme, width, details) {
     const d = details as MemoryReadDetails | undefined;
-    const content = d?.content_preview ?? "";
-    if (!content) return [];
-    const allLines = content.split(/\r?\n/);
-    const limit = 20;
-    const lines = allLines
-      .slice(0, limit)
-      .map((line) => truncateToWidth(theme.fg("dim", line), Math.max(1, width), "…"));
-    if (allLines.length > limit) {
-      lines.push(theme.fg("muted", `… ${allLines.length - limit} more line(s)`));
-    }
-    return lines;
+    return formatDimPreviewLines(d?.content_preview ?? "", theme, width);
   },
 };
 
@@ -270,22 +251,13 @@ export const memorySearchAdapter: ToolDisplayAdapter<MemorySearchArgs> = {
 
   formatExpandedContent(_args, _output, theme, _width, details) {
     const d = details as MemorySearchDetails | undefined;
-    const items = d?.items ?? [];
-    const total = d?.total ?? 0;
-    const limit = 10;
-    const lines: string[] = [];
-    for (let i = 0; i < Math.min(limit, items.length); i++) {
-      const item = items[i]!;
-      lines.push(theme.fg("accent", item.uri));
+    return listLines(d?.items ?? [], d?.total ?? 0, 10, "result", theme, (item) => {
+      const lines = [theme.fg("accent", item.uri)];
       if (item.snippet) {
-        const snip = item.snippet.length > 100 ? `${item.snippet.slice(0, 99)}…` : item.snippet;
-        lines.push(theme.fg("dim", snip));
+        lines.push(theme.fg("dim", item.snippet.length > 100 ? `${item.snippet.slice(0, 99)}…` : item.snippet));
       }
-    }
-    if (total > limit) {
-      lines.push(theme.fg("muted", `└ … ${total - limit} more result${total - limit === 1 ? "" : "s"}`));
-    }
-    return lines;
+      return lines;
+    });
   },
 };
 
@@ -424,11 +396,7 @@ interface MemoryHistoryDetails {
 
 function historySummary(theme: Theme, details: unknown): string {
   const d = details as MemoryHistoryDetails | undefined;
-  const total = d?.total ?? 0;
-  if (total === 0) return theme.fg("muted", "no versions");
-  const first = d?.versions?.[0] ?? "";
-  const more = total > 1 ? theme.fg("dim", ` · ${total - 1} more`) : "";
-  return `${theme.fg("success", `${total} version${total === 1 ? "" : "s"}`)} ${theme.fg("dim", first)}${more}`;
+  return countFirstSummary(theme, "version", "no versions", d?.total ?? 0, d?.versions?.[0] ?? "");
 }
 
 export const memoryHistoryAdapter: ToolDisplayAdapter<MemoryHistoryArgs> = {
@@ -450,14 +418,7 @@ export const memoryHistoryAdapter: ToolDisplayAdapter<MemoryHistoryArgs> = {
 
   formatExpandedContent(_args, _output, theme, _width, details) {
     const d = details as MemoryHistoryDetails | undefined;
-    const versions = d?.versions ?? [];
-    const total = d?.total ?? 0;
-    const limit = 15;
-    const lines = versions.slice(0, limit).map((v) => theme.fg("dim", v));
-    if (total > limit) {
-      lines.push(theme.fg("muted", `└ … ${total - limit} more version${total - limit === 1 ? "" : "s"}`));
-    }
-    return lines;
+    return listLines(d?.versions ?? [], d?.total ?? 0, 15, "version", theme, (v) => [theme.fg("dim", v)]);
   },
 };
 
@@ -468,11 +429,7 @@ interface MemoryDomainsDetails {
 
 function domainsSummary(theme: Theme, details: unknown): string {
   const d = details as MemoryDomainsDetails | undefined;
-  const total = d?.total ?? 0;
-  if (total === 0) return theme.fg("muted", "none");
-  const first = d?.domains?.[0] ?? "";
-  const more = total > 1 ? theme.fg("dim", ` · ${total - 1} more`) : "";
-  return `${theme.fg("success", `${total} domain${total === 1 ? "" : "s"}`)} ${theme.fg("dim", first)}${more}`;
+  return countFirstSummary(theme, "domain", "none", d?.total ?? 0, d?.domains?.[0] ?? "");
 }
 
 export const memoryDomainsAdapter: ToolDisplayAdapter<Record<string, unknown>> = {

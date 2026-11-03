@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Message text extraction reuses `userMessageText` from `@htwang-contrib/common`; overlay up/down scrolling uses `scrollKeyOffset`.
+
 ## [0.7.0] - 2026-10-30
 
 ### Changed

@@ -37,21 +37,9 @@ export type QuestionnaireAction =
   | { kind: "notes_forward"; data: string }
   | { kind: "ignore" };
 
-export interface QuestionnaireKeybindings {
-  matches(data: string, name: string): boolean;
-}
-
-export function wrapTab(index: number, total: number): number {
+function wrapTab(index: number, total: number): number {
   if (total <= 0) return 0;
   return ((index % total) + total) % total;
-}
-
-export function allAnswered(state: QuestionnaireState, runtime: QuestionnaireRuntime): boolean {
-  if (runtime.questions.length === 0) return false;
-  for (let i = 0; i < runtime.questions.length; i++) {
-    if (!state.answers.has(i)) return false;
-  }
-  return true;
 }
 
 function totalTabs(runtime: QuestionnaireRuntime): number {
@@ -144,6 +132,35 @@ function prevNavOnUp(state: QuestionnaireState, runtime: QuestionnaireRuntime): 
   };
 }
 
+// Shared UP/DOWN row navigation used by both the input-mode tail and the default path.
+function rowNavAction(
+  data: string,
+  kb: { matches(data: string, name: string): boolean },
+  state: QuestionnaireState,
+  runtime: QuestionnaireRuntime,
+): QuestionnaireAction | undefined {
+  if (kb.matches(data, KEYBIND_UP)) return prevNavOnUp(state, runtime);
+  if (kb.matches(data, KEYBIND_DOWN)) return nextNavOnDown(state, runtime);
+  return undefined;
+}
+
+// Shared confirm handling for single-select questions in both the input-mode tail and the default path.
+function singleSelectConfirm(
+  data: string,
+  kb: { matches(data: string, name: string): boolean },
+  state: QuestionnaireState,
+  runtime: QuestionnaireRuntime,
+): QuestionnaireAction | undefined {
+  if (!kb.matches(data, KEYBIND_CONFIRM)) return undefined;
+  const answer = buildSingleSelectAnswer(state, runtime);
+  if (!answer) return { kind: "ignore" };
+  return {
+    kind: "confirm",
+    answer,
+    autoAdvanceTab: computeAutoAdvanceTab(state, runtime),
+  };
+}
+
 export function routeKey(data: string, state: QuestionnaireState, runtime: QuestionnaireRuntime): QuestionnaireAction {
   const kb = runtime.keybindings;
 
@@ -169,15 +186,8 @@ export function routeKey(data: string, state: QuestionnaireState, runtime: Quest
     // Newline takes precedence over confirmation if a user configuration binds
     // the same physical key to both semantic actions.
     if (kb.matches(data, KEYBIND_NEW_LINE)) return { kind: "ignore" };
-    if (kb.matches(data, KEYBIND_CONFIRM)) {
-      const answer = buildSingleSelectAnswer(state, runtime);
-      if (!answer) return { kind: "ignore" };
-      return {
-        kind: "confirm",
-        answer,
-        autoAdvanceTab: computeAutoAdvanceTab(state, runtime),
-      };
-    }
+    const confirm = singleSelectConfirm(data, kb, state, runtime);
+    if (confirm) return confirm;
     // Treat Pi's Ctrl+U line-kill binding as an explicit whole-draft clear,
     // independent of the current cursor position.
     if (kb.matches(data, KEYBIND_INPUT_CLEAR)) return { kind: "input_clear" };
@@ -187,13 +197,7 @@ export function routeKey(data: string, state: QuestionnaireState, runtime: Quest
     // reaches its first/last logical line; only then do UP/DOWN leave for row nav.
     if (kb.matches(data, KEYBIND_EDITOR_UP) && runtime.canMoveInputUp) return { kind: "ignore" };
     if (kb.matches(data, KEYBIND_EDITOR_DOWN) && runtime.canMoveInputDown) return { kind: "ignore" };
-    if (kb.matches(data, KEYBIND_UP)) {
-      return prevNavOnUp(state, runtime);
-    }
-    if (kb.matches(data, KEYBIND_DOWN)) {
-      return nextNavOnDown(state, runtime);
-    }
-    return { kind: "ignore" };
+    return rowNavAction(data, kb, state, runtime) ?? { kind: "ignore" };
   }
 
   if (runtime.isMulti && state.currentTab === runtime.questions.length) {
@@ -220,12 +224,8 @@ export function routeKey(data: string, state: QuestionnaireState, runtime: Quest
   const q = runtime.questions[state.currentTab];
   if (!q) return { kind: "ignore" };
 
-  if (kb.matches(data, KEYBIND_UP)) {
-    return prevNavOnUp(state, runtime);
-  }
-  if (kb.matches(data, KEYBIND_DOWN)) {
-    return nextNavOnDown(state, runtime);
-  }
+  const rowNav = rowNavAction(data, kb, state, runtime);
+  if (rowNav) return rowNav;
 
   if (q.multiSelect) {
     const focusedKind = runtime.currentItem?.kind;
@@ -257,15 +257,8 @@ export function routeKey(data: string, state: QuestionnaireState, runtime: Quest
     return { kind: "ignore" };
   }
 
-  if (kb.matches(data, KEYBIND_CONFIRM)) {
-    const answer = buildSingleSelectAnswer(state, runtime);
-    if (!answer) return { kind: "ignore" };
-    return {
-      kind: "confirm",
-      answer,
-      autoAdvanceTab: computeAutoAdvanceTab(state, runtime),
-    };
-  }
+  const confirm = singleSelectConfirm(data, kb, state, runtime);
+  if (confirm) return confirm;
   if (kb.matches(data, KEYBIND_CANCEL)) return { kind: "cancel" };
   return { kind: "ignore" };
 }

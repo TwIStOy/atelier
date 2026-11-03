@@ -85,9 +85,9 @@ function getCmdName(cmd: Command): string | null {
   return cmd.name?.text ?? null;
 }
 
-export type BashChecker = (command: string) => string | null;
+type BashChecker = (command: string) => string | null;
 
-export function createBashChecker(protectedPaths: readonly string[]): BashChecker {
+function createBashChecker(protectedPaths: readonly string[]): BashChecker {
   const has = (text: string): boolean => protectedPaths.some((p) => p !== "" && text.includes(p));
 
   function wordHas(w: Word): boolean {

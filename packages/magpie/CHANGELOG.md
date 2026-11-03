@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Catalog refresh and the `/refresh-magpie` command handler now come from `@htwang-contrib/common`'s `gateway-provider` module instead of a package-private copy.
+
 ## [0.7.0] - 2026-10-30
 
 ### Changed

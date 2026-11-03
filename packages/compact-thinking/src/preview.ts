@@ -26,42 +26,10 @@ export class SingleLineText implements Component {
   invalidate(): void {}
 }
 
-export class ActiveThinkingPreview implements Component {
-  private heading: string;
-  private text: string;
-  private previewLines: number;
-  private style: (text: string) => string;
-  private cachedWidth = -1;
-  private cachedLines: string[] | undefined;
-
-  constructor(heading: string, text: string, previewLines: number, style: (text: string) => string) {
-    this.heading = heading;
-    this.text = text;
-    this.previewLines = previewLines;
-    this.style = style;
-  }
-
-  render(width: number): string[] {
-    if (this.cachedLines !== undefined && width === this.cachedWidth) return this.cachedLines;
-
-    const lines = new Text(this.style(this.text), 0, 0).render(width);
-    const heading = new Text(this.heading, 0, 0).render(width);
-    const result = [...heading, ...lines.slice(-this.previewLines)];
-    this.cachedWidth = width;
-    this.cachedLines = result;
-    return result;
-  }
-
-  invalidate(): void {
-    this.cachedWidth = -1;
-    this.cachedLines = undefined;
-  }
-}
-
-export class StrictThinkingPreview implements Component {
-  private heading: string;
-  private text: string;
-  private style: (text: string) => string;
+abstract class CachedThinkingPreview implements Component {
+  protected heading: string;
+  protected text: string;
+  protected style: (text: string) => string;
   private cachedWidth = -1;
   private cachedLines: string[] | undefined;
 
@@ -75,8 +43,8 @@ export class StrictThinkingPreview implements Component {
     if (this.cachedLines !== undefined && width === this.cachedWidth) return this.cachedLines;
 
     const lines = new Text(this.style(this.text), 0, 0).render(width);
-    const heading = new Text(this.heading + this.style(" ... (click to collapse)"), 0, 0).render(width);
-    const result = [...heading, "", ...lines];
+    const heading = new Text(this.headingText(), 0, 0).render(width);
+    const result = this.compose(heading, lines);
     this.cachedWidth = width;
     this.cachedLines = result;
     return result;
@@ -85,5 +53,39 @@ export class StrictThinkingPreview implements Component {
   invalidate(): void {
     this.cachedWidth = -1;
     this.cachedLines = undefined;
+  }
+
+  protected abstract headingText(): string;
+  protected abstract compose(heading: string[], lines: string[]): string[];
+}
+
+export class ActiveThinkingPreview extends CachedThinkingPreview {
+  private previewLines: number;
+
+  constructor(heading: string, text: string, previewLines: number, style: (text: string) => string) {
+    super(heading, text, style);
+    this.previewLines = previewLines;
+  }
+
+  protected headingText(): string {
+    return this.heading;
+  }
+
+  protected compose(heading: string[], lines: string[]): string[] {
+    return [...heading, ...lines.slice(-this.previewLines)];
+  }
+}
+
+export class StrictThinkingPreview extends CachedThinkingPreview {
+  constructor(heading: string, text: string, style: (text: string) => string) {
+    super(heading, text, style);
+  }
+
+  protected headingText(): string {
+    return this.heading + this.style(" ... (click to collapse)");
+  }
+
+  protected compose(heading: string[], lines: string[]): string[] {
+    return [...heading, "", ...lines];
   }
 }

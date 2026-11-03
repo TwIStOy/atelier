@@ -15,7 +15,7 @@ export type RowKind = WrappingSelectItem["kind"];
  * derivation, and `LABELS_BY_KIND` consumers iterate this list.
  */
 export type SentinelKind = Exclude<RowKind, "option">;
-export const SENTINEL_KINDS: readonly SentinelKind[] = ["other", "next"];
+const SENTINEL_KINDS: readonly SentinelKind[] = ["other", "next"];
 
 /**
  * Per-kind static metadata. Pure data — no closures, no per-kind handler
@@ -98,24 +98,6 @@ export const ROW_INTENT_META: Record<RowKind, RowIntentMeta> = {
     autoAppendOnMultiSelect: true,
   },
 };
-
-/**
- * Kind-keyed label view. `option` is excluded — its label is per-instance,
- * not per-kind. `types.ts#SENTINEL_LABELS` re-sources from here.
- */
-export const LABELS_BY_KIND: { readonly [K in SentinelKind]: string } = {
-  other: ROW_INTENT_META.other.label,
-  next: ROW_INTENT_META.next.label,
-};
-
-/**
- * Reserved-label set for runtime validation. Includes "Other" (a model-conditioned
- * label that has no runtime kind) plus every sentinel with `reserved: true`.
- */
-export const RESERVED_LABEL_SET: ReadonlySet<string> = new Set<string>([
-  "Other",
-  ...SENTINEL_KINDS.filter((k) => ROW_INTENT_META[k].reserved).map((k) => ROW_INTENT_META[k].label),
-]);
 
 /**
  * Walk the META table to synthesize sentinel rows for one question. The two

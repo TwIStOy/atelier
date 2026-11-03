@@ -1,4 +1,4 @@
-import { type Static, Type } from "@sinclair/typebox";
+import { Type } from "@sinclair/typebox";
 
 export const COMMAND_NAME = "todos";
 
@@ -129,7 +129,7 @@ export const DeleteTodoSchema = Type.Object({
 
 export const ClearTodoSchema = Type.Object({});
 
-export const TaskSchema = Type.Object({
+const TaskSchema = Type.Object({
   id: Type.Number(),
   subject: Type.String(),
   description: Type.Optional(Type.String()),
@@ -149,10 +149,3 @@ export const GetTodoOutputSchema = Type.Object({
   task: TaskSchema,
   blocks: Type.Array(Type.Number()),
 });
-
-export type CreateTodoParams = Static<typeof CreateTodoSchema>;
-export type UpdateTodoParams = Static<typeof UpdateTodoSchema>;
-export type ListTodoParams = Static<typeof ListTodoSchema>;
-export type GetTodoParams = Static<typeof GetTodoSchema>;
-export type DeleteTodoParams = Static<typeof DeleteTodoSchema>;
-export type ClearTodoParams = Static<typeof ClearTodoSchema>;

@@ -107,5 +107,3 @@ class Spacer implements Component {
     return Array.from({ length: this.rows }, () => "");
   }
 }
-
-export type { Component };

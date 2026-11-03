@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Catalog refresh and the `/refresh-toori` command handler now come from `@htwang-contrib/common`'s `gateway-provider` module instead of a package-private copy (identical notifications, including the `INFERENCE_V2_TWISTOY_API_KEY` pre-check).
+
 ## [0.7.0] - 2026-10-30
 
 ### Added

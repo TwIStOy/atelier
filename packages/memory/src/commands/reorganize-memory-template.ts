@@ -2,7 +2,7 @@
  * `/reorganize-memory` user-message template.
  */
 
-export const REORGANIZE_MEMORY_TEMPLATE = `Perform a comprehensive audit and reorganization of the entire memory tree.
+const REORGANIZE_MEMORY_TEMPLATE = `Perform a comprehensive audit and reorganization of the entire memory tree.
 
 ## Arguments
 

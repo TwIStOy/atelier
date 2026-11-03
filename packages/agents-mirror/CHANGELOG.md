@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Removed
+
+- Dead exports found by static analysis: `MirrorResolution`, `InjectionConfig`, `CONFIG_ID`, `defaultConfigPath`, `SINGLETON_SESSION_KEY`, `STATUS_KEY`, `WIDGET_KEY`, `Cache.clearAll()`.
+
 ## [0.7.0] - 2026-10-30
 
 ### Changed

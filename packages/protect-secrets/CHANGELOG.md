@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Removed
+
+- Dead exports found by static analysis: `BashChecker`, `ProjectConfigLocation`, `createBashChecker`, `findProjectConfig`.
+
 ## [0.7.0] - 2026-10-30
 
 ### Added

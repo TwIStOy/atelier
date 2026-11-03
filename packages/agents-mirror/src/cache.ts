@@ -30,8 +30,4 @@ export class InjectionCache {
   clearSession(sessionKey: string): void {
     this.sessions.delete(sessionKey);
   }
-
-  clearAll(): void {
-    this.sessions.clear();
-  }
 }

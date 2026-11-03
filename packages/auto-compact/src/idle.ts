@@ -1,6 +1,6 @@
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 
-export const IDLE_FLOOR_RATIO = 0.5;
+const IDLE_FLOOR_RATIO = 0.5;
 
 export const CURRENT_TURN_TOLERANCE_MS = 10_000;
 

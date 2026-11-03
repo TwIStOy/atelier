@@ -1,8 +1,9 @@
 import { execSync } from "node:child_process";
 import { getLanguageFromPath, highlightCode, type Theme } from "@earendil-works/pi-coding-agent";
-import { truncateToWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
-import { extractAnsiRgb, trimTrailingEmpty } from "@htwang-contrib/common";
+import { truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
+import { extractAnsiRgb, shortenPath, trimTrailingEmpty } from "@htwang-contrib/common";
 import { loadConfig } from "../config.ts";
+import type { ToolDisplayAdapter } from "../types.ts";
 
 const BAR_WIDTH = 6;
 
@@ -118,7 +119,7 @@ export function formatExpandedToolOutputLines(output: string, theme: Theme, widt
   return output.split("\n").map((line) => truncateToWidth(theme.fg("toolOutput", line), inner, "…"));
 }
 
-export function replaceTabs(text: string): string {
+function replaceTabs(text: string): string {
   return text.replace(/\t/g, "   ");
 }
 
@@ -183,4 +184,110 @@ export function formatLineCount(content: string, theme: Theme): string[] {
   const count = rawLines.length;
   if (count === 0) return [theme.fg("muted", "└ empty")];
   return [theme.fg("muted", `└ ${count} line${count !== 1 ? "s" : ""}`)];
+}
+
+/** First `limit` content lines in dim style with a `└ … N more line(s)` footer. */
+export function formatDimPreviewLines(content: string, theme: Theme, width: number, limit = 20): string[] {
+  if (!content) return [];
+  const allLines = content.split(/\r?\n/);
+  const lines = allLines.slice(0, limit).map((line) => truncateToWidth(theme.fg("dim", line), Math.max(1, width), "…"));
+  if (allLines.length > limit) {
+    lines.push(theme.fg("muted", `└ … ${allLines.length - limit} more line(s)`));
+  }
+  return lines;
+}
+
+/** Render up to `limit` items and append a `└ … N more <noun>(s)` footer. */
+export function listLines<T>(
+  items: readonly T[],
+  total: number,
+  limit: number,
+  noun: string,
+  theme: Theme,
+  render: (item: T) => string[],
+): string[] {
+  const lines: string[] = [];
+  for (let i = 0; i < Math.min(limit, items.length); i++) {
+    lines.push(...render(items[i]!));
+  }
+  if (total > limit) {
+    lines.push(theme.fg("muted", `└ … ${total - limit} more ${noun}${total - limit === 1 ? "" : "s"}`));
+  }
+  return lines;
+}
+
+/** `N <noun>s <first> · N-1 more` summary, or `emptyLabel` when nothing matched. */
+export function countFirstSummary(
+  theme: Theme,
+  noun: string,
+  emptyLabel: string,
+  total: number,
+  first: string,
+): string {
+  if (total === 0) return theme.fg("muted", emptyLabel);
+  const more = total > 1 ? theme.fg("dim", ` · ${total - 1} more`) : "";
+  return `${theme.fg("success", `${total} ${noun}${total === 1 ? "" : "s"}`)} ${theme.fg("dim", first)}${more}`;
+}
+
+export function stringField(details: unknown, key: string): string | undefined {
+  if (details == null || typeof details !== "object") return undefined;
+  const v = (details as Record<string, unknown>)[key];
+  return typeof v === "string" && v.length > 0 ? v : undefined;
+}
+
+export function numberField(details: unknown, key: string): number | undefined {
+  if (details == null || typeof details !== "object") return undefined;
+  const v = (details as Record<string, unknown>)[key];
+  return typeof v === "number" ? v : undefined;
+}
+
+/** Dim ` (backend)` tag appended to tool titles when details carry a backend. */
+export function backendTag(theme: Theme, details: unknown): string {
+  const backend = stringField(details, "backend");
+  return backend ? ` ${theme.fg("dim", `(${backend})`)}` : "";
+}
+
+/** Accent-styled shortened file path for edit/write headers. */
+export function filePathDisplay(args: { file_path?: string; path?: string } | undefined, theme: Theme): string {
+  const path = shortenPath(args?.file_path ?? args?.path ?? "");
+  return path ? theme.fg("accent", path) : theme.fg("toolOutput", "...");
+}
+
+/** `Title <label> · settled/total <noun>` header, width-truncated. */
+export function batchHeader(
+  theme: Theme,
+  title: string,
+  label: string,
+  stats: { settled: number; total: number } | undefined,
+  statsNoun: string,
+  width: number | undefined,
+): string {
+  const statsText = stats ? theme.fg("muted", ` · ${stats.settled}/${stats.total} ${statsNoun}`) : "";
+  const header = `${theme.fg("toolTitle", theme.bold(title))} ${theme.fg("accent", label)}${statsText}`;
+  if (width !== undefined && visibleWidth(header) > width) {
+    return truncateToWidth(header, width, "…");
+  }
+  return header;
+}
+
+/**
+ * Collapsed/expanded content pair for read-only list tools: a one-line count
+ * summary from `details` when present, falling back to a line count, and raw
+ * output lines when expanded.
+ */
+export function outputContentMethods(
+  countMessage: (details: unknown) => string | undefined,
+): Pick<ToolDisplayAdapter, "formatCollapsedContent" | "formatExpandedContent"> {
+  return {
+    formatCollapsedContent(_args, output, theme, _width, details, isPartial) {
+      if (isPartial) return [];
+      const msg = countMessage(details);
+      if (msg !== undefined) return [theme.fg("muted", `└ ${msg}`)];
+      if (!output) return [];
+      return formatLineCount(output, theme);
+    },
+    formatExpandedContent(_args, output, theme, width) {
+      return formatExpandedToolOutputLines(output ?? "", theme, width);
+    },
+  };
 }

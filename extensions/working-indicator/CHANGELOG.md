@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Removed
+
+- Dead exports found by static analysis: `DEFAULT_RUNCAT_*` constants, `DEFAULT_PHRASES`, `resolvePhrases`, `CONFIG_ID`/`DEFAULT_CONFIG`/`CONFIG_SCHEMA`, `TokenEvent`.
+
 ## [0.7.0] - 2026-10-30
 
 ### Changed

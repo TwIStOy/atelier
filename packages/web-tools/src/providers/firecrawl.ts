@@ -1,4 +1,4 @@
-import { throwIfApiError } from "./errors.ts";
+import { requestJson, requireContent, throwIfMissingApiKey } from "./http.ts";
 import type { FetchResponse, FullProvider, SearchResponse, SearchResult } from "./types.ts";
 
 const FIRECRAWL_API_URL = "https://api.firecrawl.dev/v1";
@@ -46,58 +46,48 @@ export class FirecrawlProvider implements FullProvider {
   constructor(private readonly apiKey: string) {}
 
   async search(query: string, maxResults: number, signal?: AbortSignal): Promise<SearchResponse> {
-    if (!this.apiKey) {
-      throw new Error(`${this.envVar} is not set. Use /config to set the API key, or export the env var.`);
-    }
+    throwIfMissingApiKey(this.envVar, this.apiKey);
 
-    const res = await fetch(`${FIRECRAWL_API_URL}/search`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${this.apiKey}`,
+    const raw = await requestJson<FirecrawlSearchResponse>(
+      this.name,
+      `${FIRECRAWL_API_URL}/search`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${this.apiKey}`,
+        },
+        body: JSON.stringify({ query, limit: maxResults }),
       },
-      body: JSON.stringify({ query, limit: maxResults }),
       signal,
-    });
-
-    if (!res.ok) {
-      throwIfApiError(this.name, res.status, await res.text());
-    }
-
-    const raw = (await res.json()) as FirecrawlSearchResponse;
+    );
     return { query, results: normalizeFirecrawlResults(raw.data ?? []) };
   }
 
   async fetch(url: string, _raw: boolean, signal?: AbortSignal): Promise<FetchResponse> {
-    if (!this.apiKey) {
-      throw new Error(`${this.envVar} is not set. Use /config to set the API key, or export the env var.`);
-    }
+    throwIfMissingApiKey(this.envVar, this.apiKey);
 
-    const res = await fetch(`${FIRECRAWL_API_URL}/scrape`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${this.apiKey}`,
+    const raw = await requestJson<FirecrawlScrapeResponse>(
+      this.name,
+      `${FIRECRAWL_API_URL}/scrape`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${this.apiKey}`,
+        },
+        body: JSON.stringify({ url, formats: ["markdown"] }),
       },
-      body: JSON.stringify({ url, formats: ["markdown"] }),
       signal,
-    });
-
-    if (!res.ok) {
-      throwIfApiError(this.name, res.status, await res.text());
-    }
-
-    const raw = (await res.json()) as FirecrawlScrapeResponse;
+    );
     if (!raw.success) {
       throw new Error(`${this.label} Fetch API error: ${raw.error ?? "scrape failed"}`);
     }
-    if (!raw.data?.markdown) {
-      throw new Error(`${this.label} Fetch API error: no content returned for ${url}`);
-    }
+    const text = requireContent(this.label, url, raw.data?.markdown);
 
     return {
-      text: raw.data.markdown,
-      title: raw.data.metadata?.title || undefined,
+      text,
+      title: raw.data?.metadata?.title || undefined,
       contentType: "text/markdown",
     };
   }

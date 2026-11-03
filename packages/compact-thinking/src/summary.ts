@@ -6,7 +6,7 @@ type AnyModel = Model<any>;
 
 const logger = createLogger("compact-thinking");
 
-export const SUMMARY_INPUT_MAX_CHARS = 60_000;
+const SUMMARY_INPUT_MAX_CHARS = 60_000;
 const SUMMARY_OUTPUT_MAX_CHARS = 240;
 
 const SYSTEM_PROMPT =

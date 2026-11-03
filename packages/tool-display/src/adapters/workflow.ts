@@ -1,11 +1,10 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { truncateDisplay } from "@htwang-contrib/common";
 import { parseWorkflowScript } from "@htwang-contrib/workflow/script";
 import { spinnerGlyph } from "../format.ts";
 import { defaultCollapsedRenderer } from "../tool-call-display.ts";
 import type { ToolDisplayAdapter } from "../types.ts";
-import { formatExpandedToolOutputLines, renderContentWithLineNumbers } from "./shared.ts";
+import { batchHeader, formatExpandedToolOutputLines, renderContentWithLineNumbers } from "./shared.ts";
 
 interface WorkflowArgs {
   script?: string;
@@ -95,18 +94,7 @@ function settledCounts(details: WorkflowDetails | undefined): { settled: number;
 
 export const workflowAdapter: ToolDisplayAdapter<WorkflowArgs> = {
   formatCallHeader(args, theme, details, _isPartial, _expanded, width) {
-    const title = `${theme.fg("toolTitle", theme.bold(TITLE))} `;
-    const name = theme.fg("accent", workflowName(args));
-    let stats = "";
-    const counts = settledCounts(asDetails(details));
-    if (counts) {
-      stats = theme.fg("muted", ` · ${counts.settled}/${counts.total} agents`);
-    }
-    const header = title + name + stats;
-    if (width !== undefined && visibleWidth(header) > width) {
-      return truncateToWidth(header, width, "…");
-    }
-    return header;
+    return batchHeader(theme, TITLE, workflowName(args), settledCounts(asDetails(details)), "agents", width);
   },
 
   formatCollapsedContent(_args, output, theme, width, details, isPartial, spinAt = Date.now()) {

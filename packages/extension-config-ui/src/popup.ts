@@ -282,39 +282,35 @@ function createConfigComponent(
         requestRender();
         return;
       }
+      const moveSelectedReorderable = (delta: -1 | 1): boolean => {
+        const sel = ui.selecting;
+        if (!sel || row?.item.type !== "reorderable" || filterActive) return false;
+        const vals = Array.isArray(row.currentValue) ? [...row.currentValue] : [];
+        const optVal = opts[sel.selectedOptionIndex]?.value;
+        const fromIdx = vals.findIndex((v) => JSON.stringify(v) === JSON.stringify(optVal));
+        if (fromIdx < 0 || fromIdx + delta < 0 || fromIdx + delta >= vals.length) return false;
+        const newVals = moveReorderableItem(row, fromIdx, delta);
+        saveSetting(row, newVals);
+        row.currentValue = newVals;
+        row.isExplicit = true;
+        sel.selectedOptionIndex = Math.max(0, Math.min(opts.length - 1, sel.selectedOptionIndex + delta));
+        return true;
+      };
       if (
         row?.item.type === "reorderable" &&
         !filterActive &&
-        (matchesKey(data, "alt+up") || matchesKey(data, "ctrl+p"))
+        (matchesKey(data, "alt+up") || matchesKey(data, "ctrl+p")) &&
+        moveSelectedReorderable(-1)
       ) {
-        const vals = Array.isArray(row.currentValue) ? [...row.currentValue] : [];
-        const optVal = opts[ui.selecting.selectedOptionIndex]?.value;
-        const fromIdx = vals.findIndex((v) => JSON.stringify(v) === JSON.stringify(optVal));
-        if (fromIdx > 0) {
-          const newVals = moveReorderableItem(row, fromIdx, -1);
-          saveSetting(row, newVals);
-          row.currentValue = newVals;
-          row.isExplicit = true;
-          ui.selecting.selectedOptionIndex = Math.max(0, ui.selecting.selectedOptionIndex - 1);
-        }
         requestRender();
         return;
       }
       if (
         row?.item.type === "reorderable" &&
         !filterActive &&
-        (matchesKey(data, "alt+down") || matchesKey(data, "ctrl+n"))
+        (matchesKey(data, "alt+down") || matchesKey(data, "ctrl+n")) &&
+        moveSelectedReorderable(1)
       ) {
-        const vals = Array.isArray(row.currentValue) ? [...row.currentValue] : [];
-        const optVal = opts[ui.selecting.selectedOptionIndex]?.value;
-        const fromIdx = vals.findIndex((v) => JSON.stringify(v) === JSON.stringify(optVal));
-        if (fromIdx >= 0 && fromIdx < vals.length - 1) {
-          const newVals = moveReorderableItem(row, fromIdx, 1);
-          saveSetting(row, newVals);
-          row.currentValue = newVals;
-          row.isExplicit = true;
-          ui.selecting.selectedOptionIndex = Math.min(opts.length - 1, ui.selecting.selectedOptionIndex + 1);
-        }
         requestRender();
         return;
       }

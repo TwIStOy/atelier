@@ -348,18 +348,4 @@ export class ToolCallDisplayComponent extends Container {
     this.clear();
     this.addChild(renderToolCall(this.opts, this.theme));
   }
-
-  update(opts: Partial<ToolCallDisplayOpts>) {
-    Object.assign(this.opts, opts);
-    this.rebuild();
-    this.invalidate();
-  }
-
-  setExpanded(expanded: boolean) {
-    if (this.opts.expanded !== expanded) {
-      this.opts.expanded = expanded;
-      this.rebuild();
-      this.invalidate();
-    }
-  }
 }

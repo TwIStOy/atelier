@@ -1,13 +1,10 @@
-import { spawn } from "node:child_process";
 import { readFileSync, type Stats } from "node:fs";
 import { stat as fsStat } from "node:fs/promises";
-import { homedir } from "node:os";
 import path from "node:path";
-import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { DEFAULT_MAX_BYTES, formatSize, truncateHead } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
+import { resolveSearchPath, runRg, truncateOutput } from "../shared.ts";
 
 const globDir = path.dirname(fileURLToPath(import.meta.url));
 const globToolDescription = readFileSync(path.join(globDir, "glob.txt"), "utf-8").trim();
@@ -25,101 +22,6 @@ const globParams = Type.Object({
     }),
   ),
 });
-
-function expandUser(p: string): string {
-  if (p === "~" || p.startsWith("~/")) {
-    return path.join(homedir(), p === "~" ? "" : p.slice(2));
-  }
-  return p;
-}
-
-function resolveSearchPath(raw: string | undefined, cwd: string): string {
-  const p = (raw?.trim() || ".").trim() || ".";
-  const expanded = expandUser(p);
-  if (path.isAbsolute(expanded)) return path.normalize(expanded);
-  return path.resolve(cwd, expanded);
-}
-
-function runRgFiles(
-  cwd: string,
-  globPattern: string,
-  signal: AbortSignal | undefined,
-  maxCollect: number,
-): Promise<string[]> {
-  return new Promise((resolve, reject) => {
-    const paths: string[] = [];
-    const child = spawn("rg", ["--files", "--hidden", "--glob", globPattern, "."], {
-      cwd,
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-
-    let stderr = "";
-    let settled = false;
-    const settle = (fn: () => void) => {
-      if (!settled) {
-        settled = true;
-        fn();
-      }
-    };
-
-    const onAbort = () => {
-      if (!child.killed) child.kill("SIGTERM");
-    };
-    if (signal) {
-      if (signal.aborted) onAbort();
-      else signal.addEventListener("abort", onAbort, { once: true });
-    }
-
-    child.stderr?.on("data", (c) => {
-      stderr += c.toString();
-    });
-
-    const stdout = child.stdout;
-    if (!stdout) {
-      settle(() => reject(new Error("ripgrep: no stdout")));
-      return;
-    }
-
-    const rl = createInterface({ input: stdout });
-    rl.on("line", (line) => {
-      const rel = line.trim();
-      if (!rel) return;
-      paths.push(path.resolve(cwd, rel));
-      if (paths.length >= maxCollect && !child.killed) {
-        child.kill("SIGTERM");
-      }
-    });
-
-    child.on("error", (err) => {
-      rl.close();
-      if (signal) signal.removeEventListener("abort", onAbort);
-      settle(() =>
-        reject(
-          new Error(
-            `ripgrep (rg) not found or failed to start: ${err.message}. Install ripgrep and ensure it is on PATH.`,
-          ),
-        ),
-      );
-    });
-
-    child.on("close", (code) => {
-      rl.close();
-      if (signal) signal.removeEventListener("abort", onAbort);
-      if (signal?.aborted) {
-        settle(() => reject(new Error("Operation aborted")));
-        return;
-      }
-      const killedForCap = paths.length >= maxCollect;
-      const c = code ?? 0;
-      if (!killedForCap && c !== 0 && c !== 1) {
-        const msg = stderr.trim() || `ripgrep exited with code ${c}`;
-        settle(() => reject(new Error(msg)));
-        return;
-      }
-      settle(() => resolve(paths));
-    });
-  });
-}
 
 export function registerGlobTool(pi: ExtensionAPI) {
   pi.registerTool({
@@ -146,7 +48,13 @@ export function registerGlobTool(pi: ExtensionAPI) {
         throw new Error(`glob path must be a directory: ${searchPath}`);
       }
 
-      const relPaths = await runRgFiles(searchPath, pattern, signal, FILE_LIMIT + 1);
+      const relPaths = await runRg(
+        ["--files", "--hidden", "--glob", pattern, "."],
+        searchPath,
+        signal,
+        FILE_LIMIT + 1,
+        (line) => path.resolve(searchPath, line.trim()),
+      );
 
       const truncated = relPaths.length > FILE_LIMIT;
       const capped = truncated ? relPaths.slice(0, FILE_LIMIT) : relPaths;
@@ -180,22 +88,14 @@ export function registerGlobTool(pi: ExtensionAPI) {
         }
       }
 
-      let textOut = lines.join("\n");
-      const truncation = truncateHead(textOut, {
-        maxLines: Number.MAX_SAFE_INTEGER,
-        maxBytes: DEFAULT_MAX_BYTES,
-      });
-      textOut = truncation.content;
-      if (truncation.truncated) {
-        textOut += `\n\n[Output truncated: ${truncation.outputLines} of ${truncation.totalLines} lines (${formatSize(truncation.outputBytes)} of ${formatSize(truncation.totalBytes)}).]`;
-      }
+      const output = truncateOutput(lines.join("\n"));
 
       return {
-        content: [{ type: "text", text: textOut }],
+        content: [{ type: "text", text: output.text }],
         details: {
           count,
           truncated,
-          bytesTruncated: truncation.truncated,
+          bytesTruncated: output.truncated,
         },
       };
     },

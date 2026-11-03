@@ -1,5 +1,5 @@
 // Ported from https://github.com/markoonakic/pi-working-line/blob/main/src/phrases.ts
-export const DEFAULT_PHRASES = [
+const DEFAULT_PHRASES = [
   "Accomplishing",
   "Actioning",
   "Actualizing",
@@ -193,18 +193,4 @@ export function pickPhrase(phrases: readonly string[] = DEFAULT_PHRASES, random:
   if (phrases.length === 0) return "Working";
   const index = Math.min(phrases.length - 1, Math.floor(random() * phrases.length));
   return phrases[index] ?? "Working";
-}
-
-export function resolvePhrases(
-  defaults: readonly string[] = DEFAULT_PHRASES,
-  config?: {
-    mode?: "append" | "replace";
-    verbs?: readonly string[];
-  },
-): string[] {
-  const verbs = config?.verbs?.filter((verb) => verb.trim().length > 0) ?? [];
-  if (config?.mode === "replace") {
-    return verbs.length > 0 ? [...verbs] : [...defaults];
-  }
-  return [...defaults, ...verbs];
 }

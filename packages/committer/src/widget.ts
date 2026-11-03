@@ -1,7 +1,7 @@
 import type { ExtensionCommandContext, Theme } from "@earendil-works/pi-coding-agent";
 import type { Component, OverlayOptions, TUI } from "@earendil-works/pi-tui";
 import { Key, matchesKey, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
-import { formatElapsedSeconds } from "@htwang-contrib/common";
+import { formatElapsedSeconds, scrollKeyOffset } from "@htwang-contrib/common";
 import { SpinnerTimer, spinnerGlyph } from "@htwang-contrib/tool-display";
 
 function padToVisible(line: string, width: number): string {
@@ -83,13 +83,9 @@ export class CommitterOverlayController implements Component {
       this.done();
       return;
     }
-    if (matchesKey(data, Key.up)) {
-      this.scrollOffset = Math.max(0, this.scrollOffset - 1);
-      this.invalidate();
-      return;
-    }
-    if (matchesKey(data, Key.down)) {
-      this.scrollOffset += 1;
+    const nextOffset = scrollKeyOffset(data, this.scrollOffset);
+    if (nextOffset !== undefined) {
+      this.scrollOffset = nextOffset;
       this.invalidate();
     }
   }

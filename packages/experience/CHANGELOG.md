@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- `addHiddenRule` / `removeHiddenRule` share one mutation helper; identical `RuleChangeResult` shapes and persistence behavior.
+
 ## [0.7.0] - 2026-10-30
 
 ### Breaking Changes

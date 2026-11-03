@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Changed
+
+- `ActiveThinkingPreview` / `StrictThinkingPreview` share a cached-render base class; `patchedUpdateContent` extracts thought-membership computation and stop-reason notices into named helpers.
+
+### Removed
+
+- Dead exports found by static analysis: `DEFAULT_CONFIG`, `SUMMARY_INPUT_MAX_CHARS`, `IDLE_FLOOR_RATIO`.
+
 ## [0.7.0] - 2026-10-30
 
 ### Added

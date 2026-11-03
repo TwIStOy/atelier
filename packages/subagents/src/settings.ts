@@ -82,13 +82,6 @@ export function readSubagentSettings(overrides?: SubagentSettingsOverrides): Sub
   return { maxConcurrent, maxTotal, timeoutMs, fallbackAgent, defaultsByAgentType };
 }
 
-export function readSubagentConcurrencyLimits(
-  overrides?: Pick<SubagentSettingsOverrides, "max_concurrent" | "max_total">,
-): { maxConcurrent: number; maxTotal: number } {
-  const s = readSubagentSettings(overrides);
-  return { maxConcurrent: s.maxConcurrent, maxTotal: s.maxTotal };
-}
-
 function parseFallbackAgent(v: unknown, fallback: string): string {
   if (v === false) return FALLBACK_AGENT_NONE;
   if (typeof v !== "string") return fallback;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { HINT_PART_CLEAR, HINT_PART_EDIT, HINT_PART_NEW_LINE } from "../src/view/dialog-builder.ts";
+import { HINT_PART_CLEAR, HINT_PART_EDIT, HINT_PART_NEW_LINE } from "../src/view/dialog-text.ts";
 import { buildHintText } from "../src/view/tab-content-strategy.ts";
 import { baseState } from "./helpers.ts";
 

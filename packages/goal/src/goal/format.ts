@@ -1,5 +1,5 @@
 import { formatElapsedSeconds, formatTokens } from "@htwang-contrib/common";
-import type { Goal, TokenUsageSnapshot } from "./types.ts";
+import type { Goal } from "./types.ts";
 
 export function formatGoalForTool(goal: Goal): string {
   const lines: string[] = [
@@ -47,14 +47,4 @@ export function formatGoalToolResponse(goal: Goal): Record<string, unknown> {
     ...result,
     completionBudgetReport: budgetReport ?? "No token budget set",
   };
-}
-
-export function formatTokenUsageSnapshot(snapshot: TokenUsageSnapshot): string {
-  const parts = [
-    `in=${formatTokens(snapshot.input)}`,
-    `out=${formatTokens(snapshot.output)}`,
-    `cacheRead=${formatTokens(snapshot.cacheRead)}`,
-    `cacheWrite=${formatTokens(snapshot.cacheWrite)}`,
-  ];
-  return `TokenUsage(${parts.join(", ")} total=${formatTokens(snapshot.totalTokens)})`;
 }

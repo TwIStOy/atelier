@@ -39,7 +39,7 @@ function enrichGitError(err: unknown): unknown {
   return Object.assign(enriched, err);
 }
 
-export interface GitStatus {
+interface GitStatus {
   staged: string[];
   unstaged: string[];
   untracked: string[];
@@ -60,7 +60,7 @@ export async function getRepoRoot(cwd: string, signal?: AbortSignal): Promise<st
   }
 }
 
-export async function getGitStatus(cwd: string, signal?: AbortSignal): Promise<GitStatus> {
+async function getGitStatus(cwd: string, signal?: AbortSignal): Promise<GitStatus> {
   const output = await git(cwd, ["status", "--porcelain"], { signal });
 
   const staged: string[] = [];
@@ -117,20 +117,6 @@ export async function commit(cwd: string, message: string, signal?: AbortSignal)
   await git(cwd, ["commit", "-m", message], { signal });
   const hash = await git(cwd, ["rev-parse", "--short", "HEAD"], { signal });
   return hash.trim();
-}
-
-export async function getBranchName(cwd: string, signal?: AbortSignal): Promise<string> {
-  try {
-    const name = await git(cwd, ["branch", "--show-current"], { signal });
-    return name.trim();
-  } catch {
-    return "";
-  }
-}
-
-export async function getLastCommitLog(cwd: string, count = 5, signal?: AbortSignal): Promise<string> {
-  const log = await git(cwd, ["log", "--oneline", `-n${count}`], { signal });
-  return log.trim();
 }
 
 export async function countChanges(cwd: string, signal?: AbortSignal): Promise<number> {

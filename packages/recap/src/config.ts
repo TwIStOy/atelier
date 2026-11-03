@@ -4,9 +4,9 @@ import { type ExtensionConfigSchema, readConfig, registerConfigItems, resolveMod
 
 type AnyModel = Model<any>;
 
-export const CONFIG_ID = "recap";
+const CONFIG_ID = "recap";
 
-export const DEFAULT_IDLE_SECONDS = 300;
+const DEFAULT_IDLE_SECONDS = 300;
 
 export interface RecapConfig {
   enabled: boolean;

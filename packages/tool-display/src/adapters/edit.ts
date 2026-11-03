@@ -2,11 +2,11 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { visibleWidth } from "@earendil-works/pi-tui";
-import { generateUnifiedDiff, shortenPath } from "@htwang-contrib/common";
+import { generateUnifiedDiff } from "@htwang-contrib/common";
 import { diffLines } from "diff";
 import { loadConfig } from "../config.ts";
 import type { ToolDisplayAdapter } from "../types.ts";
-import { renderChangeBar, renderWithDelta, resolveIsSplit } from "./shared.ts";
+import { filePathDisplay, renderChangeBar, renderWithDelta, resolveIsSplit } from "./shared.ts";
 
 interface EditArgs {
   path?: string;
@@ -91,11 +91,8 @@ function buildDiffStatsSuffix(args: EditArgs, theme: Theme, width: number | unde
 
 export const editAdapter: ToolDisplayAdapter<EditArgs> = {
   formatCallHeader(args, theme, _details?: unknown, isPartial?: boolean, _expanded?: boolean, width?: number) {
-    const rawPath = args?.file_path ?? args?.path ?? "";
-    const path = shortenPath(rawPath);
-    const pathDisplay = path ? theme.fg("accent", path) : theme.fg("toolOutput", "...");
     const verb = isPartial ? "Editing" : "Edited";
-    const base = `${theme.fg("toolTitle", theme.bold(verb))} ${pathDisplay}`;
+    const base = `${theme.fg("toolTitle", theme.bold(verb))} ${filePathDisplay(args, theme)}`;
 
     if (loadConfig().editStyle !== "single-line") return base;
 

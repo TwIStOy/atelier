@@ -18,8 +18,6 @@ import type { UrlInterceptor } from "./types.ts";
 
 const logger = createLogger("web-tools");
 
-export const GITHUB_TOKEN_ENV_VAR = "GITHUB_TOKEN";
-
 const MAX_TREE_ENTRIES = 200;
 const MAX_INLINE_FILE_CHARS = 100_000;
 
@@ -146,7 +144,7 @@ export interface GitHubUrlInfo {
   type: "root" | "blob" | "tree";
 }
 
-export function parseGitHubUrl(url: string): GitHubUrlInfo | null {
+function parseGitHubUrl(url: string): GitHubUrlInfo | null {
   let parsed: URL;
   try {
     parsed = new URL(url);
@@ -204,14 +202,14 @@ export interface GitHubInterceptorOptions {
   clonePath?: string;
 }
 
-export interface ResolvedGitHubOptions {
+interface ResolvedGitHubOptions {
   enabled: boolean;
   maxRepoSizeMB: number;
   cloneTimeoutSeconds: number;
   clonePath: string;
 }
 
-export const GITHUB_INTERCEPTOR_DEFAULTS: ResolvedGitHubOptions = {
+const GITHUB_INTERCEPTOR_DEFAULTS: ResolvedGitHubOptions = {
   enabled: false,
   maxRepoSizeMB: 350,
   cloneTimeoutSeconds: 30,
@@ -269,31 +267,32 @@ export class GitHubInterceptor implements UrlInterceptor {
     });
   }
 
-  private async checkRepoSize(owner: string, repo: string): Promise<number | null> {
+  private async ghQuery<T>(
+    args: string[],
+    options: { timeout: number; maxBuffer?: number },
+    handle: (stdout: string) => T | null,
+  ): Promise<T | null> {
     if (!(await this.checkGhAvailable())) return null;
     return new Promise((resolve) => {
-      execFile("gh", ["api", `repos/${owner}/${repo}`, "--jq", ".size"], { timeout: 10000 }, (err, stdout) => {
+      execFile("gh", args, options, (err, stdout) => {
         if (err) {
           resolve(null);
           return;
         }
-        const kb = parseInt(stdout.trim(), 10);
-        resolve(Number.isNaN(kb) ? null : kb);
+        try {
+          resolve(handle(stdout));
+        } catch {
+          resolve(null);
+        }
       });
     });
   }
 
-  reset(): void {
-    for (const entry of this.cloneCache.values()) {
-      try {
-        rmSync(entry.localPath, { recursive: true, force: true });
-      } catch {
-        // ignore cleanup errors
-      }
-    }
-    this.cloneCache.clear();
-    this.ghAvailable = null;
-    this.ghHintShown = false;
+  private async checkRepoSize(owner: string, repo: string): Promise<number | null> {
+    return this.ghQuery(["api", `repos/${owner}/${repo}`, "--jq", ".size"], { timeout: 10000 }, (out) => {
+      const kb = Number.parseInt(out.trim(), 10);
+      return Number.isNaN(kb) ? null : kb;
+    });
   }
 
   private showGhHint(): void {
@@ -304,91 +303,44 @@ export class GitHubInterceptor implements UrlInterceptor {
   }
 
   private async getDefaultBranch(owner: string, repo: string): Promise<string | null> {
-    if (!(await this.checkGhAvailable())) return null;
-    return new Promise((resolve) => {
-      execFile(
-        "gh",
-        ["api", `repos/${owner}/${repo}`, "--jq", ".default_branch"],
-        { timeout: 10000 },
-        (err, stdout) => {
-          if (err) {
-            resolve(null);
-            return;
-          }
-          resolve(stdout.trim() || null);
-        },
-      );
-    });
+    return this.ghQuery(
+      ["api", `repos/${owner}/${repo}`, "--jq", ".default_branch"],
+      { timeout: 10000 },
+      (out) => out.trim() || null,
+    );
   }
 
-  private async fetchTreeViaApi(owner: string, repo: string, ref: string): Promise<string | null> {
-    if (!(await this.checkGhAvailable())) return null;
-    return new Promise((resolve) => {
-      execFile(
-        "gh",
-        ["api", `repos/${owner}/${repo}/git/trees/${ref}?recursive=1`, "--jq", ".tree[].path"],
-        { timeout: 15000, maxBuffer: 5 * 1024 * 1024 },
-        (err, stdout) => {
-          if (err) {
-            resolve(null);
-            return;
-          }
-          const paths = stdout.trim().split("\n").filter(Boolean);
-          if (paths.length === 0) {
-            resolve(null);
-            return;
-          }
-          const truncated = paths.length > MAX_TREE_ENTRIES;
-          const display = paths.slice(0, MAX_TREE_ENTRIES).join("\n");
-          resolve(truncated ? `${display}\n... (${paths.length} total entries)` : display);
-        },
-      );
-    });
+  private fetchTreeViaApi(owner: string, repo: string, ref: string): Promise<string | null> {
+    return this.ghQuery(
+      ["api", `repos/${owner}/${repo}/git/trees/${ref}?recursive=1`, "--jq", ".tree[].path"],
+      { timeout: 15000, maxBuffer: 5 * 1024 * 1024 },
+      (out) => {
+        const paths = out.trim().split("\n").filter(Boolean);
+        if (paths.length === 0) return null;
+        const truncated = paths.length > MAX_TREE_ENTRIES;
+        const display = paths.slice(0, MAX_TREE_ENTRIES).join("\n");
+        return truncated ? `${display}\n... (${paths.length} total entries)` : display;
+      },
+    );
   }
 
   private async fetchReadmeViaApi(owner: string, repo: string, ref: string): Promise<string | null> {
-    if (!(await this.checkGhAvailable())) return null;
-    return new Promise((resolve) => {
-      execFile(
-        "gh",
-        ["api", `repos/${owner}/${repo}/readme?ref=${ref}`, "--jq", ".content"],
-        { timeout: 10000 },
-        (err, stdout) => {
-          if (err) {
-            resolve(null);
-            return;
-          }
-          try {
-            const decoded = Buffer.from(stdout.trim(), "base64").toString("utf-8");
-            resolve(decoded.length > 8192 ? `${decoded.slice(0, 8192)}\n\n[README truncated at 8K chars]` : decoded);
-          } catch {
-            resolve(null);
-          }
-        },
-      );
-    });
+    return this.ghQuery(
+      ["api", `repos/${owner}/${repo}/readme?ref=${ref}`, "--jq", ".content"],
+      { timeout: 10000 },
+      (out) => {
+        const decoded = Buffer.from(out.trim(), "base64").toString("utf-8");
+        return decoded.length > 8192 ? `${decoded.slice(0, 8192)}\n\n[README truncated at 8K chars]` : decoded;
+      },
+    );
   }
 
   private async fetchFileViaApi(owner: string, repo: string, path: string, ref: string): Promise<string | null> {
-    if (!(await this.checkGhAvailable())) return null;
-    return new Promise((resolve) => {
-      execFile(
-        "gh",
-        ["api", `repos/${owner}/${repo}/contents/${path}?ref=${ref}`, "--jq", ".content"],
-        { timeout: 10000, maxBuffer: 2 * 1024 * 1024 },
-        (err, stdout) => {
-          if (err) {
-            resolve(null);
-            return;
-          }
-          try {
-            resolve(Buffer.from(stdout.trim(), "base64").toString("utf-8"));
-          } catch {
-            resolve(null);
-          }
-        },
-      );
-    });
+    return this.ghQuery(
+      ["api", `repos/${owner}/${repo}/contents/${path}?ref=${ref}`, "--jq", ".content"],
+      { timeout: 10000, maxBuffer: 2 * 1024 * 1024 },
+      (out) => Buffer.from(out.trim(), "base64").toString("utf-8"),
+    );
   }
 
   private async fetchViaApi(

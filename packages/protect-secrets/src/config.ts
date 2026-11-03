@@ -23,7 +23,7 @@ export function resetProjectConfigCache(): void {
   cache.clear();
 }
 
-export interface ProjectConfigLocation {
+interface ProjectConfigLocation {
   configPath: string;
   projectRoot: string;
 }
@@ -33,7 +33,7 @@ export interface ProjectConfigLocation {
  * The directory containing `.pi` is the project root that relative
  * `protectedPaths` entries resolve against.
  */
-export function findProjectConfig(cwd: string): ProjectConfigLocation | null {
+function findProjectConfig(cwd: string): ProjectConfigLocation | null {
   let dir = resolve(cwd);
   for (;;) {
     const configPath = getProjectConfigPath(dir);

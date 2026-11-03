@@ -1,11 +1,11 @@
 import { constants as fsConstants, readFileSync } from "node:fs";
 import { access, readdir as fsReaddir, stat as fsStat } from "node:fs/promises";
-import { homedir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { DEFAULT_MAX_BYTES, formatSize, truncateHead } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
+import { resolveSearchPath } from "../shared.ts";
 
 const lsDir = path.dirname(fileURLToPath(import.meta.url));
 const lsToolDescription = readFileSync(path.join(lsDir, "ls.txt"), "utf-8").trim();
@@ -24,20 +24,6 @@ const lsParams = Type.Object({
     }),
   ),
 });
-
-function expandUser(p: string): string {
-  if (p === "~" || p.startsWith("~/")) {
-    return path.join(homedir(), p === "~" ? "" : p.slice(2));
-  }
-  return p;
-}
-
-function resolveSearchPath(raw: string | undefined, cwd: string): string {
-  const p = (raw?.trim() || ".").trim() || ".";
-  const expanded = expandUser(p);
-  if (path.isAbsolute(expanded)) return path.normalize(expanded);
-  return path.resolve(cwd, expanded);
-}
 
 async function pathExists(p: string): Promise<boolean> {
   try {

@@ -5,7 +5,7 @@ import { WrappingSelect, type WrappingSelectItem, type WrappingSelectTheme } fro
  * Maximum number of option rows visible in the WrappingSelect window. Lifted here from
  * `preview-pane.ts` so the cap travels with the option-list owner.
  */
-export const MAX_VISIBLE_OPTIONS = 10;
+const MAX_VISIBLE_OPTIONS = 10;
 
 export interface OptionListViewConfig {
   items: readonly WrappingSelectItem[];
