@@ -89,7 +89,7 @@
   "devDependencies": {
     "@biomejs/biome": "2.6.4",
     "@types/node": "^26.1.2",
-    "fallow": "^3.37.0",
+    "fallow": "^3.38.1",
     "typescript": "^7.0.2",
     "vitest": "^5.0.5"
   },
