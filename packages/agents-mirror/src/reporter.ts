@@ -42,9 +42,9 @@ export function updateStatus(ctx: UiSurface, cache: InjectionCache, sessionKey: 
 
 function statusText(theme: ThemeFn | undefined, count: number, hasErrors: boolean): string | undefined {
   if (count === 0) return undefined;
-  const fg = (theme ?? identityTheme).fg;
-  let text = fg("dim", `◆ ${count}`);
-  if (hasErrors) text += fg("warning", " \u26A0");
+  const activeTheme = theme ?? identityTheme;
+  let text = activeTheme.fg("dim", `◆ ${count}`);
+  if (hasErrors) text += activeTheme.fg("warning", " \u26A0");
   return text;
 }
 
