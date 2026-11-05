@@ -7,6 +7,7 @@
 - `ActiveThinkingPreview` / `StrictThinkingPreview` share a cached-render base class; `patchedUpdateContent` extracts thought-membership computation and stop-reason notices into named helpers.
 - Split `patchedUpdateContent` further into per-item render helpers (stock rebuild, membership markers, thinking-run heading/rail/click) plus extracted update handlers for animation ticks, finished runs, and message updates; no behavior change.
 - `needsSeparatorAbove` resolves siblings through `findComponentContextInFrame` (common's per-frame sibling index) instead of a full component-tree walk per assistant component per render, and the session widget now patches the TUI frame epoch (`patchTuiFrameEpoch`, idempotent) so the index is active even when tool-display is disabled.
+- `ActiveThinkingPreview` wraps only the last `previewLines` source lines of the thinking text instead of the full accumulated run: wrapping is per source line and each source line yields at least one wrapped line, so the rendered tail is identical while animation-tick renders stay O(preview) instead of O(total thinking length) (a 190KB stream measured 50 fresh renders in ~1ms where each old render re-wrapped the whole text).
 
 ### Removed
 

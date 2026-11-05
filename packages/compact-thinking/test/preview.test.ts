@@ -1,6 +1,6 @@
-import { stripTerminalSequences, visibleWidth } from "@earendil-works/pi-tui";
+import { stripTerminalSequences, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 import { describe, expect, it } from "vitest";
-import { SingleLineText, StrictThinkingPreview } from "../src/preview.ts";
+import { ActiveThinkingPreview, SingleLineText, StrictThinkingPreview } from "../src/preview.ts";
 
 const identity = (text: string): string => text;
 
@@ -60,6 +60,46 @@ describe("StrictThinkingPreview expanded layout", () => {
     expect(rendered).toHaveLength(42);
     expect(rendered[2].trim()).toBe("l0");
     expect(rendered[rendered.length - 1].trim()).toBe("l39");
+  });
+});
+
+describe("ActiveThinkingPreview tail wrap", () => {
+  const ansiStyle = (text: string): string => `\u001b[3m\u001b[38;2;200;200;200m${text}\u001b[0m\u001b[23m`;
+
+  // Long source lines wrap into several visual lines, an interior empty line
+  // simulates a block boundary, and the style emits real escape sequences so
+  // ANSI state carrying across wrapped lines is exercised.
+  const longText = [
+    "first line that is long enough to wrap across multiple visual rows when the width is small",
+    "",
+    "b",
+    "c",
+    "last line that also wraps because it exceeds the narrow render width by far",
+  ].join("\n");
+
+  function fullWrapTail(text: string, previewLines: number, width: number): string[] {
+    return wrapTextWithAnsiStyled(text, width).slice(-previewLines);
+  }
+
+  function wrapTextWithAnsiStyled(text: string, width: number): string[] {
+    const wrapped = wrapTextWithAnsi(ansiStyle(text), width);
+    return wrapped.map((line) => line + " ".repeat(Math.max(0, width - visibleWidth(line))));
+  }
+
+  it("renders the same tail as wrapping the full styled text", () => {
+    for (const previewLines of [1, 2, 3, 5]) {
+      const preview = new ActiveThinkingPreview("Thinking...", longText, previewLines, ansiStyle);
+      const [heading, ...body] = preview.render(30);
+      expect(stripTerminalSequences(heading)).toContain("Thinking...");
+      expect(body).toEqual(fullWrapTail(longText, previewLines, 30));
+    }
+  });
+
+  it("wraps the whole text when it has fewer lines than the preview budget", () => {
+    const text = "only\ntwo";
+    const preview = new ActiveThinkingPreview("Thinking...", text, 3, ansiStyle);
+    const [, ...body] = preview.render(30);
+    expect(body).toEqual(fullWrapTail(text, 3, 30));
   });
 });
 

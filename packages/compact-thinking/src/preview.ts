@@ -42,12 +42,16 @@ abstract class CachedThinkingPreview implements Component {
   render(width: number): string[] {
     if (this.cachedLines !== undefined && width === this.cachedWidth) return this.cachedLines;
 
-    const lines = new Text(this.style(this.text), 0, 0).render(width);
+    const lines = this.wrapBodyText(width);
     const heading = new Text(this.headingText(), 0, 0).render(width);
     const result = this.compose(heading, lines);
     this.cachedWidth = width;
     this.cachedLines = result;
     return result;
+  }
+
+  protected wrapBodyText(width: number): string[] {
+    return new Text(this.style(this.text), 0, 0).render(width);
   }
 
   invalidate(): void {
@@ -71,9 +75,32 @@ export class ActiveThinkingPreview extends CachedThinkingPreview {
     return this.heading;
   }
 
+  // Only the last previewLines visual lines are shown, and wrapping is per
+  // source line (each source line yields at least one wrapped line, empty lines
+  // included), so wrapping a suffix of the source lines yields the same tail
+  // while keeping animation-tick renders O(preview) instead of O(total thinking
+  // length).
+  protected override wrapBodyText(width: number): string[] {
+    const tail = lastLinesSuffix(this.text, this.previewLines);
+    if (tail === undefined) return super.wrapBodyText(width);
+    return new Text(this.style(tail), 0, 0).render(width);
+  }
+
   protected compose(heading: string[], lines: string[]): string[] {
     return [...heading, ...lines.slice(-this.previewLines)];
   }
+}
+
+// Suffix starting at the last `count` line breaks, or undefined when the text
+// has fewer than `count` newlines (callers wrap the whole text then).
+function lastLinesSuffix(text: string, count: number): string | undefined {
+  let index = text.length;
+  for (let i = 0; i < count; i++) {
+    const next = text.lastIndexOf("\n", index - 1);
+    if (next === -1) return undefined;
+    index = next;
+  }
+  return text.slice(index + 1);
 }
 
 export class StrictThinkingPreview extends CachedThinkingPreview {
