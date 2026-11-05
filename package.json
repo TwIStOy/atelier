@@ -46,6 +46,7 @@
       "packages/recap"
     ],
     "skills": [
+      "skills/clice",
       "skills/code-philosophy",
       "skills/code-review",
       "skills/codebase-design",
