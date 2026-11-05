@@ -5,6 +5,7 @@
 ### Changed
 
 - Behavior-preserving refactor of the `/auto-compact` status handler and context-window resolution into small helpers to reduce complexity.
+- Context estimation is now usage-anchored like pi's own compaction logic: the last assistant message carrying real provider usage pins the token count and only the messages trailing it get a chars/4 estimate, so the per-LLM-request cost drops from O(entire history) to O(messages since the last response) and the emergency-truncation gate reflects actual context size instead of a pure chars/4 guess (the pure estimate still applies before the first response of a session).
 
 ## [0.7.0] - 2026-10-30
 

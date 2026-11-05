@@ -75,11 +75,39 @@ function formatIdleThresholdLabel(minutes: number): string {
   return minutes > 0 ? `${minutes} min` : "disabled";
 }
 
-function estimateTotalTokens(messages: AgentMessage[]): number {
-  let total = 0;
-  for (const msg of messages) {
-    total += estimateMessageTokens(msg);
+// Usage-anchored estimate mirroring pi's own compaction logic: the last
+// assistant message carrying real provider usage pins the bulk of the context,
+// so only the messages trailing it need a chars/4 estimate. Per-request cost is
+// O(messages added since the last response) instead of O(entire history), and
+// the count reflects actual context size rather than a pure chars/4 guess.
+interface AssistantUsageShape {
+  totalTokens?: number;
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+}
+
+function anchoredUsageTokens(message: AgentMessage): number | undefined {
+  if (message.role !== "assistant") return undefined;
+  const assistant = message as AgentMessage & { stopReason?: string; usage?: AssistantUsageShape };
+  if (assistant.stopReason === "aborted" || assistant.stopReason === "error") return undefined;
+  const usage = assistant.usage;
+  if (!usage) return undefined;
+  const tokens = usage.totalTokens || usage.input + usage.output + usage.cacheRead + usage.cacheWrite;
+  return tokens > 0 ? tokens : undefined;
+}
+
+export function estimateTotalTokens(messages: AgentMessage[]): number {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const anchored = anchoredUsageTokens(messages[i]);
+    if (anchored === undefined) continue;
+    let trailing = 0;
+    for (let j = i + 1; j < messages.length; j++) trailing += estimateMessageTokens(messages[j]);
+    return anchored + trailing;
   }
+  let total = 0;
+  for (const msg of messages) total += estimateMessageTokens(msg);
   return total;
 }
 
