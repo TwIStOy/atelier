@@ -1,13 +1,7 @@
-import { componentRenderProbeDepth, getConfigFileVersion } from "@htwang-contrib/common";
+import { componentRenderProbeDepth, currentFrameEpoch, getConfigFileVersion } from "@htwang-contrib/common";
 
-let frameEpoch = 0;
 let roleMutationVersion = 0;
 let renderEnvVersion = 0;
-const epochPatchedTuis = new WeakSet<object>();
-
-export function currentFrameEpoch(): number {
-  return frameEpoch;
-}
 
 // Role-relevant changes: any tool state update, aggregate-group toggles,
 // aggregate-rule registrations. Only invalidates the frame-scoped role memo.
@@ -25,19 +19,8 @@ export function currentRenderEnvVersion(): number {
   return renderEnvVersion;
 }
 
-// One bump per rendered frame, driven by the TUI's doRender. Within a frame no
-// component state changes, so frame-scoped memos need no finer invalidation.
-export function patchTuiFrameEpoch(tui: unknown): void {
-  if (!tui || typeof tui !== "object" || epochPatchedTuis.has(tui)) return;
-  const target = tui as { doRender?: unknown };
-  if (typeof target.doRender !== "function") return;
-  const original = target.doRender as (this: unknown) => void;
-  target.doRender = function (this: unknown) {
-    frameEpoch++;
-    original.call(this);
-  };
-  epochPatchedTuis.add(tui);
-}
+// The frame counter itself lives in @htwang-contrib/common (frame-epoch.ts) so
+// every extension's frame-scoped caches share one bump per TUI doRender.
 
 const stateVersions = new WeakMap<object, number>();
 
@@ -64,7 +47,7 @@ const roleMemo = new WeakMap<object, RoleMemoEntry>();
 // and config versions keep the memo honest if the frame epoch never advances
 // (e.g. unit tests rendering without a patched TUI).
 export function memoizedGroupRole<T>(component: object, width: number, compute: () => T): T {
-  const epoch = frameEpoch;
+  const epoch = currentFrameEpoch();
   const mutation = roleMutationVersion;
   const configVersion = getConfigFileVersion();
   const hit = roleMemo.get(component);
@@ -100,7 +83,7 @@ export function memoizedRegionRoles<T>(
   width: number,
   compute: () => Map<number, T>,
 ): Map<number, T> {
-  const epoch = frameEpoch;
+  const epoch = currentFrameEpoch();
   const mutation = roleMutationVersion;
   const configVersion = getConfigFileVersion();
   let entry = regionRolesCache.get(children);
@@ -122,12 +105,12 @@ const frameLineCounts = new WeakMap<object, { epoch: number; count: number }>();
 // preceding siblings for visibility, those siblings have already rendered this
 // frame and their line counts are known without re-invoking their render.
 export function recordFrameLineCount(component: object, count: number): void {
-  frameLineCounts.set(component, { epoch: frameEpoch, count });
+  frameLineCounts.set(component, { epoch: currentFrameEpoch(), count });
 }
 
 export function frameLineCount(component: object): number | undefined {
   const hit = frameLineCounts.get(component);
-  return hit && hit.epoch === frameEpoch ? hit.count : undefined;
+  return hit && hit.epoch === currentFrameEpoch() ? hit.count : undefined;
 }
 
 export interface RenderLinesKey {
@@ -144,6 +127,7 @@ export interface RenderLinesKey {
   theme: unknown;
   envVersion: number;
   configVersion: number;
+  deltaVersion: number;
 }
 
 interface RenderLinesSlot {
@@ -178,7 +162,12 @@ function stateKeyEquals(a: RenderLinesKey, b: RenderLinesKey): boolean {
 }
 
 function envKeyEquals(a: RenderLinesKey, b: RenderLinesKey): boolean {
-  return a.theme === b.theme && a.envVersion === b.envVersion && a.configVersion === b.configVersion;
+  return (
+    a.theme === b.theme &&
+    a.envVersion === b.envVersion &&
+    a.configVersion === b.configVersion &&
+    a.deltaVersion === b.deltaVersion
+  );
 }
 
 // Renders reached through componentRendersLines probes run with the probe-depth

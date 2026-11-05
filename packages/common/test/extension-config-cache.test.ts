@@ -3,11 +3,20 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { CONFIG_STAT_TTL_MS } from "../src/config/extension-config.ts";
+
 const SCHEMA = { defaults: { n: 0, label: "default" } };
 
 let tmpDir: string;
 let configPath: string;
 let mod: typeof import("../src/config/extension-config.ts");
+let nowMs: number;
+
+// External edits are only observed after the stat TTL elapses; drive the clock
+// manually so tests don't depend on real timing.
+function advancePastStatTtl(): void {
+  nowMs += CONFIG_STAT_TTL_MS + 1;
+}
 
 function writeConfigFileExternally(section: Record<string, unknown>, mtime?: Date): void {
   writeFileSync(configPath, `${JSON.stringify({ demo: section })}\n`, "utf8");
@@ -17,12 +26,15 @@ function writeConfigFileExternally(section: Record<string, unknown>, mtime?: Dat
 beforeEach(async () => {
   tmpDir = mkdtempSync(join(tmpdir(), "common-config-cache-"));
   vi.stubEnv("XDG_CONFIG_HOME", tmpDir);
+  nowMs = Date.now();
+  vi.spyOn(Date, "now").mockImplementation(() => nowMs);
   mkdirSync(join(tmpDir, "pi"), { recursive: true });
   configPath = join(tmpDir, "pi", "extensions.json");
   mod = await import("../src/config/extension-config.ts");
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.unstubAllEnvs();
   vi.resetModules();
   if (tmpDir && existsSync(tmpDir)) rmSync(tmpDir, { recursive: true });
@@ -39,10 +51,12 @@ describe("readConfig file caching", () => {
     expect(mod.readConfig("demo", SCHEMA)).toEqual({ n: 3, label: "default" });
   });
 
-  it("picks up external edits when the file mtime changes", () => {
+  it("picks up external edits after the stat TTL elapses", () => {
     writeConfigFileExternally({ n: 1 }, new Date(2020, 0, 1));
     expect(mod.readConfig("demo", SCHEMA).n).toBe(1);
     writeConfigFileExternally({ n: 2 }, new Date(2021, 0, 1));
+    expect(mod.readConfig("demo", SCHEMA).n).toBe(1);
+    advancePastStatTtl();
     expect(mod.readConfig("demo", SCHEMA).n).toBe(2);
   });
 
@@ -50,6 +64,8 @@ describe("readConfig file caching", () => {
     writeConfigFileExternally({ n: 5 });
     expect(mod.readConfig("demo", SCHEMA).n).toBe(5);
     rmSync(configPath);
+    expect(mod.readConfig("demo", SCHEMA).n).toBe(5);
+    advancePastStatTtl();
     expect(mod.readConfig("demo", SCHEMA)).toEqual({ n: 0, label: "default" });
   });
 
@@ -73,6 +89,7 @@ describe("getConfigFileVersion", () => {
     mod.readConfig("demo", SCHEMA);
     const before = mod.getConfigFileVersion();
     writeConfigFileExternally({ n: 2 }, new Date(2021, 0, 1));
+    advancePastStatTtl();
     mod.readConfig("demo", SCHEMA);
     expect(mod.getConfigFileVersion()).toBeGreaterThan(before);
   });

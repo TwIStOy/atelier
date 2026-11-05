@@ -12,12 +12,13 @@ import {
   clearRailTailSpacing,
   componentRendersLines,
   createLogger,
-  findComponentContext,
+  findComponentContextInFrame,
   isExtensionDisabled,
   isStaleCtxError,
   isThoughtGroupExpanded,
   isThoughtMember,
   isThoughtMemberClaimed,
+  patchTuiFrameEpoch,
   RAIL_BULLET_SINGLE,
   RAIL_SUBROW_INDENT,
   type RailBar,
@@ -219,7 +220,7 @@ export default function compactThinking(pi: ExtensionAPI) {
   // not yet attached to the chat container, so the sibling above is only known
   // once rendering actually happens.
   function needsSeparatorAbove(component: AssistantMessageComponent, width: number): boolean {
-    const context = activeTui ? findComponentContext(activeTui, component) : undefined;
+    const context = activeTui ? findComponentContextInFrame(activeTui, component) : undefined;
     if (!context) return false;
     for (let i = context.index - 1; i >= 0; i--) {
       const sibling = context.siblings[i];
@@ -765,6 +766,7 @@ export default function compactThinking(pi: ExtensionAPI) {
 
     ctx.ui.setWidget(WIDGET_ID, (tui) => {
       activeTui = tui;
+      patchTuiFrameEpoch(tui);
       return { render: () => [], invalidate() {} };
     });
 

@@ -70,7 +70,12 @@ export {
 } from "./aggregate-rules.ts";
 export { AsyncAnnotations } from "./async-annotations.ts";
 export type { ComponentSiblingContext } from "./component-tree.ts";
-export { componentRenderProbeDepth, componentRendersLines, findComponentContext } from "./component-tree.ts";
+export {
+  componentRenderProbeDepth,
+  componentRendersLines,
+  findComponentContext,
+  findComponentContextInFrame,
+} from "./component-tree.ts";
 export { mapConcurrent } from "./concurrency.ts";
 export type {
   BooleanConfigItem,
@@ -92,6 +97,7 @@ export type {
   StringConfigItem,
 } from "./config/index.ts";
 export {
+  CONFIG_STAT_TTL_MS,
   clearConfigItems,
   deleteConfigKey,
   deleteConfigSection,
@@ -146,6 +152,7 @@ export {
   truncateDisplay,
   usagePercentStressLevel,
 } from "./format.ts";
+export { currentFrameEpoch, patchTuiFrameEpoch } from "./frame-epoch.ts";
 export {
   fetchGatewayModels,
   makeRefreshCommandHandler,

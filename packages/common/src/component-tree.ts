@@ -1,3 +1,4 @@
+import { currentFrameEpoch } from "./frame-epoch.ts";
 import { getGlobalState } from "./global-state.ts";
 
 export interface ComponentSiblingContext {
@@ -18,6 +19,46 @@ export function findComponentContext(root: unknown, target: object): ComponentSi
     if (found) return found;
   }
   return undefined;
+}
+
+interface FrameSiblingIndex {
+  epoch: number;
+  index: Map<object, ComponentSiblingContext>;
+}
+
+const frameSiblingIndexes = new WeakMap<object, FrameSiblingIndex>();
+
+// Sibling lookups are requested per component per frame; indexing the tree once
+// per frame turns N lookups from N full-tree walks into one walk plus O(1) hits.
+// Targets attached after the index was built (mid-frame tree mutation) fall back
+// to the direct walk, preserving findComponentContext semantics. An unpatched
+// TUI (epoch 0, e.g. unit tests) skips the cache entirely.
+export function findComponentContextInFrame(root: unknown, target: object): ComponentSiblingContext | undefined {
+  if (!root || typeof root !== "object") return undefined;
+  const epoch = currentFrameEpoch();
+  if (epoch <= 0) return findComponentContext(root, target);
+  let entry = frameSiblingIndexes.get(root);
+  if (!entry || entry.epoch !== epoch) {
+    entry = { epoch, index: new Map() };
+    buildSiblingIndex(root, entry.index);
+    frameSiblingIndexes.set(root, entry);
+  }
+  return entry.index.get(target) ?? findComponentContext(root, target);
+}
+
+function buildSiblingIndex(node: unknown, index: Map<object, ComponentSiblingContext>): void {
+  if (!node || typeof node !== "object") return;
+  const children = (node as { children?: unknown }).children;
+  if (!Array.isArray(children)) return;
+  for (let i = 0; i < children.length; i++) {
+    const child = children[i];
+    if (child && typeof child === "object" && !index.has(child)) {
+      index.set(child, { siblings: children, index: i });
+    }
+  }
+  for (const child of children) {
+    buildSiblingIndex(child, index);
+  }
 }
 
 export function componentRenderProbeDepth(): number {

@@ -14,6 +14,10 @@ export class AsyncAnnotations<T> {
     return this.values.get(key);
   }
 
+  size(): number {
+    return this.values.size;
+  }
+
   request(key: string, load: (signal: AbortSignal) => Promise<T>, parentSignal?: AbortSignal): void {
     if (this.controller.signal.aborted || parentSignal?.aborted || this.requested.has(key)) return;
     this.requested.add(key);

@@ -23,6 +23,7 @@ export {
 } from "./config-item.ts";
 export type { ExtensionConfigSchema } from "./extension-config.ts";
 export {
+  CONFIG_STAT_TTL_MS,
   deleteConfigKey,
   deleteConfigSection,
   getConfigFileVersion,

@@ -5,8 +5,11 @@
 ### Added
 
 - `gateway-provider.ts`: shared refresh-command handler factory (`makeRefreshCommandHandler`), cached-refresh skeleton (`refreshModelsCatalog`), and gateway models fetch (`fetchGatewayModels`) used by the magpie and toori providers; `scroll-keys.ts` with `scrollKeyOffset` for overlay up/down scrolling (btw, committer).
+- `frame-epoch.ts` with `currentFrameEpoch` / `patchTuiFrameEpoch` (moved from tool-display's render-cache so every extension's frame-scoped caches share one counter; patching the same TUI twice is a no-op) and `findComponentContextInFrame`, a per-frame sibling index that turns N per-component `findComponentContext` tree walks per frame into one walk plus O(1) lookups (targets attached mid-frame fall back to the direct walk). `AsyncAnnotations.size()` exposes the value count.
 
 ### Changed
+
+- `readConfig()` no longer `statSync`s `extensions.json` on every call: the stat is gated by a 500 ms TTL (`CONFIG_STAT_TTL_MS`, exported) and the missing-file case is cached as a sentinel, so render paths calling `loadConfig()` per tool row per frame issue at most one stat per window. In-process writes still refresh the cache immediately; only edits made by other processes are observed after the TTL.
 
 - Split oversized internal functions in `telemetry.ts` (`finalizeTurn`, `formatTurnTelemetry`), `diff.ts` (`generateUnifiedDiff`), `mcp.ts` (`mcpCall`), `gateway-provider.ts` (`refreshModelsCatalog`), and the agent modules (`child-agent.ts` `runChildAgent`, `isolated-session.ts` `runIsolatedSession`/`lastAssistantText`, `agent-personas.ts` `buildAgentPersonaCatalog`, `persona-defaults.ts` `parsePersonaDefaultsByType`, `subagent-models.ts` `loadSubagentModelConfig`) into smaller phase helpers to clear all `fallow health` complexity findings; exported names, signatures, and behavior are unchanged.
 

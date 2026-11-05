@@ -5,6 +5,7 @@
 ### Changed
 
 - Split `parseGitPorcelain` into per-entry helpers (branch header, ahead/behind, XY flags) to reduce function complexity; parsing behavior is unchanged.
+- `TokensComponent` no longer sums the entire session branch on every footer render: usage over finalized entries is kept as a prefix sum folded forward as new entries arrive (O(1) per frame after the first), the still-streaming last message's usage is read fresh so live totals keep updating, and a first-entry/anchor mismatch (tree switch, fork, head compaction) rebuilds the prefix once.
 
 ### Removed
 

@@ -3,7 +3,9 @@ import {
   COMPONENT_RENDERS_LINES_PROBE_KEY,
   componentRendersLines,
   findComponentContext,
+  findComponentContextInFrame,
 } from "../src/component-tree.ts";
+import { patchTuiFrameEpoch } from "../src/frame-epoch.ts";
 import { getGlobalState } from "../src/global-state.ts";
 
 describe("findComponentContext", () => {
@@ -18,6 +20,42 @@ describe("findComponentContext", () => {
     const inner = { children: [target] };
     const root = { children: [{ id: "a" }, inner] };
     expect(findComponentContext(root, target)).toEqual({ siblings: inner.children, index: 0 });
+  });
+});
+
+describe("findComponentContextInFrame", () => {
+  function renderFrame(): void {
+    const tui = { doRender() {} };
+    patchTuiFrameEpoch(tui);
+    tui.doRender();
+  }
+
+  it("returns the same context as the direct walk", () => {
+    const target = { id: "t" };
+    const inner = { children: [{ id: "a" }, target] };
+    const root = { children: [{ id: "x" }, inner] };
+    renderFrame();
+    expect(findComponentContextInFrame(root, target)).toEqual(findComponentContext(root, target));
+    expect(findComponentContextInFrame(root, target)).toEqual({ siblings: inner.children, index: 1 });
+  });
+
+  it("reindexes when the tree changes on a new frame", () => {
+    const target = { id: "t" };
+    const root = { children: [target] };
+    renderFrame();
+    expect(findComponentContextInFrame(root, target)).toEqual({ siblings: root.children, index: 0 });
+    root.children.unshift({ id: "new" });
+    renderFrame();
+    expect(findComponentContextInFrame(root, target)).toEqual({ siblings: root.children, index: 1 });
+  });
+
+  it("falls back to a direct walk for targets attached mid-frame", () => {
+    const late = { id: "late" };
+    const root = { children: [{ id: "a" }] };
+    renderFrame();
+    findComponentContextInFrame(root, root.children[0] as object);
+    root.children.push(late);
+    expect(findComponentContextInFrame(root, late)).toEqual({ siblings: root.children, index: 1 });
   });
 });
 

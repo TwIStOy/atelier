@@ -1,3 +1,4 @@
+import { patchTuiFrameEpoch } from "@htwang-contrib/common";
 import { describe, expect, it, vi } from "vitest";
 import {
   bumpComponentState,
@@ -5,11 +6,9 @@ import {
   bumpRoleMutation,
   cachedTextOutput,
   componentStateVersion,
-  currentFrameEpoch,
   currentRenderEnvVersion,
   getCachedRenderLines,
   memoizedGroupRole,
-  patchTuiFrameEpoch,
   type RenderLinesKey,
   setCachedRenderLines,
 } from "../src/render-cache.ts";
@@ -29,35 +28,10 @@ function baseKey(overrides: Partial<RenderLinesKey> = {}): RenderLinesKey {
     theme: null,
     envVersion: 0,
     configVersion: 0,
+    deltaVersion: 0,
     ...overrides,
   };
 }
-
-describe("patchTuiFrameEpoch", () => {
-  it("bumps the frame epoch on every doRender call", () => {
-    const before = currentFrameEpoch();
-    const calls: string[] = [];
-    const tui = {
-      doRender() {
-        calls.push("render");
-      },
-    };
-    patchTuiFrameEpoch(tui);
-    tui.doRender();
-    tui.doRender();
-    expect(currentFrameEpoch()).toBe(before + 2);
-    expect(calls).toEqual(["render", "render"]);
-  });
-
-  it("patches a given tui only once", () => {
-    const before = currentFrameEpoch();
-    const tui = { doRender() {} };
-    patchTuiFrameEpoch(tui);
-    patchTuiFrameEpoch(tui);
-    tui.doRender();
-    expect(currentFrameEpoch()).toBe(before + 1);
-  });
-});
 
 describe("component state versions", () => {
   it("increments per component independently", () => {
@@ -146,6 +120,7 @@ describe("render lines cache", () => {
     expect(getCachedRenderLines(component, baseKey({ theme: {} }))).toBeUndefined();
     expect(getCachedRenderLines(component, baseKey({ envVersion: 1 }))).toBeUndefined();
     expect(getCachedRenderLines(component, baseKey({ configVersion: 1 }))).toBeUndefined();
+    expect(getCachedRenderLines(component, baseKey({ deltaVersion: 1 }))).toBeUndefined();
   });
 
   it("keeps top-level and probe slots independent", () => {

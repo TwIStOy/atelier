@@ -72,13 +72,14 @@ import {
   aggregateRuleFor,
   componentRendersLines,
   createLogger,
-  findComponentContext,
+  findComponentContextInFrame,
   getConfigFileVersion,
   isExtensionDisabled,
   isThoughtMember,
   isThoughtMemberClaimed,
   isThoughtTransparent,
   loadSystemOneConfig,
+  patchTuiFrameEpoch,
   RAIL_SUBROW_INDENT,
   readRailTailSpacing,
   registerAggregateRule,
@@ -86,6 +87,7 @@ import {
   setThoughtGroupExpanded,
   setThoughtMemberClaimed,
 } from "@htwang-contrib/common";
+import { currentDeltaRenderVersion, setDeltaRenderInvalidator } from "./adapters/shared.ts";
 import {
   aggregateSubrowBodyWidth,
   renderAggregateLine,
@@ -109,7 +111,6 @@ import {
   getCachedRenderLines,
   memoizedGroupRole,
   memoizedRegionRoles,
-  patchTuiFrameEpoch,
   type RenderLinesKey,
   recordFrameLineCount,
   setCachedRenderLines,
@@ -199,7 +200,7 @@ const FALLBACK_THEME: Theme = {
 } as Theme;
 
 function findPreviousVisibleSibling(root: unknown, target: object, width: number): unknown {
-  const context = findComponentContext(root, target);
+  const context = findComponentContextInFrame(root, target);
   if (!context) return undefined;
   const { siblings, index } = context;
   for (let i = index - 1; i >= 0; i--) {
@@ -465,7 +466,7 @@ function assignTruncationRun(
 }
 
 function resolveGroupRole(component: ToolExecutionPatchThis, width: number): GroupRole | undefined {
-  const context = findComponentContext((component as { ui?: unknown }).ui, component);
+  const context = findComponentContextInFrame((component as { ui?: unknown }).ui, component);
   if (!context) return undefined;
   const { siblings, index } = context;
 
@@ -828,6 +829,7 @@ function patchToolExecutionRender(
       theme,
       envVersion: currentRenderEnvVersion(),
       configVersion: getConfigFileVersion(),
+      deltaVersion: currentDeltaRenderVersion(),
     };
   }
 
@@ -993,6 +995,10 @@ export default function (pi: ExtensionAPI) {
     ctx.ui.setWidget?.("tool-display:render-handle", (ui) => {
       tui = ui;
       patchTuiFrameEpoch(ui);
+      setDeltaRenderInvalidator(() => {
+        tui?.invalidate();
+        tui?.requestRender();
+      });
       return { render: () => [], invalidate() {} };
     });
     if (ctx.ui?.theme) {
@@ -1025,6 +1031,7 @@ export default function (pi: ExtensionAPI) {
   pi.on("session_shutdown", () => {
     isTui = false;
     assessments.dispose();
+    setDeltaRenderInvalidator(undefined);
     tui = undefined;
   });
 

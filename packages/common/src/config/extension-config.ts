@@ -15,7 +15,16 @@ function configPath(): string {
 }
 
 let configFileVersion = 0;
-let configFileCache: { path: string; mtimeMs: number; size: number; data: ConfigFile } | undefined;
+let configStatCheckedAtMs = 0;
+// `data: undefined` marks a stat'd-but-absent (or unparseable) file, so the
+// missing-file case is also cached instead of re-statting on every read.
+type ConfigFileCacheEntry = { path: string; mtimeMs: number; size: number; data: ConfigFile | undefined };
+let configFileCache: ConfigFileCacheEntry | undefined;
+
+// Render paths call readConfig() per tool row per frame; stat the file at most
+// once per window. In-process writes refresh the cache directly, so the TTL only
+// delays observing edits made by other processes (imperceptible for humans).
+export const CONFIG_STAT_TTL_MS = 500;
 
 // Bumped on every in-process write and whenever an on-disk change is observed,
 // so render paths can key caches on config state without re-reading the file.
@@ -23,37 +32,52 @@ export function getConfigFileVersion(): number {
   return configFileVersion;
 }
 
-function readConfigFile(): ConfigFile {
-  const path = configPath();
-  let mtimeMs = 0;
-  let size = -1;
+function statConfigFile(path: string): { mtimeMs: number; size: number } | undefined {
   try {
     const st = statSync(path);
-    mtimeMs = st.mtimeMs;
-    size = st.size;
+    return { mtimeMs: st.mtimeMs, size: st.size };
   } catch {
-    if (configFileCache) {
-      configFileCache = undefined;
-      configFileVersion++;
-    }
-    return {};
+    return undefined;
   }
-  if (
-    configFileCache &&
-    configFileCache.path === path &&
-    configFileCache.mtimeMs === mtimeMs &&
-    configFileCache.size === size
-  ) {
-    return configFileCache.data;
-  }
+}
+
+function parseConfigFile(path: string): ConfigFile | undefined {
   try {
-    const data = JSON.parse(readFileSync(path, "utf8")) as ConfigFile;
-    configFileCache = { path, mtimeMs, size, data };
-    configFileVersion++;
-    return data;
+    return JSON.parse(readFileSync(path, "utf8")) as ConfigFile;
   } catch {
-    return {};
+    return undefined;
   }
+}
+
+function statMatchesCache(
+  cached: ConfigFileCacheEntry | undefined,
+  path: string,
+  stat: { mtimeMs: number; size: number } | undefined,
+): boolean {
+  if (!cached || cached.path !== path) return false;
+  if (!stat) return cached.mtimeMs === -1 && cached.size === -1;
+  return cached.mtimeMs === stat.mtimeMs && cached.size === stat.size;
+}
+
+function buildCacheEntry(path: string, stat: { mtimeMs: number; size: number } | undefined): ConfigFileCacheEntry {
+  if (!stat) return { path, mtimeMs: -1, size: -1, data: undefined };
+  return { path, mtimeMs: stat.mtimeMs, size: stat.size, data: parseConfigFile(path) };
+}
+
+function readConfigFile(): ConfigFile {
+  const path = configPath();
+  const now = Date.now();
+  const cached = configFileCache;
+  if (cached !== undefined && cached.path === path && now - configStatCheckedAtMs < CONFIG_STAT_TTL_MS) {
+    return cached.data ?? {};
+  }
+  configStatCheckedAtMs = now;
+  const stat = statConfigFile(path);
+  if (statMatchesCache(cached, path, stat)) return cached?.data ?? {};
+  configFileVersion++;
+  const entry = buildCacheEntry(path, stat);
+  configFileCache = entry;
+  return entry.data ?? {};
 }
 
 function ensureDir(filePath: string): void {
@@ -69,6 +93,7 @@ function writeConfigFile(data: ConfigFile): void {
   const tmp = `${path}.tmp.${process.pid}.${Date.now()}`;
   writeFileSync(tmp, `${JSON.stringify(data, null, 2)}\n`, "utf8");
   renameSync(tmp, path);
+  configStatCheckedAtMs = Date.now();
   try {
     const st = statSync(path);
     configFileCache = { path, mtimeMs: st.mtimeMs, size: st.size, data };

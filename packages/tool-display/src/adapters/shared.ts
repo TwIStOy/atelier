@@ -1,7 +1,7 @@
-import { execSync } from "node:child_process";
+import { execFile } from "node:child_process";
 import { getLanguageFromPath, highlightCode, type Theme } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
-import { extractAnsiRgb, shortenPath, trimTrailingEmpty } from "@htwang-contrib/common";
+import { AsyncAnnotations, createLogger, extractAnsiRgb, shortenPath, trimTrailingEmpty } from "@htwang-contrib/common";
 import { loadConfig } from "../config.ts";
 import type { ToolDisplayAdapter } from "../types.ts";
 
@@ -47,7 +47,7 @@ function mixHex(a: string, ratioA: number, b: string, ratioB: number): string {
 function buildDeltaArgs(styles: DeltaStyles, isSplit: boolean, width: number): string[] {
   const args = ["delta", isSplit ? "--side-by-side" : "--color-only", `--width=${width}`];
 
-  const q = (flag: string, value: string) => args.push(`${flag}="${value}"`);
+  const q = (flag: string, value: string) => args.push(`${flag}=${value}`);
 
   q("--file-style", "omit");
   q("--file-decoration-style", "omit");
@@ -76,6 +76,67 @@ export function resolveIsSplit(innerWidth: number): boolean {
   return innerWidth >= cfg.splitDiffMinWidth;
 }
 
+// `delta` renders run as async child processes so the render path never blocks
+// on a spawn (which previously stalled the event loop up to the 5s timeout,
+// once per file for multi-file patches). Renders before a result lands use the
+// plain-diff fallback; the version bump + invalidator on completion make the
+// callers' render caches re-render with the styled lines.
+const DELTA_CACHE_MAX_ENTRIES = 48;
+const DELTA_SPAWN_TIMEOUT_MS = 5000;
+const DELTA_MAX_BUFFER = 1024 * 1024;
+const DELTA_DIFF_HEADER_RE = /^(diff --git|---|\+\+\+)/;
+
+let deltaRenderVersion = 0;
+let invalidateTui: (() => void) | undefined;
+const deltaLogger = createLogger("tool-display");
+
+const deltaResults = new AsyncAnnotations<string[]>(
+  () => {
+    deltaRenderVersion++;
+    invalidateTui?.();
+  },
+  (error) => deltaLogger.warn(`delta render failed: ${String(error)}`),
+);
+
+export function currentDeltaRenderVersion(): number {
+  return deltaRenderVersion;
+}
+
+export function setDeltaRenderInvalidator(invalidate: (() => void) | undefined): void {
+  invalidateTui = invalidate;
+}
+
+function fallbackDeltaLines(unifiedDiff: string, width: number): string[] {
+  return unifiedDiff
+    .split("\n")
+    .filter((line) => line.length > 0)
+    .map((line) => truncateToWidth(line, width, "…"));
+}
+
+function runDelta(args: string[], unifiedDiff: string, width: number, signal: AbortSignal): Promise<string[]> {
+  return new Promise((resolve) => {
+    const child = execFile(
+      "delta",
+      args,
+      { encoding: "utf-8", timeout: DELTA_SPAWN_TIMEOUT_MS, maxBuffer: DELTA_MAX_BUFFER, signal },
+      (error, stdout) => {
+        if (error || typeof stdout !== "string") {
+          resolve(fallbackDeltaLines(unifiedDiff, width));
+          return;
+        }
+        resolve(
+          stdout
+            .split("\n")
+            .filter((line) => line.length > 0 && !DELTA_DIFF_HEADER_RE.test(line))
+            .map((line) => truncateToWidth(replaceTabs(line), width, "")),
+        );
+      },
+    );
+    child.stdin?.on("error", () => {});
+    child.stdin?.end(unifiedDiff);
+  });
+}
+
 export function renderWithDelta(unifiedDiff: string, width: number, theme: Theme): string[] {
   const innerWidth = Math.max(1, width);
   const isSplit = resolveIsSplit(innerWidth);
@@ -85,24 +146,13 @@ export function renderWithDelta(unifiedDiff: string, width: number, theme: Theme
     ? buildDeltaArgs(styles, isSplit, innerWidth)
     : ["delta", isSplit ? "--side-by-side" : "--color-only", `--width=${innerWidth}`];
 
-  const diffHeaderRe = /^(diff --git|---|\+\+\+)/;
-  try {
-    const result = execSync(deltaArgs.join(" "), {
-      input: unifiedDiff,
-      encoding: "utf-8",
-      timeout: 5000,
-      maxBuffer: 1024 * 1024,
-    });
-    return result
-      .split("\n")
-      .filter((line) => line.length > 0 && !diffHeaderRe.test(line))
-      .map((line) => truncateToWidth(replaceTabs(line), width, ""));
-  } catch {
-    return unifiedDiff
-      .split("\n")
-      .filter((line) => line.length > 0)
-      .map((line) => truncateToWidth(line, width, "…"));
-  }
+  if (deltaResults.size() > DELTA_CACHE_MAX_ENTRIES) deltaResults.reset();
+
+  const key = `${deltaArgs.join("\u0000")}\u0000${unifiedDiff}`;
+  const cached = deltaResults.get(key);
+  if (cached) return cached;
+  deltaResults.request(key, (signal) => runDelta(deltaArgs.slice(1), unifiedDiff, width, signal));
+  return fallbackDeltaLines(unifiedDiff, width);
 }
 
 export function renderChangeBar(added: number, removed: number, theme: Theme): string {

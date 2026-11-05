@@ -1,6 +1,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { CONFIG_STAT_TTL_MS } from "@htwang-contrib/common";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mergeUsage, toPiUsage } from "../src/usage-report.ts";
 
@@ -46,23 +47,30 @@ describe("toPiUsage", () => {
 
 describe("background usage pool", () => {
   let dir: string;
+  let nowMs: number;
   let mod: typeof import("../src/usage-report.ts");
 
   beforeEach(async () => {
     dir = mkdtempSync(join(tmpdir(), "usage-report-test-"));
     vi.stubEnv("XDG_CONFIG_HOME", dir);
+    nowMs = Date.now();
+    vi.spyOn(Date, "now").mockImplementation(() => nowMs);
     vi.resetModules();
     mod = await import("../src/usage-report.ts");
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     vi.unstubAllEnvs();
     rmSync(dir, { recursive: true, force: true });
   });
 
+  // External config edits are observed after the config stat TTL; the mocked
+  // clock advances past it so each write is visible to the next read.
   function setReportUsage(on: boolean) {
     mkdirSync(join(dir, "pi"), { recursive: true });
     writeFileSync(join(dir, "pi", "extensions.json"), JSON.stringify({ subagents: { reportUsage: on } }));
+    nowMs += CONFIG_STAT_TTL_MS + 1;
   }
 
   it("is off by default", () => {

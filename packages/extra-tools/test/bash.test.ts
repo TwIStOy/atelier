@@ -5,10 +5,16 @@ import { join } from "node:path";
 const xdg = mkdtempSync(join(tmpdir(), "extra-tools-test-"));
 process.env.XDG_CONFIG_HOME = xdg;
 
+// External config edits are observed after the config stat TTL; the mocked
+// clock lets tests advance past it after writing the config file.
+let nowMs = Date.now();
+vi.spyOn(Date, "now").mockImplementation(() => nowMs);
+
 const { registerBashTool } = await import("../src/bash/index.ts");
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { afterAll, describe, expect, it } from "vitest";
+import { CONFIG_STAT_TTL_MS } from "@htwang-contrib/common";
+import { afterAll, describe, expect, it, vi } from "vitest";
 
 interface RegisteredTool {
   name: string;
@@ -47,6 +53,7 @@ describe("registerBashTool", () => {
   it("does not register bash when extendedBash is disabled", () => {
     mkdirSync(join(xdg, "pi"), { recursive: true });
     writeFileSync(join(xdg, "pi", "extensions.json"), JSON.stringify({ "extra-tools": { extendedBash: false } }));
+    nowMs += CONFIG_STAT_TTL_MS + 1;
     const { pi, tools } = capturePi();
     registerBashTool(pi);
     expect(tools.length).toBe(0);
