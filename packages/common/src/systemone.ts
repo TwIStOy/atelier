@@ -1,12 +1,13 @@
 import {
   APIUserAbortError,
+  type EntryType,
   type Fetch,
   type Questions,
   type RequestOptions,
-  type SystemOneRequest,
   type SystemOneResult,
   TypeSafeClient,
   TypeSafeError,
+  type SystemOneRequest as TypeSafeSystemOneRequest,
 } from "@typesafe-ai/sdk";
 import {
   type ExtensionConfigSchema,
@@ -26,10 +27,13 @@ export type {
   Questions as SystemOneQuestions,
   ScoreQuestion as SystemOneScoreQuestion,
   ScoreResponse as SystemOneScoreResponse,
-  SystemOneRequest,
   SystemOneResult,
   Usage as SystemOneUsage,
 } from "@typesafe-ai/sdk";
+
+export type SystemOneRequest<Q extends Questions = Questions> = Omit<TypeSafeSystemOneRequest<Q>, "state"> & {
+  state: EntryType | null;
+};
 export {
   APIConnectionError as SystemOneConnectionError,
   APIError as SystemOneAPIError,
@@ -136,6 +140,8 @@ export function registerSystemOneConfigItems(): void {
   ]);
 }
 
+const NULL_STATE_SENTINEL = "__PI_SYSTEMONE_NULL_STATE__";
+
 export async function systemOne<const Q extends Questions>(
   request: SystemOneRequest<Q>,
   options: SystemOneOptions = {},
@@ -152,14 +158,44 @@ export async function systemOne<const Q extends Questions>(
     );
   }
 
+  const fetchForClient =
+    request.state === null
+      ? (((input: string, init?: RequestInit) => {
+          const forwarded = options.fetch ?? globalThis.fetch;
+          if (!forwarded) {
+            return Promise.reject(new TypeSafeError("No fetch implementation is available for System One."));
+          }
+          const body = init?.body;
+          if (typeof body !== "string") {
+            return forwarded(input, init);
+          }
+          try {
+            const payload = JSON.parse(body);
+            if (payload && typeof payload === "object" && "state" in payload && payload.state === NULL_STATE_SENTINEL) {
+              payload.state = null;
+              return forwarded(input, { ...init, body: JSON.stringify(payload) });
+            }
+          } catch {
+            // The body is not JSON; fall through to the original request.
+          }
+          return forwarded(input, init);
+        }) satisfies Fetch)
+      : options.fetch;
+
   const client = new TypeSafeClient({
     apiKey,
     baseURL: (options.baseUrl ?? config.baseUrl).trim(),
     defaultModel: config.model,
     timeout: config.timeoutMs,
     retry: { maxRetries: config.maxRetries },
-    fetch: options.fetch,
+    fetch: fetchForClient,
     logLevel: "off",
   });
-  return client.systemOne(request, options);
+
+  const requestForClient =
+    request.state === null
+      ? ({ ...request, state: NULL_STATE_SENTINEL } as TypeSafeSystemOneRequest<Q>)
+      : (request as TypeSafeSystemOneRequest<Q>);
+
+  return client.systemOne(requestForClient, options);
 }
