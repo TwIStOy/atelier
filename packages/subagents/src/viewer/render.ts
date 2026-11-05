@@ -56,10 +56,6 @@ type ConversationBuild = {
   cwd: string;
 };
 
-function addSpacer(build: ConversationBuild): void {
-  build.container.addChild(new Spacer(1));
-}
-
 function isActionableToolCall(part: ToolCallPart): part is ResolvedToolCallPart {
   return part.type === "toolCall" && Boolean(part.id) && Boolean(part.name);
 }
@@ -102,7 +98,8 @@ function addToolCall(build: ConversationBuild, message: AssistantMessage, part: 
 
 function addAssistantMessage(build: ConversationBuild, message: AssistantMessage): void {
   const assistant = new AssistantMessageComponent(message, build.opts.hideThinkingBlock, build.markdownTheme);
-  if (build.container.children.length > 0) addSpacer(build);
+  // The component emits its own leading blank, exactly as it does in the host
+  // chat container, so no spacer is added here.
   build.container.addChild(assistant);
   for (const part of message.content as ToolCallPart[]) {
     addToolCall(build, message, part);
@@ -124,7 +121,7 @@ function applyToolResult(build: ConversationBuild, message: ToolResultMessage): 
 function addUserMessage(build: ConversationBuild, message: UserMessage): void {
   const text = getUserText(message);
   if (!text) return;
-  if (build.container.children.length > 0) addSpacer(build);
+  if (build.container.children.length > 0) build.container.addChild(new Spacer(1));
   build.container.addChild(new UserMessageComponent(text, build.markdownTheme));
 }
 

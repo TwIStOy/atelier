@@ -6,6 +6,8 @@ import {
   matchesKey,
   type OverlayOptions,
   type TUI,
+  type TuiMouseEvent,
+  type TuiMouseEventResult,
   truncateToWidth,
   visibleWidth,
   wrapTextWithAnsi,
@@ -31,11 +33,27 @@ const VIEWER_OVERLAY_OPTIONS: OverlayOptions = {
   maxHeight: "80%",
 };
 
+// Columns between the overlay edge and its content: the border glyph plus one
+// padding space on each side.
+const FRAME_INSET = 2;
+
+type ViewerLayout = {
+  innerWidth: number;
+  headerLen: number;
+  contentHeight: number;
+  viewLen: number;
+  bodyHeight: number;
+};
+
 export function subagentViewerOverlayOptions(): OverlayOptions {
   return VIEWER_OVERLAY_OPTIONS;
 }
 
 export class SubagentViewerOverlay implements Component {
+  /** Host-side sibling lookups (verb groups, spacing, hover) walk component
+   * trees; exposing the body here puts the conversation inside the overlay on
+   * that walk. */
+  readonly children: Component[] = [];
   private scrollOffset = 0;
   private currentIndex: number;
   private body: Container;
@@ -46,10 +64,12 @@ export class SubagentViewerOverlay implements Component {
   private disposed = false;
   private stickToBottom = true;
   private lastMaxScroll = 0;
+  private layout: ViewerLayout | null = null;
 
   constructor(private readonly params: SubagentViewerParams) {
     this.currentIndex = Math.max(0, Math.min(params.initialIndex, params.runs.length - 1));
     this.body = this.rebuildBody();
+    this.children.push(this.body);
     this.bodyEntryCount = this.body.children.length;
     this.startLiveRefresh();
   }
@@ -101,6 +121,46 @@ export class SubagentViewerOverlay implements Component {
     } else if (before) {
       this.rebuildAndInvalidate();
     }
+  }
+
+  /** Routes mouse input the way the host chat does: the frame only maps overlay
+   * coordinates onto the body, the body's own children handle the event. */
+  handleMouse(event: TuiMouseEvent): TuiMouseEventResult | undefined {
+    if (event.type === "wheel") return this.handleWheelMouse(event);
+    const row = this.bodyRowAt(event.y);
+    if (row === undefined || !this.layout) return undefined;
+    const result = this.body.handleMouse({
+      ...event,
+      x: event.x - FRAME_INSET,
+      y: row,
+      width: this.layout.innerWidth,
+      height: this.layout.bodyHeight,
+    });
+    if (!result) return undefined;
+    // A handled event can expand a tool row or move its hover marker, and the
+    // cached body lines predate that state.
+    this.bodyCache = null;
+    return result;
+  }
+
+  private handleWheelMouse(event: TuiMouseEvent): TuiMouseEventResult | undefined {
+    const delta = event.wheelDelta ?? 0;
+    if (delta === 0 || this.params.runs.length === 0) return undefined;
+    if (delta < 0) this.scrollUpBy(-delta);
+    else this.scrollDownBy(delta);
+    return { handled: true };
+  }
+
+  /** Translate an overlay-local row into a body line index, or undefined when
+   * the row lands on the frame, the header, the footer, or their padding. */
+  private bodyRowAt(overlayY: number): number | undefined {
+    const layout = this.layout;
+    if (!layout) return undefined;
+    const contentRow = overlayY - 1;
+    if (contentRow < 0 || contentRow >= layout.contentHeight) return undefined;
+    const bodyRow = contentRow - layout.headerLen;
+    if (bodyRow < 0 || bodyRow >= layout.viewLen) return undefined;
+    return bodyRow + this.scrollOffset;
   }
 
   handleInput(data: string): void {
@@ -266,11 +326,15 @@ export class SubagentViewerOverlay implements Component {
     if (this.scrollOffset < 0) this.scrollOffset = 0;
 
     const viewLen = Math.max(0, contentHeight - headerLen - footerLen);
-    const start = headerLen + this.scrollOffset;
-    const content: string[] = [...headerLines, ...natural.slice(start, start + viewLen), ...footerLines];
+    const content: string[] = [
+      ...headerLines,
+      ...bodyLines.slice(this.scrollOffset, this.scrollOffset + viewLen),
+      ...footerLines,
+    ];
     while (content.length < contentHeight) {
       content.splice(content.length - footerLen, 0, "");
     }
+    this.layout = { innerWidth, headerLen, contentHeight, viewLen, bodyHeight: bodyLines.length };
 
     return this.withBorder(content, innerWidth, overlayWidth);
   }
@@ -353,10 +417,15 @@ export class SubagentViewerOverlay implements Component {
     this.currentIndex = next;
     this.scrollOffset = 0;
     this.stickToBottom = true;
-    this.body = this.rebuildBody();
-    this.bodyEntryCount = this.body.children.length;
-    this.bodyCache = null;
+    this.setBody(this.rebuildBody());
     this.invalidate();
+  }
+
+  private setBody(container: Container): void {
+    this.body = container;
+    this.children.splice(0, this.children.length, container);
+    this.bodyEntryCount = container.children.length;
+    this.bodyCache = null;
   }
 
   private rebuildBody(): Container {
@@ -373,9 +442,7 @@ export class SubagentViewerOverlay implements Component {
   }
 
   private rebuildAndInvalidate(): void {
-    this.body = this.rebuildBody();
-    this.bodyEntryCount = this.body.children.length;
-    this.bodyCache = null;
+    this.setBody(this.rebuildBody());
     this.scrollOffset = 0;
     this.stickToBottom = true;
     this.invalidate();

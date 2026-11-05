@@ -2,9 +2,18 @@
 
 ## [Unreleased]
 
+### Added
+
+- Mouse support in the `/view-subagents` viewer overlay: the wheel scrolls the popup body instead of the chat behind it, and press/click/move are forwarded to the tool rows under the cursor so expand/collapse, aggregate-group toggling, and hover markers behave like they do in the main chat.
+
 ### Changed
 
 - Refactor: split the largest `subagent` package functions (tool execution phases, viewer overlay key handling and conversation rendering, batch orchestration and text formatting, input validation, `git_clone` execution, and background finalize/settings helpers) into small helpers to clear `fallow health` complexity findings with no behavior changes.
+
+### Fixed
+
+- The viewer popup now renders subagent conversations the same way the host chat does: tool rows resolve their siblings through the overlay (`component-tree` lookups cover a TUI's `overlayStack`), so verb groups, truncation folds, group spacing, and rail markers appear in the popup. Explicit spacers between messages are gone because the message components emit their own leading blanks, matching `chatContainer` layout.
+- The viewer duplicated its footer hint row directly below the conversation whenever the transcript was shorter than the viewport: the scroll window sliced the composed header+body+footer array instead of the body alone.
 
 ### Removed
 
