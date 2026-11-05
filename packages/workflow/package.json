@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@htwang-contrib/common": "*",
-    "acorn": "^8.16.0",
+    "acorn": "^8.19.0",
     "typebox": "1.4.3"
   },
   "devDependencies": {
