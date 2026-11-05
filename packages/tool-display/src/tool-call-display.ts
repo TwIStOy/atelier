@@ -238,6 +238,8 @@ export interface ToolCallDisplayOpts {
   hoverAffordance?: boolean;
   displayName?: string;
   headerAnnotation?: string;
+  /** Extra rail indent (columns) for subrow layouts, e.g. inside an expanded verb-group. */
+  indent?: number;
 }
 
 const ADAPTER_PARTIAL_PREVIEW_TOOLS = new Set(["grep", "glob", "ls"]);
@@ -271,7 +273,7 @@ function renderHeaderLines(
   width: number,
   spinAt: number,
 ): string[] {
-  const bodyWidth = toolRailBodyWidth(width);
+  const bodyWidth = toolRailBodyWidth(width, opts.indent ?? 0);
   const elapsedMs = opts.startedAtMs !== undefined ? (opts.endedAtMs ?? spinAt) - opts.startedAtMs : undefined;
   const timerLabel =
     elapsedMs !== undefined && elapsedMs >= TIMER_MIN_ELAPSED_MS ? formatDuration(elapsedMs) : undefined;
@@ -304,7 +306,7 @@ function renderBodyLines(
   width: number,
   spinAt: number,
 ): string[] {
-  const bodyWidth = toolRailBodyWidth(width);
+  const bodyWidth = toolRailBodyWidth(width, opts.indent ?? 0);
   const out = opts.output ?? "";
   if (showsErroredReason(opts, out)) return erroredReasonBody(adapter, opts, theme, bodyWidth, out);
   if (shouldUseAdapter(adapter, opts)) {
@@ -388,6 +390,7 @@ export function renderToolCall(
         mark: "run",
         bullet: bullet.bullet,
         status: bullet.status,
+        indent: opts.indent,
       };
       return renderRailLines([...header, ...body], spec, theme, width);
     },

@@ -358,10 +358,17 @@ describe("read-only tool aggregation", () => {
     expect(member.handleMouse({ type: "click", button: "left", width: 80, y: 0 })).toEqual({ handled: true });
     expect(member.expanded).toBe(true);
 
-    const memberLines = member.render(80);
+    const memberLines = member.render(80).map((line) => stripTerminalSequences(line).trimEnd());
     expect(memberLines.length).toBeGreaterThan(1);
+    expect(memberLines[0].indexOf("◆")).toBe(8);
+    expect(memberLines.every((line) => line.startsWith("  ┃"))).toBe(true);
     expect(memberLines.join("\n")).toContain("Read packages/b.ts");
     expect(memberLines.join("\n")).toContain("done");
+    for (const width of [12, 22, 40, 80]) {
+      const lines = member.render(width).map((line) => stripTerminalSequences(line).trimEnd());
+      expect(lines[0].indexOf("◆")).toBe(8);
+      expect(lines.every((line) => visibleWidth(line) <= width)).toBe(true);
+    }
     expect(leader.render(80)).toEqual(["", "  ┃  ◈ Read 2 files", "  ┃     ◆ Read packages/a.ts"]);
 
     expect(member.handleMouse({ type: "click", button: "left", width: 80, y: 2 })).toEqual({ handled: true });
@@ -486,6 +493,9 @@ describe("read-only tool aggregation", () => {
     expect(lines[0]).toBe("");
     expect(lines[1]).toBe("  ┃  ◈ Read 2 files");
     expect(lines.length).toBeGreaterThan(2);
+    const plain = lines.map((line) => stripTerminalSequences(line).trimEnd());
+    expect(plain[2].indexOf("◆")).toBe(8);
+    expect(plain.every((line) => line === "" || line.startsWith("  ┃"))).toBe(true);
     expect(lines.join("\n")).toContain("Read packages/a.ts");
     expect(lines.join("\n")).toContain("done");
     expect(asPatched(read2).render(80)).toEqual(["  ┃     ◆ Read packages/b.ts"]);
@@ -602,7 +612,12 @@ describe("read-only tool aggregation", () => {
     const read3 = withResult(makeComponent("read", root, { file_path: "packages/c.ts" }));
     root.children.push(read3);
     expect(leader.render(80)).toEqual(["", "  ┃  ◈ Read 3 files", "  ┃     ◆ Read packages/a.ts"]);
-    expect(asPatched(read2).render(80).join("\n")).toContain("Read packages/b.ts");
+    const expanded = asPatched(read2)
+      .render(80)
+      .map((line) => stripTerminalSequences(line).trimEnd());
+    expect(expanded[0].indexOf("◆")).toBe(8);
+    expect(expanded.every((line) => line.startsWith("  ┃"))).toBe(true);
+    expect(expanded.join("\n")).toContain("Read packages/b.ts");
     expect(asPatched(read3).render(80)).toEqual(["  ┃     ◆ Read packages/c.ts"]);
   });
 

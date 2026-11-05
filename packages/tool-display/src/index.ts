@@ -63,7 +63,7 @@ export type { ContentRenderer, ToolDisplayAdapter } from "./types.ts";
 
 import type { ExtensionAPI, KeybindingHints, Theme } from "@earendil-works/pi-coding-agent";
 import { ToolExecutionComponent } from "@earendil-works/pi-coding-agent";
-import { Container, Editor, type TUI } from "@earendil-works/pi-tui";
+import { Container, Editor, type TUI, truncateToWidth } from "@earendil-works/pi-tui";
 import {
   AGGREGATE_RULE_READY_EVENT,
   AGGREGATE_RULE_REGISTER_EVENT,
@@ -79,6 +79,7 @@ import {
   isThoughtMemberClaimed,
   isThoughtTransparent,
   loadSystemOneConfig,
+  RAIL_SUBROW_INDENT,
   readRailTailSpacing,
   registerAggregateRule,
   registerSystemOneConfigItems,
@@ -607,7 +608,25 @@ function patchToolExecutionRender(
       return applyGroupSpacing(lines, previous, true);
     }
 
-    return renderAdapterLines(component, width, theme, headerAnnotation, aggregatePrefix, previous);
+    return renderAdapterLines(
+      component,
+      width,
+      theme,
+      headerAnnotation,
+      aggregatePrefix,
+      previous,
+      expandedGroupIndent(component, groupRole),
+    );
+  }
+
+  // A tool showing its full block inside an expanded group keeps the subrow
+  // alignment of its collapsed siblings instead of dropping back to top-level
+  // columns.
+  function expandedGroupIndent(component: ToolExecutionPatchThis, groupRole: GroupRole | undefined): number {
+    if (!component.expanded) return 0;
+    if (groupRole?.role === "claimed" && groupRole.groupExpanded) return RAIL_SUBROW_INDENT;
+    if (groupRole?.role === "verb-leader" && groupRole.groupExpanded) return RAIL_SUBROW_INDENT;
+    return 0;
   }
 
   function renderClaimedMember(
@@ -658,16 +677,18 @@ function patchToolExecutionRender(
     headerAnnotation: string | undefined,
     aggregatePrefix: string[],
     previous: unknown,
+    indent: number,
   ): string[] {
     const reg = proto.__tdRegistry;
     const adapter = reg.get(component.toolName);
     const mcpOwned = isMcpOwned(component, adapter);
     if (usesStockRenderer(component, adapter, mcpOwned)) {
       const lines = originalRender.call(component, width) as string[];
-      return applyGroupSpacing(lines, previous, false);
+      const indented = indent > 0 ? lines.map((line) => truncateToWidth(" ".repeat(indent) + line, width, "…")) : lines;
+      return applyGroupSpacing(indented, previous, false);
     }
 
-    const opts = buildToolCallOpts(component, reg, mcpOwned, headerAnnotation);
+    const opts = buildToolCallOpts(component, reg, mcpOwned, headerAnnotation, indent);
     const rendered = renderToolCall(opts, theme);
     const lines = rendered.render(width);
 
@@ -690,6 +711,7 @@ function patchToolExecutionRender(
     reg: typeof globalToolDisplayRegistry,
     mcpOwned: boolean,
     headerAnnotation: string | undefined,
+    indent: number,
   ) {
     const getTextOutput = component.getTextOutput?.bind(component);
     const output = component.result
@@ -712,6 +734,7 @@ function patchToolExecutionRender(
       hoverAffordance: component.__tdHovered === true && !component.expanded,
       displayName: mcpOwned ? mcpDisplayName(component.toolName, component.toolDefinition?.label) : undefined,
       headerAnnotation,
+      indent,
     };
   }
 
