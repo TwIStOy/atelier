@@ -2,7 +2,7 @@ import { fileURLToPath } from "node:url";
 import type { ExtensionAPI, Theme, ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { initTheme, ToolExecutionComponent } from "@earendil-works/pi-coding-agent";
 import type * as Common from "@htwang-contrib/common";
-import { resetAggregateRulesForTest } from "@htwang-contrib/common";
+import { patchTuiFrameEpoch, resetAggregateRulesForTest } from "@htwang-contrib/common";
 import { Type } from "@sinclair/typebox";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import extension from "../src/index.ts";
@@ -154,5 +154,27 @@ describe("patched render caching", () => {
     asPatched(second).render(80);
 
     expect(asPatched(first1).render(80)).toBe(firstLines);
+  });
+
+  it("probes each shared region boundary once per frame", () => {
+    activateExtension();
+    const root: FakeRoot = { children: [] };
+    const first = withResult(makeComponent("bash", root));
+    const second = withResult(makeComponent("bash", root));
+    const boundary = { render: vi.fn(() => ["assistant text"]) };
+    root.children.push(first, second, boundary);
+
+    const tui = { doRender() {} };
+    patchTuiFrameEpoch(tui);
+    const renderFrame = () => {
+      tui.doRender();
+      asPatched(first).render(80);
+      asPatched(second).render(80);
+    };
+
+    renderFrame();
+    expect(boundary.render).toHaveBeenCalledTimes(1);
+    renderFrame();
+    expect(boundary.render).toHaveBeenCalledTimes(2);
   });
 });

@@ -70,6 +70,7 @@ interface RegionRolesCacheEntry {
   mutation: number;
   configVersion: number;
   regions: Map<string, Map<number, unknown>>;
+  hardBreaks: Map<string, boolean>;
 }
 
 const regionRolesCache = new WeakMap<object, RegionRolesCacheEntry>();
@@ -88,7 +89,7 @@ export function memoizedRegionRoles<T>(
   const configVersion = getConfigFileVersion();
   let entry = regionRolesCache.get(children);
   if (!entry || entry.epoch !== epoch || entry.mutation !== mutation || entry.configVersion !== configVersion) {
-    entry = { epoch, mutation, configVersion, regions: new Map() };
+    entry = { epoch, mutation, configVersion, regions: new Map(), hardBreaks: new Map() };
     regionRolesCache.set(children, entry);
   }
   const key = `${lo}:${hi}:${width}`;
@@ -97,6 +98,24 @@ export function memoizedRegionRoles<T>(
   const roles = compute();
   entry.regions.set(key, roles);
   return roles;
+}
+
+export function memoizedHardBreak(children: object, index: number, width: number, compute: () => boolean): boolean {
+  const epoch = currentFrameEpoch();
+  if (epoch <= 0) return compute();
+  const mutation = roleMutationVersion;
+  const configVersion = getConfigFileVersion();
+  let entry = regionRolesCache.get(children);
+  if (!entry || entry.epoch !== epoch || entry.mutation !== mutation || entry.configVersion !== configVersion) {
+    entry = { epoch, mutation, configVersion, regions: new Map(), hardBreaks: new Map() };
+    regionRolesCache.set(children, entry);
+  }
+  const key = `${width}:${index}`;
+  const hit = entry.hardBreaks.get(key);
+  if (hit !== undefined) return hit;
+  const hardBreak = compute();
+  entry.hardBreaks.set(key, hardBreak);
+  return hardBreak;
 }
 
 const frameLineCounts = new WeakMap<object, { epoch: number; count: number }>();

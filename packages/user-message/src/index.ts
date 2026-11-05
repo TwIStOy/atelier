@@ -88,6 +88,17 @@ function styledLine(line: string, width: number, theme: Theme | undefined, color
   return `${prefix}${text}${padding}`;
 }
 
+interface UserMessageRenderCacheEntry {
+  text: string;
+  width: number;
+  theme: Theme | undefined;
+  color: ThemeColor;
+  complexityLabel: string | undefined;
+  lines: string[];
+}
+
+const userMessageRenderCache = new WeakMap<UserMessageComponent, UserMessageRenderCacheEntry>();
+
 function renderUserMessage(
   instance: UserMessageComponent,
   width: number,
@@ -98,6 +109,20 @@ function renderUserMessage(
   const text = findMarkdownText(instance);
   if (text === undefined) return undefined;
 
+  const complexity = getComplexity(instance, text);
+  const complexityLabel = complexity ? `  ${formatMessageComplexity(complexity)}` : undefined;
+  const cached = userMessageRenderCache.get(instance);
+  if (
+    cached &&
+    cached.text === text &&
+    cached.width === width &&
+    cached.theme === theme &&
+    cached.color === color &&
+    cached.complexityLabel === complexityLabel
+  ) {
+    return cached.lines;
+  }
+
   const prefixWidth = 3;
   const contentWidth = Math.max(1, width - prefixWidth);
   const renderer = new Markdown(text, 0, 0, getMarkdownTheme());
@@ -105,12 +130,12 @@ function renderUserMessage(
   const body = lines.length > 0 ? lines : [""];
 
   const rendered = ["", ...body.map((line) => styledLine(line, width, theme, color))];
-  const complexity = getComplexity(instance, text);
-  if (complexity) {
-    const label = `  ${formatMessageComplexity(complexity)}`;
-    rendered.push(truncateToWidth(theme ? theme.fg("muted", label) : label, width, "…"));
+  if (complexityLabel) {
+    rendered.push(truncateToWidth(theme ? theme.fg("muted", complexityLabel) : complexityLabel, width, "…"));
   }
-  return rendered.map((line) => truncateToWidth(line, width, ""));
+  const result = rendered.map((line) => truncateToWidth(line, width, ""));
+  userMessageRenderCache.set(instance, { text, width, theme, color, complexityLabel, lines: result });
+  return result;
 }
 
 function patchUserMessageRender(
@@ -138,6 +163,11 @@ function patchUserMessageRender(
       proto.__getComplexity?.(instance, text),
     );
     return custom ?? originalRender.call(this, width);
+  };
+  const originalInvalidate = proto.invalidate;
+  proto.invalidate = function (): void {
+    userMessageRenderCache.delete(this);
+    originalInvalidate.call(this);
   };
   proto.__patched = true;
 }

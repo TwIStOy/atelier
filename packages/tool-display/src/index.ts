@@ -110,6 +110,7 @@ import {
   frameLineCount,
   getCachedRenderLines,
   memoizedGroupRole,
+  memoizedHardBreak,
   memoizedRegionRoles,
   type RenderLinesKey,
   recordFrameLineCount,
@@ -475,10 +476,12 @@ function resolveGroupRole(component: ToolExecutionPatchThis, width: number): Gro
     if (isThoughtMember(sibling) || isThoughtTransparent(sibling)) return false;
     return componentRendersLines(sibling, width);
   };
+  const hardBreakAt = (siblingIndex: number) =>
+    memoizedHardBreak(siblings, siblingIndex, width, () => isHardBreak(siblings[siblingIndex]));
   let lo = index;
-  while (lo > 0 && !isHardBreak(siblings[lo - 1])) lo--;
+  while (lo > 0 && !hardBreakAt(lo - 1)) lo--;
   let hi = index;
-  while (hi < siblings.length - 1 && !isHardBreak(siblings[hi + 1])) hi++;
+  while (hi < siblings.length - 1 && !hardBreakAt(hi + 1)) hi++;
 
   const roles = memoizedRegionRoles(siblings, lo, hi, width, () => computeRegionRoles(siblings, lo, hi));
   return roles.get(index);

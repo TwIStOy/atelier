@@ -293,3 +293,26 @@ describe("user message complexity annotation", () => {
     emit("session_shutdown");
   });
 });
+
+describe("user message rendering", () => {
+  test("reuses rendered lines for unchanged content and width", () => {
+    const { emit, component } = activate();
+    const message = component("Cache this message");
+    const first = message.render(80);
+    expect(message.render(80)).toBe(first);
+    emit("session_shutdown");
+  });
+
+  test("re-renders when the width changes or the component is invalidated", () => {
+    const { emit, component } = activate();
+    const message = component("Cache this message");
+    const wide = message.render(80);
+    const narrow = message.render(40);
+    expect(narrow).not.toBe(wide);
+    expect(message.render(40)).toBe(narrow);
+    message.invalidate();
+    expect(message.render(40)).not.toBe(narrow);
+    expect(message.render(40)).toEqual(narrow);
+    emit("session_shutdown");
+  });
+});

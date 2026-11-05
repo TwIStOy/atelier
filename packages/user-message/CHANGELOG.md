@@ -6,6 +6,10 @@
 
 - Split the sticky-prompt scan (`getPinnedPrompt`) into bracket-search, bounds-trim, and preview-line helpers, and the jump-marker mouse handler into accept/press/click helpers; no behavior change.
 
+### Fixed
+
+- User-message rendering now caches lines by content, width, theme, thinking color, and complexity label, with component invalidation clearing the entry. Fullscreen scrolling no longer reparses every user message's Markdown on every frame, while asynchronous annotations and width changes still re-render correctly.
+
 ## [0.7.0] - 2026-10-30
 
 ### Added
