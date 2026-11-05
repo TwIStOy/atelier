@@ -21,6 +21,14 @@ describe("findComponentContext", () => {
     const root = { children: [{ id: "a" }, inner] };
     expect(findComponentContext(root, target)).toEqual({ siblings: inner.children, index: 0 });
   });
+
+  it("searches overlay components of a TUI root", () => {
+    const target = { id: "t" };
+    const body = { children: [{ id: "a" }, target] };
+    const overlay = { children: [body] };
+    const root = { children: [{ id: "layout" }], overlayStack: [{ component: overlay }] };
+    expect(findComponentContext(root, target)).toEqual({ siblings: body.children, index: 1 });
+  });
 });
 
 describe("findComponentContextInFrame", () => {
@@ -56,6 +64,15 @@ describe("findComponentContextInFrame", () => {
     findComponentContextInFrame(root, root.children[0] as object);
     root.children.push(late);
     expect(findComponentContextInFrame(root, late)).toEqual({ siblings: root.children, index: 1 });
+  });
+
+  it("indexes overlay components of a TUI root", () => {
+    const target = { id: "t" };
+    const body = { children: [target] };
+    const overlay = { children: [body] };
+    const root = { children: [{ id: "layout" }], overlayStack: [{ component: overlay }] };
+    renderFrame();
+    expect(findComponentContextInFrame(root, target)).toEqual({ siblings: body.children, index: 0 });
   });
 });
 

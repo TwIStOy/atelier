@@ -8,14 +8,37 @@ export interface ComponentSiblingContext {
 
 export const COMPONENT_RENDERS_LINES_PROBE_KEY = "htwang-contrib-common:component-renders-lines-probe";
 
-export function findComponentContext(root: unknown, target: object): ComponentSiblingContext | undefined {
+// A TUI renders its layout under `children` but keeps overlays in a separate
+// `overlayStack`. Extension overlays (dialogs, viewers) render their own trees,
+// so a lookup rooted at the TUI has to cover both: otherwise components inside
+// an overlay resolve no siblings and their grouping/spacing logic goes idle.
+function searchRoots(root: unknown): unknown[] {
+  const stack = (root as { overlayStack?: unknown }).overlayStack;
+  if (!Array.isArray(stack)) return [root];
+  const roots = [root];
+  for (const entry of stack) {
+    const component = (entry as { component?: unknown } | null | undefined)?.component;
+    if (component) roots.push(component);
+  }
+  return roots;
+}
+
+function findComponentContextInTree(root: unknown, target: object): ComponentSiblingContext | undefined {
   if (!root || typeof root !== "object") return undefined;
   const children = (root as { children?: unknown }).children;
   if (!Array.isArray(children)) return undefined;
   const index = children.indexOf(target);
   if (index >= 0) return { siblings: children, index };
   for (const child of children) {
-    const found = findComponentContext(child, target);
+    const found = findComponentContextInTree(child, target);
+    if (found) return found;
+  }
+  return undefined;
+}
+
+export function findComponentContext(root: unknown, target: object): ComponentSiblingContext | undefined {
+  for (const candidate of searchRoots(root)) {
+    const found = findComponentContextInTree(candidate, target);
     if (found) return found;
   }
   return undefined;
@@ -40,7 +63,7 @@ export function findComponentContextInFrame(root: unknown, target: object): Comp
   let entry = frameSiblingIndexes.get(root);
   if (!entry || entry.epoch !== epoch) {
     entry = { epoch, index: new Map() };
-    buildSiblingIndex(root, entry.index);
+    for (const candidate of searchRoots(root)) buildSiblingIndex(candidate, entry.index);
     frameSiblingIndexes.set(root, entry);
   }
   return entry.index.get(target) ?? findComponentContext(root, target);

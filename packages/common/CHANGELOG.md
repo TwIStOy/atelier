@@ -9,6 +9,8 @@
 
 ### Changed
 
+- `findComponentContext` / `findComponentContextInFrame` now search a TUI's `overlayStack` in addition to its layout `children`. Components rendered inside an extension overlay (e.g. the `/view-subagents` viewer's tool rows) previously resolved no sibling context, so host-side grouping and spacing logic went idle there.
+
 - `readConfig()` no longer `statSync`s `extensions.json` on every call: the stat is gated by a 500 ms TTL (`CONFIG_STAT_TTL_MS`, exported) and the missing-file case is cached as a sentinel, so render paths calling `loadConfig()` per tool row per frame issue at most one stat per window. In-process writes still refresh the cache immediately; only edits made by other processes are observed after the TTL.
 
 - Split oversized internal functions in `telemetry.ts` (`finalizeTurn`, `formatTurnTelemetry`), `diff.ts` (`generateUnifiedDiff`), `mcp.ts` (`mcpCall`), `gateway-provider.ts` (`refreshModelsCatalog`), and the agent modules (`child-agent.ts` `runChildAgent`, `isolated-session.ts` `runIsolatedSession`/`lastAssistantText`, `agent-personas.ts` `buildAgentPersonaCatalog`, `persona-defaults.ts` `parsePersonaDefaultsByType`, `subagent-models.ts` `loadSubagentModelConfig`) into smaller phase helpers to clear all `fallow health` complexity findings; exported names, signatures, and behavior are unchanged.
