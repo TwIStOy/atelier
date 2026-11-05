@@ -57,6 +57,13 @@ const PASSTHROUGH_THEME: Theme = { fg: (_color: string, text: string) => text } 
 
 type RenderedItem = { kind: "text"; text: string } | { kind: "thinking"; startIndex: number; endIndex: number };
 
+type TextMarkdownSlot = { text: string; markdown: Markdown };
+type TextMarkdownPool = {
+  outputPad: number;
+  theme: AssistantInternals["markdownTheme"];
+  slots: TextMarkdownSlot[];
+};
+
 function collectRenderedItems(message: AssistantMessage, active: ActiveThinking | undefined): RenderedItem[] {
   const items: RenderedItem[] = [];
   let i = 0;
@@ -127,6 +134,7 @@ export default function compactThinking(pi: ExtensionAPI) {
   const summarizingComponents = new Set<AssistantMessageComponent>();
   const leadingBlankDropped = new WeakSet<AssistantMessageComponent>();
   let expandedRuns = new WeakMap<AssistantMessageComponent, Set<number>>();
+  const textMarkdownPools = new WeakMap<AssistantMessageComponent, TextMarkdownPool>();
   let activeThinking: ActiveThinking | undefined;
   let activeTheme: Theme | undefined;
   let activeTui: TUI | undefined;
@@ -347,6 +355,7 @@ export default function compactThinking(pi: ExtensionAPI) {
     message: AssistantMessage,
   ): void {
     leadingBlankDropped.delete(component);
+    textMarkdownPools.delete(component);
     clearRailTailSpacing(component);
     setThoughtGroupExpanded(component, false);
     setThoughtMember(component, false);
@@ -390,12 +399,19 @@ export default function compactThinking(pi: ExtensionAPI) {
     items: RenderedItem[],
     spacing: number,
   ): void {
+    const pool = textMarkdownPools.get(component);
+    const previousSlots = pool?.outputPad === self.outputPad && pool.theme === self.markdownTheme ? pool.slots : [];
+    const slots: TextMarkdownSlot[] = [];
     if (items[0]) addSpacer(self, items[0].kind === "text" ? 1 : spacing);
     let thinkingRunIndex = 0;
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
       if (item.kind === "text") {
-        self.contentContainer.addChild(new Markdown(item.text, self.outputPad, 0, self.markdownTheme));
+        const previous = previousSlots[slots.length];
+        const markdown = previous?.markdown ?? new Markdown(item.text, self.outputPad, 0, self.markdownTheme);
+        if (previous && previous.text !== item.text) markdown.setText(item.text);
+        slots.push({ text: item.text, markdown });
+        self.contentContainer.addChild(markdown);
         continue;
       }
       if (items[i - 1]?.kind === "text") addSpacer(self, Math.max(spacing, 1));
@@ -403,6 +419,7 @@ export default function compactThinking(pi: ExtensionAPI) {
       thinkingRunIndex++;
       addSpacer(self, items[i + 1]?.kind === "text" ? Math.max(spacing, 1) : spacing);
     }
+    textMarkdownPools.set(component, { outputPad: self.outputPad, theme: self.markdownTheme, slots });
   }
 
   function renderThinkingRun(

@@ -6,6 +6,10 @@
 
 - Split complex render/detail builders into smaller phase helpers; no behavior change.
 
+### Fixed
+
+- `/context` now reuses rendered lines for unchanged details and width instead of rebuilding the grid, summaries, detail sections, and ANSI truncation on every frame. Width changes rebuild the cache, and component invalidation clears it.
+
 ## [0.7.0] - 2026-10-30
 
 ### Changed

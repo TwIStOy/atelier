@@ -88,6 +88,14 @@ export function componentRenderProbeDepth(): number {
   return getGlobalState(COMPONENT_RENDERS_LINES_PROBE_KEY, () => ({ depth: 0 })).depth;
 }
 
+interface ComponentVisibilityCacheEntry {
+  epoch: number;
+  width: number;
+  visible: boolean;
+}
+
+const componentVisibilityCache = new WeakMap<object, ComponentVisibilityCacheEntry>();
+
 export function componentRendersLines(component: unknown, width: number): boolean {
   if (typeof width !== "number" || width <= 0) return true;
   if (!component || typeof component !== "object") return false;
@@ -95,9 +103,14 @@ export function componentRendersLines(component: unknown, width: number): boolea
   if (typeof render !== "function") return false;
   const probe = getGlobalState(COMPONENT_RENDERS_LINES_PROBE_KEY, () => ({ depth: 0 }));
   if (probe.depth > 0) return true;
+  const epoch = currentFrameEpoch();
+  const cached = componentVisibilityCache.get(component);
+  if (epoch > 0 && cached?.epoch === epoch && cached.width === width) return cached.visible;
   probe.depth++;
   try {
-    return render.call(component, width).length > 0;
+    const visible = render.call(component, width).length > 0;
+    if (epoch > 0) componentVisibilityCache.set(component, { epoch, width, visible });
+    return visible;
   } finally {
     probe.depth--;
   }

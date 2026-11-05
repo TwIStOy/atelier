@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   COMPONENT_RENDERS_LINES_PROBE_KEY,
   componentRendersLines,
@@ -77,6 +77,21 @@ describe("findComponentContextInFrame", () => {
 });
 
 describe("componentRendersLines", () => {
+  it("reuses a visibility probe within a frame", () => {
+    const component = { render: vi.fn(() => ["line"]) };
+    const tui = { doRender() {} };
+    patchTuiFrameEpoch(tui);
+
+    tui.doRender();
+    expect(componentRendersLines(component, 80)).toBe(true);
+    expect(componentRendersLines(component, 80)).toBe(true);
+    expect(component.render).toHaveBeenCalledTimes(1);
+
+    tui.doRender();
+    expect(componentRendersLines(component, 80)).toBe(true);
+    expect(component.render).toHaveBeenCalledTimes(2);
+  });
+
   it("is true when render returns any lines", () => {
     expect(componentRendersLines({ render: () => ["line"] }, 80)).toBe(true);
   });

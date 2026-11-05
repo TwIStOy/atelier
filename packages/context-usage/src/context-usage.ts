@@ -998,11 +998,17 @@ export function renderContextUsageMessage(
   theme: Theme,
 ): { render(width: number): string[]; invalidate(): void } {
   const details = message?.details as ContextUsageMessageDetails | undefined;
+  let cachedWidth: number | undefined;
+  let cachedLines: string[] | undefined;
   return {
-    invalidate() {},
+    invalidate() {
+      cachedWidth = undefined;
+      cachedLines = undefined;
+    },
     render(width: number): string[] {
       if (!details) return [theme.fg("warning", "Context usage details unavailable.")];
       const safeWidth = Math.max(48, width);
+      if (cachedLines && cachedWidth === safeWidth) return cachedLines;
       const lines: string[] = [];
       lines.push(`${theme.fg("customMessageLabel", theme.bold("Context Usage"))}`);
       const { gridCols, gridRows } = qcuGridLayout(safeWidth);
@@ -1013,7 +1019,10 @@ export function renderContextUsageMessage(
       if (details.note) lines.push("", theme.fg("dim", details.note));
       lines.push(...qcuConversationLines(theme, details.messageStats));
       qcuAllDetailSections(lines, details, theme);
-      return lines.map((line) => truncateToWidth(line, safeWidth, ""));
+      const result = lines.map((line) => truncateToWidth(line, safeWidth, ""));
+      cachedWidth = safeWidth;
+      cachedLines = result;
+      return result;
     },
   };
 }

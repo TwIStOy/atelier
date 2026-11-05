@@ -9,6 +9,7 @@ import {
   currentRenderEnvVersion,
   getCachedRenderLines,
   memoizedGroupRole,
+  memoizedRegionBounds,
   type RenderLinesKey,
   setCachedRenderLines,
 } from "../src/render-cache.ts";
@@ -96,6 +97,22 @@ function patchTuiFrameEpochSeam(): void {
   patchTuiFrameEpoch(tui);
   tui.doRender();
 }
+
+describe("memoizedRegionBounds", () => {
+  it("shares one computed span with every contained index", () => {
+    patchTuiFrameEpochSeam();
+    const children = {};
+    const compute = vi.fn(() => ({ lo: 1, hi: 3 }));
+    const bounds = memoizedRegionBounds(children, 2, 80, compute);
+
+    expect(memoizedRegionBounds(children, 1, 80, compute)).toBe(bounds);
+    expect(memoizedRegionBounds(children, 3, 80, compute)).toBe(bounds);
+    expect(compute).toHaveBeenCalledTimes(1);
+
+    expect(memoizedRegionBounds(children, 2, 100, compute)).not.toBe(bounds);
+    expect(compute).toHaveBeenCalledTimes(2);
+  });
+});
 
 describe("render lines cache", () => {
   it("returns cached lines for an identical key", () => {

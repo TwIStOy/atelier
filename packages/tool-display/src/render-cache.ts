@@ -70,10 +70,22 @@ interface RegionRolesCacheEntry {
   mutation: number;
   configVersion: number;
   regions: Map<string, Map<number, unknown>>;
-  hardBreaks: Map<string, boolean>;
+  bounds: Map<string, { lo: number; hi: number }>;
 }
 
 const regionRolesCache = new WeakMap<object, RegionRolesCacheEntry>();
+
+function regionCacheEntry(children: object): RegionRolesCacheEntry {
+  const epoch = currentFrameEpoch();
+  const mutation = roleMutationVersion;
+  const configVersion = getConfigFileVersion();
+  let entry = regionRolesCache.get(children);
+  if (!entry || entry.epoch !== epoch || entry.mutation !== mutation || entry.configVersion !== configVersion) {
+    entry = { epoch, mutation, configVersion, regions: new Map(), bounds: new Map() };
+    regionRolesCache.set(children, entry);
+  }
+  return entry;
+}
 
 // All components in one hard-break-bounded region share a single grouping
 // computation per frame, instead of each component re-scanning the region.
@@ -84,14 +96,7 @@ export function memoizedRegionRoles<T>(
   width: number,
   compute: () => Map<number, T>,
 ): Map<number, T> {
-  const epoch = currentFrameEpoch();
-  const mutation = roleMutationVersion;
-  const configVersion = getConfigFileVersion();
-  let entry = regionRolesCache.get(children);
-  if (!entry || entry.epoch !== epoch || entry.mutation !== mutation || entry.configVersion !== configVersion) {
-    entry = { epoch, mutation, configVersion, regions: new Map(), hardBreaks: new Map() };
-    regionRolesCache.set(children, entry);
-  }
+  const entry = regionCacheEntry(children);
   const key = `${lo}:${hi}:${width}`;
   const hit = entry.regions.get(key);
   if (hit) return hit as Map<number, T>;
@@ -100,22 +105,19 @@ export function memoizedRegionRoles<T>(
   return roles;
 }
 
-export function memoizedHardBreak(children: object, index: number, width: number, compute: () => boolean): boolean {
-  const epoch = currentFrameEpoch();
-  if (epoch <= 0) return compute();
-  const mutation = roleMutationVersion;
-  const configVersion = getConfigFileVersion();
-  let entry = regionRolesCache.get(children);
-  if (!entry || entry.epoch !== epoch || entry.mutation !== mutation || entry.configVersion !== configVersion) {
-    entry = { epoch, mutation, configVersion, regions: new Map(), hardBreaks: new Map() };
-    regionRolesCache.set(children, entry);
-  }
-  const key = `${width}:${index}`;
-  const hit = entry.hardBreaks.get(key);
-  if (hit !== undefined) return hit;
-  const hardBreak = compute();
-  entry.hardBreaks.set(key, hardBreak);
-  return hardBreak;
+export function memoizedRegionBounds(
+  children: object,
+  index: number,
+  width: number,
+  compute: () => { lo: number; hi: number },
+): { lo: number; hi: number } {
+  if (currentFrameEpoch() <= 0) return compute();
+  const entry = regionCacheEntry(children);
+  const hit = entry.bounds.get(`${width}:${index}`);
+  if (hit) return hit;
+  const bounds = compute();
+  for (let i = bounds.lo; i <= bounds.hi; i++) entry.bounds.set(`${width}:${i}`, bounds);
+  return bounds;
 }
 
 const frameLineCounts = new WeakMap<object, { epoch: number; count: number }>();

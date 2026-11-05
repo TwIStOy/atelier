@@ -6,7 +6,7 @@
 
 - Tools expanded inside an expanded verb-group (a member's own output, or the leader's call opened below the summary) now keep the subrow alignment of their collapsed siblings: rail at column 2, bullet at column 8, body at column 10, with the wrap budget narrowed by the same three columns. Previously the full block dropped back to top-level columns (bullet 5, body 7). Stock-renderer tools without an adapter (rule-registered by a third-party extension) get the same indent as a space prefix with ANSI-aware truncation.
 - Collapsed `web_search` errors render `details.error` on the `└` line instead of the generic squashed tool output.
-- Fullscreen scrolling now shares hard-break visibility probes across tool rows within each frame instead of re-rendering the same assistant or user boundary for every tool. Unpatched renders without a frame epoch still probe directly, preserving thought-to-text updates between calls.
+- Fullscreen scrolling now shares visibility probes across grouping and spacing within each frame, so a preceding assistant or user boundary is rendered only once for both decisions. Hard-break region bounds are also cached for every contained tool, replacing per-tool boundary walks with one linear scan per region per frame. Unpatched renders without a frame epoch still probe directly, preserving thought-to-text updates between calls.
 
 ### Changed
 

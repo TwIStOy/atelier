@@ -1,5 +1,5 @@
 import type { AssistantMessageComponent, Theme } from "@earendil-works/pi-coding-agent";
-import { stripTerminalSequences } from "@earendil-works/pi-tui";
+import { Markdown, stripTerminalSequences } from "@earendil-works/pi-tui";
 import type * as Common from "@htwang-contrib/common";
 import { describe, expect, it, vi } from "vitest";
 import { activateExtension, click, emitAssistantUpdate, makeComponent, makeMessage, PLAIN_THEME } from "./harness.ts";
@@ -94,6 +94,38 @@ describe("animation tick rebuild cadence", () => {
       expect(spy).toHaveBeenCalledTimes(2);
     } finally {
       session.shutdown();
+      vi.useRealTimers();
+    }
+  });
+
+  it("reuses text Markdown caches across rebuilds", () => {
+    vi.useFakeTimers();
+    const session = activateExtension({ theme: PLAIN_THEME });
+    const message = makeMessage([
+      { type: "text", text: "Text before the active run" },
+      { type: "thinking", thinking: "streaming thought" },
+    ]);
+    const component = makeComponent(message);
+    const render = vi.spyOn(Markdown.prototype, "render");
+    try {
+      emitAssistantUpdate(session, message, { type: "thinking_start", contentIndex: 1 });
+      component.render(80);
+      vi.advanceTimersByTime(90);
+      component.render(80);
+
+      expect(render).toHaveBeenCalledTimes(2);
+      expect(render.mock.instances[1]).toBe(render.mock.instances[0]);
+      expect(render.mock.results[1]?.value).toBe(render.mock.results[0]?.value);
+
+      const updated = makeMessage([
+        { type: "text", text: "Updated text" },
+        { type: "thinking", thinking: "streaming thought" },
+      ]);
+      (component as unknown as AssistantMessageComponent).updateContent(updated);
+      expect(component.render(80).map(stripTerminalSequences).join("\n")).toContain("Updated text");
+    } finally {
+      session.shutdown();
+      render.mockRestore();
       vi.useRealTimers();
     }
   });

@@ -177,4 +177,24 @@ describe("patched render caching", () => {
     renderFrame();
     expect(boundary.render).toHaveBeenCalledTimes(2);
   });
+
+  it("shares a preceding boundary probe with spacing resolution", () => {
+    activateExtension();
+    const root: FakeRoot = { children: [] };
+    const tool = withResult(makeComponent("bash", root));
+    const boundary = { render: vi.fn(() => ["assistant text"]) };
+    root.children.push(boundary, tool);
+
+    const tui = { doRender() {} };
+    patchTuiFrameEpoch(tui);
+    const renderFrame = () => {
+      tui.doRender();
+      asPatched(tool).render(80);
+    };
+
+    renderFrame();
+    expect(boundary.render).toHaveBeenCalledTimes(1);
+    renderFrame();
+    expect(boundary.render).toHaveBeenCalledTimes(2);
+  });
 });
