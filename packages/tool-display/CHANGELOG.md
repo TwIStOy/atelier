@@ -9,6 +9,7 @@
 
 ### Changed
 
+- Extracted the header timer-prefix computation from `renderHeaderLines` into a `timerPrefix` helper, clearing the last fallow `maxCrap` (31.6) health-gate finding; no behavior change.
 - Simplified remaining adapter formatters (subagent-status, memory, todo, codemode, goal, journal, write, edit, ls, shared, web-fetch, web-search) by extracting small helpers; no behavior change.
 - `<key> to expand` / `<key> to collapse` hints now resolve through the host-injected `keyText()` captured from the pi-owned `ToolExecutionComponent` render context, instead of a module import that can bind to the extension's own `@earendil-works/pi-coding-agent` copy and format `app.*` ids as `""` because that copy never sees pi's configured keybindings. The import stays as a fallback when no host render context is available (pre-1.5.0 or test harnesses).
 - Adapters share `adapters/shared.ts` helpers (`outputContentMethods`, `formatDimPreviewLines`, `listLines`, `countFirstSummary`, `filePathDisplay`, `batchHeader`, `backendTag`, `stringField`/`numberField`) instead of per-adapter copies; behavior and rendered output are unchanged.

@@ -2,6 +2,9 @@
   "$schema": "./node_modules/fallow/schema.json",
   // pi loads extension entries from each package's "pi.extensions" field and the
   // root manifest, which fallow does not read; seed them as manual entries.
+  // Single-segment `*` is intentional (one level only): per-package src entries
+  // are already covered by package.json discovery; `**` would over-seed entries
+  // and weaken dead-code detection. The 3.38 glob-semantics warning is expected.
   "entry": [
     "packages/*/index.ts",
     "extensions/*/index.ts",

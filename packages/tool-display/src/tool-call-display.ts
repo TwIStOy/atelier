@@ -266,6 +266,14 @@ function detailsErrorPresent(details: unknown): boolean {
   return typeof error === "string" && error.length > 0;
 }
 
+function timerPrefix(opts: ToolCallDisplayOpts, theme: Theme, spinAt: number): { text: string; width: number } {
+  if (opts.startedAtMs === undefined) return { text: "", width: 0 };
+  const elapsedMs = (opts.endedAtMs ?? spinAt) - opts.startedAtMs;
+  if (elapsedMs < TIMER_MIN_ELAPSED_MS) return { text: "", width: 0 };
+  const label = formatDuration(elapsedMs);
+  return { text: `${theme.fg("dim", label)} `, width: visibleWidth(label) + 1 };
+}
+
 function renderHeaderLines(
   adapter: ToolDisplayAdapter | undefined,
   opts: ToolCallDisplayOpts,
@@ -273,13 +281,8 @@ function renderHeaderLines(
   width: number,
   spinAt: number,
 ): string[] {
-  const bodyWidth = toolRailBodyWidth(width, opts.indent ?? 0);
-  const elapsedMs = opts.startedAtMs !== undefined ? (opts.endedAtMs ?? spinAt) - opts.startedAtMs : undefined;
-  const timerLabel =
-    elapsedMs !== undefined && elapsedMs >= TIMER_MIN_ELAPSED_MS ? formatDuration(elapsedMs) : undefined;
-  const timerPart = timerLabel ? `${theme.fg("dim", timerLabel)} ` : "";
-  const timerWidth = timerLabel ? visibleWidth(timerLabel) + 1 : 0;
-  const innerWidth = Math.max(1, bodyWidth - timerWidth);
+  const timer = timerPrefix(opts, theme, spinAt);
+  const innerWidth = Math.max(1, toolRailBodyWidth(width, opts.indent ?? 0) - timer.width);
 
   const headerText = adapter
     ? adapter.formatCallHeader(
@@ -295,7 +298,7 @@ function renderHeaderLines(
     : formatGenericToolHeader(opts.toolName, opts.args, theme, innerWidth, opts.displayName);
 
   const headerLines = headerText.split("\n");
-  if (timerPart) headerLines[0] = timerPart + headerLines[0];
+  if (timer.text) headerLines[0] = timer.text + headerLines[0];
   return headerLines;
 }
 
