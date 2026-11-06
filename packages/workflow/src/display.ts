@@ -1,7 +1,7 @@
 import type { AgentToolResult } from "@earendil-works/pi-agent-core";
 import type { Theme, ThemeColor } from "@earendil-works/pi-coding-agent";
 import { type Component, Text, type TUI } from "@earendil-works/pi-tui";
-import { DEFAULT_SPINNER, resolveSpinner } from "@htwang-contrib/common";
+import { DEFAULT_SPINNER, resolveSpinner } from "@htwang-contrib/common/spinner";
 import type { WorkflowAgentSnapshot, WorkflowSnapshot, WorkflowStatus } from "./engine.ts";
 
 const AGENT_ICONS: Record<WorkflowAgentSnapshot["status"], string> = {

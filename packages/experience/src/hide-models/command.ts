@@ -1,6 +1,7 @@
 import type { Api, Model } from "@earendil-works/pi-ai";
 import type { ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
-import { fitColWidths, formatNumber, makeTable } from "@htwang-contrib/common";
+import { formatNumber } from "@htwang-contrib/common/format";
+import { fitColWidths, makeTable } from "@htwang-contrib/common/terminal";
 import { addHiddenRule, loadConfig, removeHiddenRule } from "./config.ts";
 import { isSuppressed, listAllModels, listAvailableModels, setSuppress } from "./model-patch.ts";
 import { buildRuleSet, canonicalRule, describeRule, isModelHidden, parseTarget } from "./rules.ts";

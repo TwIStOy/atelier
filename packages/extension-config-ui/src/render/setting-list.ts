@@ -6,7 +6,7 @@ import type {
   MultiSelectConfigItem,
   ReorderableConfigItem,
   SelectConfigItem,
-} from "@htwang-contrib/common";
+} from "@htwang-contrib/common/config";
 import { buildSelectDisplayOptions } from "../config-registry.ts";
 import type { InlineEditState, SelectingState, SettingRow } from "../types.ts";
 import { SELECT_PAGE_SIZE } from "../types.ts";

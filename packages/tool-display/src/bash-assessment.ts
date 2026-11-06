@@ -1,4 +1,4 @@
-import { systemOne, systemOneNoul } from "@htwang-contrib/common";
+import { systemOne, systemOneNoul } from "@htwang-contrib/common/systemone";
 
 export interface BashAssessment {
   destructive: number;

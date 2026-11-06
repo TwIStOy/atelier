@@ -17,7 +17,7 @@ import {
   SettingsManager,
   truncateHead,
 } from "@earendil-works/pi-coding-agent";
-import { getChildExtensionFactories } from "@htwang-contrib/common";
+import { getChildExtensionFactories } from "@htwang-contrib/common/agents/child-extensions";
 import { loadGoalConfig, resolveVerifierModel } from "./config.ts";
 import type { Goal } from "./types.ts";
 

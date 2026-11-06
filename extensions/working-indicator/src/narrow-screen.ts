@@ -1,4 +1,4 @@
-import { DEFAULT_SPINNER, SPINNER_STYLES, type SpinnerStyle } from "@htwang-contrib/common";
+import { DEFAULT_SPINNER, SPINNER_STYLES, type SpinnerStyle } from "@htwang-contrib/common/spinner";
 
 /**
  * Terminal width (in columns) below which the working indicator is treated as

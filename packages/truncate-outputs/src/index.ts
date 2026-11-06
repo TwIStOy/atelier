@@ -2,13 +2,9 @@ import * as nodeFs from "node:fs";
 import * as nodePath from "node:path";
 import type { TextContent } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionContext, ToolResultEvent } from "@earendil-works/pi-coding-agent";
-import {
-  type ExtensionConfigSchema,
-  isExtensionDisabled,
-  isStaleCtxError,
-  readConfig,
-  registerConfigItems,
-} from "@htwang-contrib/common";
+import { type ExtensionConfigSchema, readConfig, registerConfigItems } from "@htwang-contrib/common/config";
+import { isExtensionDisabled } from "@htwang-contrib/common/extension-disable";
+import { isStaleCtxError } from "@htwang-contrib/common/session-cache";
 import {
   buildReplacementMessage,
   buildTempFilePath,

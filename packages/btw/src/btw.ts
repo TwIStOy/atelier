@@ -9,15 +9,12 @@ import type {
   SessionCompactEvent,
   SessionTreeEvent,
 } from "@earendil-works/pi-coding-agent";
-import type { SideCallResult } from "@htwang-contrib/common";
-import {
-  branchToMessages,
-  createSessionCache,
-  executeSideCall,
-  getGlobalState,
-  registerTuiCommands,
-  userMessageText,
-} from "@htwang-contrib/common";
+import { getGlobalState } from "@htwang-contrib/common/global-state";
+import { userMessageText } from "@htwang-contrib/common/message-text";
+import { branchToMessages, createSessionCache } from "@htwang-contrib/common/session-cache";
+import type { SideCallResult } from "@htwang-contrib/common/side-call";
+import { executeSideCall } from "@htwang-contrib/common/side-call";
+import { registerTuiCommands } from "@htwang-contrib/common/tui-commands";
 import type { BtwTurn } from "./btw-ui.ts";
 import { showBtwOverlay } from "./btw-ui.ts";
 

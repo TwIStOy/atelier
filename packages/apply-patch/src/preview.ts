@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { generateUnifiedDiff } from "@htwang-contrib/common";
+import { generateUnifiedDiff } from "@htwang-contrib/common/diff";
 import { type Change, diffLines } from "diff";
 import { type ApplyPatchOperation, type ApplyPatchProgress, type ApplyPatchResult, resolvePatchPath } from "./apply.ts";
 import { type ParsedPatch, replaceChunks } from "./patch.ts";

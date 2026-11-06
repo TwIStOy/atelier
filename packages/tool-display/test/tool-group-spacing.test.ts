@@ -9,12 +9,19 @@ import extension from "../src/index.ts";
 import { globalToolDisplayRegistry } from "../src/registry.ts";
 import type { ToolDisplayAdapter } from "../src/types.ts";
 
-vi.mock("@htwang-contrib/common", async (importOriginal) => {
+vi.mock("@htwang-contrib/common/config", async (importOriginal) => {
+  const actual = await importOriginal<typeof Common>();
+  return {
+    ...actual,
+    registerConfigItems: vi.fn(),
+  };
+});
+
+vi.mock("@htwang-contrib/common/extension-disable", async (importOriginal) => {
   const actual = await importOriginal<typeof Common>();
   return {
     ...actual,
     isExtensionDisabled: () => false,
-    registerConfigItems: vi.fn(),
   };
 });
 

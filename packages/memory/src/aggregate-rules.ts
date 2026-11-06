@@ -1,4 +1,4 @@
-import { registerAggregateRule } from "@htwang-contrib/common";
+import { registerAggregateRule } from "@htwang-contrib/common/aggregate-rules";
 
 const MEMORY_AGGREGATE_RULES = {
   "memory-read": { verb: "Read", singular: "memory", plural: "memories", progressive: "Reading…" },

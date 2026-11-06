@@ -1,5 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { isExtensionDisabled, registerTuiCommands } from "@htwang-contrib/common";
+import { isExtensionDisabled } from "@htwang-contrib/common/extension-disable";
+import { registerTuiCommands } from "@htwang-contrib/common/tui-commands";
 import { openConfigPopup } from "./popup.ts";
 
 const INSTALL_GUARD = Symbol.for("pi-extensions.extension-config-ui.installed");

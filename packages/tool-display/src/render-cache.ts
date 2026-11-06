@@ -1,4 +1,6 @@
-import { componentRenderProbeDepth, currentFrameEpoch, getConfigFileVersion } from "@htwang-contrib/common";
+import { componentRenderProbeDepth } from "@htwang-contrib/common/component-tree";
+import { getConfigFileVersion } from "@htwang-contrib/common/config";
+import { currentFrameEpoch } from "@htwang-contrib/common/frame-epoch";
 
 let roleMutationVersion = 0;
 let renderEnvVersion = 0;

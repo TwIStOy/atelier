@@ -1,5 +1,5 @@
 import type { Usage } from "@earendil-works/pi-ai";
-import { type ExtensionConfigSchema, readConfig, registerConfigItems } from "@htwang-contrib/common";
+import { type ExtensionConfigSchema, readConfig, registerConfigItems } from "@htwang-contrib/common/config";
 import type { SubagentUsageSnapshot } from "./run-agent.ts";
 
 const CONFIG_ID = "subagents";

@@ -1,13 +1,7 @@
 import { type Theme, truncateToVisualLines } from "@earendil-works/pi-coding-agent";
 import { Container, truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
-import {
-  type RailSpec,
-  type RailStatus,
-  renderRailLines,
-  toolRailBodyWidth,
-  trimTrailingEmpty,
-  truncateDisplay,
-} from "@htwang-contrib/common";
+import { trimTrailingEmpty, truncateDisplay } from "@htwang-contrib/common/format";
+import { type RailSpec, type RailStatus, renderRailLines, toolRailBodyWidth } from "@htwang-contrib/common/tool-rail";
 import { formatExpandedToolOutputLines } from "./adapters/shared.ts";
 import { loadConfig } from "./config.ts";
 import { formatDuration, spinnerGlyph, TIMER_MIN_ELAPSED_MS } from "./format.ts";

@@ -1,7 +1,7 @@
 import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import type { TUI } from "@earendil-works/pi-tui";
 import { Key, matchesKey } from "@earendil-works/pi-tui";
-import type { ConfigItemPreviewHandle, ConfigItemSelectOption } from "@htwang-contrib/common";
+import type { ConfigItemPreviewHandle, ConfigItemSelectOption } from "@htwang-contrib/common/config";
 import {
   buildSelectDisplayOptions,
   buildSettingRows,

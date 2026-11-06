@@ -4,13 +4,9 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ExtensionAPI, ExtensionContext, MessageRenderer } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
-import {
-  type ExtensionConfigSchema,
-  getLocalRexContext,
-  isExtensionDisabled,
-  readConfig,
-  registerConfigItems,
-} from "@htwang-contrib/common";
+import { type ExtensionConfigSchema, readConfig, registerConfigItems } from "@htwang-contrib/common/config";
+import { isExtensionDisabled } from "@htwang-contrib/common/extension-disable";
+import { getLocalRexContext } from "@htwang-contrib/common/rex";
 import { Type } from "@sinclair/typebox";
 import { canvasPublishAdapter } from "./display.ts";
 import { openCanvasPreview } from "./preview.ts";

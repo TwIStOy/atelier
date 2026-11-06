@@ -1,4 +1,4 @@
-import { makeRefreshCommandHandler } from "@htwang-contrib/common";
+import { makeRefreshCommandHandler } from "@htwang-contrib/common/gateway-provider";
 
 export const PROVIDER_ID = "magpie";
 export const COMMAND_NAME = "refresh-magpie";

@@ -1,4 +1,4 @@
-import { mcpCall, mcpInit } from "@htwang-contrib/common";
+import { mcpCall, mcpInit } from "@htwang-contrib/common/mcp";
 import { ProviderError } from "./errors.ts";
 import { throwIfMissingApiKey } from "./http.ts";
 import type { FetchResponse, FullProvider, SearchResponse, SearchResult } from "./types.ts";

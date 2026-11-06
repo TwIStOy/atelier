@@ -7,7 +7,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import type { EditorTheme, TUI } from "@earendil-works/pi-tui";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
-import type { EditorHintPayload } from "@htwang-contrib/common";
+import type { EditorHintPayload } from "@htwang-contrib/common/events";
 import { loadConfig } from "./config.ts";
 import { DoubleEscapeController } from "./double-escape.ts";
 

@@ -1,4 +1,4 @@
-import { formatElapsedSeconds, formatTokens } from "@htwang-contrib/common";
+import { formatElapsedSeconds, formatTokens } from "@htwang-contrib/common/format";
 import type { Goal } from "./types.ts";
 
 export function formatGoalForTool(goal: Goal): string {

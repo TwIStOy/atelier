@@ -1,7 +1,9 @@
 import { fileURLToPath } from "node:url";
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { GOAL_UPDATE_EVENT, isExtensionDisabled, isStaleCtxError } from "@htwang-contrib/common";
+import { GOAL_UPDATE_EVENT } from "@htwang-contrib/common/events";
+import { isExtensionDisabled } from "@htwang-contrib/common/extension-disable";
+import { isStaleCtxError } from "@htwang-contrib/common/session-cache";
 import { Type } from "@sinclair/typebox";
 import { parseGoalCommand } from "./goal/command.ts";
 import { loadGoalConfig, registerGoalConfigItems, setCachedModelOptions } from "./goal/config.ts";

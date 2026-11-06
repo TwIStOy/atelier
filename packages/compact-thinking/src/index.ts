@@ -8,23 +8,22 @@ import {
   ToolExecutionComponent,
 } from "@earendil-works/pi-coding-agent";
 import { Markdown, MouseRegion, Spacer, Text, type TUI } from "@earendil-works/pi-tui";
+import { componentRendersLines, findComponentContextInFrame } from "@htwang-contrib/common/component-tree";
+import { isExtensionDisabled } from "@htwang-contrib/common/extension-disable";
+import { patchTuiFrameEpoch } from "@htwang-contrib/common/frame-epoch";
+import { createLogger } from "@htwang-contrib/common/log";
+import { resolveModel } from "@htwang-contrib/common/model-resolve";
+import { isStaleCtxError } from "@htwang-contrib/common/session-cache";
 import {
   clearRailTailSpacing,
-  componentRendersLines,
-  createLogger,
-  findComponentContextInFrame,
-  isExtensionDisabled,
-  isStaleCtxError,
   isThoughtGroupExpanded,
   isThoughtMember,
   isThoughtMemberClaimed,
-  patchTuiFrameEpoch,
   RAIL_BULLET_SINGLE,
   RAIL_SUBROW_INDENT,
   type RailBar,
   type RailSpec,
   readRailTailSpacing,
-  resolveModel,
   setRailTailSpacing,
   setThoughtGroupExpanded,
   setThoughtMember,
@@ -32,7 +31,7 @@ import {
   setThoughtTransparent,
   TOOL_RAIL_LAYOUT,
   ToolRailComponent,
-} from "@htwang-contrib/common";
+} from "@htwang-contrib/common/tool-rail";
 import { loadConfig, registerCompactThinkingConfigItems, setCachedModelOptions } from "./config.ts";
 import { DURATION_ENTRY_TYPE, restoreDurationEntries } from "./durations.ts";
 import { ActiveThinkingPreview, formatThoughtDuration, SingleLineText, StrictThinkingPreview } from "./preview.ts";

@@ -1,5 +1,5 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { truncateDisplay } from "@htwang-contrib/common";
+import { truncateDisplay } from "@htwang-contrib/common/format";
 import { parseWorkflowScript } from "@htwang-contrib/workflow/script";
 import { spinnerGlyph } from "../format.ts";
 import { defaultCollapsedRenderer } from "../tool-call-display.ts";

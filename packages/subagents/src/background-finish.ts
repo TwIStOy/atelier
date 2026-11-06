@@ -1,6 +1,6 @@
 import type { Usage } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { truncateDisplay } from "@htwang-contrib/common";
+import { truncateDisplay } from "@htwang-contrib/common/format";
 import { updateBackgroundJob } from "./background-jobs.ts";
 import { subagentDetails } from "./details.ts";
 import { SUBAGENT_EVENTS } from "./events.ts";

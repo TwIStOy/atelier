@@ -10,14 +10,11 @@ import {
   UserMessageComponent,
 } from "@earendil-works/pi-coding-agent";
 import { Markdown, type TUI, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
-import {
-  AsyncAnnotations,
-  createLogger,
-  findComponentContext,
-  isExtensionDisabled,
-  loadSystemOneConfig,
-  registerSystemOneConfigItems,
-} from "@htwang-contrib/common";
+import { AsyncAnnotations } from "@htwang-contrib/common/async-annotations";
+import { findComponentContext } from "@htwang-contrib/common/component-tree";
+import { isExtensionDisabled } from "@htwang-contrib/common/extension-disable";
+import { createLogger } from "@htwang-contrib/common/log";
+import { loadSystemOneConfig, registerSystemOneConfigItems } from "@htwang-contrib/common/systemone";
 import {
   classifyMessageComplexity,
   formatMessageComplexity,

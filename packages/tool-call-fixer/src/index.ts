@@ -1,12 +1,8 @@
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionContext, ToolCallEvent } from "@earendil-works/pi-coding-agent";
-import {
-  type ExtensionConfigSchema,
-  isExtensionDisabled,
-  isStaleCtxError,
-  readConfig,
-  registerConfigItems,
-} from "@htwang-contrib/common";
+import { type ExtensionConfigSchema, readConfig, registerConfigItems } from "@htwang-contrib/common/config";
+import { isExtensionDisabled } from "@htwang-contrib/common/extension-disable";
+import { isStaleCtxError } from "@htwang-contrib/common/session-cache";
 import { repairAssistantMessageGrammarLeaks } from "./grammar-repair/index.ts";
 import { normalizePhantomToolUse } from "./phantom-tool-use.ts";
 import { STRATEGIES } from "./strategies/index.ts";

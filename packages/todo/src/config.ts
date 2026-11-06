@@ -1,4 +1,4 @@
-import { readConfig, registerConfigItems } from "@htwang-contrib/common";
+import { readConfig, registerConfigItems } from "@htwang-contrib/common/config";
 
 const CONFIG_ID = "todo";
 

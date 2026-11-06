@@ -1,15 +1,19 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import type { ChildAgentProgress, ChildAgentUsageSnapshot, RunChildAgentResult } from "@htwang-contrib/common";
-import { runChildAgent } from "@htwang-contrib/common";
+import type {
+  ChildAgentProgress,
+  ChildAgentUsageSnapshot,
+  RunChildAgentResult,
+} from "@htwang-contrib/common/child-agent";
+import { runChildAgent } from "@htwang-contrib/common/child-agent";
 import { buildSubagentAgentCatalog, type SubagentAgentCatalog } from "./agent-catalog.ts";
 import { SUBAGENT_SESSION_DIR } from "./paths.ts";
 
 export {
+  assistantMessageText,
   extractAssistantText,
   finalTurnError,
   parseThinking,
-} from "@htwang-contrib/common";
-export { assistantMessageText } from "@htwang-contrib/common/child-agent";
+} from "@htwang-contrib/common/child-agent";
 
 export type SubagentUsageSnapshot = ChildAgentUsageSnapshot;
 

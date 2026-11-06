@@ -1,6 +1,6 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
-import { truncateDisplay } from "@htwang-contrib/common";
+import { truncateDisplay } from "@htwang-contrib/common/format";
 import { formatDuration, spinnerGlyph } from "../format.ts";
 import { keyText } from "../key-text.ts";
 import { activeRegistryRef } from "../tool-call-display.ts";

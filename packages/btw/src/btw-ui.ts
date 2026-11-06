@@ -9,7 +9,8 @@ import {
   truncateToWidth,
   wrapTextWithAnsi,
 } from "@earendil-works/pi-tui";
-import { scrollKeyOffset, userMessageText } from "@htwang-contrib/common";
+import { userMessageText } from "@htwang-contrib/common/message-text";
+import { scrollKeyOffset } from "@htwang-contrib/common/scroll-keys";
 import { SpinnerTimer, spinnerGlyph } from "@htwang-contrib/tool-display";
 
 const BTW_OVERLAY_OPTIONS: OverlayOptions = {

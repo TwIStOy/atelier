@@ -11,7 +11,7 @@ import {
 
 let mockConfig: ToolTimeoutConfig;
 
-vi.mock("@htwang-contrib/common", () => ({
+vi.mock("@htwang-contrib/common/config", () => ({
   registerConfigItems: () => {},
   readConfig: () => mockConfig,
 }));

@@ -1,10 +1,5 @@
-import {
-  DEFAULT_SPINNER,
-  type ExtensionConfigSchema,
-  readConfig,
-  registerConfigItems,
-  SPINNER_STYLES,
-} from "@htwang-contrib/common";
+import { type ExtensionConfigSchema, readConfig, registerConfigItems } from "@htwang-contrib/common/config";
+import { DEFAULT_SPINNER, SPINNER_STYLES } from "@htwang-contrib/common/spinner";
 import { DEFAULT_NARROW_WIDTH_SPINNER, DEFAULT_NARROW_WIDTH_THRESHOLD } from "./narrow-screen.ts";
 import { createSpinnerPreview } from "./preview.ts";
 

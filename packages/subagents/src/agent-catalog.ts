@@ -4,7 +4,7 @@ import {
   normalizePersonaId,
   personasCatalogXml,
   resolvePersonaId,
-} from "@htwang-contrib/common";
+} from "@htwang-contrib/common/agents/agent-personas";
 
 import { FALLBACK_AGENT_NONE, type SubagentSettings } from "./settings.ts";
 

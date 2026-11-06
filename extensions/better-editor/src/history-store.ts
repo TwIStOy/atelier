@@ -13,7 +13,7 @@ import {
 } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
-import { createLogger } from "@htwang-contrib/common";
+import { createLogger } from "@htwang-contrib/common/log";
 import lockfile from "proper-lockfile";
 
 const logger = createLogger("better-editor");

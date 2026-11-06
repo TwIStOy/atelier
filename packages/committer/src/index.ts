@@ -1,5 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { isExtensionDisabled, registerConfigItems, registerTuiCommands } from "@htwang-contrib/common";
+import { registerConfigItems } from "@htwang-contrib/common/config";
+import { isExtensionDisabled } from "@htwang-contrib/common/extension-disable";
+import { registerTuiCommands } from "@htwang-contrib/common/tui-commands";
 import { handleCommit } from "./commit.ts";
 import { loadConfig, selectModel } from "./model-select.ts";
 import { MAX_DIFF_LENGTH, MAX_DIFF_LENGTH_SINGLE, MAX_GROUPING_RETRIES } from "./prompt.ts";

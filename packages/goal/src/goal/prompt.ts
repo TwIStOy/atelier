@@ -1,4 +1,4 @@
-import { formatElapsedSeconds, formatTokens } from "@htwang-contrib/common";
+import { formatElapsedSeconds, formatTokens } from "@htwang-contrib/common/format";
 import type { Goal } from "./types.ts";
 
 const CONTINUATION_MARKER_OPEN = (goalId: string) => `<pi_goal_continuation goal_id="${goalId}">`;

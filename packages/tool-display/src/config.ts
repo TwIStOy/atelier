@@ -1,5 +1,5 @@
-import type { ExtensionConfigSchema } from "@htwang-contrib/common";
-import { readConfig, registerConfigItems, updateConfig } from "@htwang-contrib/common";
+import type { ExtensionConfigSchema } from "@htwang-contrib/common/config";
+import { readConfig, registerConfigItems, updateConfig } from "@htwang-contrib/common/config";
 
 export interface ToolDisplayConfig {
   previewLines: number;

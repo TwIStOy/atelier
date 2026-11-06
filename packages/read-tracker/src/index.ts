@@ -5,7 +5,7 @@ import type {
   ToolCallEventResult,
 } from "@earendil-works/pi-coding-agent";
 import { isToolCallEventType } from "@earendil-works/pi-coding-agent";
-import { isExtensionDisabled } from "@htwang-contrib/common";
+import { isExtensionDisabled } from "@htwang-contrib/common/extension-disable";
 import { buildReadRows, renderReadTrackerTable, summarizeRows } from "./display.ts";
 import { ReadTracker } from "./read-tracker.ts";
 

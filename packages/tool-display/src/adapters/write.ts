@@ -1,6 +1,6 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { visibleWidth } from "@earendil-works/pi-tui";
-import { trimTrailingEmpty } from "@htwang-contrib/common";
+import { trimTrailingEmpty } from "@htwang-contrib/common/format";
 import { loadConfig } from "../config.ts";
 import type { ToolDisplayAdapter } from "../types.ts";
 import { filePathDisplay, formatLineCount, rawPathOf, renderContentWithLineNumbers } from "./shared.ts";

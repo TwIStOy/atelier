@@ -1,7 +1,7 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import type { Component, TUI } from "@earendil-works/pi-tui";
 import { visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
-import { formatElapsedSeconds, formatTokens } from "@htwang-contrib/common";
+import { formatElapsedSeconds, formatTokens } from "@htwang-contrib/common/format";
 import type { Goal } from "./types.ts";
 
 export const GOAL_WIDGET_KEY = "pi-extensions.goal";

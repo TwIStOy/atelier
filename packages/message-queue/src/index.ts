@@ -8,7 +8,9 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import type { TUI } from "@earendil-works/pi-tui";
 import { getKeybindings, Key, matchesKey } from "@earendil-works/pi-tui";
-import { isExtensionDisabled, MODAL_ACTIVE_EVENT, registerTuiCommands } from "@htwang-contrib/common";
+import { MODAL_ACTIVE_EVENT } from "@htwang-contrib/common/events";
+import { isExtensionDisabled } from "@htwang-contrib/common/extension-disable";
+import { registerTuiCommands } from "@htwang-contrib/common/tui-commands";
 import type { QueuedMessage } from "./queue.ts";
 import { MessageQueue } from "./queue.ts";
 import { createQueuePanel, type QueueAction } from "./queue-panel.ts";

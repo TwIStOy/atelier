@@ -7,10 +7,13 @@ import extension from "../src/index.ts";
 let mockConfig: ToolTimeoutConfig;
 let disabled: boolean;
 
-vi.mock("@htwang-contrib/common", () => ({
-  isExtensionDisabled: () => disabled,
+vi.mock("@htwang-contrib/common/config", () => ({
   readConfig: () => mockConfig,
   registerConfigItems: () => {},
+}));
+
+vi.mock("@htwang-contrib/common/extension-disable", () => ({
+  isExtensionDisabled: () => disabled,
 }));
 
 function mockPi() {

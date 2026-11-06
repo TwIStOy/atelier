@@ -6,6 +6,7 @@
 
 - `gateway-provider.ts`: shared refresh-command handler factory (`makeRefreshCommandHandler`), cached-refresh skeleton (`refreshModelsCatalog`), and gateway models fetch (`fetchGatewayModels`) used by the magpie and toori providers; `scroll-keys.ts` with `scrollKeyOffset` for overlay up/down scrolling (btw, committer).
 - `frame-epoch.ts` with `currentFrameEpoch` / `patchTuiFrameEpoch` (moved from tool-display's render-cache so every extension's frame-scoped caches share one counter; patching the same TUI twice is a no-op) and `findComponentContextInFrame`, a per-frame sibling index that turns N per-component `findComponentContext` tree walks per frame into one walk plus O(1) lookups (targets attached mid-frame fall back to the direct walk). `AsyncAnnotations.size()` exposes the value count.
+- Fine-grained `exports` subpaths for every module exposed through the root entry, allowing consumers to load only the implementation modules they use instead of evaluating the full root barrel.
 
 ### Changed
 
@@ -16,6 +17,7 @@
 - `componentRendersLines` memoizes top-level visibility probes by component and width within each frame, allowing grouping and spacing consumers to share one render probe. Nested probes retain their non-rendering recursion guard, and unpatched epoch-0 renders still probe directly.
 
 - Split oversized internal functions in `telemetry.ts` (`finalizeTurn`, `formatTurnTelemetry`), `diff.ts` (`generateUnifiedDiff`), `mcp.ts` (`mcpCall`), `gateway-provider.ts` (`refreshModelsCatalog`), and the agent modules (`child-agent.ts` `runChildAgent`, `isolated-session.ts` `runIsolatedSession`/`lastAssistantText`, `agent-personas.ts` `buildAgentPersonaCatalog`, `persona-defaults.ts` `parsePersonaDefaultsByType`, `subagent-models.ts` `loadSubagentModelConfig`) into smaller phase helpers to clear all `fallow health` complexity findings; exported names, signatures, and behavior are unchanged.
+- Runtime consumers in `packages/*/src` and `extensions/*/src` now import common through fine-grained subpaths. Biome `noRestrictedImports` rejects new root-entry imports in those source trees, preventing the startup module graph from silently regrowing.
 
 ### Removed
 

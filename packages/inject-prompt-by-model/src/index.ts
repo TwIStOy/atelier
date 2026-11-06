@@ -1,10 +1,10 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { isExtensionDisabled } from "@htwang-contrib/common/extension-disable";
+import { isStaleCtxError } from "@htwang-contrib/common/session-cache";
 import {
-  isExtensionDisabled,
-  isStaleCtxError,
   registerSystemPromptContribution,
   SYSTEM_PROMPT_CONTRIBUTION_PRIORITIES,
-} from "@htwang-contrib/common";
+} from "@htwang-contrib/common/system-prompt-contributions";
 import {
   applyModelPromptRules,
   type ModelLike,

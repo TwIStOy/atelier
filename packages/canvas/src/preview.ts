@@ -2,7 +2,8 @@ import { mkdirSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { findExecutable, openRexPane, type RexContext } from "@htwang-contrib/common";
+import { findExecutable } from "@htwang-contrib/common/executable";
+import { openRexPane, type RexContext } from "@htwang-contrib/common/rex";
 
 export async function openCanvasPreview(
   exec: ExtensionAPI["exec"],

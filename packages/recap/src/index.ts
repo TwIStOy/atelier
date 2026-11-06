@@ -1,5 +1,5 @@
 import type { ExtensionAPI, ExtensionContext, SessionStartEvent } from "@earendil-works/pi-coding-agent";
-import { isExtensionDisabled } from "@htwang-contrib/common";
+import { isExtensionDisabled } from "@htwang-contrib/common/extension-disable";
 import { loadRecapConfig, registerRecapConfigItems, setCachedModels } from "./config.ts";
 import { IdleListener } from "./idle.ts";
 import { createRecapManager, type RecapManager } from "./manager.ts";

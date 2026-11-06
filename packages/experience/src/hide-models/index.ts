@@ -1,5 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { registerConfigItems } from "@htwang-contrib/common";
+import { registerConfigItems } from "@htwang-contrib/common/config";
 import { handleHideModels } from "./command.ts";
 import { CONFIG_ID, loadConfig } from "./config.ts";
 import { buildHideRuleOptions, captureRegistry, installPatch, setSuppress } from "./model-patch.ts";

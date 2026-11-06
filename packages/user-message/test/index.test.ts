@@ -14,12 +14,20 @@ vi.mock("../src/complexity.ts", async (importOriginal) => ({
   classifyMessageComplexity: mocks.classify,
 }));
 
-vi.mock("@htwang-contrib/common", async (importOriginal) => ({
+vi.mock("@htwang-contrib/common/extension-disable", async (importOriginal) => ({
   ...(await importOriginal<typeof Common>()),
   isExtensionDisabled: () => false,
+}));
+
+vi.mock("@htwang-contrib/common/log", async (importOriginal) => ({
+  ...(await importOriginal<typeof Common>()),
+  createLogger: () => ({ warn: mocks.warn }),
+}));
+
+vi.mock("@htwang-contrib/common/systemone", async (importOriginal) => ({
+  ...(await importOriginal<typeof Common>()),
   loadSystemOneConfig: () => ({ apiKey: mocks.key }),
   registerSystemOneConfigItems: mocks.register,
-  createLogger: () => ({ warn: mocks.warn }),
 }));
 
 process.env.PI_PACKAGE_DIR = fileURLToPath(

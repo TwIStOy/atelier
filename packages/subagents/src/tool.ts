@@ -1,5 +1,5 @@
 import type { AgentToolUpdateCallback, ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { FALLBACK_PERSONA_ID } from "@htwang-contrib/common";
+import { FALLBACK_PERSONA_ID } from "@htwang-contrib/common/agents/agent-personas";
 import { mergeAbortWithTimeoutMs } from "./abort-timeout.ts";
 import { buildSubagentAgentCatalog, resolveDispatchAgentId, type SubagentAgentCatalog } from "./agent-catalog.ts";
 import { backgroundStartedReply, finalizeBackgroundSuccess, finalizeBackgroundThrown } from "./background-finish.ts";

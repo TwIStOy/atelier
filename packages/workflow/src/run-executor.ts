@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { AgentToolUpdateCallback, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, formatSize, truncateHead } from "@earendil-works/pi-coding-agent";
-import { runChildAgent } from "@htwang-contrib/common";
+import { runChildAgent } from "@htwang-contrib/common/child-agent";
 import { Type } from "typebox";
 import { loadWorkflowConfig } from "./config.ts";
 import { createStreamingWorkflowDisplay, createWidgetWorkflowDisplay, type WorkflowDisplay } from "./display.ts";

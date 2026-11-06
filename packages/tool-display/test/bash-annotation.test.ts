@@ -3,7 +3,7 @@ import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-c
 import { initTheme, ToolExecutionComponent } from "@earendil-works/pi-coding-agent";
 import { type TUI, visibleWidth } from "@earendil-works/pi-tui";
 import type * as Common from "@htwang-contrib/common";
-import { getConfigItems } from "@htwang-contrib/common";
+import { getConfigItems } from "@htwang-contrib/common/config";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import type { BashAssessment } from "../src/bash-assessment.ts";
 import extension from "../src/index.ts";
@@ -22,19 +22,31 @@ vi.mock("../src/bash-assessment.ts", async (importOriginal) => ({
   assessBashCommand: mocks.assess,
 }));
 
-vi.mock("@htwang-contrib/common", async (importOriginal) => ({
+vi.mock("@htwang-contrib/common/config", async (importOriginal) => ({
+  ...(await importOriginal<typeof Common>()),
+  readConfig: (_name: string, schema: { defaults: Record<string, unknown> }) => ({
+    ...schema.defaults,
+    bashAssessment: mocks.bashAssessment,
+  }),
+}));
+
+vi.mock("@htwang-contrib/common/extension-disable", async (importOriginal) => ({
   ...(await importOriginal<typeof Common>()),
   isExtensionDisabled: () => false,
+}));
+
+vi.mock("@htwang-contrib/common/log", async (importOriginal) => ({
+  ...(await importOriginal<typeof Common>()),
+  createLogger: () => ({ warn: mocks.warn }),
+}));
+
+vi.mock("@htwang-contrib/common/systemone", async (importOriginal) => ({
+  ...(await importOriginal<typeof Common>()),
   loadSystemOneConfig: () => {
     if (mocks.configError) throw new Error("Invalid config");
     return { apiKey: mocks.key };
   },
   registerSystemOneConfigItems: mocks.register,
-  createLogger: () => ({ warn: mocks.warn }),
-  readConfig: (_name: string, schema: { defaults: Record<string, unknown> }) => ({
-    ...schema.defaults,
-    bashAssessment: mocks.bashAssessment,
-  }),
 }));
 
 process.env.PI_PACKAGE_DIR = fileURLToPath(

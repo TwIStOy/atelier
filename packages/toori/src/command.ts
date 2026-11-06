@@ -1,4 +1,4 @@
-import { makeRefreshCommandHandler } from "@htwang-contrib/common";
+import { makeRefreshCommandHandler } from "@htwang-contrib/common/gateway-provider";
 import { ENV_VAR } from "./catalog.ts";
 
 export const PROVIDER_ID = "toori";

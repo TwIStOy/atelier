@@ -68,25 +68,25 @@ import {
   AGGREGATE_RULE_READY_EVENT,
   AGGREGATE_RULE_REGISTER_EVENT,
   type AggregateRule,
-  AsyncAnnotations,
   aggregateRuleFor,
-  componentRendersLines,
-  createLogger,
-  findComponentContextInFrame,
-  getConfigFileVersion,
-  isExtensionDisabled,
+  registerAggregateRule,
+} from "@htwang-contrib/common/aggregate-rules";
+import { AsyncAnnotations } from "@htwang-contrib/common/async-annotations";
+import { componentRendersLines, findComponentContextInFrame } from "@htwang-contrib/common/component-tree";
+import { getConfigFileVersion } from "@htwang-contrib/common/config";
+import { isExtensionDisabled } from "@htwang-contrib/common/extension-disable";
+import { patchTuiFrameEpoch } from "@htwang-contrib/common/frame-epoch";
+import { createLogger } from "@htwang-contrib/common/log";
+import { loadSystemOneConfig, registerSystemOneConfigItems } from "@htwang-contrib/common/systemone";
+import {
   isThoughtMember,
   isThoughtMemberClaimed,
   isThoughtTransparent,
-  loadSystemOneConfig,
-  patchTuiFrameEpoch,
   RAIL_SUBROW_INDENT,
   readRailTailSpacing,
-  registerAggregateRule,
-  registerSystemOneConfigItems,
   setThoughtGroupExpanded,
   setThoughtMemberClaimed,
-} from "@htwang-contrib/common";
+} from "@htwang-contrib/common/tool-rail";
 import { currentDeltaRenderVersion, setDeltaRenderInvalidator } from "./adapters/shared.ts";
 import {
   aggregateSubrowBodyWidth,

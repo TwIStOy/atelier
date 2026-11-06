@@ -1,4 +1,4 @@
-import { shortenPath } from "@htwang-contrib/common";
+import { shortenPath } from "@htwang-contrib/common/format";
 import type { ToolDisplayAdapter } from "../types.ts";
 import { outputContentMethods } from "./shared.ts";
 

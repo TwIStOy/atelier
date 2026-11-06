@@ -5,8 +5,8 @@ import type {
   MultiSelectConfigItem,
   ReorderableConfigItem,
   SelectConfigItem,
-} from "@htwang-contrib/common";
-import { deleteConfigKey, getConfigItems, readRawConfig, setConfigKey } from "@htwang-contrib/common";
+} from "@htwang-contrib/common/config";
+import { deleteConfigKey, getConfigItems, readRawConfig, setConfigKey } from "@htwang-contrib/common/config";
 import type { SettingRow, TabDef } from "./types.ts";
 import { PACKAGE_TAB_PREFIX, TAB_ALL } from "./types.ts";
 

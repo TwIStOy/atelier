@@ -1,4 +1,4 @@
-import { type ExtensionConfigSchema, readConfig, registerConfigItems } from "@htwang-contrib/common";
+import { type ExtensionConfigSchema, readConfig, registerConfigItems } from "@htwang-contrib/common/config";
 
 export interface WorkflowConfig {
   maxConcurrency: number;

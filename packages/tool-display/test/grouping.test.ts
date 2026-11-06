@@ -2,30 +2,36 @@ import { fileURLToPath } from "node:url";
 import type { ExtensionAPI, Theme, ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { initTheme, ToolExecutionComponent } from "@earendil-works/pi-coding-agent";
 import type * as Common from "@htwang-contrib/common";
+import { registerAggregateRule, resetAggregateRulesForTest } from "@htwang-contrib/common/aggregate-rules";
 import {
   isThoughtMemberClaimed,
-  registerAggregateRule,
-  resetAggregateRulesForTest,
   setThoughtMember,
   setThoughtMemberClaimed,
   setThoughtTransparent,
-} from "@htwang-contrib/common";
+} from "@htwang-contrib/common/tool-rail";
 import { Type } from "@sinclair/typebox";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import extension from "../src/index.ts";
 
 const mockConfig = vi.hoisted(() => ({ overrides: {} as Record<string, unknown> }));
 
-vi.mock("@htwang-contrib/common", async (importOriginal) => {
+vi.mock("@htwang-contrib/common/config", async (importOriginal) => {
   const actual = await importOriginal<typeof Common>();
   return {
     ...actual,
-    isExtensionDisabled: () => false,
     readConfig: (_name: string, schema: { defaults: Record<string, unknown> }) => ({
       ...schema.defaults,
       ...mockConfig.overrides,
     }),
     registerConfigItems: vi.fn(),
+  };
+});
+
+vi.mock("@htwang-contrib/common/extension-disable", async (importOriginal) => {
+  const actual = await importOriginal<typeof Common>();
+  return {
+    ...actual,
+    isExtensionDisabled: () => false,
   };
 });
 

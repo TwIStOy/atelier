@@ -56,12 +56,10 @@ export { YouComProvider } from "./providers/youcom.ts";
 export { ZaiProvider } from "./providers/zai.ts";
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import {
-  createLogger,
-  isExtensionDisabled,
-  registerAggregateRule,
-  registerChildExtensionFactory,
-} from "@htwang-contrib/common";
+import { registerChildExtensionFactory } from "@htwang-contrib/common/agents/child-extensions";
+import { registerAggregateRule } from "@htwang-contrib/common/aggregate-rules";
+import { isExtensionDisabled } from "@htwang-contrib/common/extension-disable";
+import { createLogger } from "@htwang-contrib/common/log";
 import { registerWebToolsConfigItems } from "./config.ts";
 import { registerWebFetchTool } from "./fetch/index.ts";
 import { buildInterceptors } from "./interceptors/index.ts";

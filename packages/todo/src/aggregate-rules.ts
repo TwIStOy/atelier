@@ -1,4 +1,4 @@
-import { registerAggregateRule } from "@htwang-contrib/common";
+import { registerAggregateRule } from "@htwang-contrib/common/aggregate-rules";
 import { TODO_CLEAR, TODO_CREATE, TODO_DELETE, TODO_GET, TODO_LIST, TODO_UPDATE } from "./tool/types.ts";
 
 const TODO_AGGREGATE_RULES = {

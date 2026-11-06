@@ -3,7 +3,7 @@ import type { AssistantMessageComponent } from "@earendil-works/pi-coding-agent"
 import { initTheme, ToolExecutionComponent } from "@earendil-works/pi-coding-agent";
 import { stripTerminalSequences } from "@earendil-works/pi-tui";
 import type * as Common from "@htwang-contrib/common";
-import { readRailTailSpacing, setRailTailSpacing } from "@htwang-contrib/common";
+import { readRailTailSpacing, setRailTailSpacing } from "@htwang-contrib/common/tool-rail";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { activateExtension, makeComponent, makeMessage } from "./harness.ts";
 
@@ -14,12 +14,12 @@ initTheme("dark", false);
 
 const mockConfig = vi.hoisted(() => ({ overrides: {} as Record<string, unknown> }));
 
-vi.mock("@htwang-contrib/common", async (importOriginal) => {
+vi.mock("@htwang-contrib/common/component-tree", async (importOriginal) => importOriginal<typeof Common>());
+
+vi.mock("@htwang-contrib/common/config", async (importOriginal) => {
   const actual = await importOriginal<typeof Common>();
   return {
     ...actual,
-    createLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
-    isExtensionDisabled: () => false,
     readConfig: (_name: string, schema: { defaults: Record<string, unknown> }) => ({
       ...schema.defaults,
       ...mockConfig.overrides,
@@ -27,6 +27,25 @@ vi.mock("@htwang-contrib/common", async (importOriginal) => {
     registerConfigItems: vi.fn(),
   };
 });
+
+vi.mock("@htwang-contrib/common/extension-disable", async (importOriginal) => {
+  const actual = await importOriginal<typeof Common>();
+  return { ...actual, isExtensionDisabled: () => false };
+});
+
+vi.mock("@htwang-contrib/common/frame-epoch", async (importOriginal) => importOriginal<typeof Common>());
+
+vi.mock("@htwang-contrib/common/log", async (importOriginal) => {
+  const actual = await importOriginal<typeof Common>();
+  return {
+    ...actual,
+    createLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
+  };
+});
+
+vi.mock("@htwang-contrib/common/model-resolve", async (importOriginal) => importOriginal<typeof Common>());
+vi.mock("@htwang-contrib/common/session-cache", async (importOriginal) => importOriginal<typeof Common>());
+vi.mock("@htwang-contrib/common/tool-rail", async (importOriginal) => importOriginal<typeof Common>());
 
 afterEach(() => {
   mockConfig.overrides = {};

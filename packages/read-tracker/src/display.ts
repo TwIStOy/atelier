@@ -1,5 +1,6 @@
 import { formatSize } from "@earendil-works/pi-coding-agent";
-import { fitColWidths, formatElapsedSeconds, makeTable, shortenPath } from "@htwang-contrib/common";
+import { formatElapsedSeconds, shortenPath } from "@htwang-contrib/common/format";
+import { fitColWidths, makeTable } from "@htwang-contrib/common/terminal";
 import type { ReadEntry } from "./read-tracker.ts";
 
 export interface ReadDisplayRow {

@@ -1,11 +1,11 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { isExtensionDisabled } from "@htwang-contrib/common/extension-disable";
 import {
   formatTurnTelemetry,
-  isExtensionDisabled,
   type TelemetryModelRef,
   type TelemetryUsage,
   TurnTelemetryTracker,
-} from "@htwang-contrib/common";
+} from "@htwang-contrib/common/telemetry";
 import { loadConfig, registerStatuslineConfigItems } from "./config.ts";
 import { makeFooter } from "./footer.ts";
 

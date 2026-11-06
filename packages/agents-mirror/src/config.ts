@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { type ExtensionConfigSchema, readConfig, registerConfigItems } from "@htwang-contrib/common";
+import { type ExtensionConfigSchema, readConfig, registerConfigItems } from "@htwang-contrib/common/config";
 import type { MirrorMappings } from "./types.ts";
 
 const CONFIG_ID = "agents-mirror";

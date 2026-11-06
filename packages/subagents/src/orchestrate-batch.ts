@@ -1,6 +1,7 @@
 import type { Usage } from "@earendil-works/pi-ai";
 import type { AgentToolUpdateCallback, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { type AgentPersonaFileOptions, mapConcurrent } from "@htwang-contrib/common";
+import type { AgentPersonaFileOptions } from "@htwang-contrib/common/agents/agent-personas";
+import { mapConcurrent } from "@htwang-contrib/common/concurrency";
 import { mergeAbortWithTimeoutMs } from "./abort-timeout.ts";
 import { buildSubagentAgentCatalog, resolveDispatchAgentId, resolveSubagentAgentId } from "./agent-catalog.ts";
 import { formatBatchToolText } from "./batch-text.ts";

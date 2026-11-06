@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import { homedir } from "node:os";
 import * as path from "node:path";
-import { normalizePersonaId } from "@htwang-contrib/common";
+import { normalizePersonaId } from "@htwang-contrib/common/agents/agent-personas";
 import { parseWorkflowScript } from "./script.ts";
 
 export type SavedWorkflowScope = "project" | "user";

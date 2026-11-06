@@ -1,6 +1,6 @@
 import type { Api, Model } from "@earendil-works/pi-ai";
 import { type ModelRegistry, ModelRuntime } from "@earendil-works/pi-coding-agent";
-import type { ConfigItemSelectOption } from "@htwang-contrib/common";
+import type { ConfigItemSelectOption } from "@htwang-contrib/common/config";
 import { loadConfig } from "./config.ts";
 import { buildRuleSet, isModelHidden } from "./rules.ts";
 

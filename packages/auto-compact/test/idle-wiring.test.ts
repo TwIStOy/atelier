@@ -1,5 +1,6 @@
 import type { ExtensionAPI, ExtensionContext, SessionEntry } from "@earendil-works/pi-coding-agent";
-import type * as Common from "@htwang-contrib/common";
+import type * as CommonConfig from "@htwang-contrib/common/config";
+import type * as CommonExtensionDisable from "@htwang-contrib/common/extension-disable";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import autoCompact from "../src/index.ts";
 import { compactionEntry, messageEntry } from "./helpers.ts";
@@ -14,11 +15,15 @@ const mockConfig = vi.hoisted(() => ({
   } as Record<string, unknown>,
 }));
 
-vi.mock("@htwang-contrib/common", async (importOriginal) => ({
-  ...(await importOriginal<typeof Common>()),
-  isExtensionDisabled: () => false,
+vi.mock("@htwang-contrib/common/config", async (importOriginal) => ({
+  ...(await importOriginal<typeof CommonConfig>()),
   readConfig: () => mockConfig.current,
   registerConfigItems: vi.fn(),
+}));
+
+vi.mock("@htwang-contrib/common/extension-disable", async (importOriginal) => ({
+  ...(await importOriginal<typeof CommonExtensionDisable>()),
+  isExtensionDisabled: () => false,
 }));
 
 type Handler = (...args: unknown[]) => unknown;

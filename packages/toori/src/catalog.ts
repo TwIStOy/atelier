@@ -1,6 +1,6 @@
 import type { Api, RefreshModelsContext } from "@earendil-works/pi-ai";
 import type { ProviderModelConfig } from "@earendil-works/pi-coding-agent";
-import { fetchGatewayModels, refreshModelsCatalog } from "@htwang-contrib/common";
+import { fetchGatewayModels, refreshModelsCatalog } from "@htwang-contrib/common/gateway-provider";
 
 type ChatModelConfig = Extract<ProviderModelConfig, { type?: "chat" }>;
 

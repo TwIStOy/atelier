@@ -1,11 +1,11 @@
 import * as fs from "node:fs";
+import { FALLBACK_PERSONA_ID } from "@htwang-contrib/common/agents/agent-personas";
 import {
-  FALLBACK_PERSONA_ID,
   type PersonaTypeDefaults,
   parsePersonaDefaultsByType,
   personaDefaultsFilePath,
   personaDefaultsForType,
-} from "@htwang-contrib/common";
+} from "@htwang-contrib/common/agents/persona-defaults";
 
 const DEFAULT_MAX_CONCURRENT = 3;
 const DEFAULT_MAX_TOTAL = 10;

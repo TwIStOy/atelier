@@ -1,5 +1,5 @@
 import { type KeyId, matchesKey } from "@earendil-works/pi-tui";
-import type { ConfigItem, SelectConfigItem } from "@htwang-contrib/common";
+import type { ConfigItem, SelectConfigItem } from "@htwang-contrib/common/config";
 import type { InlineEditChar, InlineEditState } from "../types.ts";
 
 function inlineEditChars(text: string): InlineEditChar[] {

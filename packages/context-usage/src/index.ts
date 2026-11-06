@@ -1,7 +1,8 @@
 import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import type { TUI } from "@earendil-works/pi-tui";
 import { Key, matchesKey } from "@earendil-works/pi-tui";
-import { isExtensionDisabled, registerTuiCommands } from "@htwang-contrib/common";
+import { isExtensionDisabled } from "@htwang-contrib/common/extension-disable";
+import { registerTuiCommands } from "@htwang-contrib/common/tui-commands";
 import { buildContextUsageDetails, renderContextUsageMessage } from "./context-usage.ts";
 
 const CONTEXT_USAGE_WIDGET_KEY = "pi-extensions.context-usage";

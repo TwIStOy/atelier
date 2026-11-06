@@ -1,5 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { createLogger, isExtensionDisabled, registerChildExtensionFactory } from "@htwang-contrib/common";
+import { registerChildExtensionFactory } from "@htwang-contrib/common/agents/child-extensions";
+import { isExtensionDisabled } from "@htwang-contrib/common/extension-disable";
+import { createLogger } from "@htwang-contrib/common/log";
 import { API_KEY, refreshCatalog } from "./catalog.ts";
 import { COMMAND_NAME, handleRefreshCommand, PROVIDER_ID } from "./command.ts";
 

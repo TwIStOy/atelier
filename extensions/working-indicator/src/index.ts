@@ -1,6 +1,7 @@
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionContext, MessageUpdateEvent } from "@earendil-works/pi-coding-agent";
-import { isExtensionDisabled, SPINNER_STYLES } from "@htwang-contrib/common";
+import { isExtensionDisabled } from "@htwang-contrib/common/extension-disable";
+import { SPINNER_STYLES } from "@htwang-contrib/common/spinner";
 import { loadConfig, registerWorkingIndicatorConfigItems } from "./config.ts";
 import { type NarrowWidthOptions, resolveEffectiveSpinnerKey } from "./narrow-screen.ts";
 import { pickPhrase } from "./phrase.ts";

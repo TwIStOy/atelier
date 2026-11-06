@@ -1,5 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { EDITOR_HINT_EVENT, type EditorHintPayload, isExtensionDisabled } from "@htwang-contrib/common";
+import { EDITOR_HINT_EVENT, type EditorHintPayload } from "@htwang-contrib/common/events";
+import { isExtensionDisabled } from "@htwang-contrib/common/extension-disable";
 import { registerBetterEditorConfigItems } from "./config.ts";
 import { BetterEditor } from "./editor.ts";
 import { installHistory, registerHistory } from "./history.ts";

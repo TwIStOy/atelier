@@ -1,7 +1,10 @@
 import { execFile } from "node:child_process";
 import { getLanguageFromPath, highlightCode, type Theme } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
-import { AsyncAnnotations, createLogger, extractAnsiRgb, shortenPath, trimTrailingEmpty } from "@htwang-contrib/common";
+import { AsyncAnnotations } from "@htwang-contrib/common/async-annotations";
+import { shortenPath, trimTrailingEmpty } from "@htwang-contrib/common/format";
+import { createLogger } from "@htwang-contrib/common/log";
+import { extractAnsiRgb } from "@htwang-contrib/common/terminal";
 import { loadConfig } from "../config.ts";
 import type { ToolDisplayAdapter } from "../types.ts";
 

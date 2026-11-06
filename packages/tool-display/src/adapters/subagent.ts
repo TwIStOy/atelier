@@ -1,6 +1,6 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
-import { formatTokenUsageArrows, truncateDisplay, usagePercentStressLevel } from "@htwang-contrib/common";
+import { formatTokenUsageArrows, truncateDisplay, usagePercentStressLevel } from "@htwang-contrib/common/format";
 import { spinnerGlyph } from "../format.ts";
 import type { ToolDisplayAdapter } from "../types.ts";
 import { formatExpandedToolOutputLines, formatLineCount } from "./shared.ts";

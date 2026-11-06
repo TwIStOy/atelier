@@ -1,5 +1,5 @@
-import type { ConfigItemPreview } from "@htwang-contrib/common";
-import { resolveSpinner } from "@htwang-contrib/common";
+import type { ConfigItemPreview } from "@htwang-contrib/common/config";
+import { resolveSpinner } from "@htwang-contrib/common/spinner";
 
 function clipLine(line: string, width: number): string {
   return line.length > width ? line.slice(0, width) : line;

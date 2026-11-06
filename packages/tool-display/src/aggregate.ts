@@ -1,13 +1,13 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
+import { aggregateRuleFor } from "@htwang-contrib/common/aggregate-rules";
 import {
-  aggregateRuleFor,
   RAIL_BULLET_AGGREGATE,
   RAIL_SUBROW_INDENT,
   type RailSpec,
   type RailStatus,
   renderRailLines,
   toolRailBodyWidth,
-} from "@htwang-contrib/common";
+} from "@htwang-contrib/common/tool-rail";
 import { spinnerGlyph } from "./format.ts";
 
 export interface AggregateMemberState {

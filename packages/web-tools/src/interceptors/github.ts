@@ -13,7 +13,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { extname, join, sep as pathSep, resolve as resolvePath } from "node:path";
-import { createLogger } from "@htwang-contrib/common";
+import { createLogger } from "@htwang-contrib/common/log";
 import type { FetchResponse } from "../providers/types.ts";
 import type { UrlInterceptor } from "./types.ts";
 

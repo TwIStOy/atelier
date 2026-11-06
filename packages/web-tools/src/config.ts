@@ -1,6 +1,6 @@
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { type ExtensionConfigSchema, readConfig, registerConfigItems } from "@htwang-contrib/common";
+import { type ExtensionConfigSchema, readConfig, registerConfigItems } from "@htwang-contrib/common/config";
 import { ProviderError } from "./providers/errors.ts";
 import { createSearchProvider } from "./providers/factory.ts";
 import { PROVIDERS } from "./providers/index.ts";

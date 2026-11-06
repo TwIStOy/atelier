@@ -1,6 +1,8 @@
 import type { ExtensionAPI, ExtensionContext, ExtensionUIContext } from "@earendil-works/pi-coding-agent";
 import { type EditorTheme, setKeybindings, type TUI } from "@earendil-works/pi-tui";
-import * as common from "@htwang-contrib/common";
+import * as commonConfig from "@htwang-contrib/common/config";
+import { EDITOR_HINT_EVENT } from "@htwang-contrib/common/events";
+import * as commonExtensionDisable from "@htwang-contrib/common/extension-disable";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { BetterEditorConfig } from "../src/config.ts";
 import { BetterEditor } from "../src/editor.ts";
@@ -10,14 +12,18 @@ import { createKeybindings } from "./helpers.ts";
 
 const settings = vi.hoisted(() => ({ disabled: false, config: {} as Partial<BetterEditorConfig> }));
 
-vi.mock("@htwang-contrib/common", async (importOriginal) => ({
-  ...(await importOriginal<typeof common>()),
-  isExtensionDisabled: vi.fn(() => settings.disabled),
+vi.mock("@htwang-contrib/common/config", async (importOriginal) => ({
+  ...(await importOriginal<typeof commonConfig>()),
   registerConfigItems: vi.fn(),
   readConfig: vi.fn((_name: string, schema: { defaults: BetterEditorConfig }) => ({
     ...schema.defaults,
     ...settings.config,
   })),
+}));
+
+vi.mock("@htwang-contrib/common/extension-disable", async (importOriginal) => ({
+  ...(await importOriginal<typeof commonExtensionDisable>()),
+  isExtensionDisabled: vi.fn(() => settings.disabled),
 }));
 
 vi.mock("../src/history-store.ts", () => ({
@@ -204,7 +210,7 @@ describe("better-editor integration", () => {
     const first = app.editor();
     app.emit("agent_start");
     first.handleInput("\x1b");
-    app.listeners.get(common.EDITOR_HINT_EVENT)?.({ source: "test", text: "external hint" });
+    app.listeners.get(EDITOR_HINT_EVENT)?.({ source: "test", text: "external hint" });
     expect(first.render(100)[0]).toContain("external hint");
     app.emit("session_shutdown");
     expect(app.listeners.size).toBe(0);
@@ -244,7 +250,7 @@ describe("better-editor integration", () => {
 
   test("registers editor settings only under better-editor", () => {
     createHarness();
-    expect(common.registerConfigItems).toHaveBeenCalledExactlyOnceWith(
+    expect(commonConfig.registerConfigItems).toHaveBeenCalledExactlyOnceWith(
       "better-editor",
       expect.arrayContaining([
         expect.objectContaining({ key: "borderColor" }),
@@ -259,8 +265,8 @@ describe("better-editor integration", () => {
     const app = createHarness();
     app.emit("session_start");
     app.emit("input", { text: "ignored" });
-    expect(common.isExtensionDisabled).toHaveBeenCalledWith("better-editor");
-    expect(common.registerConfigItems).not.toHaveBeenCalled();
+    expect(commonExtensionDisable.isExtensionDisabled).toHaveBeenCalledWith("better-editor");
+    expect(commonConfig.registerConfigItems).not.toHaveBeenCalled();
     expect(app.ui.setEditorComponent).not.toHaveBeenCalled();
     expect(app.registerShortcut).not.toHaveBeenCalled();
     expect(persistHistoryMergedWithDisk).not.toHaveBeenCalled();

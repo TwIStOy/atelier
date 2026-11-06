@@ -7,7 +7,7 @@ import {
   type SessionEntry,
   type SessionHeader,
 } from "@earendil-works/pi-coding-agent";
-import { childSessionIndexPath } from "@htwang-contrib/common";
+import { childSessionIndexPath } from "@htwang-contrib/common/agents/session-links";
 
 type SubagentLinkRecord = {
   parent_session_id: string;

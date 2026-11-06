@@ -4,7 +4,7 @@ import { classifyMessageComplexity } from "../src/complexity.ts";
 
 const mockSystemOne = vi.hoisted(() => vi.fn());
 
-vi.mock("@htwang-contrib/common", async (importOriginal) => ({
+vi.mock("@htwang-contrib/common/systemone", async (importOriginal) => ({
   ...(await importOriginal<typeof Common>()),
   systemOne: mockSystemOne,
 }));

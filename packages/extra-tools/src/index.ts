@@ -1,5 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { isExtensionDisabled, registerChildExtensionFactory } from "@htwang-contrib/common";
+import { registerChildExtensionFactory } from "@htwang-contrib/common/agents/child-extensions";
+import { isExtensionDisabled } from "@htwang-contrib/common/extension-disable";
 import { registerBashTool } from "./bash/index.ts";
 import { registerGlobTool } from "./glob/index.ts";
 import { registerGrepTool } from "./grep/index.ts";

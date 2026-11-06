@@ -1,5 +1,6 @@
 import { type ContextEvent, convertToLlm } from "@earendil-works/pi-coding-agent";
-import { createComplexityAssessment, systemOne } from "@htwang-contrib/common";
+import { createComplexityAssessment } from "@htwang-contrib/common/model-complexity";
+import { systemOne } from "@htwang-contrib/common/systemone";
 
 export interface MessageComplexity {
   flash: number;

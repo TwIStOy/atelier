@@ -3,7 +3,8 @@ import type { ExtensionAPI, Theme, ToolDefinition } from "@earendil-works/pi-cod
 import { initTheme, ToolExecutionComponent } from "@earendil-works/pi-coding-agent";
 import { stripTerminalSequences, visibleWidth } from "@earendil-works/pi-tui";
 import type * as Common from "@htwang-contrib/common";
-import { componentRendersLines, setRailTailSpacing } from "@htwang-contrib/common";
+import { componentRendersLines } from "@htwang-contrib/common/component-tree";
+import { setRailTailSpacing } from "@htwang-contrib/common/tool-rail";
 import { Type } from "@sinclair/typebox";
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -15,13 +16,20 @@ import {
 } from "../../compact-thinking/test/harness.ts";
 import extension from "../src/index.ts";
 
-vi.mock("@htwang-contrib/common", async (importOriginal) => {
+vi.mock("@htwang-contrib/common/config", async (importOriginal) => {
+  const actual = await importOriginal<typeof Common>();
+  return {
+    ...actual,
+    readConfig: (_name: string, schema: { defaults: Record<string, unknown> }) => ({ ...schema.defaults }),
+    registerConfigItems: vi.fn(),
+  };
+});
+
+vi.mock("@htwang-contrib/common/extension-disable", async (importOriginal) => {
   const actual = await importOriginal<typeof Common>();
   return {
     ...actual,
     isExtensionDisabled: () => false,
-    readConfig: (_name: string, schema: { defaults: Record<string, unknown> }) => ({ ...schema.defaults }),
-    registerConfigItems: vi.fn(),
   };
 });
 

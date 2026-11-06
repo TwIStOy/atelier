@@ -1,5 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { ASK_USER_PROMPT_EVENT, type AskUserPromptPayload } from "@htwang-contrib/common";
+import { ASK_USER_PROMPT_EVENT, type AskUserPromptPayload } from "@htwang-contrib/common/events";
 import type { QuestionParams } from "./tool/types.ts";
 
 function buildAskUserPromptPayload(params: QuestionParams): AskUserPromptPayload {

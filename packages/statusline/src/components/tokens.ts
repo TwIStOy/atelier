@@ -1,7 +1,7 @@
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth } from "@earendil-works/pi-tui";
-import { formatTokens, formatTokenUsageArrows } from "@htwang-contrib/common";
+import { formatTokens, formatTokenUsageArrows } from "@htwang-contrib/common/format";
 import type { StatusLineComponent } from "./base.ts";
 
 type BranchEntry = ReturnType<ExtensionContext["sessionManager"]["getBranch"]>[number];

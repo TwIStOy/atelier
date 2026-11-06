@@ -1,4 +1,4 @@
-import { formatTokenUsageSummaryLine } from "@htwang-contrib/common";
+import { formatTokenUsageSummaryLine } from "@htwang-contrib/common/format";
 import type { SubagentBatchItemDetail } from "./run-agent.ts";
 
 const MAX_ITEM_TEXT = 12_000;

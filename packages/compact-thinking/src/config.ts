@@ -1,4 +1,4 @@
-import { type ExtensionConfigSchema, readConfig, registerConfigItems } from "@htwang-contrib/common";
+import { type ExtensionConfigSchema, readConfig, registerConfigItems } from "@htwang-contrib/common/config";
 import type { CompactThinkingConfig } from "./types.ts";
 
 const CONFIG_ID = "compact-thinking";

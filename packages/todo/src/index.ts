@@ -1,5 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { isExtensionDisabled, isStaleCtxError } from "@htwang-contrib/common";
+import { isExtensionDisabled } from "@htwang-contrib/common/extension-disable";
+import { isStaleCtxError } from "@htwang-contrib/common/session-cache";
 import { registerTodoAggregateRules } from "./aggregate-rules.ts";
 import { loadConfig, registerConfig, type TodoConfig } from "./config.ts";
 import {

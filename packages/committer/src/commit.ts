@@ -1,7 +1,7 @@
 import type { Message, Model } from "@earendil-works/pi-ai";
 import type { ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
-import type { SideCallResult } from "@htwang-contrib/common";
-import { executeSideCall } from "@htwang-contrib/common";
+import type { SideCallResult } from "@htwang-contrib/common/side-call";
+import { executeSideCall } from "@htwang-contrib/common/side-call";
 import {
   commit,
   countChanges,

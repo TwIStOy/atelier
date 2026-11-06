@@ -1,4 +1,4 @@
-import { type ExtensionConfigSchema, readConfig, updateConfig } from "@htwang-contrib/common";
+import { type ExtensionConfigSchema, readConfig, updateConfig } from "@htwang-contrib/common/config";
 import { addRule, canonicalRule, parseTarget, removeRule } from "./rules.ts";
 
 export const CONFIG_ID = "experience";

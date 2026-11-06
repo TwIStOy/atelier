@@ -4,16 +4,35 @@ import { describe, expect, it, vi } from "vitest";
 import { DURATION_ENTRY_TYPE } from "../src/durations.ts";
 import { activateExtension, emitAssistantUpdate, makeComponent, makeMessage, PLAIN_THEME } from "./harness.ts";
 
-vi.mock("@htwang-contrib/common", async (importOriginal) => {
+vi.mock("@htwang-contrib/common/component-tree", async (importOriginal) => importOriginal<typeof Common>());
+
+vi.mock("@htwang-contrib/common/config", async (importOriginal) => {
   const actual = await importOriginal<typeof Common>();
   return {
     ...actual,
-    createLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
-    isExtensionDisabled: () => false,
     readConfig: (_name: string, schema: { defaults: Record<string, unknown> }) => ({ ...schema.defaults }),
     registerConfigItems: vi.fn(),
   };
 });
+
+vi.mock("@htwang-contrib/common/extension-disable", async (importOriginal) => {
+  const actual = await importOriginal<typeof Common>();
+  return { ...actual, isExtensionDisabled: () => false };
+});
+
+vi.mock("@htwang-contrib/common/frame-epoch", async (importOriginal) => importOriginal<typeof Common>());
+
+vi.mock("@htwang-contrib/common/log", async (importOriginal) => {
+  const actual = await importOriginal<typeof Common>();
+  return {
+    ...actual,
+    createLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
+  };
+});
+
+vi.mock("@htwang-contrib/common/model-resolve", async (importOriginal) => importOriginal<typeof Common>());
+vi.mock("@htwang-contrib/common/session-cache", async (importOriginal) => importOriginal<typeof Common>());
+vi.mock("@htwang-contrib/common/tool-rail", async (importOriginal) => importOriginal<typeof Common>());
 
 function renderActive(content: Array<{ type: string; thinking?: string; text?: string }>): string[] {
   const session = activateExtension({ theme: PLAIN_THEME });

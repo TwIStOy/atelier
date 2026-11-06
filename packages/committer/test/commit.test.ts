@@ -4,12 +4,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import type { ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
-import { executeSideCall } from "@htwang-contrib/common";
+import { executeSideCall } from "@htwang-contrib/common/side-call";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { handleCommit } from "../src/commit.ts";
 import { showCommitterOverlay } from "../src/widget.ts";
 
-vi.mock("@htwang-contrib/common", () => ({ executeSideCall: vi.fn() }));
+vi.mock("@htwang-contrib/common/side-call", () => ({ executeSideCall: vi.fn() }));
 
 vi.mock("../src/model-select.ts", () => ({
   loadConfig: () => ({

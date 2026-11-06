@@ -1,9 +1,9 @@
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
+import { isExtensionDisabled } from "@htwang-contrib/common/extension-disable";
 import {
-  isExtensionDisabled,
   registerSystemPromptContribution,
   SYSTEM_PROMPT_CONTRIBUTION_PRIORITIES,
-} from "@htwang-contrib/common";
+} from "@htwang-contrib/common/system-prompt-contributions";
 import { registerMemoryAggregateRules } from "./aggregate-rules.js";
 import { buildReorganizeMemoryPrompt } from "./commands/reorganize-memory-template.js";
 import { buildSelfImprovePrompt } from "./commands/self-improve-template.js";

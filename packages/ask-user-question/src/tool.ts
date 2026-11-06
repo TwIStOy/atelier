@@ -1,6 +1,6 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { SettingsManager } from "@earendil-works/pi-coding-agent";
-import { GOAL_UPDATE_EVENT, type GoalUpdatePayload, MODAL_ACTIVE_EVENT } from "@htwang-contrib/common";
+import { GOAL_UPDATE_EVENT, type GoalUpdatePayload, MODAL_ACTIVE_EVENT } from "@htwang-contrib/common/events";
 import { buildItemsForQuestion } from "./build-items.ts";
 import { emitAskUserPrompt } from "./events.ts";
 import { editWithExternalEditor } from "./state/external-editor.ts";

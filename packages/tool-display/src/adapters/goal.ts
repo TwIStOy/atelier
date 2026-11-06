@@ -1,5 +1,5 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { truncateDisplay } from "@htwang-contrib/common";
+import { truncateDisplay } from "@htwang-contrib/common/format";
 import type { ToolDisplayAdapter } from "../types.ts";
 import { formatExpandedToolOutputLines } from "./shared.ts";
 

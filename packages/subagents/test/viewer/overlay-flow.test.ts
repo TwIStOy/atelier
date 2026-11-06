@@ -7,14 +7,13 @@ import type { ExtensionAPI, Theme } from "@earendil-works/pi-coding-agent";
 import { initTheme } from "@earendil-works/pi-coding-agent";
 import type { TUI } from "@earendil-works/pi-tui";
 import { stripTerminalSequences } from "@earendil-works/pi-tui";
-import type * as Common from "@htwang-contrib/common";
 import toolDisplay from "@htwang-contrib/tool-display";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SubagentRunSummary } from "../../src/viewer/index.ts";
 import { SubagentViewerOverlay } from "../../src/viewer/overlay.ts";
 
-vi.mock("@htwang-contrib/common", async (importOriginal) => {
-  const actual = await importOriginal<typeof Common>();
+vi.mock("@htwang-contrib/common/extension-disable", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@htwang-contrib/common/extension-disable")>();
   return { ...actual, isExtensionDisabled: () => false };
 });
 

@@ -1,12 +1,8 @@
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { ContextUsage, ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { estimateTokens } from "@earendil-works/pi-coding-agent";
-import {
-  type ExtensionConfigSchema,
-  isExtensionDisabled,
-  readConfig,
-  registerConfigItems,
-} from "@htwang-contrib/common";
+import { type ExtensionConfigSchema, readConfig, registerConfigItems } from "@htwang-contrib/common/config";
+import { isExtensionDisabled } from "@htwang-contrib/common/extension-disable";
 import { computeIdleGapMs, normalizeIdleCompactMinutes, shouldIdleCompact } from "./idle.ts";
 
 type CompactionStrategy = "keep-recent" | "keep-bookends" | "summarize-all";

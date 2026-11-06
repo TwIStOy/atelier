@@ -1,11 +1,11 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { registerChildExtensionFactory } from "@htwang-contrib/common/agents/child-extensions";
+import { isExtensionDisabled } from "@htwang-contrib/common/extension-disable";
 import {
-  isExtensionDisabled,
-  registerChildExtensionFactory,
   registerSystemPromptContribution,
-  registerTuiCommands,
   SYSTEM_PROMPT_CONTRIBUTION_PRIORITIES,
-} from "@htwang-contrib/common";
+} from "@htwang-contrib/common/system-prompt-contributions";
+import { registerTuiCommands } from "@htwang-contrib/common/tui-commands";
 import { buildSubagentAgentCatalog, subagentsPersonasSystemPromptXml } from "./agent-catalog.ts";
 import { runSubagentsAgentsCommand } from "./agents-inspect.ts";
 import { shouldInjectSubagentsParentSystemPrompt, subagentsFeatureSystemPrompt } from "./feature-system-prompt.ts";

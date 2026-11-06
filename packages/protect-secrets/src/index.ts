@@ -1,5 +1,6 @@
 import type { ExtensionAPI, ExtensionUIContext, ToolCallEventResult } from "@earendil-works/pi-coding-agent";
-import { isExtensionDisabled, registerChildExtensionFactory } from "@htwang-contrib/common";
+import { registerChildExtensionFactory } from "@htwang-contrib/common/agents/child-extensions";
+import { isExtensionDisabled } from "@htwang-contrib/common/extension-disable";
 import { checkBashCommand, DEFAULT_PROTECTED_PATHS } from "./bash-check.ts";
 import { loadProjectConfig } from "./config.ts";
 

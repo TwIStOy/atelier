@@ -1,4 +1,4 @@
-import type { ConfigItem } from "@htwang-contrib/common";
+import type { ConfigItem } from "@htwang-contrib/common/config";
 
 export const TAB_ALL = "all";
 export const PACKAGE_TAB_PREFIX = "pkg:";

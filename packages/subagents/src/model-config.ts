@@ -1,13 +1,8 @@
 import type { ModelRegistry } from "@earendil-works/pi-coding-agent";
-import {
-  type AgentPersonaCatalog,
-  type ConfigItem,
-  loadSubagentModelConfig,
-  personaDefaultsForType,
-  readPersonaDefaultsByType,
-  registerConfigItems,
-  SUBAGENT_MODEL_TIERS,
-} from "@htwang-contrib/common";
+import type { AgentPersonaCatalog } from "@htwang-contrib/common/agents/agent-personas";
+import { personaDefaultsForType, readPersonaDefaultsByType } from "@htwang-contrib/common/agents/persona-defaults";
+import { loadSubagentModelConfig, SUBAGENT_MODEL_TIERS } from "@htwang-contrib/common/agents/subagent-models";
+import { type ConfigItem, registerConfigItems } from "@htwang-contrib/common/config";
 
 export function registerSubagentModelConfig(catalog: AgentPersonaCatalog, modelRegistry: ModelRegistry): void {
   const items: ConfigItem[] = SUBAGENT_MODEL_TIERS.map((tier, index) => ({

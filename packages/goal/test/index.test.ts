@@ -2,18 +2,17 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { GOAL_UPDATE_EVENT } from "@htwang-contrib/common";
+import { GOAL_UPDATE_EVENT } from "@htwang-contrib/common/events";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
-vi.mock("@htwang-contrib/common", async (importOriginal) => {
-  const actual = await importOriginal<typeof Common>();
+vi.mock("@htwang-contrib/common/extension-disable", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@htwang-contrib/common/extension-disable")>();
   return {
     ...actual,
     isExtensionDisabled: () => false,
   };
 });
 
-import type * as Common from "@htwang-contrib/common";
 import { createGoal, type GoalStoreRef, updateGoal } from "../src/goal/store.ts";
 import initGoal from "../src/index.ts";
 

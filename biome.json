@@ -36,5 +36,24 @@
       "!packages/mom/data/**/*",
       "!!**/node_modules"
     ]
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["packages/*/src/**/*.ts", "extensions/*/src/**/*.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "@htwang-contrib/common": "Use a fine-grained @htwang-contrib/common/<module> subpath instead of the root barrel."
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }

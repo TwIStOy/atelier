@@ -7,12 +7,19 @@ import type * as Common from "@htwang-contrib/common";
 import { Type } from "@sinclair/typebox";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@htwang-contrib/common", async (importOriginal) => {
+vi.mock("@htwang-contrib/common/config", async (importOriginal) => {
+  const actual = await importOriginal<typeof Common>();
+  return {
+    ...actual,
+    registerConfigItems: vi.fn(),
+  };
+});
+
+vi.mock("@htwang-contrib/common/extension-disable", async (importOriginal) => {
   const actual = await importOriginal<typeof Common>();
   return {
     ...actual,
     isExtensionDisabled: () => false,
-    registerConfigItems: vi.fn(),
   };
 });
 

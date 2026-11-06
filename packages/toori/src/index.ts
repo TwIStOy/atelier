@@ -1,6 +1,8 @@
 import * as systemOne from "@earendil-works/pi-ai/api/typesafe-system-one";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { createLogger, isExtensionDisabled, registerChildExtensionFactory } from "@htwang-contrib/common";
+import { registerChildExtensionFactory } from "@htwang-contrib/common/agents/child-extensions";
+import { isExtensionDisabled } from "@htwang-contrib/common/extension-disable";
+import { createLogger } from "@htwang-contrib/common/log";
 import { refreshCatalog } from "./catalog.ts";
 import { COMMAND_NAME, ENV_VAR, handleRefreshCommand, PROVIDER_ID } from "./command.ts";
 

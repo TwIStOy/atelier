@@ -1,7 +1,8 @@
 import type { ExtensionCommandContext, Theme } from "@earendil-works/pi-coding-agent";
 import type { Component, OverlayOptions, TUI } from "@earendil-works/pi-tui";
 import { Key, matchesKey, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
-import { formatElapsedSeconds, scrollKeyOffset } from "@htwang-contrib/common";
+import { formatElapsedSeconds } from "@htwang-contrib/common/format";
+import { scrollKeyOffset } from "@htwang-contrib/common/scroll-keys";
 import { SpinnerTimer, spinnerGlyph } from "@htwang-contrib/tool-display";
 
 function padToVisible(line: string, width: number): string {

@@ -1,4 +1,4 @@
-import { type ExtensionConfigSchema, readConfig, registerConfigItems } from "@htwang-contrib/common";
+import { type ExtensionConfigSchema, readConfig, registerConfigItems } from "@htwang-contrib/common/config";
 
 export type BorderColorMode = "dim" | "border" | "thinkingLevel";
 

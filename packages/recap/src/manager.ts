@@ -1,7 +1,9 @@
 import type { Message, Model } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { serializeConversation } from "@earendil-works/pi-coding-agent";
-import { branchToMessages, createLogger, executeSideCall, type SideCallResult } from "@htwang-contrib/common";
+import { createLogger } from "@htwang-contrib/common/log";
+import { branchToMessages } from "@htwang-contrib/common/session-cache";
+import { executeSideCall, type SideCallResult } from "@htwang-contrib/common/side-call";
 import { loadRecapConfig, type RecapConfig, resolveRecapModel } from "./config.ts";
 import { clearRecapWidget, setRecapLoadingWidget, setRecapTextWidget } from "./widget.ts";
 

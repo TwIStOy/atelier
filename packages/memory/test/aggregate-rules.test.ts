@@ -1,8 +1,9 @@
-import { aggregateRuleFor, isExtensionDisabled, resetAggregateRulesForTest } from "@htwang-contrib/common";
+import { aggregateRuleFor, resetAggregateRulesForTest } from "@htwang-contrib/common/aggregate-rules";
+import { isExtensionDisabled } from "@htwang-contrib/common/extension-disable";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@htwang-contrib/common", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@htwang-contrib/common")>();
+vi.mock("@htwang-contrib/common/extension-disable", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@htwang-contrib/common/extension-disable")>();
   return {
     ...actual,
     isExtensionDisabled: vi.fn(() => false),

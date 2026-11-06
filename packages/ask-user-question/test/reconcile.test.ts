@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@htwang-contrib/common", async (importOriginal) => {
-  const actual = await importOriginal<typeof Common>();
+vi.mock("@htwang-contrib/common/extension-disable", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@htwang-contrib/common/extension-disable")>();
   return {
     ...actual,
     isExtensionDisabled: () => false,
@@ -9,7 +9,6 @@ vi.mock("@htwang-contrib/common", async (importOriginal) => {
 });
 
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import type * as Common from "@htwang-contrib/common";
 import factory from "../src/index.ts";
 import { reconcileAskUserQuestionTool, registerAskUserQuestionReconciler } from "../src/reconcile.ts";
 import { ASK_USER_QUESTION_TOOL_NAME } from "../src/tool.ts";

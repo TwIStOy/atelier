@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { visibleWidth } from "@earendil-works/pi-tui";
-import { generateUnifiedDiff } from "@htwang-contrib/common";
+import { generateUnifiedDiff } from "@htwang-contrib/common/diff";
 import { diffLines } from "diff";
 import { loadConfig } from "../config.ts";
 import type { ToolDisplayAdapter } from "../types.ts";

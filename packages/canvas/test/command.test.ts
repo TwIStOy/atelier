@@ -20,11 +20,15 @@ vi.mock("node:os", async (importOriginal) => ({
   homedir: () => testHome.path,
 }));
 
-vi.mock("@htwang-contrib/common", async (importOriginal) => ({
+vi.mock("@htwang-contrib/common/config", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  isExtensionDisabled: () => false,
   registerConfigItems: vi.fn(),
   readConfig: () => ({ port: 0, pagesDir: join(directory, "pages"), terminalBrowser }),
+}));
+
+vi.mock("@htwang-contrib/common/extension-disable", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  isExtensionDisabled: () => false,
 }));
 
 function runCommand(args = "") {

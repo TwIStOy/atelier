@@ -1,13 +1,12 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { AgentPersonaEntry, AgentPersonaFileOptions } from "@htwang-contrib/common/agents/agent-personas";
+import { resolveChildToolNames } from "@htwang-contrib/common/agents/child-tools";
 import {
-  type AgentPersonaEntry,
-  type AgentPersonaFileOptions,
   loadSubagentModelConfig,
-  resolveChildToolNames,
-  resolveModel,
   resolveSubagentModelPattern,
   type SubagentModelConfig,
-} from "@htwang-contrib/common";
+} from "@htwang-contrib/common/agents/subagent-models";
+import { resolveModel } from "@htwang-contrib/common/model-resolve";
 import { buildSubagentAgentCatalog, type SubagentAgentCatalog } from "./agent-catalog.ts";
 import { defaultsForAgentType, readSubagentSettings, type SubagentSettings } from "./settings.ts";
 

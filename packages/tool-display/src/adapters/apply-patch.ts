@@ -2,7 +2,7 @@ import type { Theme } from "@earendil-works/pi-coding-agent";
 import { visibleWidth } from "@earendil-works/pi-tui";
 import { countPatchChanges, extractPatchedPaths, parsePatch } from "@htwang-contrib/apply-patch/patch";
 import type { ApplyPatchPreviewFile, ApplyPatchToolDetails } from "@htwang-contrib/apply-patch/preview";
-import { shortenPath } from "@htwang-contrib/common";
+import { shortenPath } from "@htwang-contrib/common/format";
 import { loadConfig } from "../config.ts";
 import type { ToolDisplayAdapter } from "../types.ts";
 import { formatExpandedToolOutputLines, renderChangeBar, renderWithDelta, resolveIsSplit } from "./shared.ts";

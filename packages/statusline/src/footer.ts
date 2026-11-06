@@ -1,7 +1,7 @@
 import type { ExtensionContext, ReadonlyFooterDataProvider, Theme } from "@earendil-works/pi-coding-agent";
 import type { Component, TUI } from "@earendil-works/pi-tui";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
-import { fitSegmentsByPriority, type PrioritizedSegment } from "@htwang-contrib/common";
+import { fitSegmentsByPriority, type PrioritizedSegment } from "@htwang-contrib/common/format";
 import type { StatusLineComponent } from "./components/base.ts";
 import { ExtensionStatusComponent } from "./components/extension-status.ts";
 import { GitComponent } from "./components/git.ts";

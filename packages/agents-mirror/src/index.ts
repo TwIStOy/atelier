@@ -8,7 +8,7 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import { isReadToolResult } from "@earendil-works/pi-coding-agent";
 import { Box, Text } from "@earendil-works/pi-tui";
-import { isExtensionDisabled } from "@htwang-contrib/common";
+import { isExtensionDisabled } from "@htwang-contrib/common/extension-disable";
 import { InjectionCache } from "./cache.ts";
 import { clearMappingsCache, loadConfigPath, loadInlineEntry, loadMappings, registerConfig } from "./config.ts";
 import { injectDirectoryContext } from "./injection.ts";

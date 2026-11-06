@@ -1,6 +1,7 @@
 import type { Message, Model } from "@earendil-works/pi-ai";
 import type { ModelRegistry } from "@earendil-works/pi-coding-agent";
-import { createLogger, executeSideCall, type SideCallResult } from "@htwang-contrib/common";
+import { createLogger } from "@htwang-contrib/common/log";
+import { executeSideCall, type SideCallResult } from "@htwang-contrib/common/side-call";
 
 type AnyModel = Model<any>;
 

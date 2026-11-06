@@ -1,7 +1,8 @@
 import type { Model } from "@earendil-works/pi-ai";
 import type { ExtensionCommandContext, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import type { ExtensionConfigSchema } from "@htwang-contrib/common";
-import { readConfig, resolveModel, updateConfig } from "@htwang-contrib/common";
+import type { ExtensionConfigSchema } from "@htwang-contrib/common/config";
+import { readConfig, updateConfig } from "@htwang-contrib/common/config";
+import { resolveModel } from "@htwang-contrib/common/model-resolve";
 import { buildModelEntries, ModelSelectController } from "./model-selector.ts";
 
 export interface CommitterConfig {
