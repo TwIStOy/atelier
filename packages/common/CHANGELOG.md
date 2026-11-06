@@ -19,6 +19,10 @@
 - Split oversized internal functions in `telemetry.ts` (`finalizeTurn`, `formatTurnTelemetry`), `diff.ts` (`generateUnifiedDiff`), `mcp.ts` (`mcpCall`), `gateway-provider.ts` (`refreshModelsCatalog`), and the agent modules (`child-agent.ts` `runChildAgent`, `isolated-session.ts` `runIsolatedSession`/`lastAssistantText`, `agent-personas.ts` `buildAgentPersonaCatalog`, `persona-defaults.ts` `parsePersonaDefaultsByType`, `subagent-models.ts` `loadSubagentModelConfig`) into smaller phase helpers to clear all `fallow health` complexity findings; exported names, signatures, and behavior are unchanged.
 - Runtime consumers in `packages/*/src` and `extensions/*/src` now import common through fine-grained subpaths. Biome `noRestrictedImports` rejects new root-entry imports in those source trees, preventing the startup module graph from silently regrowing.
 
+### Fixed
+
+- `findComponentContext` no longer throws when its TUI root is unavailable during rendering; overlay-aware root discovery now ignores non-object roots.
+
 ### Removed
 
 - `ASK_USER_BLOCKED_EVENT` (`"ask_user_question:blocked"`) and `AskUserBlockedPayload`, whose only consumer was the removed `moshi-hooks-extra` extension. `MODAL_ACTIVE_EVENT` and `ASK_USER_PROMPT_EVENT` are unchanged.

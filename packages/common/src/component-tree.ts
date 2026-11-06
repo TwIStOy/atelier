@@ -13,6 +13,7 @@ export const COMPONENT_RENDERS_LINES_PROBE_KEY = "htwang-contrib-common:componen
 // so a lookup rooted at the TUI has to cover both: otherwise components inside
 // an overlay resolve no siblings and their grouping/spacing logic goes idle.
 function searchRoots(root: unknown): unknown[] {
+  if (!root || typeof root !== "object") return [];
   const stack = (root as { overlayStack?: unknown }).overlayStack;
   if (!Array.isArray(stack)) return [root];
   const roots = [root];

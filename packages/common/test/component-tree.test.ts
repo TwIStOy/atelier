@@ -22,6 +22,10 @@ describe("findComponentContext", () => {
     expect(findComponentContext(root, target)).toEqual({ siblings: inner.children, index: 0 });
   });
 
+  it("returns undefined for an undefined root", () => {
+    expect(findComponentContext(undefined, {})).toBeUndefined();
+  });
+
   it("searches overlay components of a TUI root", () => {
     const target = { id: "t" };
     const body = { children: [{ id: "a" }, target] };
