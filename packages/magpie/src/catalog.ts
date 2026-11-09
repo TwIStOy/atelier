@@ -1,11 +1,12 @@
 import type { RefreshModelsContext, ThinkingLevelMap } from "@earendil-works/pi-ai";
 import type { ProviderModelConfig } from "@earendil-works/pi-coding-agent";
 import { fetchGatewayModels, refreshModelsCatalog } from "@htwang-contrib/common/gateway-provider";
+import { loadMagpieConfig, type MagpieEndpoint, magpieClassifierIds, magpieEndpoint } from "./config.ts";
+
+export const DEFAULT_CLASSIFIER_CONTEXT_WINDOW = 32_768;
 
 type ChatModelConfig = Extract<ProviderModelConfig, { type?: "chat" }>;
-
-export const API_KEY = "magpie-private";
-const GATEWAY_V1_BASE_URL = "http://100.65.0.3:3425/v1";
+type ClassifierModelConfig = Extract<ProviderModelConfig, { type: "classifier" }>;
 const DEFAULT_CONTEXT_WINDOW = 200000;
 const DEFAULT_MAX_TOKENS = 16384;
 const PI_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
@@ -178,18 +179,18 @@ function magpieCost(pricing: MagpieModel["pricing"]): ChatModelConfig["cost"] {
 
 export async function fetchCatalog(
   context: RefreshModelsContext,
-  baseUrl: string = GATEWAY_V1_BASE_URL,
+  endpoint: MagpieEndpoint = magpieEndpoint(),
 ): Promise<ProviderModelConfig[]> {
   const headers: Record<string, string> = {
     accept: "application/json",
-    authorization: `Bearer ${API_KEY}`,
+    authorization: `Bearer ${endpoint.apiKey}`,
   };
 
-  const payload = await fetchGatewayModels<MagpieModelsResponse>(baseUrl, headers, context.signal);
+  const payload = await fetchGatewayModels<MagpieModelsResponse>(endpoint.baseUrl, headers, context.signal);
   const seen = new Set<string>();
   const models: ProviderModelConfig[] = [];
   for (const entry of payload.data ?? []) {
-    const config = toModelConfig(entry, baseUrl);
+    const config = toModelConfig(entry, endpoint.baseUrl);
     if (!config || seen.has(config.id)) continue;
     seen.add(config.id);
     models.push(config);
@@ -197,6 +198,24 @@ export async function fetchCatalog(
   return models;
 }
 
+/** Decision models are asked on System One; magpie's model list does not include them, so they come from configuration. */
+export function classifierModelConfigs(endpoint: MagpieEndpoint, ids: readonly string[]): ClassifierModelConfig[] {
+  return [...new Set(ids.map((id) => id.trim()).filter((id) => id.length > 0))].map((id) => ({
+    type: "classifier" as const,
+    id,
+    name: id,
+    api: "typesafe-system-one",
+    baseUrl: endpoint.baseUrl,
+    input: ["text"],
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    contextWindow: DEFAULT_CLASSIFIER_CONTEXT_WINDOW,
+  }));
+}
+
 export async function refreshCatalog(context: RefreshModelsContext): Promise<ProviderModelConfig[]> {
-  return refreshModelsCatalog(context, fetchCatalog);
+  const endpoint = magpieEndpoint();
+  const config = loadMagpieConfig();
+  const refreshed = await refreshModelsCatalog(context, (refreshContext) => fetchCatalog(refreshContext, endpoint));
+  const chatModels = refreshed.filter((model) => model.type !== "classifier");
+  return [...chatModels, ...classifierModelConfigs(endpoint, magpieClassifierIds(config))];
 }

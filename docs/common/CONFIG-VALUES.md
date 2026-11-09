@@ -3,7 +3,7 @@
 Use `resolveConfigValue` from `@htwang-contrib/common/config` for string settings
 that accept literal values or environment-variable references. It is also
 exported from `@htwang-contrib/common`; the config subpath does not load the Pi
-runtime or the TypeSafe SDK.
+runtime.
 
 ```typescript
 import { getConfigEnvVar, resolveConfigValue } from "@htwang-contrib/common/config";
@@ -42,5 +42,6 @@ every field. ConfigItem getters used for editing should return the stored
 expression so saving a setting preserves references instead of persisting
 resolved secrets.
 
-[System One](SYSTEMONE.md) uses these helpers for its API key. Its own integration
-owns the `TYPESAFE_API_KEY` precedence and missing-credential error.
+[Magpie](../magpie/README.md) uses these helpers for its gateway key. The
+classifier owns the `MAGPIE_API_KEY` precedence and the missing-credential
+error.

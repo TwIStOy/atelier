@@ -72,12 +72,12 @@ import {
   registerAggregateRule,
 } from "@htwang-contrib/common/aggregate-rules";
 import { AsyncAnnotations } from "@htwang-contrib/common/async-annotations";
+import { type ClassifierRegistry, createClassifierCall } from "@htwang-contrib/common/classifier-models";
 import { componentRendersLines, findComponentContextInFrame } from "@htwang-contrib/common/component-tree";
 import { getConfigFileVersion } from "@htwang-contrib/common/config";
 import { isExtensionDisabled } from "@htwang-contrib/common/extension-disable";
 import { patchTuiFrameEpoch } from "@htwang-contrib/common/frame-epoch";
 import { createLogger } from "@htwang-contrib/common/log";
-import { loadSystemOneConfig, registerSystemOneConfigItems } from "@htwang-contrib/common/systemone";
 import {
   isThoughtMember,
   isThoughtMemberClaimed,
@@ -95,7 +95,7 @@ import {
   renderTruncationLine,
 } from "./aggregate.ts";
 import { assessBashCommand, type BashAssessment, formatBashAssessment } from "./bash-assessment.ts";
-import { loadConfig, registerToolDisplayConfigItems } from "./config.ts";
+import { loadConfig, registerToolDisplayConfigItems, setClassifierRegistry } from "./config.ts";
 import { formatDuration, TIMER_MIN_ELAPSED_MS } from "./format.ts";
 import { useHostKeyText } from "./key-text.ts";
 import { isMcpTool, MCP_STATUS_EVENT, mcpDisplayName, refreshMcpTools } from "./mcp.ts";
@@ -993,9 +993,9 @@ export default function (pi: ExtensionAPI) {
   pi.on("session_start", (_event, ctx) => {
     assessments.reset();
     isTui = ctx.mode === "tui";
+    setClassifierRegistry(ctx.modelRegistry);
     if (!isTui) return;
     registerToolDisplayConfigItems();
-    registerSystemOneConfigItems();
     ctx.ui.setWidget?.("tool-display:render-handle", (ui) => {
       tui = ui;
       patchTuiFrameEpoch(ui);
@@ -1019,14 +1019,16 @@ export default function (pi: ExtensionAPI) {
 
   function requestBashAssessment(
     event: { toolCallId: string; input: Record<string, unknown> },
-    ctx: { cwd: string; signal: AbortSignal | undefined },
+    ctx: { cwd: string; signal: AbortSignal | undefined; modelRegistry: ClassifierRegistry },
   ): void {
     try {
-      if (!loadConfig().bashAssessment || !loadSystemOneConfig().apiKey?.trim()) return;
+      if (!loadConfig().bashAssessment) return;
+      const classify = createClassifierCall(ctx.modelRegistry, loadConfig().classifierModel);
+      if (!classify) return;
       const command = event.input.command;
       if (typeof command !== "string" || !command.trim()) return;
       const cwd = "workdir" in event.input && typeof event.input.workdir === "string" ? event.input.workdir : ctx.cwd;
-      assessments.request(event.toolCallId, (signal) => assessBashCommand(command, cwd, signal), ctx.signal);
+      assessments.request(event.toolCallId, (signal) => assessBashCommand(command, cwd, signal, classify), ctx.signal);
     } catch (error) {
       logger.warn(`Bash assessment setup failed: ${String(error)}`);
     }

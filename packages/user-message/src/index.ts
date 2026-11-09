@@ -11,19 +11,26 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { Markdown, type TUI, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { AsyncAnnotations } from "@htwang-contrib/common/async-annotations";
+import { type ClassifierCall, createClassifierCall } from "@htwang-contrib/common/classifier-models";
 import { findComponentContext } from "@htwang-contrib/common/component-tree";
 import { isExtensionDisabled } from "@htwang-contrib/common/extension-disable";
 import { createLogger } from "@htwang-contrib/common/log";
-import { loadSystemOneConfig, registerSystemOneConfigItems } from "@htwang-contrib/common/systemone";
 import {
   classifyMessageComplexity,
   formatMessageComplexity,
   type MessageComplexity,
   type MessageComplexityContext,
 } from "./complexity.ts";
+import { loadConfig, registerUserMessageConfigItems, setClassifierRegistry } from "./config.ts";
 import { installStickyPrompt } from "./sticky-prompt.ts";
 
 const PREFIX_MARKER = "▌ ";
+
+function complexityClassifier(ctx: ExtensionContext): ClassifierCall | undefined {
+  const config = loadConfig();
+  if (!config.complexityAssessment) return undefined;
+  return createClassifierCall(ctx.modelRegistry, config.classifierModel);
+}
 
 function messageKey(message: UserMessage): string {
   return JSON.stringify([message.timestamp, message.content]);
@@ -228,9 +235,10 @@ export default function (pi: ExtensionAPI) {
     messageKeys.clear();
     componentKeys = new WeakMap();
     isTui = ctx.mode === "tui";
+    setClassifierRegistry(ctx.modelRegistry);
     if (!isTui) return;
     refreshMessageKeys(ctx);
-    registerSystemOneConfigItems();
+    registerUserMessageConfigItems();
     activeTheme = ctx.ui.theme;
     activeThinkingLevel = pi.getThinkingLevel();
     ctx.ui.setWidget("user-message:render-handle", (ui) => {
@@ -243,8 +251,8 @@ export default function (pi: ExtensionAPI) {
     patchUserMessageRender(getTheme, getThinkingLevel, getComplexity);
   });
 
-  pi.on("message_start", (event) => {
-    if (!isTui || event.message.role !== "user" || !loadSystemOneConfig().apiKey?.trim()) return;
+  pi.on("message_start", (event, ctx) => {
+    if (!isTui || event.message.role !== "user" || !complexityClassifier(ctx)) return;
     const text = visibleMessageText(event.message);
     if (!text.trim()) return;
     pendingMessages.set(messageKey(event.message), event.message);
@@ -256,7 +264,8 @@ export default function (pi: ExtensionAPI) {
     pendingMessages.clear();
     try {
       refreshMessageKeys(ctx);
-      if (!loadSystemOneConfig().apiKey?.trim()) return;
+      const classify = complexityClassifier(ctx);
+      if (!classify) return;
       const context: MessageComplexityContext = {
         systemPrompt: ctx.getSystemPrompt(),
         messages: structuredClone(event.messages),
@@ -264,7 +273,7 @@ export default function (pi: ExtensionAPI) {
       for (const [key, message] of messages) {
         annotations.request(
           key,
-          (signal) => classifyMessageComplexity(visibleMessageText(message), context, signal),
+          (signal) => classifyMessageComplexity(visibleMessageText(message), context, signal, classify),
           ctx.signal,
         );
       }

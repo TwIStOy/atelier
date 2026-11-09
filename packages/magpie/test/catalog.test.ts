@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { fetchCatalog } from "../src/catalog.ts";
+import { classifierModelConfigs, fetchCatalog } from "../src/catalog.ts";
 
 afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+const endpoint = { baseUrl: "http://100.65.0.3:3425/v1", apiKey: "magpie-private" };
 const context = {
   allowNetwork: true,
   publish: async () => true,
@@ -36,7 +37,7 @@ describe("fetchCatalog", () => {
     );
     vi.stubGlobal("fetch", fetch);
 
-    const [model] = await fetchCatalog(context);
+    const [model] = await fetchCatalog(context, endpoint);
     if (!model || model.type === "classifier" || model.type === "image") throw new Error("Expected a chat model");
 
     expect(String(fetch.mock.calls[0]?.[0])).toBe("http://100.65.0.3:3425/v1/models");
@@ -84,7 +85,7 @@ describe("fetchCatalog", () => {
       ),
     );
 
-    const [model] = await fetchCatalog(context);
+    const [model] = await fetchCatalog(context, endpoint);
     expect(model).toMatchObject({
       id: "zai/glm-4.5",
       api: "openai-completions",
@@ -106,7 +107,7 @@ describe("fetchCatalog", () => {
       ),
     );
 
-    const [model] = await fetchCatalog(context);
+    const [model] = await fetchCatalog(context, endpoint);
     expect(model).toMatchObject({ api: "openai-responses" });
     expect(model).not.toHaveProperty("baseUrl");
   });
@@ -121,7 +122,7 @@ describe("fetchCatalog", () => {
       ),
     );
 
-    const [model] = await fetchCatalog(context);
+    const [model] = await fetchCatalog(context, endpoint);
     expect(model).toMatchObject({
       api: "anthropic-messages",
       baseUrl: "http://100.65.0.3:3425",
@@ -138,7 +139,7 @@ describe("fetchCatalog", () => {
       ),
     );
 
-    const [model] = await fetchCatalog(context);
+    const [model] = await fetchCatalog(context, endpoint);
     expect(model).toMatchObject({
       api: "google-generative-ai",
       baseUrl: "http://100.65.0.3:3425/v1beta",
@@ -165,7 +166,7 @@ describe("fetchCatalog", () => {
       ),
     );
 
-    const [model] = await fetchCatalog(context);
+    const [model] = await fetchCatalog(context, endpoint);
     expect(model?.cost).toEqual({ input: 0.3, output: 1.2, cacheRead: 0.03, cacheWrite: 0 });
   });
 
@@ -184,7 +185,7 @@ describe("fetchCatalog", () => {
       ),
     );
 
-    const [model] = await fetchCatalog(context);
+    const [model] = await fetchCatalog(context, endpoint);
     if (!model || model.type === "classifier" || model.type === "image") throw new Error("Expected a chat model");
     expect(model.thinkingLevelMap).toEqual({
       off: "none",
@@ -207,7 +208,7 @@ describe("fetchCatalog", () => {
       ),
     );
 
-    const [model] = await fetchCatalog(context);
+    const [model] = await fetchCatalog(context, endpoint);
     expect(model).toMatchObject({ reasoning: true, input: ["text"], contextWindow: 200000, maxTokens: 16384 });
     expect(model).not.toHaveProperty("thinkingLevelMap");
   });
@@ -216,10 +217,41 @@ describe("fetchCatalog", () => {
     const fetch = vi.fn<typeof globalThis.fetch>(async () => Response.json({ data: [] }));
     vi.stubGlobal("fetch", fetch);
 
-    await fetchCatalog({
-      ...context,
-      credential: { type: "api_key", key: "from-store" },
-    });
+    await fetchCatalog(
+      {
+        ...context,
+        credential: { type: "api_key", key: "from-store" },
+      },
+      endpoint,
+    );
     expect(fetch.mock.calls[0]?.[1]).toMatchObject({ headers: { authorization: "Bearer magpie-private" } });
+  });
+});
+
+describe("classifierModelConfigs", () => {
+  test("registers configured decision models on System One and drops blanks and duplicates", () => {
+    const rows = classifierModelConfigs(endpoint, [" jev-latest", "group/jevs", "jev-latest", "  "]);
+    expect(rows).toEqual([
+      {
+        type: "classifier",
+        id: "jev-latest",
+        name: "jev-latest",
+        api: "typesafe-system-one",
+        baseUrl: "http://100.65.0.3:3425/v1",
+        input: ["text"],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        contextWindow: 32_768,
+      },
+      {
+        type: "classifier",
+        id: "group/jevs",
+        name: "group/jevs",
+        api: "typesafe-system-one",
+        baseUrl: "http://100.65.0.3:3425/v1",
+        input: ["text"],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        contextWindow: 32_768,
+      },
+    ]);
   });
 });

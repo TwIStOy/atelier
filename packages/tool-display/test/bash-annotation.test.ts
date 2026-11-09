@@ -10,10 +10,8 @@ import extension from "../src/index.ts";
 
 const mocks = vi.hoisted(() => ({
   assess: vi.fn(),
-  register: vi.fn(),
   warn: vi.fn(),
-  key: "test-key",
-  configError: false,
+  modelAvailable: true,
   bashAssessment: true,
 }));
 
@@ -27,6 +25,7 @@ vi.mock("@htwang-contrib/common/config", async (importOriginal) => ({
   readConfig: (_name: string, schema: { defaults: Record<string, unknown> }) => ({
     ...schema.defaults,
     bashAssessment: mocks.bashAssessment,
+    classifierModel: "magpie/jev-latest",
   }),
 }));
 
@@ -40,15 +39,6 @@ vi.mock("@htwang-contrib/common/log", async (importOriginal) => ({
   createLogger: () => ({ warn: mocks.warn }),
 }));
 
-vi.mock("@htwang-contrib/common/systemone", async (importOriginal) => ({
-  ...(await importOriginal<typeof Common>()),
-  loadSystemOneConfig: () => {
-    if (mocks.configError) throw new Error("Invalid config");
-    return { apiKey: mocks.key };
-  },
-  registerSystemOneConfigItems: mocks.register,
-}));
-
 process.env.PI_PACKAGE_DIR = fileURLToPath(
   new URL("../../../node_modules/@earendil-works/pi-coding-agent", import.meta.url),
 );
@@ -60,6 +50,18 @@ const theme = {
   bold: (text: string) => text,
 } as Theme;
 
+const classifierModel = {
+  type: "classifier",
+  api: "typesafe-system-one",
+  provider: "magpie",
+  id: "jev-latest",
+  name: "jev-latest",
+  baseUrl: "http://gateway.invalid/v1",
+  input: ["text"],
+  cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+  contextWindow: 32_768,
+};
+
 function activate(mode = "tui") {
   const handlers = new Map<string, (event: unknown, ctx: ExtensionContext) => unknown>();
   const root = { children: [] as unknown[], requestRender: vi.fn(), invalidate: vi.fn() };
@@ -67,6 +69,14 @@ function activate(mode = "tui") {
     mode,
     cwd: "/project",
     signal: new AbortController().signal,
+    modelRegistry: {
+      getModelsOfType: (type: string) => (type === "classifier" ? [classifierModel] : []),
+      getModelOfType: (type: string, provider: string, id: string) =>
+        mocks.modelAvailable && type === "classifier" && provider === "magpie" && id === "jev-latest"
+          ? classifierModel
+          : undefined,
+      classify: vi.fn(),
+    },
     ui: {
       theme,
       setWidget: (_name: string, factory: (tui: TUI) => unknown) => factory(root as unknown as TUI),
@@ -90,8 +100,7 @@ function activate(mode = "tui") {
 
 afterEach(() => {
   vi.clearAllMocks();
-  mocks.key = "test-key";
-  mocks.configError = false;
+  mocks.modelAvailable = true;
   mocks.bashAssessment = true;
 });
 
@@ -111,7 +120,8 @@ describe("Bash header assessment annotation", () => {
 
     expect(tool.render(120).join("\n")).toContain("Ran Print lines · 2 lines · destructive 90.0% · exfiltration 80.0%");
     expect(event.input).toEqual(args);
-    expect(mocks.register).toHaveBeenCalledTimes(1);
+    const setting = getConfigItems("tool-display").find((item) => item.key === "classifierModel");
+    expect(setting).toMatchObject({ type: "select", label: "Classifier Model" });
     expect(mocks.assess.mock.calls[0][0]).toBe(args.command);
     expect(mocks.assess.mock.calls[0][1]).toBe("/project");
     for (const width of [1, 20, 50, 80]) {
@@ -203,11 +213,11 @@ describe("Bash header assessment annotation", () => {
     emit("session_shutdown");
   });
 
-  test("skips restored tools, non-bash tools, and calls without credentials", () => {
+  test("skips restored tools, non-bash tools, and calls without an available classifier model", () => {
     const { emit, component } = activate();
     component("restored", { command: "echo restored" }).render(80);
     emit("tool_call", { toolName: "read", input: { path: "test" } });
-    mocks.key = "";
+    mocks.modelAvailable = false;
     emit("tool_call", { toolName: "bash", toolCallId: "new", input: { command: "echo new" } });
     expect(mocks.assess).not.toHaveBeenCalled();
     emit("session_shutdown");
@@ -220,14 +230,14 @@ describe("Bash header assessment annotation", () => {
     emit("session_shutdown");
   });
 
-  test("does not block a Bash call when assessment configuration cannot be loaded", () => {
+  test("does not block or warn when the classifier model is not registered", () => {
     const { emit } = activate();
-    mocks.configError = true;
+    mocks.modelAvailable = false;
     expect(
-      emit("tool_call", { toolName: "bash", toolCallId: "config-failure", input: { command: "echo test" } }),
+      emit("tool_call", { toolName: "bash", toolCallId: "no-model", input: { command: "echo test" } }),
     ).toBeUndefined();
-    expect(mocks.warn).toHaveBeenCalled();
     expect(mocks.assess).not.toHaveBeenCalled();
+    expect(mocks.warn).not.toHaveBeenCalled();
     emit("session_shutdown");
   });
 
@@ -244,7 +254,7 @@ describe("Bash header assessment annotation", () => {
     expect(setting.value()).toBe(true);
     mocks.bashAssessment = false;
     expect(setting.value()).toBe(false);
-    mocks.configError = true;
+    mocks.modelAvailable = false;
     const next = component("disabled", { command: "echo next" });
     expect(
       emit("tool_call", { toolName: "bash", toolCallId: "disabled", input: { command: "echo next" } }),

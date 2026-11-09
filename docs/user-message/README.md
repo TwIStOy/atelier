@@ -1,6 +1,6 @@
 # User Message
 
-Submitted prompts use a thinking-level-colored gutter and italic Markdown. When System One is configured, a muted complexity assessment appears below each new prompt; see [System One](../common/SYSTEMONE.md).
+Submitted prompts use a thinking-level-colored gutter and italic Markdown. When a Magpie classifier is configured, a muted complexity assessment appears below each new prompt; see [Magpie](../magpie/README.md).
 
 In Pi's fullscreen mode, the prompt for the turn being read stays at the top as its original block reaches the viewport edge. The pinned block takes over before any prompt text is clipped, rather than waiting for the original to disappear. Scrolling through older turns selects their corresponding prompts, including repeated prompt text. The previous pin yields when the next user block reaches its space, keeping that next block unobscured.
 

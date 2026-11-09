@@ -41,7 +41,7 @@ describe("configuration value resolution", () => {
   });
 
   test("returns empty literal values without selecting a service-specific environment variable", () => {
-    vi.stubEnv("TYPESAFE_API_KEY", "default-key");
+    vi.stubEnv("MAGPIE_API_KEY", "default-key");
     expect(resolveConfigValue("")).toBe("");
     expect(resolveConfigValue(" \n\t ")).toBe("");
     expect(resolveConfigValue("literal")).toBe("literal");

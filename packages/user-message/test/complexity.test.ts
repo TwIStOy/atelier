@@ -1,56 +1,82 @@
-import type * as Common from "@htwang-contrib/common";
-import { describe, expect, test, vi } from "vitest";
-import { classifyMessageComplexity } from "../src/complexity.ts";
+import type { AssistantMessage, ClassifierContext, ClassifierResult } from "@earendil-works/pi-ai";
+import type { ClassifierCall } from "@htwang-contrib/common/classifier-models";
+import { describe, expect, test } from "vitest";
+import { classifyMessageComplexity, messageComplexityRequest } from "../src/complexity.ts";
 
-const mockSystemOne = vi.hoisted(() => vi.fn());
-
-vi.mock("@htwang-contrib/common/systemone", async (importOriginal) => ({
-  ...(await importOriginal<typeof Common>()),
-  systemOne: mockSystemOne,
-}));
+function choiceResult(probabilities: Record<string, number>): ClassifierResult {
+  return {
+    api: "typesafe-system-one",
+    provider: "magpie",
+    model: "jev-latest",
+    answers: {
+      model: { type: "choice", choice: "middle", confidence: 0.9, probabilities },
+    },
+    stopReason: "stop",
+    timestamp: 1,
+  };
+}
 
 describe("message complexity", () => {
   test("asks for all three model tiers in one choice question and preserves their probabilities", async () => {
     const probabilities = { flash: 0.1, middle: 0.7, flagship: 0.2 };
-    mockSystemOne.mockResolvedValueOnce({ answers: { model: { probabilities } } });
+    const requests: ClassifierContext[] = [];
+    const classify: ClassifierCall = async (request) => {
+      requests.push(request);
+      return choiceResult(probabilities);
+    };
     const signal = new AbortController().signal;
     const context = {
       systemPrompt: "Follow the project conventions",
       messages: [{ role: "user" as const, content: "Fix the race condition", timestamp: 1 }],
     };
-    expect(await classifyMessageComplexity("Fix the race condition", context, signal)).toEqual(probabilities);
-    expect(mockSystemOne).toHaveBeenLastCalledWith(
-      {
-        state: {
-          message: "Fix the race condition",
-          context: { systemPrompt: context.systemPrompt, messages: JSON.stringify(context.messages) },
-        },
-        questions: {
-          model: expect.objectContaining({
-            type: "choice",
-            criteria: {
-              flash: expect.any(String),
-              middle: expect.any(String),
-              flagship: expect.any(String),
-            },
-          }),
+    expect(await classifyMessageComplexity("Fix the race condition", context, signal, classify)).toEqual(probabilities);
+    expect(requests).toHaveLength(1);
+    expect(requests[0]).toEqual(messageComplexityRequest("Fix the race condition", context));
+    expect(requests[0]).toMatchObject({
+      state: {
+        message: "Fix the race condition",
+        context: { systemPrompt: context.systemPrompt, messages: expect.any(String) },
+      },
+      questions: {
+        model: {
+          type: "choice",
+          instructions: expect.stringContaining("least expensive model tier"),
+          criteria: {
+            flash: expect.any(String),
+            middle: expect.any(String),
+            flagship: expect.any(String),
+          },
         },
       },
-      { signal },
-    );
+    });
   });
 
   test("rejects an invalid probability before it reaches the renderer", async () => {
-    mockSystemOne.mockResolvedValueOnce({ answers: { model: { probabilities: { flash: 0.1, middle: 0.7 } } } });
+    const classify: ClassifierCall = async () => choiceResult({ flash: 0.1, middle: 0.7 });
     await expect(
-      classifyMessageComplexity("test", { systemPrompt: "", messages: [] }, new AbortController().signal),
+      classifyMessageComplexity("test", { systemPrompt: "", messages: [] }, new AbortController().signal, classify),
     ).rejects.toThrow("flagship");
   });
 
+  test("rejects a failed or malformed classifier result", async () => {
+    const failed: ClassifierCall = async () =>
+      ({ ...choiceResult({}), stopReason: "error", errorMessage: "gateway down" }) as ClassifierResult;
+    await expect(
+      classifyMessageComplexity("test", { systemPrompt: "", messages: [] }, new AbortController().signal, failed),
+    ).rejects.toThrow("gateway down");
+
+    const malformed: ClassifierCall = async () => ({ ...choiceResult({}), answers: {} }) as unknown as ClassifierResult;
+    await expect(
+      classifyMessageComplexity("test", { systemPrompt: "", messages: [] }, new AbortController().signal, malformed),
+    ).rejects.toThrow("no model tier choice");
+  });
+
   test("preserves conversation, tool output, summaries and image markers without forwarding image bytes", async () => {
-    mockSystemOne.mockResolvedValueOnce({
-      answers: { model: { probabilities: { flash: 0, middle: 0, flagship: 1 } } },
-    });
+    const requests: ClassifierContext[] = [];
+    const classify: ClassifierCall = async (request) => {
+      requests.push(request);
+      return choiceResult({ flash: 0, middle: 0, flagship: 1 });
+    };
     const assistant: AssistantMessage = {
       role: "assistant",
       content: [
@@ -108,10 +134,9 @@ describe("message complexity", () => {
         ],
       },
       new AbortController().signal,
+      classify,
     );
-    const call = mockSystemOne.mock.lastCall;
-    if (!call) throw new Error("Missing System One request");
-    const { state } = call[0];
+    const state = requests[0]?.state as { context: { systemPrompt: string; messages: string } };
     expect(state.context.systemPrompt).toBe("Repository instructions");
     const messages = JSON.parse(state.context.messages);
     expect(messages).toHaveLength(7);
@@ -128,5 +153,3 @@ describe("message complexity", () => {
     expect(state.context.messages).not.toContain("image-bytes-must-not-be-in-text");
   });
 });
-
-import type { AssistantMessage } from "@earendil-works/pi-ai";

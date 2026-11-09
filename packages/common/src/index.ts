@@ -69,6 +69,15 @@ export {
   resetAggregateRulesForTest,
 } from "./aggregate-rules.ts";
 export { AsyncAnnotations } from "./async-annotations.ts";
+export {
+  type ClassifierCall,
+  type ClassifierRegistry,
+  classifierModelOptions,
+  createClassifierCall,
+  DEFAULT_CLASSIFIER_MODEL,
+  parseClassifierRef,
+  resolveClassifierModel,
+} from "./classifier-models.ts";
 export type { ComponentSiblingContext } from "./component-tree.ts";
 export {
   componentRenderProbeDepth,
@@ -177,7 +186,6 @@ export {
   extractMessageText,
   userMessageText,
 } from "./message-text.ts";
-export { createComplexityAssessment } from "./model-complexity.ts";
 export type { ResolvableModel } from "./model-resolve.ts";
 export { resolveModel } from "./model-resolve.ts";
 export type { RexContext, RexPaneOptions } from "./rex.ts";
@@ -210,36 +218,6 @@ export {
   SYSTEM_PROMPT_CONTRIBUTION_PRIORITIES,
   unregisterSystemPromptContribution,
 } from "./system-prompt-contributions.ts";
-export type {
-  SystemOneChoiceQuestion,
-  SystemOneChoiceResponse,
-  SystemOneConfig,
-  SystemOneNoulQuestion,
-  SystemOneNoulResponse,
-  SystemOneOptions,
-  SystemOneQuestion,
-  SystemOneQuestions,
-  SystemOneRequest,
-  SystemOneResult,
-  SystemOneScoreQuestion,
-  SystemOneScoreResponse,
-  SystemOneState,
-  SystemOneUsage,
-} from "./systemone.ts";
-export {
-  loadSystemOneConfig,
-  registerSystemOneConfigItems,
-  SYSTEM_ONE_CONFIG_ID,
-  SystemOneAbortError,
-  SystemOneAPIError,
-  SystemOneConnectionError,
-  SystemOneError,
-  SystemOneTimeoutError,
-  systemOne,
-  systemOneChoice,
-  systemOneNoul,
-  systemOneScore,
-} from "./systemone.ts";
 export type {
   TelemetryDeltaType,
   TelemetryFormatOptions,

@@ -1,3 +1,8 @@
+import {
+  type ClassifierRegistry,
+  classifierModelOptions,
+  DEFAULT_CLASSIFIER_MODEL,
+} from "@htwang-contrib/common/classifier-models";
 import type { ExtensionConfigSchema } from "@htwang-contrib/common/config";
 import { readConfig, registerConfigItems, updateConfig } from "@htwang-contrib/common/config";
 
@@ -14,9 +19,16 @@ export interface ToolDisplayConfig {
   groupMaxVisible: number;
   mcpToolCalls: boolean;
   bashAssessment: boolean;
+  classifierModel: string;
 }
 
 const CONFIG_NAME = "tool-display";
+
+let classifierRegistry: ClassifierRegistry | undefined;
+
+export function setClassifierRegistry(registry: ClassifierRegistry | undefined): void {
+  classifierRegistry = registry;
+}
 
 const CONFIG_SCHEMA: ExtensionConfigSchema<ToolDisplayConfig> = {
   defaults: {
@@ -32,6 +44,7 @@ const CONFIG_SCHEMA: ExtensionConfigSchema<ToolDisplayConfig> = {
     groupMaxVisible: 10,
     mcpToolCalls: true,
     bashAssessment: true,
+    classifierModel: DEFAULT_CLASSIFIER_MODEL,
   },
 };
 
@@ -189,9 +202,26 @@ export function registerToolDisplayConfigItems(): void {
       type: "boolean",
       label: "Bash Assessments",
       value: () => loadConfig().bashAssessment,
-      description: "Assess Bash commands with System One and show destructive and exfiltration probabilities",
+      description: "Assess Bash commands with a classifier model and show destructive and exfiltration probabilities",
       extensionLabel: "Tool Display",
       order: 11,
+    },
+    {
+      key: "classifierModel",
+      type: "select",
+      label: "Classifier Model",
+      value: () => loadConfig().classifierModel,
+      options: () => {
+        const options = classifierModelOptions(classifierRegistry);
+        const current = loadConfig().classifierModel;
+        return options.some((option) => option.value === current)
+          ? options
+          : [...options, { label: current, value: current }];
+      },
+      description:
+        "Decision model asked for Bash assessments and other transcript annotations. Magpie registers jev-latest; other providers list their own classifier models.",
+      extensionLabel: "Tool Display",
+      order: 12,
     },
   ]);
 }

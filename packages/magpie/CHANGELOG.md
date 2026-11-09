@@ -2,9 +2,19 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Magpie** configuration section (`/config`) with Gateway URL, API Key, Classifier Models, Classifier Timeout (ms), and Classifier Max Retries, persisted under `magpie` in `extensions.json`; `MAGPIE_BASE_URL` and `MAGPIE_API_KEY` override the stored values.
+- Native classifier registration: ids from **Classifier Models** (default `jev-latest`) become Pi classifier models (`magpie/<id>`, api `typesafe-system-one`) reachable through `modelRegistry.classify()`, codemode, and virtual-model routing. The provider registers the `magpieSystemOneClassifier` transport from `@htwang-contrib/magpie/classifier` (Pi's own `typesafe-system-one` module is not importable from extension code); it maps public `bool` questions to wire-level `noul`, parses choice/score answers and token usage into `ClassifierResult`, and applies the timeout/retry settings. `refreshCatalog` merges the classifier rows so catalog refreshes keep them.
+
 ### Changed
 
+- The provider URL and key now come from the configuration section instead of package constants, and registration is repeated at `session_start` so edited connection values apply to the next session.
 - Catalog refresh and the `/refresh-magpie` command handler now come from `@htwang-contrib/common`'s `gateway-provider` module instead of a package-private copy.
+
+### Removed
+
+- Hardcoded `API_KEY` and `GATEWAY_V1_BASE_URL` exports from `catalog.ts`; callers use `magpieEndpoint()` instead.
 
 ## [0.7.0] - 2026-10-30
 

@@ -1,15 +1,15 @@
 # Magpie Extension
 
-A pi extension that registers the `magpie` provider against a personal [magpie](https://github.com/yetone/magpie) gateway at `http://100.65.0.3:3425/v1`.
+A pi extension that registers the `magpie` provider against a personal [magpie](https://github.com/yetone/magpie) gateway (default `http://100.65.0.3:3425`) and registers its decision models as native Pi classifier models.
 
 ## Configuration
 
-No environment variable. The gateway is only reachable on the Tailscale network, so every request uses the fixed key `magpie-private`.
+`/config` → **Magpie** sets the gateway root, key, classifier model list, and classifier timeout/retries; `MAGPIE_BASE_URL` and `MAGPIE_API_KEY` override them. See [docs/magpie/README.md](../../docs/magpie/README.md) for the full table, the classifier registration, and how transcript annotations select a model. The default key is the Tailscale-only gateway key shipped with the extension; a stored `/login` credential does not replace it.
 
 ## Routing
 
-- Provider `baseUrl`: `http://100.65.0.3:3425/v1`. pi's `openai-completions` api appends `/chat/completions`.
-- `Authorization: Bearer magpie-private` is sent on every request, including the catalog fetch. A stored `/login` credential does not replace it.
+- Provider `baseUrl`: `<Gateway URL>/v1`. pi's `openai-completions` api appends `/chat/completions`.
+- `Authorization: Bearer <API Key>` is sent on every request, including the catalog fetch. A stored `/login` credential does not replace it.
 - A model stays on Chat Completions when `native_endpoints` is absent (routing groups) or lists `/v1/chat/completions`. magpie then translates `reasoning_effort` to the upstream. If chat is not native, the model is asked on the first endpoint Pi can speak: `/v1/responses`, then `/v1/messages` (gateway root, because the Anthropic SDK appends `/v1/messages`), then Gemini `generateContent` (`/v1beta`). No per-family `thinkingFormat` override is applied.
 - `compat.sendSessionAffinityHeaders` is set on each catalog model so pi sends its session-affinity headers. Requests also carry `x-magpie-session` set to the current pi session id, which magpie uses for routing-group route lookup.
 
@@ -22,7 +22,7 @@ No environment variable. The gateway is only reachable on the Tailscale network,
 Starts with an empty `models: []` baseline and is populated by `refreshModels`:
 
 1. pi calls `refreshModels(context)` during startup and on `/model` refresh.
-2. The callback (`src/catalog.ts` -> `refreshCatalog`) issues `GET http://100.65.0.3:3425/v1/models` with `Authorization: Bearer magpie-private` and maps each entry to a `ProviderModelConfig`.
+2. The callback (`src/catalog.ts` -> `refreshCatalog`) issues `GET <Gateway URL>/v1/models` with `Authorization: Bearer <API Key>` and maps each entry to a `ProviderModelConfig`.
 3. The result is persisted through `context.publish` with a 4h freshness interval, so offline startup still sees the last known catalog.
 4. `/refresh-magpie` calls `modelRegistry.refresh({ providers: ["magpie"], allowNetwork: true, force: true })`.
 

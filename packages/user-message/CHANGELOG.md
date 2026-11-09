@@ -4,6 +4,7 @@
 
 ### Changed
 
+- Complexity classification now calls Pi's native classifier models through `ctx.modelRegistry.classify`, selected by a new **User Message → Classifier Model** setting (any registered classifier model, default `magpie/jev-latest`) and gated by **Complexity Assessment**, replacing the removed TypeSafe SDK path. The request rubric and the display are unchanged.
 - Split the sticky-prompt scan (`getPinnedPrompt`) into bracket-search, bounds-trim, and preview-line helpers, and the jump-marker mouse handler into accept/press/click helpers; no behavior change.
 
 ### Fixed

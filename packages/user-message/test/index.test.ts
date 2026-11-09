@@ -5,13 +5,26 @@ import { type TUI, visibleWidth } from "@earendil-works/pi-tui";
 import type * as Common from "@htwang-contrib/common";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import type { MessageComplexity } from "../src/complexity.ts";
+import type * as UserMessageConfig from "../src/config.ts";
 import extension from "../src/index.ts";
 
-const mocks = vi.hoisted(() => ({ classify: vi.fn(), register: vi.fn(), key: "test-key", warn: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  classify: vi.fn(),
+  register: vi.fn(),
+  modelAvailable: true,
+  complexityAssessment: true,
+  warn: vi.fn(),
+}));
 
 vi.mock("../src/complexity.ts", async (importOriginal) => ({
   ...(await importOriginal<{ formatMessageComplexity(value: MessageComplexity): string }>()),
   classifyMessageComplexity: mocks.classify,
+}));
+
+vi.mock("../src/config.ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof UserMessageConfig>()),
+  loadConfig: () => ({ classifierModel: "magpie/jev-latest", complexityAssessment: mocks.complexityAssessment }),
+  registerUserMessageConfigItems: mocks.register,
 }));
 
 vi.mock("@htwang-contrib/common/extension-disable", async (importOriginal) => ({
@@ -22,12 +35,6 @@ vi.mock("@htwang-contrib/common/extension-disable", async (importOriginal) => ({
 vi.mock("@htwang-contrib/common/log", async (importOriginal) => ({
   ...(await importOriginal<typeof Common>()),
   createLogger: () => ({ warn: mocks.warn }),
-}));
-
-vi.mock("@htwang-contrib/common/systemone", async (importOriginal) => ({
-  ...(await importOriginal<typeof Common>()),
-  loadSystemOneConfig: () => ({ apiKey: mocks.key }),
-  registerSystemOneConfigItems: mocks.register,
 }));
 
 process.env.PI_PACKAGE_DIR = fileURLToPath(
@@ -43,6 +50,18 @@ const theme = {
   italic: (s: string) => s,
 } as unknown as Theme;
 
+const classifierModel = {
+  type: "classifier",
+  api: "typesafe-system-one",
+  provider: "magpie",
+  id: "jev-latest",
+  name: "jev-latest",
+  baseUrl: "http://gateway.invalid/v1",
+  input: ["text"],
+  cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+  contextWindow: 32_768,
+} as const;
+
 function activate(mode = "tui", session = SessionManager.inMemory("/project")) {
   const handlers = new Map<string, (event: unknown, ctx: ExtensionContext) => unknown>();
   const ui = { children: [] as UserMessageComponent[], requestRender: vi.fn(), invalidate: vi.fn() };
@@ -51,6 +70,14 @@ function activate(mode = "tui", session = SessionManager.inMemory("/project")) {
     sessionManager: session,
     getSystemPrompt: () => "Project instructions and available tools",
     signal: new AbortController().signal,
+    modelRegistry: {
+      getModelsOfType: (type: string) => (type === "classifier" ? [classifierModel] : []),
+      getModelOfType: (type: string, provider: string, id: string) =>
+        mocks.modelAvailable && type === "classifier" && provider === "magpie" && id === "jev-latest"
+          ? classifierModel
+          : undefined,
+      classify: vi.fn(),
+    },
     ui: {
       theme,
       setWidget: (_name: string, factory: (tui: TUI) => unknown) => factory(ui as unknown as TUI),
@@ -81,11 +108,12 @@ function activate(mode = "tui", session = SessionManager.inMemory("/project")) {
 
 afterEach(() => {
   vi.clearAllMocks();
-  mocks.key = "test-key";
+  mocks.modelAvailable = true;
+  mocks.complexityAssessment = true;
 });
 
 describe("user message complexity annotation", () => {
-  test("registers model configuration and refreshes a muted row after the user message", async () => {
+  test("registers the classifier configuration and refreshes a muted row after the user message", async () => {
     const { emit, ui, startMessage, context } = activate();
     const probabilities = { flash: 0.1, middle: 0.7, flagship: 0.2 };
     let resolve: (value: MessageComplexity) => void = () => {};
@@ -113,13 +141,17 @@ describe("user message complexity annotation", () => {
     emit("session_shutdown");
   });
 
-  test("does not classify restored components, non-user messages, or messages without credentials", () => {
+  test("does not classify restored components, non-user messages, disabled assessments, or unavailable models", () => {
     const { emit, component, context } = activate();
     component("Restored text").render(80);
     context();
     emit("message_start", { message: { role: "assistant" } });
-    mocks.key = "";
-    emit("message_start", { message: { role: "user", content: "New text", timestamp: 1 } });
+    mocks.complexityAssessment = false;
+    emit("message_start", { message: { role: "user", content: "Disabled text", timestamp: 1 } });
+    context();
+    mocks.complexityAssessment = true;
+    mocks.modelAvailable = false;
+    emit("message_start", { message: { role: "user", content: "New text", timestamp: 2 } });
     context();
     expect(mocks.classify).not.toHaveBeenCalled();
     emit("session_shutdown");
@@ -217,6 +249,7 @@ describe("user message complexity annotation", () => {
       "Continue",
       { systemPrompt: ctx.getSystemPrompt(), messages: snapshot },
       expect.any(AbortSignal),
+      expect.any(Function),
     );
     emit("context", event);
     await new Promise((done) => setImmediate(done));
