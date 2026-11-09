@@ -9,13 +9,6 @@
 ### Added
 
 - `agents/child-session.ts`: one `withChildSession` engine for every child session. It owns the whole spawn scaffold (loader flags with `noSkills` unless `skills`, session dir creation, `SessionManager` with the parent link, `createAgentSession`, `bindExtensions`, session-links records unless `linkParent: false`), the observer (progress payloads assembled from the usage snapshot plus a caller-supplied `progressContext` spread, and the turn limiter — soft steer at `maxTurns`, hard abort at `maxTurns + 3`), abort forwarding with a pre-aborted check (an already-aborted signal aborts the session and never runs the driver), and Settle (unsubscribe, detach abort, `recordChildSessionFinished` with `"done"`/`"error"` status, shutdown) guaranteed in `finally`. Callers supply only the Driver. Exported via the new `./agents/child-session` subpath and the root entry (`withChildSession`, `ChildSessionSpec`, `ChildSessionHandle`, `EngineProgress`, `ChildSessionUsage`, `childUsageSnapshot`).
-
-### Changed
-
-- `runChildAgent` rides the `withChildSession` engine instead of its own spawn/observe/abort/settle scaffold: option resolution, the structured-output tool, and the result Projections stay in `child-agent.ts`; the #179 setup-throw contract (spawn failures throw, a pre-aborted signal returns an `isError` result before spawning) is unchanged. `ChildAgentProgress` is now the engine payload shape — batch `task_index` / `task_total` arrive through `progressContext`. The turn-limit steer text and grace (`+3`) are engine-owned and unified across callers. Session-links records now carry an explicit `"done"` / `"error"` status where the subagent path previously recorded none.
-
-### Fixed
-
 - `gateway-provider.ts`: shared refresh-command handler factory (`makeRefreshCommandHandler`), cached-refresh skeleton (`refreshModelsCatalog`), and gateway models fetch (`fetchGatewayModels`) used by the magpie and toori providers; `scroll-keys.ts` with `scrollKeyOffset` for overlay up/down scrolling (btw, committer).
 - `frame-epoch.ts` with `currentFrameEpoch` / `patchTuiFrameEpoch` (moved from tool-display's render-cache so every extension's frame-scoped caches share one counter; patching the same TUI twice is a no-op) and `findComponentContextInFrame`, a per-frame sibling index that turns N per-component `findComponentContext` tree walks per frame into one walk plus O(1) lookups (targets attached mid-frame fall back to the direct walk). `AsyncAnnotations.size()` exposes the value count.
 - Fine-grained `exports` subpaths for every module exposed through the root entry, allowing consumers to load only the implementation modules they use instead of evaluating the full root barrel.
@@ -31,6 +24,7 @@
 
 - Split oversized internal functions in `telemetry.ts` (`finalizeTurn`, `formatTurnTelemetry`), `diff.ts` (`generateUnifiedDiff`), `mcp.ts` (`mcpCall`), `gateway-provider.ts` (`refreshModelsCatalog`), and the agent modules (`child-agent.ts` `runChildAgent`, `isolated-session.ts` `runIsolatedSession`/`lastAssistantText`, `agent-personas.ts` `buildAgentPersonaCatalog`, `persona-defaults.ts` `parsePersonaDefaultsByType`, `subagent-models.ts` `loadSubagentModelConfig`) into smaller phase helpers to clear all `fallow health` complexity findings; exported names, signatures, and behavior are unchanged.
 - Runtime consumers in `packages/*/src` and `extensions/*/src` now import common through fine-grained subpaths. Biome `noRestrictedImports` rejects new root-entry imports in those source trees, preventing the startup module graph from silently regrowing.
+- `runChildAgent` rides the `withChildSession` engine instead of its own spawn/observe/abort/settle scaffold: option resolution, the structured-output tool, and the result Projections stay in `child-agent.ts`; the #179 setup-throw contract (spawn failures throw, a pre-aborted signal returns an `isError` result before spawning) is unchanged. `ChildAgentProgress` is now the engine payload shape — batch `task_index` / `task_total` arrive through `progressContext`. The turn-limit steer text and grace (`+3`) are engine-owned and unified across callers. Session-links records now carry an explicit `"done"` / `"error"` status where the subagent path previously recorded none.
 
 ### Fixed
 
