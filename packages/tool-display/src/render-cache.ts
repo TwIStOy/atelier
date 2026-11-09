@@ -1,15 +1,7 @@
 import { componentRenderProbeDepth } from "@htwang-contrib/common/component-tree";
-import { getConfigFileVersion } from "@htwang-contrib/common/config";
 import { currentFrameEpoch } from "@htwang-contrib/common/frame-epoch";
 
-let roleMutationVersion = 0;
 let renderEnvVersion = 0;
-
-// Role-relevant changes: any tool state update, aggregate-group toggles,
-// aggregate-rule registrations. Only invalidates the frame-scoped role memo.
-export function bumpRoleMutation(): void {
-  roleMutationVersion++;
-}
 
 // Environment changes that alter rendered output without touching component
 // state (e.g. the MCP tool set refreshing). Part of the render-lines key.
@@ -21,105 +13,14 @@ export function currentRenderEnvVersion(): number {
   return renderEnvVersion;
 }
 
-// The frame counter itself lives in @htwang-contrib/common (frame-epoch.ts) so
-// every extension's frame-scoped caches share one bump per TUI doRender.
-
 const stateVersions = new WeakMap<object, number>();
 
 export function bumpComponentState(component: object): void {
   stateVersions.set(component, (stateVersions.get(component) ?? 0) + 1);
-  roleMutationVersion++;
 }
 
 export function componentStateVersion(component: object): number {
   return stateVersions.get(component) ?? 0;
-}
-
-interface RoleMemoEntry {
-  epoch: number;
-  mutation: number;
-  configVersion: number;
-  width: number;
-  role: unknown;
-}
-
-const roleMemo = new WeakMap<object, RoleMemoEntry>();
-
-// Group roles are recomputed at most once per component per frame; the mutation
-// and config versions keep the memo honest if the frame epoch never advances
-// (e.g. unit tests rendering without a patched TUI).
-export function memoizedGroupRole<T>(component: object, width: number, compute: () => T): T {
-  const epoch = currentFrameEpoch();
-  const mutation = roleMutationVersion;
-  const configVersion = getConfigFileVersion();
-  const hit = roleMemo.get(component);
-  if (
-    hit &&
-    hit.epoch === epoch &&
-    hit.mutation === mutation &&
-    hit.configVersion === configVersion &&
-    hit.width === width
-  ) {
-    return hit.role as T;
-  }
-  const role = compute();
-  roleMemo.set(component, { epoch, mutation, configVersion, width, role });
-  return role;
-}
-
-interface RegionRolesCacheEntry {
-  epoch: number;
-  mutation: number;
-  configVersion: number;
-  regions: Map<string, Map<number, unknown>>;
-  bounds: Map<string, { lo: number; hi: number }>;
-}
-
-const regionRolesCache = new WeakMap<object, RegionRolesCacheEntry>();
-
-function regionCacheEntry(children: object): RegionRolesCacheEntry {
-  const epoch = currentFrameEpoch();
-  const mutation = roleMutationVersion;
-  const configVersion = getConfigFileVersion();
-  let entry = regionRolesCache.get(children);
-  if (!entry || entry.epoch !== epoch || entry.mutation !== mutation || entry.configVersion !== configVersion) {
-    entry = { epoch, mutation, configVersion, regions: new Map(), bounds: new Map() };
-    regionRolesCache.set(children, entry);
-  }
-  return entry;
-}
-
-// All components in one hard-break-bounded region share a single grouping
-// computation per frame, instead of each component re-scanning the region.
-export function memoizedRegionRoles<T>(
-  children: object,
-  lo: number,
-  hi: number,
-  width: number,
-  compute: () => Map<number, T>,
-): Map<number, T> {
-  const entry = regionCacheEntry(children);
-  const key = `${lo}:${hi}:${width}`;
-  const hit = entry.regions.get(key);
-  if (hit) return hit as Map<number, T>;
-  const roles = compute();
-  entry.regions.set(key, roles);
-  return roles;
-}
-
-export function memoizedRegionBounds(
-  children: object,
-  index: number,
-  width: number,
-  compute: () => { lo: number; hi: number },
-): { lo: number; hi: number } {
-  if (currentFrameEpoch() <= 0) return compute();
-  const entry = regionCacheEntry(children);
-  const hit = entry.bounds.get(`${width}:${index}`);
-  if (hit) return hit;
-  const bounds = compute();
-  for (let i = bounds.lo; i <= bounds.hi; i++) entry.bounds.set(`${width}:${i}`, bounds);
-  return bounds;
 }
 
 const frameLineCounts = new WeakMap<object, { epoch: number; count: number }>();

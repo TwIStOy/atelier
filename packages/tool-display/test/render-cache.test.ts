@@ -1,15 +1,11 @@
-import { patchTuiFrameEpoch } from "@htwang-contrib/common";
 import { describe, expect, it, vi } from "vitest";
 import {
   bumpComponentState,
   bumpRenderEnv,
-  bumpRoleMutation,
   cachedTextOutput,
   componentStateVersion,
   currentRenderEnvVersion,
   getCachedRenderLines,
-  memoizedGroupRole,
-  memoizedRegionBounds,
   type RenderLinesKey,
   setCachedRenderLines,
 } from "../src/render-cache.ts";
@@ -44,73 +40,6 @@ describe("component state versions", () => {
     bumpComponentState(b);
     expect(componentStateVersion(a)).toBe(2);
     expect(componentStateVersion(b)).toBe(1);
-  });
-});
-
-describe("memoizedGroupRole", () => {
-  it("computes once per frame and reuses within the same frame", () => {
-    const component = {};
-    const compute = vi.fn(() => "role-a");
-    expect(memoizedGroupRole(component, 80, compute)).toBe("role-a");
-    expect(memoizedGroupRole(component, 80, compute)).toBe("role-a");
-    expect(compute).toHaveBeenCalledTimes(1);
-  });
-
-  it("recomputes when the width changes", () => {
-    const component = {};
-    const compute = vi.fn(() => "role-a");
-    memoizedGroupRole(component, 80, compute);
-    memoizedGroupRole(component, 120, compute);
-    expect(compute).toHaveBeenCalledTimes(2);
-  });
-
-  it("recomputes after a role mutation bump even within one frame", () => {
-    const component = {};
-    const compute = vi.fn(() => "role-a");
-    memoizedGroupRole(component, 80, compute);
-    bumpRoleMutation();
-    memoizedGroupRole(component, 80, compute);
-    expect(compute).toHaveBeenCalledTimes(2);
-  });
-
-  it("recomputes after a component state bump", () => {
-    const component = {};
-    const compute = vi.fn(() => "role-a");
-    memoizedGroupRole(component, 80, compute);
-    bumpComponentState(component);
-    memoizedGroupRole(component, 80, compute);
-    expect(compute).toHaveBeenCalledTimes(2);
-  });
-
-  it("recomputes on a new frame", () => {
-    const component = {};
-    const compute = vi.fn(() => "role-a");
-    memoizedGroupRole(component, 80, compute);
-    patchTuiFrameEpochSeam();
-    memoizedGroupRole(component, 80, compute);
-    expect(compute).toHaveBeenCalledTimes(2);
-  });
-});
-
-function patchTuiFrameEpochSeam(): void {
-  const tui = { doRender() {} };
-  patchTuiFrameEpoch(tui);
-  tui.doRender();
-}
-
-describe("memoizedRegionBounds", () => {
-  it("shares one computed span with every contained index", () => {
-    patchTuiFrameEpochSeam();
-    const children = {};
-    const compute = vi.fn(() => ({ lo: 1, hi: 3 }));
-    const bounds = memoizedRegionBounds(children, 2, 80, compute);
-
-    expect(memoizedRegionBounds(children, 1, 80, compute)).toBe(bounds);
-    expect(memoizedRegionBounds(children, 3, 80, compute)).toBe(bounds);
-    expect(compute).toHaveBeenCalledTimes(1);
-
-    expect(memoizedRegionBounds(children, 2, 100, compute)).not.toBe(bounds);
-    expect(compute).toHaveBeenCalledTimes(2);
   });
 });
 

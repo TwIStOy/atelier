@@ -1,17 +1,28 @@
 import { fileURLToPath } from "node:url";
-import type { ExtensionAPI, Theme, ToolDefinition } from "@earendil-works/pi-coding-agent";
-import { initTheme, ToolExecutionComponent } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, Theme } from "@earendil-works/pi-coding-agent";
+import { initTheme, type ToolExecutionComponent } from "@earendil-works/pi-coding-agent";
 import type * as Common from "@htwang-contrib/common";
 import { registerAggregateRule, resetAggregateRulesForTest } from "@htwang-contrib/common/aggregate-rules";
+import { componentRendersLines } from "@htwang-contrib/common/component-tree";
 import {
+  isThoughtGroupExpanded,
   isThoughtMemberClaimed,
   setThoughtMember,
   setThoughtMemberClaimed,
-  setThoughtTransparent,
 } from "@htwang-contrib/common/tool-rail";
-import { Type } from "@sinclair/typebox";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { loadConfig } from "../src/config.ts";
+import {
+  bumpRoleMutation,
+  type GroupRole,
+  groupRoleSummary,
+  isGroupExpanded,
+  resolveGroupRole,
+  setGroupExpanded,
+} from "../src/grouping.ts";
 import extension from "../src/index.ts";
+import type { ToolExecutionPatchThis } from "../src/types.ts";
+import { fakeThoughtMember, fakeTransparentThought, makeComponent, textBlock, withResult } from "./helpers.ts";
 
 const mockConfig = vi.hoisted(() => ({ overrides: {} as Record<string, unknown> }));
 
@@ -52,164 +63,454 @@ afterEach(() => {
   resetAggregateRulesForTest();
 });
 
-function activateExtension(): void {
-  const handlers = new Map<string, Array<(event: unknown, ctx: unknown) => void>>();
-  const pi = {
-    events: { on: vi.fn(), emit: vi.fn() },
-    on: vi.fn((name: string, handler: (event: unknown, ctx: unknown) => void) => {
-      const list = handlers.get(name) ?? [];
-      list.push(handler);
-      handlers.set(name, list);
-    }),
-  };
-  extension(pi as unknown as ExtensionAPI);
-  const sessionStart = handlers.get("session_start")?.[0];
-  if (!sessionStart) throw new Error("session_start handler not registered");
-  sessionStart(undefined, { mode: "tui", ui: { theme: PLAIN_THEME } });
-}
-
 type FakeRoot = { children: unknown[] };
 
-let callSeq = 0;
+function newRoot(): FakeRoot {
+  return { children: [] };
+}
 
-function makeComponent(toolName: string, root: FakeRoot): ToolExecutionComponent {
-  const toolDefinition: ToolDefinition = {
-    name: toolName,
-    label: toolName,
-    description: "test tool",
-    parameters: Type.Object({}),
-    execute: async () => ({ content: [], details: {} }),
-  };
-  return new ToolExecutionComponent(
+function roleOf(component: ToolExecutionComponent, width = 80): GroupRole | undefined {
+  return resolveGroupRole(component as unknown as ToolExecutionPatchThis, width);
+}
+
+function memberLike(toolName: string, opts: { partial?: boolean; error?: boolean } = {}): ToolExecutionPatchThis {
+  return {
     toolName,
-    `call-${toolName}-${callSeq++}`,
-    {},
-    {},
-    toolDefinition,
-    root as unknown as ConstructorParameters<typeof ToolExecutionComponent>[5],
-    process.cwd(),
-  );
+    isPartial: opts.partial ?? false,
+    result: opts.error ? { isError: true } : undefined,
+  } as ToolExecutionPatchThis;
 }
 
-function withResult(component: ToolExecutionComponent, isError = false): ToolExecutionComponent {
-  component.updateResult({ content: [{ type: "text", text: isError ? "boom" : "done" }], details: {}, isError }, false);
-  return component;
-}
-
-function makeTools(toolName: string, count: number, root: FakeRoot): ToolExecutionComponent[] {
-  const tools: ToolExecutionComponent[] = [];
-  for (let i = 0; i < count; i++) {
-    const component = withResult(makeComponent(toolName, root));
-    tools.push(component);
-    root.children.push(component);
-  }
-  return tools;
-}
-
-function fakeThoughtMember(lines: string[] = ["     ◆ Thought for 5s"]): object {
-  const fake = { render: () => lines };
-  setThoughtMember(fake, true);
-  return fake;
-}
-
-function fakeTransparentThought(lines: string[] = ["     ◆ Thinking..."]): object {
-  const fake = { render: () => lines };
-  setThoughtTransparent(fake, true);
-  return fake;
-}
-
-type PatchedComponent = {
-  expanded: boolean;
-  render(width: number): string[];
-  handleMouse(event: { type: string; button: string; width: number }): unknown;
-};
-
-function asPatched(component: ToolExecutionComponent): PatchedComponent {
-  return component as unknown as PatchedComponent;
-}
-
-describe("thought member folding", () => {
-  it("claims an eligible thought between two member batches into one group", () => {
-    activateExtension();
-    const root: FakeRoot = { children: [] };
+describe("resolveGroupRole: Member claiming", () => {
+  it("claims consecutive rule-registered tools into one verb-group span", () => {
+    const root = newRoot();
     const read1 = withResult(makeComponent("read", root));
-    const thought = fakeThoughtMember();
+    const read2 = withResult(makeComponent("read", root));
     const grep1 = withResult(makeComponent("grep", root));
-    root.children.push(read1, thought, grep1);
+    root.children.push(read1, read2, grep1);
 
-    expect(asPatched(read1).render(80)).toEqual(["", "  ❙  ◈ Read 1 file, Searched 1 pattern"]);
-    expect(isThoughtMemberClaimed(thought)).toBe(true);
-    expect(asPatched(grep1).render(80)).toEqual([]);
+    expect(roleOf(read1)).toEqual({ role: "verb-leader", members: [read1, read2, grep1], groupExpanded: false });
+    expect(roleOf(read2)).toEqual({ role: "claimed", groupExpanded: false });
+    expect(roleOf(grep1)).toEqual({ role: "claimed", groupExpanded: false });
   });
 
-  it("leaves a leading thought ahead of the first member unclaimed", () => {
-    activateExtension();
-    const root: FakeRoot = { children: [] };
-    const thought = fakeThoughtMember();
+  it("merges interleaved types into one span in first-appearance order", () => {
+    const root = newRoot();
     const read1 = withResult(makeComponent("read", root));
-    root.children.push(thought, read1);
-
-    asPatched(read1).render(80);
-    expect(isThoughtMemberClaimed(thought)).toBe(false);
-  });
-
-  it("releases the claim once the group behind it breaks", () => {
-    activateExtension();
-    const root: FakeRoot = { children: [] };
-    const read1 = withResult(makeComponent("read", root));
-    const thought = fakeThoughtMember();
+    const grep1 = withResult(makeComponent("grep", root));
     const read2 = withResult(makeComponent("read", root));
-    root.children.push(read1, thought, read2);
+    root.children.push(read1, grep1, read2);
 
-    asPatched(read1).render(80);
-    expect(isThoughtMemberClaimed(thought)).toBe(true);
-
-    // Simulate the assistant appending body text to the thinking message:
-    // compact-thinking rebuilds content, clears both markers, and the block
-    // renders rows again, so the next scan no longer treats it as a thought.
-    const textBearing = thought as { render: (width: number) => string[] };
-    setThoughtMember(thought, false);
-    setThoughtMemberClaimed(thought, false);
-    textBearing.render = () => ["assistant text"];
-
-    asPatched(read1).render(80);
-    expect(isThoughtMemberClaimed(thought)).toBe(false);
-    expect(asPatched(read2).render(80)).toEqual(["", "  ┃  ◆ Read ...", "  ┃    └ 1 line"]);
+    const role = roleOf(read1);
+    expect(role?.role).toBe("verb-leader");
+    if (role?.role === "verb-leader") expect(role.members).toEqual([read1, grep1, read2]);
   });
 
-  it("folds across a streaming or user-expanded thinking block without claiming it", () => {
-    activateExtension();
-    const root: FakeRoot = { children: [] };
+  it("leaves a singleton span ungrouped", () => {
+    const root = newRoot();
     const read1 = withResult(makeComponent("read", root));
-    const streaming = fakeTransparentThought();
-    const read2 = withResult(makeComponent("read", root));
-    root.children.push(read1, streaming, read2);
+    root.children.push(read1);
 
-    expect(asPatched(read1).render(80)).toEqual(["", "  ❙  ◈ Read 2 files"]);
-    expect(isThoughtMemberClaimed(streaming)).toBe(false);
-    expect(asPatched(read2).render(80)).toEqual([]);
+    expect(roleOf(read1)).toBeUndefined();
   });
-});
 
-describe("aggregate rule registration", () => {
-  it("folds tools with a rule registered through common into the verb-group", () => {
+  it("claims tools that registered an Aggregate Rule through common", () => {
     registerAggregateRule("my_probe", {
       verb: "Probed",
       singular: "target",
       plural: "targets",
       progressive: "Probing…",
     });
-    activateExtension();
-    const root: FakeRoot = { children: [] };
+    const root = newRoot();
     const probe1 = withResult(makeComponent("my_probe", root));
-    const read1 = withResult(makeComponent("read", root));
-    root.children.push(probe1, read1);
+    const probe2 = withResult(makeComponent("my_probe", root));
+    root.children.push(probe1, probe2);
 
-    expect(asPatched(probe1).render(80)).toEqual(["", "  ❙  ◈ Probed 1 target, Read 1 file"]);
-    expect(asPatched(read1).render(80)).toEqual([]);
+    expect(roleOf(probe1)).toMatchObject({ role: "verb-leader", groupExpanded: false });
+    expect(roleOf(probe2)).toEqual({ role: "claimed", groupExpanded: false });
+  });
+});
+
+describe("resolveGroupRole: Break", () => {
+  it("breaks the span on assistant text and user message siblings", () => {
+    for (const lines of [["assistant text"], ["  user message"]]) {
+      const root = newRoot();
+      const read1 = withResult(makeComponent("read", root));
+      const read2 = withResult(makeComponent("read", root));
+      root.children.push(read1, textBlock(lines), read2);
+
+      expect(roleOf(read1)).toBeUndefined();
+      expect(roleOf(read2)).toBeUndefined();
+    }
   });
 
-  it("bridges the register event into the common registry", () => {
+  it("breaks the span on a tool without an Aggregate Rule", () => {
+    const root = newRoot();
+    const read1 = withResult(makeComponent("read", root));
+    const bash1 = withResult(makeComponent("bash", root));
+    const read2 = withResult(makeComponent("read", root));
+    root.children.push(read1, bash1, read2);
+
+    expect(roleOf(read1)).toBeUndefined();
+    expect(roleOf(bash1)).toBeUndefined();
+    expect(roleOf(read2)).toBeUndefined();
+  });
+
+  it("bounds the Region at hard breaks on both sides", () => {
+    const root = newRoot();
+    const read1 = withResult(makeComponent("read", root));
+    const read2 = withResult(makeComponent("read", root));
+    const grep1 = withResult(makeComponent("grep", root));
+    const grep2 = withResult(makeComponent("grep", root));
+    root.children.push(textBlock(["before"]), read1, read2, textBlock(["middle"]), grep1, grep2, textBlock(["after"]));
+
+    expect(roleOf(read1)).toEqual({ role: "verb-leader", members: [read1, read2], groupExpanded: false });
+    expect(roleOf(grep1)).toEqual({ role: "verb-leader", members: [grep1, grep2], groupExpanded: false });
+  });
+});
+
+describe("resolveGroupRole: Transparent", () => {
+  it("skips zero-line siblings without breaking the span", () => {
+    const root = newRoot();
+    const read1 = withResult(makeComponent("read", root));
+    const read2 = withResult(makeComponent("read", root));
+    root.children.push(read1, textBlock([]), read2);
+
+    expect(roleOf(read1)).toEqual({ role: "verb-leader", members: [read1, read2], groupExpanded: false });
+  });
+
+  it("folds across a streaming thinking block without claiming it", () => {
+    const root = newRoot();
+    const read1 = withResult(makeComponent("read", root));
+    const streaming = fakeTransparentThought();
+    const read2 = withResult(makeComponent("read", root));
+    root.children.push(read1, streaming, read2);
+
+    expect(roleOf(read1)).toEqual({ role: "verb-leader", members: [read1, read2], groupExpanded: false });
+    expect(isThoughtMemberClaimed(streaming)).toBe(false);
+  });
+
+  it("keeps a standalone expanded tool out of a neighboring group", () => {
+    const root = newRoot();
+    const stray = withResult(makeComponent("read", root));
+    const read1 = withResult(makeComponent("read", root));
+    const read2 = withResult(makeComponent("read", root));
+    root.children.push(stray, read1, read2);
+    stray.setExpanded(true);
+
+    expect(roleOf(stray)).toBeUndefined();
+    expect(roleOf(read1)).toEqual({ role: "verb-leader", members: [read1, read2], groupExpanded: false });
+  });
+
+  it("does not recurse when a sibling probes this tool from its own render", () => {
+    const root = newRoot();
+    const read1 = withResult(makeComponent("read", root));
+    const read2 = withResult(makeComponent("read", root));
+    const probing = {
+      render: (width: number) => (componentRendersLines(read1, width) ? ["     ◆ Thought for 3s"] : []),
+    };
+    root.children.push(probing, read1, read2);
+
+    expect(roleOf(read1)).toEqual({ role: "verb-leader", members: [read1, read2], groupExpanded: false });
+  });
+});
+
+describe("resolveGroupRole: ThoughtMember", () => {
+  it("claims an eligible thought between two members", () => {
+    const root = newRoot();
+    const read1 = withResult(makeComponent("read", root));
+    const thought = fakeThoughtMember();
+    const grep1 = withResult(makeComponent("grep", root));
+    root.children.push(read1, thought, grep1);
+
+    expect(roleOf(read1)).toEqual({ role: "verb-leader", members: [read1, grep1], groupExpanded: false });
+    expect(isThoughtMemberClaimed(thought)).toBe(true);
+    expect(isThoughtGroupExpanded(thought)).toBe(false);
+  });
+
+  it("leaves a leading or trailing thought outside the span unclaimed", () => {
+    const root = newRoot();
+    const leading = fakeThoughtMember();
+    const read1 = withResult(makeComponent("read", root));
+    const read2 = withResult(makeComponent("read", root));
+    const trailing = fakeThoughtMember();
+    root.children.push(leading, read1, read2, trailing);
+
+    expect(isThoughtMemberClaimed(leading)).toBe(false);
+    expect(isThoughtMemberClaimed(trailing)).toBe(false);
+  });
+
+  it("releases the claim once the block gains body text and breaks the Region", () => {
+    const root = newRoot();
+    const read1 = withResult(makeComponent("read", root));
+    const thought = fakeThoughtMember();
+    const read2 = withResult(makeComponent("read", root));
+    root.children.push(read1, thought, read2);
+
+    expect(roleOf(read1)).toMatchObject({ role: "verb-leader" });
+    expect(isThoughtMemberClaimed(thought)).toBe(true);
+
+    // Simulate the assistant appending body text: compact-thinking clears the
+    // member stamp and the block renders rows again, so it turns into a Break.
+    setThoughtMember(thought, false);
+    setThoughtMemberClaimed(thought, false);
+    (thought as { render: (width: number) => string[] }).render = () => ["assistant text"];
+    bumpRoleMutation();
+
+    expect(isThoughtMemberClaimed(thought)).toBe(false);
+    expect(roleOf(read1)).toBeUndefined();
+    expect(roleOf(read2)).toBeUndefined();
+  });
+
+  it("marks thoughts as group-expanded while their group is expanded", () => {
+    const root = newRoot();
+    const read1 = withResult(makeComponent("read", root));
+    const claimed = fakeThoughtMember();
+    const streaming = fakeTransparentThought();
+    const read2 = withResult(makeComponent("read", root));
+    root.children.push(read1, claimed, streaming, read2);
+    setGroupExpanded(read1, true);
+    bumpRoleMutation();
+
+    expect(roleOf(read1)).toMatchObject({ role: "verb-leader", groupExpanded: true });
+    expect(isThoughtGroupExpanded(claimed)).toBe(true);
+    expect(isThoughtGroupExpanded(streaming)).toBe(true);
+  });
+});
+
+describe("resolveGroupRole: group expansion", () => {
+  it("keeps an expanded leader heading its expanded group", () => {
+    const root = newRoot();
+    const read1 = withResult(makeComponent("read", root));
+    const read2 = withResult(makeComponent("read", root));
+    root.children.push(read1, read2);
+    setGroupExpanded(read1, true);
+    read1.setExpanded(true);
+    bumpRoleMutation();
+
+    expect(roleOf(read1)).toEqual({ role: "verb-leader", members: [read1, read2], groupExpanded: true });
+  });
+
+  it("keeps an individually expanded member inside an expanded span", () => {
+    const root = newRoot();
+    const read1 = withResult(makeComponent("read", root));
+    const read2 = withResult(makeComponent("read", root));
+    const read3 = withResult(makeComponent("read", root));
+    root.children.push(read1, read2, read3);
+    setGroupExpanded(read1, true);
+    read2.setExpanded(true);
+    bumpRoleMutation();
+
+    expect(roleOf(read1)).toEqual({ role: "verb-leader", members: [read1, read2, read3], groupExpanded: true });
+    expect(roleOf(read2)).toEqual({ role: "claimed", groupExpanded: true });
+  });
+
+  it("drops an individually expanded member from a collapsed span", () => {
+    const root = newRoot();
+    const read1 = withResult(makeComponent("read", root));
+    const read2 = withResult(makeComponent("read", root));
+    const read3 = withResult(makeComponent("read", root));
+    root.children.push(read1, read2, read3);
+    read2.setExpanded(true);
+    bumpRoleMutation();
+
+    expect(roleOf(read1)).toEqual({ role: "verb-leader", members: [read1, read3], groupExpanded: false });
+    expect(roleOf(read2)).toBeUndefined();
+  });
+});
+
+describe("group expansion state", () => {
+  it("tracks expansion per leader", () => {
+    const root = newRoot();
+    const read1 = withResult(makeComponent("read", root));
+    const read2 = withResult(makeComponent("read", root));
+
+    expect(isGroupExpanded(read1)).toBe(false);
+    setGroupExpanded(read1, true);
+    expect(isGroupExpanded(read1)).toBe(true);
+    expect(isGroupExpanded(read2)).toBe(false);
+    setGroupExpanded(read1, false);
+    expect(isGroupExpanded(read1)).toBe(false);
+  });
+});
+
+describe("resolveGroupRole: truncation", () => {
+  it("keeps every collapsed tool visible at exactly groupMaxVisible + 1", () => {
+    const { groupMaxVisible } = loadConfig();
+    const root = newRoot();
+    const tools = Array.from({ length: groupMaxVisible + 1 }, () => withResult(makeComponent("bash", root)));
+    root.children.push(...tools);
+
+    for (const tool of tools) {
+      expect(roleOf(tool)).toBeUndefined();
+    }
+  });
+
+  it("hides the oldest entries once the run exceeds groupMaxVisible + 1", () => {
+    const { groupMaxVisible } = loadConfig();
+    const root = newRoot();
+    const tools = Array.from({ length: groupMaxVisible + 2 }, () => withResult(makeComponent("bash", root)));
+    root.children.push(...tools);
+
+    expect(roleOf(tools[0])).toEqual({ role: "truncation-leader", hidden: [tools[0], tools[1]] });
+    expect(roleOf(tools[1])).toEqual({ role: "claimed", groupExpanded: false });
+    for (const tool of tools.slice(2)) {
+      expect(roleOf(tool)).toBeUndefined();
+    }
+  });
+
+  it("collects mixed-kind leftovers into one truncation run", () => {
+    const { groupMaxVisible } = loadConfig();
+    const root = newRoot();
+    const bash1 = withResult(makeComponent("bash", root));
+    const edit1 = withResult(makeComponent("edit", root));
+    const rest = Array.from({ length: groupMaxVisible }, () => withResult(makeComponent("bash", root)));
+    root.children.push(bash1, edit1, ...rest);
+
+    expect(roleOf(bash1)).toEqual({ role: "truncation-leader", hidden: [bash1, edit1] });
+    expect(roleOf(edit1)).toEqual({ role: "claimed", groupExpanded: false });
+  });
+
+  it("does not truncate when groupMaxVisible is 0", () => {
+    mockConfig.overrides = { groupMaxVisible: 0 };
+    const root = newRoot();
+    const tools = Array.from({ length: 12 }, () => withResult(makeComponent("bash", root)));
+    root.children.push(...tools);
+
+    for (const tool of tools) {
+      expect(roleOf(tool)).toBeUndefined();
+    }
+  });
+
+  it("keeps streaming members visible at the run tail as the run grows", () => {
+    const { groupMaxVisible } = loadConfig();
+    const root = newRoot();
+    const finished = Array.from({ length: groupMaxVisible + 1 }, () => withResult(makeComponent("bash", root)));
+    const streaming = makeComponent("bash", root);
+    root.children.push(...finished, streaming);
+
+    expect(roleOf(finished[0])).toEqual({ role: "truncation-leader", hidden: [finished[0], finished[1]] });
+    expect(roleOf(streaming)).toBeUndefined();
+  });
+
+  it("splits the run at a streaming thinking block", () => {
+    const { groupMaxVisible } = loadConfig();
+    const root = newRoot();
+    const half = Math.ceil((groupMaxVisible + 2) / 2);
+    const before = Array.from({ length: half }, () => withResult(makeComponent("bash", root)));
+    const after = Array.from({ length: half }, () => withResult(makeComponent("bash", root)));
+    root.children.push(...before, fakeTransparentThought(), ...after);
+
+    for (const tool of [...before, ...after]) {
+      expect(roleOf(tool)).toBeUndefined();
+    }
+  });
+
+  it("claims rule-registered leftovers when the verb-group is off", () => {
+    mockConfig.overrides = { groupToolVerbs: false };
+    const { groupMaxVisible } = loadConfig();
+    const root = newRoot();
+    const tools = Array.from({ length: groupMaxVisible + 2 }, () => withResult(makeComponent("read", root)));
+    root.children.push(...tools);
+
+    expect(roleOf(tools[0])).toEqual({ role: "truncation-leader", hidden: [tools[0], tools[1]] });
+  });
+
+  it("renders no verb-group roles when the verb-group is off", () => {
+    mockConfig.overrides = { groupToolVerbs: false };
+    const root = newRoot();
+    const read1 = withResult(makeComponent("read", root));
+    const grep1 = withResult(makeComponent("grep", root));
+    root.children.push(read1, grep1);
+
+    expect(roleOf(read1)).toBeUndefined();
+    expect(roleOf(grep1)).toBeUndefined();
+  });
+});
+
+describe("role memoization", () => {
+  it("returns the identical role object for repeated resolves", () => {
+    const root = newRoot();
+    const read1 = withResult(makeComponent("read", root));
+    const read2 = withResult(makeComponent("read", root));
+    root.children.push(read1, read2);
+
+    expect(roleOf(read1)).toBe(roleOf(read1));
+  });
+
+  it("shares one Region computation with every sibling", () => {
+    const root = newRoot();
+    const read1 = withResult(makeComponent("read", root));
+    const read2 = withResult(makeComponent("read", root));
+    root.children.push(read1, read2);
+
+    const leaderFirst = roleOf(read1);
+    expect(roleOf(read2)).toEqual({ role: "claimed", groupExpanded: false });
+    expect(roleOf(read1)).toBe(leaderFirst);
+  });
+
+  it("recomputes after a role mutation bump", () => {
+    const root = newRoot();
+    const read1 = withResult(makeComponent("read", root));
+    const read2 = withResult(makeComponent("read", root));
+    root.children.push(read1, read2);
+
+    const first = roleOf(read1);
+    read2.setExpanded(true);
+    expect(roleOf(read1)).toBe(first);
+    bumpRoleMutation();
+    expect(roleOf(read1)).not.toBe(first);
+    expect(roleOf(read1)).toBeUndefined();
+  });
+
+  it("recomputes when the width changes", () => {
+    const root = newRoot();
+    const read1 = withResult(makeComponent("read", root));
+    const read2 = withResult(makeComponent("read", root));
+    root.children.push(read1, read2);
+
+    const at80 = roleOf(read1, 80);
+    const at120 = roleOf(read1, 120);
+    expect(at120).not.toBe(at80);
+    expect(at120).toEqual(at80);
+    expect(roleOf(read1, 80)).toBe(at80);
+  });
+});
+
+describe("groupRoleSummary", () => {
+  it("signs every role shape for the render-lines cache key", () => {
+    expect(groupRoleSummary(undefined)).toBe("none");
+    expect(groupRoleSummary({ role: "claimed", groupExpanded: false })).toBe("claimed:shut");
+    expect(groupRoleSummary({ role: "claimed", groupExpanded: true })).toBe("claimed:open");
+    expect(groupRoleSummary({ role: "truncation-leader", hidden: [memberLike("bash")] })).toBe("trunc:bash");
+    expect(
+      groupRoleSummary({
+        role: "verb-leader",
+        members: [memberLike("grep", { partial: true }), memberLike("read", { error: true })],
+        groupExpanded: true,
+      }),
+    ).toBe("lead:open:grepp,reade");
+  });
+});
+
+describe("patch bridge", () => {
+  function activateExtension(): void {
+    const handlers = new Map<string, Array<(event: unknown, ctx: unknown) => void>>();
+    const pi = {
+      events: { on: vi.fn(), emit: vi.fn() },
+      on: vi.fn((name: string, handler: (event: unknown, ctx: unknown) => void) => {
+        const list = handlers.get(name) ?? [];
+        list.push(handler);
+        handlers.set(name, list);
+      }),
+    };
+    extension(pi as unknown as ExtensionAPI);
+    const sessionStart = handlers.get("session_start")?.[0];
+    if (!sessionStart) throw new Error("session_start handler not registered");
+    sessionStart(undefined, { mode: "tui", ui: { theme: PLAIN_THEME } });
+  }
+
+  it("bridges the aggregate-rule register event into the common registry", () => {
     const events = new Map<string, Array<(data: unknown) => void>>();
     const handlers = new Map<string, Array<(event: unknown, ctx: unknown) => void>>();
     const pi = {
@@ -234,146 +535,29 @@ describe("aggregate rule registration", () => {
 
     const sessionStart = handlers.get("session_start")?.[0];
     sessionStart?.(undefined, { mode: "tui", ui: { theme: PLAIN_THEME } });
-    const root: FakeRoot = { children: [] };
+    const root = newRoot();
     const probe1 = withResult(makeComponent("my_probe", root));
     const probe2 = withResult(makeComponent("my_probe", root));
     root.children.push(probe1, probe2);
 
-    expect(asPatched(probe1).render(80)).toEqual(["", "  ❙  ◈ Probed 2 ts"]);
-    expect(asPatched(probe2).render(80)).toEqual([]);
-  });
-});
-
-describe("truncation layer", () => {
-  it("keeps every collapsed bash visible at exactly groupMaxVisible + 1", () => {
-    activateExtension();
-    const root: FakeRoot = { children: [] };
-    const tools = makeTools("bash", 11, root);
-
-    for (const tool of tools) {
-      expect(asPatched(tool).render(80).join("\n")).toContain("◆");
-    }
-  });
-
-  it("hides the oldest entries behind a header once the run exceeds groupMaxVisible + 1", () => {
-    activateExtension();
-    const root: FakeRoot = { children: [] };
-    const tools = makeTools("bash", 12, root);
-
-    expect(asPatched(tools[0]).render(80)).toEqual(["", "  ❙  ◈ Ran 2 commands"]);
-    expect(asPatched(tools[1]).render(80)).toEqual([]);
-    for (const tool of tools.slice(2)) {
-      const lines = asPatched(tool).render(80);
-      expect(lines.join("\n")).toContain("◆");
-      expect(lines.join("\n")).not.toContain("◈");
-    }
-  });
-
-  it("phrases a uniform edit/write/apply_patch run as Edited N files", () => {
-    activateExtension();
-    const root: FakeRoot = { children: [] };
-    for (const name of ["edit", "write", "apply_patch"]) {
-      makeTools(name, 4, root);
-    }
-    const first = root.children[0] as ToolExecutionComponent;
-
-    expect(asPatched(first).render(80)).toEqual(["", "  ❙  ◈ Edited 2 files"]);
-  });
-
-  it("falls back to N more when the hidden entries mix kinds", () => {
-    activateExtension();
-    const root: FakeRoot = { children: [] };
-    makeTools("bash", 1, root);
-    makeTools("edit", 1, root);
-    makeTools("bash", 10, root);
-    const first = root.children[0] as ToolExecutionComponent;
-
-    expect(asPatched(first).render(80)).toEqual(["", "  ❙  ◈ 2 more"]);
-  });
-
-  it("renders the header red with a failed suffix when a hidden member errored", () => {
-    activateExtension();
-    const root: FakeRoot = { children: [] };
-    const tools = makeTools("bash", 12, root);
-    tools[0].updateResult({ content: [{ type: "text", text: "boom" }], details: {}, isError: true }, false);
-
-    expect(asPatched(tools[0]).render(80)).toEqual(["", "  ┃  ◈ Ran 2 commands · 1 failed"]);
-  });
-
-  it("does not truncate when groupMaxVisible is 0", () => {
-    mockConfig.overrides = { groupMaxVisible: 0 };
-    activateExtension();
-    const root: FakeRoot = { children: [] };
-    const tools = makeTools("bash", 12, root);
-
-    for (const tool of tools) {
-      expect(asPatched(tool).render(80).join("\n")).toContain("◆");
-    }
+    expect(roleOf(probe1)).toMatchObject({ role: "verb-leader" });
+    expect(roleOf(probe2)).toEqual({ role: "claimed", groupExpanded: false });
   });
 
   it("ignores left clicks on the truncation header", () => {
     activateExtension();
-    const root: FakeRoot = { children: [] };
-    const tools = makeTools("bash", 12, root);
+    const { groupMaxVisible } = loadConfig();
+    const root = newRoot();
+    const tools = Array.from({ length: groupMaxVisible + 2 }, () => withResult(makeComponent("bash", root)));
+    root.children.push(...tools);
 
-    const leader = asPatched(tools[0]);
+    const leader = tools[0] as unknown as {
+      expanded: boolean;
+      render(width: number): string[];
+      handleMouse(event: { type: string; button: string; width: number }): unknown;
+    };
     leader.render(80);
     expect(leader.handleMouse({ type: "click", button: "left", width: 80 })).toBeUndefined();
     expect(leader.expanded).toBe(false);
-  });
-
-  it("keeps rule phrasing for read/grep in the header when the verb-group is off", () => {
-    mockConfig.overrides = { groupToolVerbs: false };
-    activateExtension();
-    const root: FakeRoot = { children: [] };
-    const tools = makeTools("read", 12, root);
-
-    expect(asPatched(tools[0]).render(80)).toEqual(["", "  ❙  ◈ Read 2 files"]);
-    expect(asPatched(tools[1]).render(80)).toEqual([]);
-    const visible = asPatched(tools[11]).render(80).join("\n");
-    expect(visible).toContain("◆");
-    expect(visible).not.toContain("◈");
-  });
-
-  it("renders read/grep as ordinary collapsed rows when the verb-group is off", () => {
-    mockConfig.overrides = { groupToolVerbs: false };
-    activateExtension();
-    const root: FakeRoot = { children: [] };
-    const read1 = withResult(makeComponent("read", root));
-    const grep1 = withResult(makeComponent("grep", root));
-    root.children.push(read1, grep1);
-
-    for (const tool of [read1, grep1]) {
-      const lines = asPatched(tool).render(80).join("\n");
-      expect(lines).toContain("◆");
-      expect(lines).not.toContain("◈");
-    }
-  });
-
-  it("keeps streaming members visible at the run tail as the run grows", () => {
-    activateExtension();
-    const root: FakeRoot = { children: [] };
-    const tools = makeTools("bash", 11, root);
-    const streaming = makeComponent("bash", root);
-    root.children.push(streaming);
-
-    expect(asPatched(tools[0]).render(80)).toEqual(["", "  ❙  ◈ Ran 2 commands"]);
-    expect(asPatched(streaming).render(80).join("\n")).not.toContain("◈");
-    withResult(streaming);
-    expect(asPatched(tools[0]).render(80)).toEqual(["", "  ❙  ◈ Ran 2 commands"]);
-  });
-
-  it("splits the run at a streaming or user-expanded thinking block", () => {
-    activateExtension();
-    const root: FakeRoot = { children: [] };
-    const before = makeTools("bash", 6, root);
-    root.children.push(fakeTransparentThought());
-    const after = makeTools("bash", 6, root);
-
-    // Each side is its own 6-participant run, below the truncation threshold.
-    for (const tool of [...before, ...after]) {
-      const lines = asPatched(tool).render(80).join("\n");
-      expect(lines).not.toContain("◈");
-    }
   });
 });
