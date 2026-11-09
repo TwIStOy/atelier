@@ -7,7 +7,7 @@
 - `gateway-provider.ts`: shared refresh-command handler factory (`makeRefreshCommandHandler`), cached-refresh skeleton (`refreshModelsCatalog`), and gateway models fetch (`fetchGatewayModels`) used by the magpie and toori providers; `scroll-keys.ts` with `scrollKeyOffset` for overlay up/down scrolling (btw, committer).
 - `frame-epoch.ts` with `currentFrameEpoch` / `patchTuiFrameEpoch` (moved from tool-display's render-cache so every extension's frame-scoped caches share one counter; patching the same TUI twice is a no-op) and `findComponentContextInFrame`, a per-frame sibling index that turns N per-component `findComponentContext` tree walks per frame into one walk plus O(1) lookups (targets attached mid-frame fall back to the direct walk). `AsyncAnnotations.size()` exposes the value count.
 - Fine-grained `exports` subpaths for every module exposed through the root entry, allowing consumers to load only the implementation modules they use instead of evaluating the full root barrel.
-- `classifier-models.ts`: shared classifier-model selection over Pi's ModelRegistry (`classifierModelOptions`, `createClassifierCall`, `resolveClassifierModel`, `parseClassifierRef`, `DEFAULT_CLASSIFIER_MODEL` `magpie/jev-latest`). Annotation consumers pick any registered classifier model and call it through `ctx.modelRegistry.classify()` with caller-owned cancellation.
+- `classifier-models.ts`: shared classifier-model selection over Pi's ModelRegistry (`classifierModelOptions`, `createClassifierCall`, `resolveClassifierModel`, `parseClassifierRef`, `DEFAULT_CLASSIFIER_MODEL` `magpie/group/classifier`). Annotation consumers pick any registered classifier model and call it through `ctx.modelRegistry.classify()` with caller-owned cancellation.
 
 ### Changed
 

@@ -12,7 +12,7 @@ classifier models.
 | --- | --- | --- | --- |
 | Gateway URL | `MAGPIE_BASE_URL` | `http://100.65.0.3:3425` | Gateway root, without `/v1` |
 | API Key | `MAGPIE_API_KEY` | the gateway key shipped with the extension | Literal key or `$VAR` / `{env:VAR}` reference |
-| Classifier Models | — | `jev-latest` | Decision model ids to register, comma or space separated |
+| Classifier Models | — | `group/classifier` | Decision model ids to register, comma or space separated |
 | Classifier Timeout (ms) | — | `10000` | Timeout per attempt, including body delivery |
 | Classifier Max Retries | — | `2` | Retries after the initial attempt; `0` disables them |
 
@@ -21,7 +21,7 @@ classifier models.
   "magpie": {
     "url": "http://100.65.0.3:3425",
     "apiKey": "$MAGPIE_KEY",
-    "classifierModels": "jev-latest"
+    "classifierModels": "group/classifier"
   }
 }
 ```
@@ -39,11 +39,13 @@ but its `/v1/models` list does not include them, so the **Classifier Models**
 setting names them explicitly. Every listed id is registered as a Pi classifier
 model:
 
-- id `jev-latest`, model reference `magpie/jev-latest`, api `typesafe-system-one`,
-  `baseUrl` `<url>/v1` (Pi appends `/systemone`), context window 32768.
-- Decision-only groups (`group/<id>`) and provider-qualified names
-  (`typesafe/jev-latest`) work the same way; a conversation model is refused
-  with 404 and a group of conversation models with 400.
+- id `group/classifier` (magpie's decision group), model reference
+  `magpie/group/classifier`, api `typesafe-system-one`, `baseUrl` `<url>/v1`
+  (Pi appends `/systemone`), context window 32768.
+- Plain decision model ids (`jev-latest`), other decision groups, and
+  provider-qualified names (`typesafe/jev-latest`) work the same way; a
+  conversation model is refused with 404 and a group of conversation models
+  with 400.
 
 Classifier models do not appear in `/model`; Pi reaches them through
 `ctx.modelRegistry.classify()`, the `codemode` tool, and virtual-model routing.
@@ -73,7 +75,7 @@ TypeSafe, Cloudflare, llama.cpp decision models, …) and calls
   questions estimate `destructive` and `exfiltration` probabilities, shown
   after the Bash output count.
 
-Both default to `magpie/jev-latest`; a missing model (provider not loaded, id
+Both default to `magpie/group/classifier`; a missing model (provider not loaded, id
 renamed) silently disables the annotation. Requests run in the background, start
 only for new TUI messages and tool calls, and are cancelled with the turn or
 session. Failures are logged and leave the transcript unchanged.

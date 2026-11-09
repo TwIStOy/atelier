@@ -21,7 +21,7 @@ const CONFIG_SCHEMA: ExtensionConfigSchema<MagpieConfig> = {
   defaults: {
     url: DEFAULT_MAGPIE_URL,
     apiKey: "magpie-private",
-    classifierModels: "jev-latest",
+    classifierModels: "group/classifier",
     classifierTimeoutMs: 10_000,
     classifierMaxRetries: 2,
   },

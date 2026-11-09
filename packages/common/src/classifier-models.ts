@@ -1,7 +1,7 @@
 import type { ClassifierApi, ClassifierContext, ClassifierModel, ClassifierResult } from "@earendil-works/pi-ai";
 import type { ConfigItemSelectOption } from "./config/index.ts";
 
-export const DEFAULT_CLASSIFIER_MODEL = "magpie/jev-latest";
+export const DEFAULT_CLASSIFIER_MODEL = "magpie/group/classifier";
 
 /** The classifier-facing slice of Pi's ModelRegistry. */
 export interface ClassifierRegistry {

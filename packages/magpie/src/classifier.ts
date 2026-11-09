@@ -123,10 +123,13 @@ async function postOnce(
   }
   const timeout = AbortSignal.timeout(timeoutMs);
   const attemptSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
+  const requestHeaders = new Headers(headers);
+  if (!requestHeaders.has("content-type")) requestHeaders.set("content-type", "application/json");
+  if (!requestHeaders.has("authorization")) requestHeaders.set("authorization", `Bearer ${apiKey}`);
   try {
     const response = await fetchImpl(url, {
       method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}`, ...headers },
+      headers: requestHeaders,
       body,
       signal: attemptSignal,
     });
@@ -196,7 +199,8 @@ export const magpieSystemOneClassifier: ProviderClassifier = {
   ): Promise<ClassifierResult> {
     const config: MagpieConfig = loadMagpieConfig();
     const apiKey = options.apiKey?.trim() || config.apiKey;
-    if (!apiKey.trim()) {
+    const headers = callerHeaders(options);
+    if (!apiKey.trim() && !new Headers(headers).has("authorization")) {
       throw new MagpieClassifierError(
         "Magpie API key is missing. Set MAGPIE_API_KEY or configure the Magpie API key in /config.",
       );
@@ -212,7 +216,6 @@ export const magpieSystemOneClassifier: ProviderClassifier = {
     });
     const timeoutMs = options.timeoutMs ?? config.classifierTimeoutMs;
     const attempts = Math.max(0, options.maxRetries ?? config.classifierMaxRetries) + 1;
-    const headers = callerHeaders(options);
 
     let payload: unknown;
     for (let attempt = 1; ; attempt++) {

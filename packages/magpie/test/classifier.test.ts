@@ -148,6 +148,18 @@ describe("magpie system one classifier", () => {
     ]);
   });
 
+  test("merges a caller-supplied authorization header instead of duplicating it", async () => {
+    const fetcher = successfulFetch();
+    await magpieSystemOneClassifier.classify(makeModel(), context, {
+      fetch: fetcher,
+      apiKey: "key-from-api",
+      headers: { Authorization: "Bearer key-from-headers" },
+    });
+    const headers = new Headers(fetcher.mock.calls[0]?.[1]?.headers);
+    expect(headers.get("authorization")).toBe("Bearer key-from-headers");
+    expect(headers.get("content-type")).toBe("application/json");
+  });
+
   test("does not retry a rejected request", async () => {
     const fetcher = vi
       .fn<typeof globalThis.fetch>()
