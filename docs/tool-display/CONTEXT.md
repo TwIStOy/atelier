@@ -36,6 +36,14 @@ _Avoid_: interrupt, delimiter
 A registration of `toolName → { verb, singular, plural, progressive }` in common. Built-in rules cover `grep`, `glob`, `ls`, and `read`. Other tools join only by registering.
 _Avoid_: adapter (display adapters are separate), whitelist
 
+**Region**:
+A hard-break-bounded span of consecutive transcript siblings within which the grouping scan runs. Verb-group claims, ThoughtMember claiming, and truncation are all computed per Region and shared by every sibling in it.
+_Avoid_: block, window, segment
+
+**Group role**:
+The layout role of one sibling inside its Region: verb-group leader, truncation leader, claimed, or none. A sibling with no Group role keeps its own rows.
+_Avoid_: state, mode, membership
+
 **Group leader**:
 The first claimed Member (or truncation participant) of a span. It draws the summary row; later claimed siblings render empty.
 _Avoid_: parent, header widget
