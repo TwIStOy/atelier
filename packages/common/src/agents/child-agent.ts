@@ -1,20 +1,10 @@
-import { randomUUID } from "node:crypto";
-import * as fs from "node:fs";
 import type { AgentMessage, ThinkingLevel } from "@earendil-works/pi-agent-core";
-import type { ExtensionContext, ExtensionFactory } from "@earendil-works/pi-coding-agent";
+import type { AgentSession, ExtensionContext, ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import {
-  type AgentSession,
-  type AgentSessionEvent,
-  createAgentSession,
   DEFAULT_MAX_BYTES,
   DEFAULT_MAX_LINES,
-  DefaultResourceLoader,
   defineTool,
   formatSize,
-  getAgentDir,
-  ModelRuntime,
-  SessionManager,
-  SettingsManager,
   truncateHead,
 } from "@earendil-works/pi-coding-agent";
 import type { TSchema } from "typebox";
@@ -26,34 +16,18 @@ import {
   personaSystemPrompt,
   resolvePersonaId,
 } from "./agent-personas.ts";
-import { getChildExtensionFactories } from "./child-extensions.ts";
+import { type ChildSessionUsage, childUsageSnapshot, type EngineProgress, withChildSession } from "./child-session.ts";
 import { resolveChildToolNames } from "./child-tools.ts";
 import { type PersonaTypeDefaults, personaDefaultsForType, readPersonaDefaultsByType } from "./persona-defaults.ts";
-import { recordChildSessionFinished, recordChildSessionStarted } from "./session-links.ts";
-import { shutdownChildSession } from "./session-shutdown.ts";
 import { loadSubagentModelConfig, resolveSubagentModelPattern, type SubagentModelConfig } from "./subagent-models.ts";
 
 export const STRUCTURED_OUTPUT_TOOL_NAME = "structured_output";
 
 const THINKING_LEVELS = new Set<string>(["off", "minimal", "low", "medium", "high", "xhigh", "max"]);
 
-export type ChildAgentUsageSnapshot = {
-  usage_input: number;
-  usage_output: number;
-  usage_cache_read?: number;
-  usage_cache_write?: number;
-  usage_cost_usd?: number;
-  context_percent: number | null;
-  context_tokens: number | null;
-  context_window: number;
-};
+export type ChildAgentUsageSnapshot = ChildSessionUsage;
 
-export type ChildAgentProgress = {
-  tool_calls: number;
-  sub_session_file?: string;
-  task_index?: number;
-  task_total?: number;
-} & ChildAgentUsageSnapshot;
+export type ChildAgentProgress = EngineProgress;
 
 export type RunChildAgentInput = {
   task: string;
@@ -183,19 +157,6 @@ function resolveModelForChild(raw: string | undefined, ctx: ExtensionContext) {
   return found ?? ctx.model;
 }
 
-function forwardAbort(session: AgentSession, signal: AbortSignal | undefined) {
-  if (!signal) return () => {};
-  const onAbort = () => {
-    void session.abort();
-  };
-  if (signal.aborted) {
-    onAbort();
-    return () => {};
-  }
-  signal.addEventListener("abort", onAbort, { once: true });
-  return () => signal.removeEventListener("abort", onAbort);
-}
-
 const EMPTY_USAGE: ChildAgentUsageSnapshot = {
   usage_input: 0,
   usage_output: 0,
@@ -206,22 +167,6 @@ const EMPTY_USAGE: ChildAgentUsageSnapshot = {
   context_tokens: null,
   context_window: 0,
 };
-
-function snapshotUsage(child: AgentSession): ChildAgentUsageSnapshot {
-  const st = child.getSessionStats();
-  const cu = child.getContextUsage();
-  const cw = cu?.contextWindow ?? child.model?.contextWindow ?? 0;
-  return {
-    usage_input: st.tokens.input,
-    usage_output: st.tokens.output,
-    usage_cache_read: st.tokens.cacheRead,
-    usage_cache_write: st.tokens.cacheWrite,
-    usage_cost_usd: st.cost,
-    context_percent: cu?.percent ?? null,
-    context_tokens: cu?.tokens ?? null,
-    context_window: cw,
-  };
-}
 
 type ChildResultPartial = Omit<
   RunChildAgentResult,
@@ -248,8 +193,8 @@ function buildChildResult(
   toolCallCount: number,
   parentSessionId: string,
   parentSessionFile: string,
+  usage: ChildAgentUsageSnapshot,
 ): RunChildAgentResult {
-  const base = session ? snapshotUsage(session) : EMPTY_USAGE;
   return {
     parent_session_id: partial.parent_session_id ?? parentSessionId,
     parent_session_file: partial.parent_session_file ?? parentSessionFile,
@@ -259,7 +204,7 @@ function buildChildResult(
     value: partial.value,
     isError: partial.isError,
     errorMessage: partial.errorMessage,
-    ...mergedUsageSnapshot(partial, base),
+    ...mergedUsageSnapshot(partial, usage),
   };
 }
 
@@ -329,163 +274,6 @@ function resolveChildSetup(ctx: ExtensionContext, input: RunChildAgentInput): Ch
   return { opts, effectiveTask, structured, toolList, systemPrompt, modelConfig };
 }
 
-type ParentSessionHeader = ReturnType<ExtensionContext["sessionManager"]["getHeader"]>;
-
-function childSessionOptions(parentSessionId: string | undefined): { id: string; parentSession?: string } {
-  const newOpts: { id: string; parentSession?: string } = { id: randomUUID() };
-  if (parentSessionId) {
-    newOpts.parentSession = parentSessionId;
-  }
-  return newOpts;
-}
-
-async function spawnChildSession(
-  ctx: ExtensionContext,
-  input: RunChildAgentInput,
-  setup: ChildAgentSetup,
-  parentHeader: ParentSessionHeader,
-): Promise<AgentSession> {
-  const cwd = ctx.cwd;
-  const agentDir = getAgentDir();
-  const settingsManager = SettingsManager.create(cwd, agentDir);
-  const model = resolveModelForChild(resolveSubagentModelPattern(setup.opts.model, setup.modelConfig.modelTiers), ctx);
-  const thinkingLevel = parseThinking(setup.opts.thinking);
-
-  fs.mkdirSync(input.sessionDir, { recursive: true });
-
-  const sessionManager = SessionManager.create(cwd, input.sessionDir, childSessionOptions(parentHeader?.id));
-
-  const loader = new DefaultResourceLoader({
-    cwd,
-    agentDir,
-    settingsManager,
-    noExtensions: true,
-    extensionFactories: [...(input.extensionFactories ?? []), ...getChildExtensionFactories()],
-    noSkills: true,
-    noPromptTemplates: true,
-    noThemes: true,
-    noContextFiles: true,
-    systemPromptOverride: () => setup.systemPrompt,
-    appendSystemPromptOverride: () => [],
-  });
-  await loader.reload();
-
-  const modelRuntime = await ModelRuntime.create();
-  const { session } = await createAgentSession({
-    cwd,
-    agentDir,
-    modelRuntime,
-    model,
-    thinkingLevel,
-    tools: setup.toolList,
-    customTools: setup.structured ? [setup.structured.tool] : undefined,
-    resourceLoader: loader,
-    sessionManager,
-    settingsManager,
-  });
-  return session;
-}
-
-async function activateChildSession(
-  created: AgentSession,
-  parentSessionId: string,
-  parentSessionFile: string,
-): Promise<void> {
-  recordChildSessionStarted(parentSessionId, {
-    parentSessionFile,
-    childSessionFile: created.sessionManager.getSessionFile() ?? "",
-  });
-  await created.bindExtensions({});
-}
-
-type TurnLimitState = { count: number; soft: boolean };
-
-function applyTurnLimitAction(state: TurnLimitState, created: AgentSession, maxTurns: number, grace: number): void {
-  if (!state.soft && state.count >= maxTurns) {
-    state.soft = true;
-    void created.steer(
-      "You have reached the turn limit. Finish now with a short final answer; do not start new tool work.",
-    );
-    return;
-  }
-  if (state.soft && state.count >= maxTurns + grace) {
-    void created.abort();
-  }
-}
-
-function enforceTurnLimit(
-  state: TurnLimitState,
-  created: AgentSession,
-  maxTurns: number | undefined,
-  grace: number,
-): void {
-  if (maxTurns === undefined || maxTurns <= 0) return;
-  state.count += 1;
-  applyTurnLimitAction(state, created, maxTurns, grace);
-}
-
-type ToolCallCounter = { count: number };
-
-function childProgressPayload(
-  created: AgentSession,
-  input: RunChildAgentInput,
-  usage: ChildAgentUsageSnapshot,
-  toolCallCount: number,
-): ChildAgentProgress {
-  return {
-    tool_calls: toolCallCount,
-    sub_session_file: created.sessionManager.getSessionFile(),
-    ...(input.stream
-      ? {
-          task_index: input.stream.task_index,
-          task_total: input.stream.task_total,
-        }
-      : {}),
-    ...usage,
-  };
-}
-
-type ChildSessionObserver = { unsub: () => void; emitProgress: () => void };
-
-function observeChildSession(
-  created: AgentSession,
-  input: RunChildAgentInput,
-  toolCalls: ToolCallCounter,
-  maxTurns: number | undefined,
-): ChildSessionObserver {
-  const grace = 3;
-  const turnLimit: TurnLimitState = { count: 0, soft: false };
-  const emitProgress = () => {
-    const u = snapshotUsage(created);
-    input.onProgress?.(childProgressPayload(created, input, u, toolCalls.count));
-  };
-  const unsub = created.subscribe((event: AgentSessionEvent) => {
-    if (event.type === "tool_execution_end") {
-      toolCalls.count += 1;
-      emitProgress();
-      return;
-    }
-    if (event.type !== "turn_end") return;
-    emitProgress();
-    enforceTurnLimit(turnLimit, created, maxTurns, grace);
-  });
-  return { unsub, emitProgress };
-}
-
-async function runChildPrompt(
-  created: AgentSession,
-  task: string,
-  unsub: () => void,
-  cleanupAbort: () => void,
-): Promise<void> {
-  try {
-    await created.prompt(task);
-  } finally {
-    unsub();
-    cleanupAbort();
-  }
-}
-
 function structuredChildResult(
   structured: StructuredOutputTool,
   created: AgentSession,
@@ -533,23 +321,6 @@ function plainChildResult(
   });
 }
 
-async function settleChildSession(
-  session: AgentSession | undefined,
-  parentSessionId: string,
-  parentSessionFile: string,
-  toolCallCount: number,
-): Promise<void> {
-  const subFile = session?.sessionManager.getSessionFile();
-  if (subFile) {
-    recordChildSessionFinished(parentSessionId, {
-      parentSessionFile,
-      childSessionFile: subFile,
-      toolCalls: toolCallCount,
-    });
-  }
-  await shutdownChildSession(session);
-}
-
 export async function runChildAgent(
   ctx: ExtensionContext,
   input: RunChildAgentInput,
@@ -560,42 +331,61 @@ export async function runChildAgent(
   const parentSessionFile = ctx.sessionManager.getSessionFile() ?? "";
 
   let session: AgentSession | undefined;
-  const toolCalls: ToolCallCounter = { count: 0 };
-
+  let toolCallCount = 0;
   const finish = (partial: ChildResultPartial): RunChildAgentResult =>
-    buildChildResult(partial, session, toolCalls.count, parentSessionId, parentSessionFile);
+    buildChildResult(
+      partial,
+      session,
+      toolCallCount,
+      parentSessionId,
+      parentSessionFile,
+      session ? childUsageSnapshot(session) : EMPTY_USAGE,
+    );
 
   // Setup failures throw: pi marks a tool call failed only when execute throws,
   // and a returned isError flag is discarded — a spawn that never started must
   // not read as an agent that ran and reported a problem (upstream #179).
   // Callers that need per-item error results (batch) catch and convert.
-  try {
-    const earlyError = childTaskError(input.task, signal);
-    if (earlyError) {
-      return finish({ text: "", isError: true, errorMessage: earlyError, tool_calls: 0 });
-    }
-
-    const setup = resolveChildSetup(ctx, input);
-    const created = await spawnChildSession(ctx, input, setup, parentHeader);
-    session = created;
-    await activateChildSession(created, parentSessionId, parentSessionFile);
-
-    const { unsub, emitProgress } = observeChildSession(created, input, toolCalls, setup.opts.max_turns);
-    const cleanupAbort = forwardAbort(created, signal);
-    emitProgress();
-
-    // The run phase: failures here settle on the result, never throw.
-    try {
-      await runChildPrompt(created, setup.effectiveTask, unsub, cleanupAbort);
-      if (setup.structured) {
-        return structuredChildResult(setup.structured, created, toolCalls.count, finish);
-      }
-      return plainChildResult(created, toolCalls.count, finish);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      return finish({ text: "", isError: true, errorMessage: msg, tool_calls: toolCalls.count });
-    }
-  } finally {
-    await settleChildSession(session, parentSessionId, parentSessionFile, toolCalls.count);
+  const earlyError = childTaskError(input.task, signal);
+  if (earlyError) {
+    return finish({ text: "", isError: true, errorMessage: earlyError, tool_calls: 0 });
   }
+
+  const setup = resolveChildSetup(ctx, input);
+  const model = resolveModelForChild(resolveSubagentModelPattern(setup.opts.model, setup.modelConfig.modelTiers), ctx);
+
+  return withChildSession(
+    ctx,
+    {
+      sessionDir: input.sessionDir,
+      systemPrompt: setup.systemPrompt,
+      tools: setup.toolList,
+      customTools: setup.structured ? [setup.structured.tool] : undefined,
+      model,
+      thinkingLevel: parseThinking(setup.opts.thinking),
+      extensionFactories: input.extensionFactories,
+      maxTurns: setup.opts.max_turns,
+      signal,
+      onProgress: input.onProgress,
+      progressContext: input.stream
+        ? { task_index: input.stream.task_index, task_total: input.stream.task_total }
+        : undefined,
+    },
+    async (h) => {
+      session = h.session;
+      // The run phase: failures here settle on the result, never throw.
+      try {
+        await h.session.prompt(setup.effectiveTask);
+        toolCallCount = h.toolCallCount();
+        if (setup.structured) {
+          return structuredChildResult(setup.structured, h.session, toolCallCount, finish);
+        }
+        return plainChildResult(h.session, toolCallCount, finish);
+      } catch (e) {
+        toolCallCount = h.toolCallCount();
+        const msg = e instanceof Error ? e.message : String(e);
+        return finish({ text: "", isError: true, errorMessage: msg, tool_calls: toolCallCount });
+      }
+    },
+  );
 }

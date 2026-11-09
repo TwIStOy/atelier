@@ -1,7 +1,12 @@
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { AssistantMessage, TextContent } from "@earendil-works/pi-ai";
+import {
+  assistantMessageText,
+  extractAssistantText,
+  finalTurnError,
+  parseThinking,
+} from "@htwang-contrib/common/child-agent";
 import { describe, expect, it } from "vitest";
-import { assistantMessageText, extractAssistantText, finalTurnError, parseThinking } from "../src/run-agent.ts";
 
 function text(value: string): TextContent {
   return { type: "text", text: value };

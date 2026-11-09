@@ -2,7 +2,19 @@
 
 ## [Unreleased]
 
+### Breaking Changes
+
+- Removed the public `runIsolatedSession` API (`IsolatedSessionOptions`, `IsolatedSessionResult`, the `./agents/isolated-session` subpath, and the module itself). It had no production consumers; spawn a child session through `withChildSession` instead.
+
 ### Added
+
+- `agents/child-session.ts`: one `withChildSession` engine for every child session. It owns the whole spawn scaffold (loader flags with `noSkills` unless `skills`, session dir creation, `SessionManager` with the parent link, `createAgentSession`, `bindExtensions`, session-links records unless `linkParent: false`), the observer (progress payloads assembled from the usage snapshot plus a caller-supplied `progressContext` spread, and the turn limiter — soft steer at `maxTurns`, hard abort at `maxTurns + 3`), abort forwarding with a pre-aborted check (an already-aborted signal aborts the session and never runs the driver), and Settle (unsubscribe, detach abort, `recordChildSessionFinished` with `"done"`/`"error"` status, shutdown) guaranteed in `finally`. Callers supply only the Driver. Exported via the new `./agents/child-session` subpath and the root entry (`withChildSession`, `ChildSessionSpec`, `ChildSessionHandle`, `EngineProgress`, `ChildSessionUsage`, `childUsageSnapshot`).
+
+### Changed
+
+- `runChildAgent` rides the `withChildSession` engine instead of its own spawn/observe/abort/settle scaffold: option resolution, the structured-output tool, and the result Projections stay in `child-agent.ts`; the #179 setup-throw contract (spawn failures throw, a pre-aborted signal returns an `isError` result before spawning) is unchanged. `ChildAgentProgress` is now the engine payload shape — batch `task_index` / `task_total` arrive through `progressContext`. The turn-limit steer text and grace (`+3`) are engine-owned and unified across callers. Session-links records now carry an explicit `"done"` / `"error"` status where the subagent path previously recorded none.
+
+### Fixed
 
 - `gateway-provider.ts`: shared refresh-command handler factory (`makeRefreshCommandHandler`), cached-refresh skeleton (`refreshModelsCatalog`), and gateway models fetch (`fetchGatewayModels`) used by the magpie and toori providers; `scroll-keys.ts` with `scrollKeyOffset` for overlay up/down scrolling (btw, committer).
 - `frame-epoch.ts` with `currentFrameEpoch` / `patchTuiFrameEpoch` (moved from tool-display's render-cache so every extension's frame-scoped caches share one counter; patching the same TUI twice is a no-op) and `findComponentContextInFrame`, a per-frame sibling index that turns N per-component `findComponentContext` tree walks per frame into one walk plus O(1) lookups (targets attached mid-frame fall back to the direct walk). `AsyncAnnotations.size()` exposes the value count.
@@ -26,6 +38,7 @@
 
 ### Removed
 
+- `agents/isolated-session.ts` and its exports (see Breaking Changes above).
 - TypeSafe System One integration: the `systemOne` client, its `systemone` configuration section and ConfigItems, its `noul` / `choice` / `score` builders and error aliases, `createComplexityAssessment`, the `./systemone` and `./model-complexity` subpaths, and the `@typesafe-ai/sdk` dependency. Transcript annotations now ask a Magpie decision model; see `docs/magpie/README.md`.
 - `ASK_USER_BLOCKED_EVENT` (`"ask_user_question:blocked"`) and `AskUserBlockedPayload`, whose only consumer was the removed `moshi-hooks-extra` extension. `MODAL_ACTIVE_EVENT` and `ASK_USER_PROMPT_EVENT` are unchanged.
 - `TurnTelemetryTracker.discardCurrentTurn()` — designed for abort wiring that never landed.

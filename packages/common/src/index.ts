@@ -33,13 +33,18 @@ export {
   getChildExtensionFactories,
   registerChildExtensionFactory,
 } from "./agents/child-extensions.ts";
+export type {
+  ChildSessionHandle,
+  ChildSessionSpec,
+  ChildSessionUsage,
+  EngineProgress,
+} from "./agents/child-session.ts";
+export { childUsageSnapshot, withChildSession } from "./agents/child-session.ts";
 export {
   CHILD_DELEGATION_TOOL_NAMES,
   childSessionToolNames,
   resolveChildToolNames,
 } from "./agents/child-tools.ts";
-export type { IsolatedSessionOptions, IsolatedSessionResult } from "./agents/isolated-session.ts";
-export { runIsolatedSession } from "./agents/isolated-session.ts";
 export {
   type PersonaTypeDefaults,
   parsePersonaDefaultsByType,

@@ -8,13 +8,6 @@ import { runChildAgent } from "@htwang-contrib/common/child-agent";
 import { buildSubagentAgentCatalog, type SubagentAgentCatalog } from "./agent-catalog.ts";
 import { SUBAGENT_SESSION_DIR } from "./paths.ts";
 
-export {
-  assistantMessageText,
-  extractAssistantText,
-  finalTurnError,
-  parseThinking,
-} from "@htwang-contrib/common/child-agent";
-
 export type SubagentUsageSnapshot = ChildAgentUsageSnapshot;
 
 export type SubagentBatchItemDetail = {

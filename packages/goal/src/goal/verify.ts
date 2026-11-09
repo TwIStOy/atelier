@@ -1,28 +1,12 @@
-import { randomUUID } from "node:crypto";
-import * as fs from "node:fs";
 import * as path from "node:path";
-import type { AgentMessage } from "@earendil-works/pi-agent-core";
-import type { TextContent } from "@earendil-works/pi-ai";
-import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import {
-  type AgentSession,
-  type AgentSessionEvent,
-  createAgentSession,
-  DEFAULT_MAX_BYTES,
-  DEFAULT_MAX_LINES,
-  DefaultResourceLoader,
-  getAgentDir,
-  ModelRuntime,
-  SessionManager,
-  SettingsManager,
-  truncateHead,
-} from "@earendil-works/pi-coding-agent";
-import { getChildExtensionFactories } from "@htwang-contrib/common/agents/child-extensions";
+import type { AgentSession, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, getAgentDir, truncateHead } from "@earendil-works/pi-coding-agent";
+import { withChildSession } from "@htwang-contrib/common/agents/child-session";
+import { extractAssistantText } from "@htwang-contrib/common/child-agent";
 import { loadGoalConfig, resolveVerifierModel } from "./config.ts";
 import type { Goal } from "./types.ts";
 
 const VERIFIER_TOOLS = ["read", "bash", "grep", "glob", "ls"];
-const TURN_GRACE = 3;
 const FORMAT_NUDGE =
   "Your previous response did not end with a valid verdict line. Based on your investigation so far, do not run more tools — respond now with a brief summary ending with exactly one line on its own: VERDICT: COMPLETE or VERDICT: INCOMPLETE.";
 
@@ -69,28 +53,6 @@ function buildVerificationTask(objective: string): string {
   ].join("\n");
 }
 
-function extractAssistantText(messages: AgentMessage[]): string {
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const text = assistantMessageText(messages[i]);
-    if (text) return text;
-  }
-  return "";
-}
-
-function assistantMessageText(msg: AgentMessage): string {
-  if (msg.role !== "assistant") return "";
-  return joinTextParts(msg.content);
-}
-
-function joinTextParts(parts: unknown): string {
-  if (!Array.isArray(parts)) return "";
-  const chunks: string[] = [];
-  for (const part of parts as TextContent[]) {
-    if (part.type === "text" && typeof part.text === "string") chunks.push(part.text);
-  }
-  return chunks.join("").trim();
-}
-
 function parseVerdict(text: string): VerdictParseResult {
   const match = text.match(/VERDICT:\s*(COMPLETE|INCOMPLETE)\b/i);
   if (!match || match.index === undefined) {
@@ -129,117 +91,23 @@ export async function verifyGoalCompletion(
       message: "no active model available to run the verification agent",
     };
   }
-  const setup = await createVerifierSession(ctx, verifierModel);
-  if ("error" in setup) {
-    return { error: true, message: setup.error };
-  }
-  return runVerifierSession(setup.session, goal, signal);
-}
-
-type VerifierModel = ReturnType<typeof resolveVerifierModel>;
-
-async function createVerifierSession(
-  ctx: ExtensionContext,
-  verifierModel: VerifierModel,
-): Promise<{ session: AgentSession } | { error: string }> {
   try {
-    const session = await buildVerifierSession(ctx, verifierModel);
-    await session.bindExtensions({});
-    return { session };
-  } catch (e) {
-    return { error: e instanceof Error ? e.message : String(e) };
-  }
-}
-
-async function buildVerifierSession(ctx: ExtensionContext, verifierModel: VerifierModel): Promise<AgentSession> {
-  const cwd = ctx.cwd;
-  const agentDir = getAgentDir();
-  const verifierDir = path.join(agentDir, "goal-verifiers");
-  fs.mkdirSync(verifierDir, { recursive: true });
-
-  const parentHeader = ctx.sessionManager.getHeader();
-  const sessionManager = SessionManager.create(cwd, verifierDir, {
-    id: randomUUID(),
-    ...(parentHeader?.id ? { parentSession: parentHeader.id } : {}),
-  });
-  const settingsManager = SettingsManager.create(cwd, agentDir);
-
-  const loader = new DefaultResourceLoader({
-    cwd,
-    agentDir,
-    settingsManager,
-    noExtensions: true,
-    extensionFactories: getChildExtensionFactories(),
-    noPromptTemplates: true,
-    noThemes: true,
-    noContextFiles: true,
-    systemPromptOverride: () => buildVerificationSystemPrompt(),
-    appendSystemPromptOverride: () => [],
-  });
-  await loader.reload();
-
-  const modelRuntime = await ModelRuntime.create();
-  const { session } = await createAgentSession({
-    cwd,
-    agentDir,
-    modelRuntime,
-    model: verifierModel,
-    tools: VERIFIER_TOOLS,
-    resourceLoader: loader,
-    sessionManager,
-    settingsManager,
-  });
-  return session;
-}
-
-async function runVerifierSession(
-  session: AgentSession,
-  goal: Goal,
-  signal: AbortSignal | undefined,
-): Promise<GoalVerificationResult> {
-  const detachAbort = attachAbort(signal, () => void session.abort());
-  const unsub = subscribeTurnLimiter(session);
-  try {
-    return await collectVerifierOutcome(session, goal, loadGoalConfig().verifierMaxRetries);
+    return await withChildSession(
+      ctx,
+      {
+        sessionDir: path.join(getAgentDir(), "goal-verifiers"),
+        systemPrompt: buildVerificationSystemPrompt(),
+        tools: VERIFIER_TOOLS,
+        model: verifierModel,
+        skills: true,
+        linkParent: false,
+        maxTurns: loadGoalConfig().verifierMaxTurns,
+        signal,
+      },
+      (h) => collectVerifierOutcome(h.session, goal, loadGoalConfig().verifierMaxRetries),
+    );
   } catch (e) {
     return verifierFailure(e, signal);
-  } finally {
-    unsub();
-    detachAbort();
-  }
-}
-
-function attachAbort(signal: AbortSignal | undefined, onAbort: () => void): () => void {
-  if (!signal) return () => {};
-  signal.addEventListener("abort", onAbort, { once: true });
-  return () => signal.removeEventListener("abort", onAbort);
-}
-
-function subscribeTurnLimiter(session: AgentSession): () => void {
-  const maxTurns = loadGoalConfig().verifierMaxTurns;
-  const state = { count: 0, soft: false };
-  return session.subscribe((event: AgentSessionEvent) => {
-    if (event.type !== "turn_end") return;
-    noteVerifierTurn(session, state, maxTurns);
-  });
-}
-
-function noteVerifierTurn(session: AgentSession, state: { count: number; soft: boolean }, maxTurns: number): void {
-  state.count += 1;
-  if (maxTurns <= 0) return;
-  applyTurnLimit(session, state, maxTurns);
-}
-
-function applyTurnLimit(session: AgentSession, state: { count: number; soft: boolean }, maxTurns: number): void {
-  if (!state.soft && state.count >= maxTurns) {
-    state.soft = true;
-    void session.steer(
-      "You have reached the investigation turn limit. Stop running new tools and give your final verdict now.",
-    );
-    return;
-  }
-  if (state.soft && state.count >= maxTurns + TURN_GRACE) {
-    void session.abort();
   }
 }
 

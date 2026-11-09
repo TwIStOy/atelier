@@ -4,7 +4,9 @@
 
 ### Changed
 
-- Split the `/goal` command handler into per-subcommand functions, `agent_end` into usage/error/continuation phases, and the verifier into session-setup/turn-limiter/verdict-loop helpers; no behavior change.
+- The goal verifier now spawns through the shared `withChildSession` engine from `@htwang-contrib/common` (`skills: true`, `linkParent: false`, `verifierMaxTurns`) instead of its own session scaffold; the verdict retry loop and `VERDICT` parsing are the Driver. Abort forwarding is now pre-checked: an already-aborted parent signal aborts the verifier session and returns `verification aborted by parent session` instead of running the whole verification against a dead signal. The turn-limit steer text is the engine's unified wording; verdict semantics are unchanged.
+
+- Split the `/goal` command handler into per-subcommand functions and `agent_end` into usage/error/continuation phases; no behavior change.
 
 ## [0.7.0] - 2026-10-30
 
