@@ -6,6 +6,7 @@ import { classifierModelConfigs, refreshCatalog } from "./catalog.ts";
 import { MAGPIE_SYSTEM_ONE_API, magpieSystemOneClassifier } from "./classifier.ts";
 import { COMMAND_NAME, handleRefreshCommand, PROVIDER_ID } from "./command.ts";
 import { loadMagpieConfig, magpieClassifierIds, magpieEndpoint, registerMagpieConfigItems } from "./config.ts";
+import { registerGenerateImageTool } from "./image-tool.ts";
 
 const logger = createLogger("magpie");
 
@@ -33,6 +34,7 @@ export default async function magpie(pi: ExtensionAPI) {
 
   registerMagpieConfigItems();
   registerProvider();
+  registerGenerateImageTool(pi);
 
   pi.registerCommand(COMMAND_NAME, {
     description: "Force-refresh the magpie model catalog",

@@ -1,6 +1,6 @@
 # Magpie Extension
 
-A pi extension that registers the `magpie` provider against a personal [magpie](https://github.com/yetone/magpie) gateway (default `http://100.65.0.3:3425`) and registers its decision models as native Pi classifier models.
+A pi extension that registers the `magpie` provider against a personal [magpie](https://github.com/yetone/magpie) gateway (default `http://100.65.0.3:3425`), registers its decision models as native Pi classifier models, and exposes a `generate_image` tool backed by the gateway's image API.
 
 ## Configuration
 
@@ -16,6 +16,14 @@ A pi extension that registers the `magpie` provider against a personal [magpie](
 ## Commands
 
 - `/refresh-magpie` — force-refresh the catalog now (bypasses the 4h window) and persist it to `~/.pi/agent/models-store.json`. `pi update --models` does not load extensions, so it never calls this provider's `refreshModels`.
+
+## Image generation
+
+`generate_image` calls the gateway's images API (`/v1/images/generations`, or
+`/v1/images/edits` for `reference_images`), saves the images to the working
+directory, and returns them as image content blocks so the TUI shows them
+inline. See [docs/magpie/README.md](../../docs/magpie/README.md) for the full
+parameter and behavior notes.
 
 ## Model Catalog (dynamic)
 

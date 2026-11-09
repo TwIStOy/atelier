@@ -15,6 +15,7 @@ export interface MagpieConfig {
   classifierModels: string;
   classifierTimeoutMs: number;
   classifierMaxRetries: number;
+  imageTimeoutMs: number;
 }
 
 const CONFIG_SCHEMA: ExtensionConfigSchema<MagpieConfig> = {
@@ -24,6 +25,7 @@ const CONFIG_SCHEMA: ExtensionConfigSchema<MagpieConfig> = {
     classifierModels: "group/classifier",
     classifierTimeoutMs: 10_000,
     classifierMaxRetries: 2,
+    imageTimeoutMs: 300_000,
   },
 };
 
@@ -108,6 +110,17 @@ export function registerMagpieConfigItems(): void {
       extensionLabel: "Magpie",
       min: 0,
       order: 4,
+    },
+    {
+      key: "imageTimeoutMs",
+      type: "number",
+      label: "Image Timeout (ms)",
+      value: () => loadMagpieConfig().imageTimeoutMs,
+      description:
+        "Timeout for generate_image calls, matching magpie's image generation timeout (its default is 5 minutes).",
+      extensionLabel: "Magpie",
+      min: 1_000,
+      order: 5,
     },
   ]);
 }

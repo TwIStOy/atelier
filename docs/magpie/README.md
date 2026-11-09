@@ -15,6 +15,7 @@ classifier models.
 | Classifier Models | — | `group/classifier` | Decision model ids to register, comma or space separated |
 | Classifier Timeout (ms) | — | `10000` | Timeout per attempt, including body delivery |
 | Classifier Max Retries | — | `2` | Retries after the initial attempt; `0` disables them |
+| Image Timeout (ms) | — | `300000` | Timeout for `generate_image` calls, matching magpie's image timeout |
 
 ```json
 {
@@ -31,6 +32,42 @@ The provider uses `<url>/v1` and the catalog comes from `GET /v1/models`.
 `apiKey` takes precedence over `MAGPIE_API_KEY`, and an unset or blank reference
 is an error rather than a fallback. Reads happen per request; provider
 connection values are re-read at `session_start`.
+
+## Image generation
+
+The extension registers a `generate_image` tool that draws through the Magpie
+gateway's image models. With `reference_images` it edits or combines; without
+them it generates from the prompt.
+
+- **Endpoint**: `POST <url>/v1/images/generations`, or `/v1/images/edits` when
+  `reference_images` names local files (sent as data URLs). The request always
+  asks for base64 image data (`response_format`); a URL-only answer is
+  downloaded as a fallback.
+- **Parameters**: `prompt` (required), `size` (`WIDTHxHEIGHT` or a ratio like
+  `16:9`), `n` (1-4), `reference_images` (up to 5 file paths), `quality`
+  (`low`/`medium`/`high`/`xhigh`/`max`/`auto`), `background`
+  (`transparent`/`opaque`/`auto`), and `model` (a magpie image model id or
+  `group/<id>`; omitted, magpie uses the model picked in its Settings →
+  Images → Image generation).
+- **Result**: each image is saved to the working directory as
+  `<slug>-<timestamp>[-N].<ext>` and returned as an image content block. The
+  tool renders its own row (`renderShell: "self"`) in tool-display's visual
+  language (bold verb header with the quoted prompt, muted one-line summary
+  collapsed, `saved <path>` lines expanded), and pi appends the images inline
+  right below it (kitty/sixel; a text indicator otherwise) while multimodal
+  models see what they drew. `details` carries the model, saved paths, and the
+  revised prompt. Defining its own renderers also makes tool-display defer to
+  the stock renderer (`usesStockRenderer`), which is what keeps the inline
+  images when tool-display is loaded.
+- **Timeout**: **Image Timeout (ms)** (default 300000, magpie's own default).
+  Slow image models need a larger value on both sides.
+- **Key**: the same gateway key as the provider; magpie answers remote calls
+  without one with 401, which the tool surfaces as a `/config` hint.
+
+The tool shape follows Codex's `image_gen.imagegen` (prompt, transparency via
+  `background`, reference images, quality) and magpie's own `generate_image`
+  MCP tool, minus what has no magpie equivalent (GIF frames, conversation
+  image inclusion).
 
 ## Classifier models
 
