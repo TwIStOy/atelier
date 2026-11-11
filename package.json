@@ -43,7 +43,8 @@
       "packages/inject-prompt-by-model",
       "packages/canvas",
       "packages/apply-patch",
-      "packages/recap"
+      "packages/recap",
+      "extensions/rex-title"
     ],
     "skills": [
       "skills/clice",

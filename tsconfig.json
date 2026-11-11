@@ -26,6 +26,7 @@
     { "path": "packages/read-tracker" },
     { "path": "extensions/working-indicator" },
     { "path": "packages/heap-probe" },
-    { "path": "packages/apply-patch" }
+    { "path": "packages/apply-patch" },
+    { "path": "extensions/rex-title" }
   ]
 }

@@ -194,7 +194,7 @@ export {
 export type { ResolvableModel } from "./model-resolve.ts";
 export { resolveModel } from "./model-resolve.ts";
 export type { RexContext, RexPaneOptions } from "./rex.ts";
-export { getLocalRexContext, openRexPane } from "./rex.ts";
+export { getLocalRexContext, openRexPane, renameRexPane } from "./rex.ts";
 export { scrollKeyOffset } from "./scroll-keys.ts";
 export type { SessionCache } from "./session-cache.ts";
 export {

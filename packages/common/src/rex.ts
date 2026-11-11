@@ -54,6 +54,22 @@ export async function getLocalRexContext(
   return { executable, endpoint: identity.endpoint, sessionId, blockId };
 }
 
+export async function renameRexPane(exec: ExtensionAPI["exec"], context: RexContext, label: string): Promise<void> {
+  if (Array.from(label).length > 128 || /\p{Cc}/u.test(label)) {
+    throw new Error("Rex labels must contain at most 128 characters and no control characters.");
+  }
+  await runRexJson(exec, context.executable, [
+    "--server",
+    context.endpoint,
+    "api",
+    "call",
+    "--session",
+    context.sessionId,
+    "session.set_block_label",
+    JSON.stringify({ block_id: context.blockId, label }),
+  ]);
+}
+
 export async function openRexPane(
   exec: ExtensionAPI["exec"],
   context: RexContext,

@@ -4,7 +4,7 @@ import { join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { findExecutable } from "../src/executable.ts";
-import { getLocalRexContext, openRexPane, type RexContext } from "../src/rex.ts";
+import { getLocalRexContext, openRexPane, type RexContext, renameRexPane } from "../src/rex.ts";
 
 describe("Rex pane launches", () => {
   let directory: string;
@@ -71,9 +71,21 @@ describe("Rex pane launches", () => {
   });
 
   it.each([
-    { session_id: "session:other", block_id: "block:source", endpoint: "unix:///run/rex/server.sock" },
-    { session_id: "session:source", block_id: "block:other", endpoint: "unix:///run/rex/server.sock" },
-    { session_id: "session:source", block_id: "block:source", endpoint: "https://remote.example" },
+    {
+      session_id: "session:other",
+      block_id: "block:source",
+      endpoint: "unix:///run/rex/server.sock",
+    },
+    {
+      session_id: "session:source",
+      block_id: "block:other",
+      endpoint: "unix:///run/rex/server.sock",
+    },
+    {
+      session_id: "session:source",
+      block_id: "block:source",
+      endpoint: "https://remote.example",
+    },
   ])("rejects mismatched or remote contexts", async (identity) => {
     exec.mockResolvedValueOnce({
       code: 0,
@@ -85,6 +97,36 @@ describe("Rex pane launches", () => {
     await expect(getLocalRexContext(exec, env)).rejects.toThrow();
     expect(exec).toHaveBeenCalledTimes(1);
   });
+
+  it("renames the originating pane with a literal label", async () => {
+    exec.mockResolvedValue({
+      code: 0,
+      killed: false,
+      stderr: "",
+      stdout: '{"revision":2}',
+      truncated: false,
+    });
+    const label = "Fix title: $(not-a-shell) 中文";
+
+    await renameRexPane(exec, context, label);
+
+    const args = ["--autostart=false", "--server", context.endpoint, "api", "call", "--session", context.sessionId];
+    expect(exec.mock.calls).toEqual([
+      [
+        executable,
+        [...args, "session.set_block_label", JSON.stringify({ block_id: context.blockId, label })],
+        { timeout: 15_000 },
+      ],
+    ]);
+  });
+
+  it.each(["x".repeat(129), "bad\nlabel", "bad\u0000label"])(
+    "rejects invalid labels before renaming the pane",
+    async (label) => {
+      await expect(renameRexPane(exec, context, label)).rejects.toThrow("Rex labels");
+      expect(exec).not.toHaveBeenCalled();
+    },
+  );
 
   it("anchors the new pane to the originating block and preserves literal argv and focus", async () => {
     exec.mockResolvedValueOnce({
