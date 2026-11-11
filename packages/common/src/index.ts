@@ -270,4 +270,5 @@ export {
   ToolRailComponent,
   toolRailBodyWidth,
 } from "./tool-rail.ts";
+export { type ClickSpan, dispatchClick, spanAt } from "./tui-click.ts";
 export { registerTuiCommands } from "./tui-commands.ts";

@@ -46,6 +46,7 @@
     "./terminal": "./src/terminal.ts",
     "./time": "./src/time.ts",
     "./tool-rail": "./src/tool-rail.ts",
+    "./tui-click": "./src/tui-click.ts",
     "./tui-commands": "./src/tui-commands.ts"
   },
   "dependencies": {
