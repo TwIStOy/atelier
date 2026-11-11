@@ -1,4 +1,7 @@
-import type { StatefulView } from "../stateful-view.ts";
+import type { TuiMouseEvent, TuiMouseEventResult } from "@earendil-works/pi-tui";
+import { dispatchClick } from "@htwang-contrib/common/tui-click";
+import type { PointerTarget } from "../../state/pointer-target.ts";
+import type { Clickable } from "../stateful-view.ts";
 import { WrappingSelect, type WrappingSelectItem, type WrappingSelectTheme } from "./wrapping-select.ts";
 
 /**
@@ -10,6 +13,8 @@ const MAX_VISIBLE_OPTIONS = 10;
 export interface OptionListViewConfig {
   items: readonly WrappingSelectItem[];
   theme: WrappingSelectTheme;
+  /** Reports a click on an option row to the dialog owner. */
+  onPick: (target: PointerTarget) => void;
 }
 
 /**
@@ -30,18 +35,20 @@ export interface OptionListViewProps {
 
 /**
  * Sole owner of the option list's interactive state. Wraps a single
- * `WrappingSelect`. Implements `StatefulView<OptionListViewProps>`:
- * `setProps` is the only mutator; render output reflects the last props
- * received.
+ * `WrappingSelect`. Implements `Clickable<OptionListViewProps>`:
+ * `setProps` is the only mutator, render output reflects the last props
+ * received, and clicks resolve to item indices through the select's own row math.
  */
-export class OptionListView implements StatefulView<OptionListViewProps> {
+export class OptionListView implements Clickable<OptionListViewProps> {
   private readonly select: WrappingSelect;
+  private readonly onPick: (target: PointerTarget) => void;
 
   constructor(config: OptionListViewConfig) {
     this.select = new WrappingSelect(config.items, Math.min(config.items.length, MAX_VISIBLE_OPTIONS), config.theme, {
       numberStartOffset: 0,
       totalItemsForNumbering: config.items.length,
     });
+    this.onPick = config.onPick;
   }
 
   setProps(props: OptionListViewProps): void {
@@ -53,6 +60,14 @@ export class OptionListView implements StatefulView<OptionListViewProps> {
   }
 
   handleInput(_data: string): void {}
+
+  handleMouse(event: TuiMouseEvent): TuiMouseEventResult | undefined {
+    return dispatchClick(
+      event,
+      (x, y) => this.select.itemAt(x, y, event.width),
+      (index) => this.onPick({ kind: "option", index }),
+    );
+  }
 
   invalidate(): void {
     this.select.invalidate();

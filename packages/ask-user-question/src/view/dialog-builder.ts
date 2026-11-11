@@ -1,5 +1,12 @@
 import { DynamicBorder, type Theme } from "@earendil-works/pi-coding-agent";
-import { type Component, Container, type Input, Spacer } from "@earendil-works/pi-tui";
+import {
+  type Component,
+  Container,
+  type Input,
+  Spacer,
+  type TuiMouseEvent,
+  type TuiMouseEventResult,
+} from "@earendil-works/pi-tui";
 import type { QuestionData } from "../tool/types.ts";
 import type { PreviewPaneProps } from "./components/preview/preview-pane.ts";
 import type { TabBar } from "./components/tab-bar.ts";
@@ -59,6 +66,10 @@ function clipToTerminalRows(rows: string[], termRows: number): string[] {
   return rows.length > termRows ? rows.slice(0, termRows) : rows;
 }
 
+function rowRange(start: number, count: number): number[] {
+  return Array.from({ length: count }, (_, i) => start + i);
+}
+
 /**
  * The 7th renderable, promoted from a structural literal to a named class so
  * all view-layer components share one explicit `implements StatefulView<P>`
@@ -73,6 +84,11 @@ export class DialogView implements StatefulView<DialogProps> {
   private readonly questionStrategy: TabContentStrategy;
   private readonly submitStrategy: TabContentStrategy | undefined;
   private readonly maxFooterRowCount: number;
+  /** Container of the last paint — the coordinate space mouse events are mapped back into. */
+  private lastContainer: Container | undefined;
+  private lastNaturalHeight = 0;
+  /** Final row → container row, `-1` for rows the container does not own (spacer, scroll markers). */
+  private rowMap: readonly number[] = [];
 
   constructor(config: DialogConfig, initialProps: DialogProps) {
     this.config = config;
@@ -102,6 +118,19 @@ export class DialogView implements StatefulView<DialogProps> {
 
   handleInput(_data: string): void {}
 
+  /**
+   * Click handling runs in two coordinate spaces: the framework hands over rows of the
+   * FINAL (overflow-clipped, scroll-windowed) output, while the container only knows its
+   * own natural rows. `rowMap` bridges the two, then the container's own dispatch routes
+   * the event to the child that occupies that row.
+   */
+  handleMouse(event: TuiMouseEvent): TuiMouseEventResult | undefined {
+    const container = this.lastContainer;
+    const naturalY = this.rowMap[event.y];
+    if (!container || naturalY === undefined || naturalY < 0) return undefined;
+    return container.handleMouse({ ...event, y: naturalY, height: this.lastNaturalHeight });
+  }
+
   // Invalidation is driven by `QuestionnairePropsAdapter.invalidate()`, which
   // owns the full set of renderables (binding registries + extras like
   // `notesInput`). DialogView has no cached layout of its own.
@@ -125,7 +154,10 @@ export class DialogView implements StatefulView<DialogProps> {
     const headingRowCache = strategy.headingRows(state);
 
     // Build container WITHOUT residual spacer — spacer handled below based on overflow.
-    const natural = this.buildContainerFromStrategy(strategy, headingRowCache).render(width);
+    const container = this.buildContainerFromStrategy(strategy, headingRowCache);
+    const natural = container.render(width);
+    this.lastContainer = container;
+    this.lastNaturalHeight = natural.length;
 
     // Fixed region sizes (deterministic from structure).
     const topFixed = this.topFixedRowCount();
@@ -152,7 +184,7 @@ export class DialogView implements StatefulView<DialogProps> {
 
     if (natural.length + spacerRows <= layout.termRows) {
       // No overflow — add residual spacer rows after footer.
-      return renderWithSpacerRows(natural, spacerRows);
+      return this.paint(renderWithSpacerRows(natural, spacerRows), rowRange(0, natural.length));
     }
 
     // OVERFLOW — apply 3-region partition with scroll-to-focus.
@@ -163,13 +195,19 @@ export class DialogView implements StatefulView<DialogProps> {
     return this.renderOverflowBody(strategy, state, width, layout);
   }
 
+  /** Record the row mapping for the rows actually painted, then hand them to the framework. */
+  private paint(rows: string[], map: readonly number[]): string[] {
+    this.rowMap = rows.map((_row, i) => map[i] ?? -1);
+    return rows;
+  }
+
   // Terminal too small for any middle content — show just chrome.
   private renderChromeOnly(layout: DialogLayout): string[] {
-    const chromeOnly = [
-      ...layout.natural.slice(0, layout.topFixed),
-      ...layout.natural.slice(layout.natural.length - layout.bottomFixed),
-    ];
-    return clipToTerminalRows(chromeOnly, layout.termRows);
+    const top = layout.natural.slice(0, layout.topFixed);
+    const bottomStart = layout.natural.length - layout.bottomFixed;
+    const bottom = layout.natural.slice(bottomStart);
+    const rows = clipToTerminalRows([...top, ...bottom], layout.termRows);
+    return this.paint(rows, [...rowRange(0, top.length), ...rowRange(bottomStart, bottom.length)]);
   }
 
   private renderOverflowBody(
@@ -188,14 +226,22 @@ export class DialogView implements StatefulView<DialogProps> {
     const hasDown = scrollStart + layout.availableMiddle < layout.middleRows;
     this.applyOverflowMarkers(scrollableMiddle, hasUp, hasDown);
 
-    const result = [
-      ...layout.natural.slice(0, layout.topFixed),
-      ...scrollableMiddle,
-      ...layout.natural.slice(layout.natural.length - layout.bottomFixed),
-    ];
-    // Safety: never exceed terminal rows (covers the availableMiddle === 0 case
-    // where topFixed + bottomFixed > termRows).
-    return clipToTerminalRows(result, layout.termRows);
+    const bottomStart = layout.natural.length - layout.bottomFixed;
+    const rows = clipToTerminalRows(
+      [...layout.natural.slice(0, layout.topFixed), ...scrollableMiddle, ...layout.natural.slice(bottomStart)],
+      layout.termRows,
+    );
+
+    // Rows rewritten into ↑/↓ markers must not stay clickable.
+    const middleRows = rowRange(layout.topFixed + scrollStart, scrollableMiddle.length);
+    if (hasUp) middleRows[0] = -1;
+    if (hasDown) middleRows[middleRows.length - 1] = -1;
+
+    return this.paint(rows, [
+      ...rowRange(0, layout.topFixed),
+      ...middleRows,
+      ...rowRange(bottomStart, layout.bottomFixed),
+    ]);
   }
 
   // Compute scroll window centered on the focused option.

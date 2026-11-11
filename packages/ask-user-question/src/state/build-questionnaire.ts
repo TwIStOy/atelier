@@ -1,5 +1,12 @@
 import { getMarkdownTheme, type Theme } from "@earendil-works/pi-coding-agent";
-import { Editor, type EditorTheme, Input, type TUI } from "@earendil-works/pi-tui";
+import {
+  Editor,
+  type EditorTheme,
+  Input,
+  type TUI,
+  type TuiMouseEvent,
+  type TuiMouseEventResult,
+} from "@earendil-works/pi-tui";
 import type { QuestionData } from "../tool/types.ts";
 import {
   type BoundGlobalBinding,
@@ -20,6 +27,7 @@ import { DialogView } from "../view/dialog-builder.ts";
 import { QuestionnairePropsAdapter } from "../view/props-adapter.ts";
 import type { StatefulView } from "../view/stateful-view.ts";
 import type { TabBodyHeights, TabComponents } from "../view/tab-components.ts";
+import type { PointerTarget } from "./pointer-target.ts";
 import type { PerTabSelector } from "./selectors/contract.ts";
 import { selectActivePreviewPaneIndex } from "./selectors/derivations.ts";
 import {
@@ -40,6 +48,8 @@ export interface QuestionnaireBuildConfig {
   isMulti: boolean;
   initialState: QuestionnaireState;
   getCurrentTab: () => number;
+  /** Destination for clicks resolved by the view layer (tab bar, option rows, submit picker). */
+  onPick: (target: PointerTarget) => void;
 }
 
 export interface QuestionnaireBuilt {
@@ -47,6 +57,7 @@ export interface QuestionnaireBuilt {
   notesInput: Input;
   inlineEditor: Editor;
   render: (width: number) => string[];
+  handleMouse: (event: TuiMouseEvent) => TuiMouseEventResult | undefined;
   invalidate: () => void;
 }
 
@@ -114,6 +125,7 @@ class QuestionnaireBuilder {
   private readonly isMulti: boolean;
   private readonly initialState: QuestionnaireState;
   private readonly getCurrentTab: () => number;
+  private readonly onPick: (target: PointerTarget) => void;
 
   private readonly selectTheme: WrappingSelectTheme;
   private readonly markdownTheme = getMarkdownTheme();
@@ -135,6 +147,7 @@ class QuestionnaireBuilder {
     this.isMulti = config.isMulti;
     this.initialState = config.initialState;
     this.getCurrentTab = config.getCurrentTab;
+    this.onPick = config.onPick;
 
     this.selectTheme = this.makeSelectTheme();
     // The structural host type covers both members the headless editor touches at
@@ -174,6 +187,7 @@ class QuestionnaireBuilder {
     const optionList = new OptionListView({
       items: this.itemsByTab[index] ?? [],
       theme: this.selectTheme,
+      onPick: this.onPick,
     });
     const previewBlock = new PreviewBlockRenderer({
       question,
@@ -186,7 +200,7 @@ class QuestionnaireBuilder {
       optionListView: optionList,
       previewBlock,
     });
-    const multiSelect = question.multiSelect ? new MultiSelectView(this.theme, question) : undefined;
+    const multiSelect = question.multiSelect ? new MultiSelectView(this.theme, question, this.onPick) : undefined;
     const bodyHeights = this.buildBodyHeights(question, preview, multiSelect);
     return { optionList, preview, multiSelect, bodyHeights };
   }
@@ -219,11 +233,11 @@ class QuestionnaireBuilder {
   }
 
   private buildSubmitPicker(): SubmitPicker | undefined {
-    return this.isMulti ? new SubmitPicker(this.theme) : undefined;
+    return this.isMulti ? new SubmitPicker(this.theme, this.onPick) : undefined;
   }
 
   private buildTabBar(): TabBar | undefined {
-    return this.isMulti ? new TabBar(this.theme) : undefined;
+    return this.isMulti ? new TabBar(this.theme, this.onPick) : undefined;
   }
 
   private buildHeightComputers(tabs: ReadonlyArray<TabComponents>): HeightComputers {
@@ -334,6 +348,7 @@ class QuestionnaireBuilder {
       notesInput: this.notesInput,
       inlineEditor: this.inlineEditor,
       render: (w) => dialog.render(w),
+      handleMouse: (event) => dialog.handleMouse(event),
       invalidate: () => adapter.invalidate(),
     };
   }

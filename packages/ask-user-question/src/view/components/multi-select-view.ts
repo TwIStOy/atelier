@@ -1,8 +1,16 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
+import {
+  type TuiMouseEvent,
+  type TuiMouseEventResult,
+  truncateToWidth,
+  visibleWidth,
+  wrapTextWithAnsi,
+} from "@earendil-works/pi-tui";
+import { dispatchClick } from "@htwang-contrib/common/tui-click";
+import type { PointerTarget } from "../../state/pointer-target.ts";
 import { ROW_INTENT_META } from "../../state/row-intent.ts";
 import type { QuestionData } from "../../tool/types.ts";
-import type { StatefulView } from "../stateful-view.ts";
+import type { Clickable } from "../stateful-view.ts";
 
 const ACTIVE_POINTER = "❯ ";
 const INACTIVE_POINTER = "  ";
@@ -32,13 +40,16 @@ export interface MultiSelectViewProps {
  *
  * `setProps(props)` is a pure field reassignment — no render, no invalidate side effects.
  */
-export class MultiSelectView implements StatefulView<MultiSelectViewProps> {
+export class MultiSelectView implements Clickable<MultiSelectViewProps> {
   private props: MultiSelectViewProps;
+  private readonly theme: Theme;
+  private readonly question: QuestionData;
+  private readonly onPick: (target: PointerTarget) => void;
 
-  constructor(
-    private readonly theme: Theme,
-    private readonly question: QuestionData,
-  ) {
+  constructor(theme: Theme, question: QuestionData, onPick: (target: PointerTarget) => void) {
+    this.theme = theme;
+    this.question = question;
+    this.onPick = onPick;
     this.props = {
       rows: [],
       nextActive: false,
@@ -51,6 +62,15 @@ export class MultiSelectView implements StatefulView<MultiSelectViewProps> {
   }
 
   handleInput(_data: string): void {}
+
+  handleMouse(event: TuiMouseEvent): TuiMouseEventResult | undefined {
+    const contentWidth = Math.max(1, event.width - this.prefixVisibleWidth());
+    return dispatchClick(
+      event,
+      (_x, y) => this.optionIndexAtRow(y, contentWidth),
+      (index) => this.onPick({ kind: "option", index }),
+    );
+  }
 
   invalidate(): void {}
 
@@ -120,6 +140,20 @@ export class MultiSelectView implements StatefulView<MultiSelectViewProps> {
   private optionItemHeight(opt: QuestionData["options"][number], contentWidth: number): number {
     if (!opt.description) return 1;
     return 1 + wrapTextWithAnsi(opt.description, contentWidth).length;
+  }
+
+  /** Option index (or `question.options.length` for the Next row) rendered at `row`. */
+  private optionIndexAtRow(row: number, contentWidth: number): number | undefined {
+    if (row < 0) return undefined;
+    let cursor = 0;
+    for (let i = 0; i < this.question.options.length; i++) {
+      const pair = this.optionRowPair(i);
+      if (!pair) continue;
+      const itemHeight = this.optionItemHeight(pair.opt, contentWidth);
+      if (row < cursor + itemHeight) return i;
+      cursor += itemHeight;
+    }
+    return row === cursor ? this.question.options.length : undefined;
   }
 
   private scanForActiveRow(contentWidth: number): { row: number; range: [number, number] | undefined } {

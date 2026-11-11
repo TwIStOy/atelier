@@ -18,6 +18,7 @@ vi.mock("@earendil-works/pi-tui", async (orig) => {
   return { ...actual, Markdown: FakeMarkdown };
 });
 
+import type { PointerTarget } from "../src/state/pointer-target.ts";
 import type { QuestionData } from "../src/tool/types.ts";
 import { OptionListView } from "../src/view/components/option-list-view.ts";
 import {
@@ -65,6 +66,7 @@ interface PaneHarness {
   optionListView: OptionListView;
   previewBlock: PreviewBlockRenderer;
   items: WrappingSelectItem[];
+  picked: PointerTarget[];
 }
 
 function makePane(question: QuestionData, getWidth: () => number = () => 120): PaneHarness {
@@ -73,12 +75,13 @@ function makePane(question: QuestionData, getWidth: () => number = () => 120): P
     label: o.label,
     description: o.description,
   }));
-  const optionListView = new OptionListView({ items, theme: selectTheme });
+  const picked: PointerTarget[] = [];
+  const optionListView = new OptionListView({ items, theme: selectTheme, onPick: (t) => picked.push(t) });
   const previewBlock = new PreviewBlockRenderer({ question, theme, markdownTheme });
   const pane = new PreviewPane({ question, getTerminalWidth: getWidth, optionListView, previewBlock });
   const totalForNumbering = question.multiSelect === true ? items.length : items.length + 1;
   pane.setGlobalLeftWidth((paneWidth) => adaptiveLeftWidth(items, totalForNumbering, paneWidth));
-  return { pane, optionListView, previewBlock, items };
+  return { pane, optionListView, previewBlock, items, picked };
 }
 
 const mdLine = (l: string) => /MD\[\d+\]:/.test(l);

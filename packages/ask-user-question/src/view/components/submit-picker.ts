@@ -1,6 +1,8 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { truncateToWidth } from "@earendil-works/pi-tui";
-import type { StatefulView } from "../stateful-view.ts";
+import { type TuiMouseEvent, type TuiMouseEventResult, truncateToWidth } from "@earendil-works/pi-tui";
+import { dispatchClick } from "@htwang-contrib/common/tui-click";
+import type { PointerTarget } from "../../state/pointer-target.ts";
+import type { Clickable } from "../stateful-view.ts";
 
 const ACTIVE_POINTER = "❯ ";
 const INACTIVE_POINTER = "  ";
@@ -27,10 +29,14 @@ export interface SubmitPickerProps {
  *   so Submit is never dimmed or visually marked as unselectable. The warning header in
  *   `buildSubmitContainer` is the sole signal of incompleteness.
  */
-export class SubmitPicker implements StatefulView<SubmitPickerProps> {
+export class SubmitPicker implements Clickable<SubmitPickerProps> {
   private props: SubmitPickerProps;
+  private readonly theme: Theme;
+  private readonly onPick: (target: PointerTarget) => void;
 
-  constructor(private readonly theme: Theme) {
+  constructor(theme: Theme, onPick: (target: PointerTarget) => void) {
+    this.theme = theme;
+    this.onPick = onPick;
     this.props = { rows: [{ active: false }, { active: false }] };
   }
 
@@ -39,6 +45,20 @@ export class SubmitPicker implements StatefulView<SubmitPickerProps> {
   }
 
   handleInput(_data: string): void {}
+
+  handleMouse(event: TuiMouseEvent): TuiMouseEventResult | undefined {
+    return dispatchClick(
+      event,
+      (_x, y) => this.choiceAt(y),
+      (index) => this.onPick({ kind: "submit_choice", index }),
+    );
+  }
+
+  private choiceAt(y: number): 0 | 1 | undefined {
+    if (y === 0) return 0;
+    if (y === 1) return 1;
+    return undefined;
+  }
 
   invalidate(): void {}
 

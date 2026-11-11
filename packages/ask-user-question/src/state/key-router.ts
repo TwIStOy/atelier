@@ -1,5 +1,6 @@
 import { Key, matchesKey } from "@earendil-works/pi-tui";
 import type { QuestionAnswer, QuestionData } from "../tool/types.ts";
+import type { PointerTarget } from "./pointer-target.ts";
 import { ROW_INTENT_META, type RowIntentMeta } from "./row-intent.ts";
 import type { QuestionnaireRuntime, QuestionnaireState } from "./state.ts";
 
@@ -396,4 +397,91 @@ function routeDialogKeys(data: string, state: QuestionnaireState, runtime: Quest
 export function routeKey(data: string, state: QuestionnaireState, runtime: QuestionnaireRuntime): QuestionnaireAction {
   if (state.notesVisible) return routeNotesKeys(data, runtime);
   return routeDialogKeys(data, state, runtime);
+}
+
+// Absolute tab target — a click names the tab, so no wrap arithmetic is needed on the
+// pointer path (unlike the relative Tab/Shift+Tab keys).
+function pointerTabAction(
+  target: PointerTarget,
+  state: QuestionnaireState,
+  runtime: QuestionnaireRuntime,
+): QuestionnaireAction[] {
+  if (!runtime.isMulti) return [];
+  const total = totalTabs(runtime);
+  if (target.kind === "submit_tab") return [{ kind: "tab_switch", nextTab: runtime.questions.length }];
+  if (target.index < 0 || target.index >= total) return [];
+  if (target.index === state.currentTab) return [];
+  return [{ kind: "tab_switch", nextTab: target.index }];
+}
+
+/**
+ * Click on an option row: focus it first, then apply the mode's action, mirroring what
+ * the keyboard does (Enter on a single-select commits, Enter/Space on a multi-select
+ * toggles, Enter on Next commits the question).
+ *
+ * Two actions — not one — because the reducer reads the focused row from state
+ * (`runtime.currentItem`) when building answers, so focus must be committed first.
+ * The `other` sentinel only focuses: its commit path is typing into the inline input.
+ */
+function pointerOptionActions(
+  index: number,
+  state: QuestionnaireState,
+  runtime: QuestionnaireRuntime,
+): QuestionnaireAction[] {
+  const question = runtime.questions[state.currentTab];
+  const item = runtime.items[index];
+  if (!question || !item) return [];
+  const focus: QuestionnaireAction = { kind: "nav", nextIndex: index };
+  const meta = ROW_INTENT_META[item.kind];
+  if (meta.activatesInputMode) return [focus];
+
+  if (question.multiSelect) {
+    if (meta.autoSubmitsInMulti) {
+      return [
+        focus,
+        {
+          kind: "multi_confirm",
+          selected: buildMultiSelected(state, runtime),
+          autoAdvanceTab: computeAutoAdvanceTab(state, runtime),
+        },
+      ];
+    }
+    return [focus, { kind: "toggle", index }];
+  }
+
+  if (item.kind !== "option") return [focus];
+  return [
+    focus,
+    {
+      kind: "confirm",
+      answer: {
+        questionIndex: state.currentTab,
+        question: question.question,
+        kind: "option",
+        answer: item.label,
+      },
+      autoAdvanceTab: computeAutoAdvanceTab(state, runtime),
+    },
+  ];
+}
+
+/**
+ * Reducer actions for a click, in commit order. Empty when the click has no effect
+ * (stale row, the already-active tab, or a dialog owned by the notes editor).
+ */
+export function routePointer(
+  target: PointerTarget,
+  state: QuestionnaireState,
+  runtime: QuestionnaireRuntime,
+): QuestionnaireAction[] {
+  if (state.notesVisible) return [];
+  switch (target.kind) {
+    case "tab":
+    case "submit_tab":
+      return pointerTabAction(target, state, runtime);
+    case "option":
+      return pointerOptionActions(target.index, state, runtime);
+    case "submit_choice":
+      return [target.index === 1 ? { kind: "cancel" } : { kind: "submit" }];
+  }
 }

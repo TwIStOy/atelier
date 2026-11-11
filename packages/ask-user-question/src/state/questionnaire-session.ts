@@ -1,10 +1,11 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import type { Editor, Input } from "@earendil-works/pi-tui";
+import type { Editor, Input, TuiMouseEvent, TuiMouseEventResult } from "@earendil-works/pi-tui";
 import type { QuestionData, QuestionnaireResult, QuestionParams } from "../tool/types.ts";
 import type { WrappingSelectItem } from "../view/components/wrapping-select.ts";
 import type { QuestionnairePropsAdapter } from "../view/props-adapter.ts";
 import { buildQuestionnaire } from "./build-questionnaire.ts";
-import { type QuestionnaireAction, routeKey } from "./key-router.ts";
+import { type QuestionnaireAction, routeKey, routePointer } from "./key-router.ts";
+import type { PointerTarget } from "./pointer-target.ts";
 import type { QuestionnaireRuntime, QuestionnaireState } from "./state.ts";
 import { type ApplyContext, type Effect, reduce } from "./state-reducer.ts";
 
@@ -24,6 +25,7 @@ export interface QuestionnaireSessionComponent {
   render(width: number): string[];
   invalidate(): void;
   handleInput(data: string): void;
+  handleMouse(event: TuiMouseEvent): TuiMouseEventResult | undefined;
 }
 
 function initialState(): QuestionnaireState {
@@ -85,6 +87,7 @@ export class QuestionnaireSession {
       isMulti: this.isMulti,
       initialState: this.state,
       getCurrentTab: () => this.state.currentTab,
+      onPick: (target) => this.dispatchPointer(target),
     });
 
     this.notesInput = built.notesInput;
@@ -95,6 +98,7 @@ export class QuestionnaireSession {
       render: (width) => built.render(width),
       invalidate: built.invalidate,
       handleInput: (data) => this.dispatch(data),
+      handleMouse: (event) => built.handleMouse(event),
     };
 
     this.viewAdapter.apply(this.state);
@@ -107,13 +111,27 @@ export class QuestionnaireSession {
       this.handleIgnoreInline(data);
       return;
     }
-    this.commit(action);
+    this.commitAll([action]);
   }
 
-  private commit(action: QuestionnaireAction): void {
-    const result = reduce(this.state, action, this.applyContext());
-    this.state = result.state;
-    for (const effect of result.effects) this.runEffect(effect);
+  /**
+   * Click path: `routePointer` yields the action sequence a click implies (focus first,
+   * then act), each reduced against the state the previous one produced so the reducer
+   * reads the clicked row from state rather than from a stale runtime snapshot.
+   */
+  dispatchPointer(target: PointerTarget): void {
+    if (this.inputEditorOpen) return;
+    const actions = routePointer(target, this.state, this.runtime());
+    if (actions.length === 0) return;
+    this.commitAll(actions);
+  }
+
+  private commitAll(actions: readonly QuestionnaireAction[]): void {
+    for (const action of actions) {
+      const result = reduce(this.state, action, this.applyContext());
+      this.state = result.state;
+      for (const effect of result.effects) this.runEffect(effect);
+    }
     this.state = this.mirrorNotesDraft(this.state);
     this.viewAdapter.apply(this.state);
   }
@@ -140,7 +158,7 @@ export class QuestionnaireSession {
             this.inputEditorOpen = false;
             // `undefined` means the host reported a launch failure (or the user made no
             // editable change worth committing) — retain the existing draft and resume.
-            if (value !== undefined) this.commit({ kind: "input_replace", value });
+            if (value !== undefined) this.commitAll([{ kind: "input_replace", value }]);
           },
           () => {
             this.inputEditorOpen = false;

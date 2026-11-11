@@ -1,6 +1,12 @@
-import { type Component, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import {
+  type Component,
+  type TuiMouseEvent,
+  type TuiMouseEventResult,
+  truncateToWidth,
+  visibleWidth,
+} from "@earendil-works/pi-tui";
 import type { QuestionData } from "../../../tool/types.ts";
-import type { StatefulView } from "../../stateful-view.ts";
+import type { Clickable } from "../../stateful-view.ts";
 import type { OptionListView } from "../option-list-view.ts";
 import type { PreviewBlockRenderer } from "./preview-block-renderer.ts";
 import {
@@ -49,7 +55,7 @@ export interface PreviewPaneConfig {
  * combines them via `decideLayout` (mode threaded into both calls — never
  * re-derived).
  */
-export class PreviewPane implements StatefulView<PreviewPaneProps>, Component {
+export class PreviewPane implements Clickable<PreviewPaneProps>, Component {
   private readonly question: QuestionData;
   private readonly getTerminalWidth: () => number;
   private readonly optionListView: OptionListView;
@@ -85,6 +91,29 @@ export class PreviewPane implements StatefulView<PreviewPaneProps>, Component {
   }
 
   handleInput(_data: string): void {}
+
+  /**
+   * Forwards clicks that land on the options column to the option list. The preview
+   * column, the stacked gap, and everything to the right of the options stay
+   * click-through so terminal text selection keeps working there.
+   */
+  handleMouse(event: TuiMouseEvent): TuiMouseEventResult | undefined {
+    if (this.question.multiSelect === true || !this.previewBlock.hasAnyPreview()) {
+      return this.optionListView.handleMouse(event);
+    }
+
+    const mode = decideLayout(this.getTerminalWidth(), event.width);
+    const adaptiveLeft = this.getAdaptiveLeft(event.width);
+    const { optionsWidth } = bodyWidths(event.width, mode, adaptiveLeft);
+
+    if (mode === "stacked") {
+      if (event.y >= this.optionListView.render(optionsWidth).length) return undefined;
+    } else if (event.x >= optionsWidth) {
+      return undefined;
+    }
+
+    return this.optionListView.handleMouse({ ...event, width: optionsWidth });
+  }
 
   invalidate(): void {
     this.previewBlock.invalidate();

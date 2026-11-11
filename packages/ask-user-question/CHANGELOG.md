@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Fullscreen mouse support: clicking a tab, an option row, the inline "Type something." row, or a submit-picker row now drives the same reducer actions the keyboard does — single-select commits the clicked option, multi-select toggles it, the `Next` row commits the question, and submit-picker rows submit or cancel. A click focuses its row first, so the answer is built from the clicked row. Regular (inline) mode is unaffected: pi delivers mouse events only from the fullscreen renderer, and the keyboard path is unchanged. See [ADR 0002](../../docs/ask-user-question/adr/0002-pointer-support.md).
+
 ### Changed
 
 - Split the highest-complexity functions in the questionnaire state, view, and validation layers (key router, dialog builder, multi-select/submit/tab-bar views, selectors, reducer, questionnaire validator) into small per-branch and per-phase helpers to clear all `fallow health` complexity findings; behavior is unchanged.

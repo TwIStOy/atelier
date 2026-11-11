@@ -158,6 +158,27 @@ export class WrappingSelect implements Component {
     return lines;
   }
 
+  /**
+   * Index of the item rendered at `(x, y)` of a `render(width)` output, or `undefined` for
+   * the scroll-info row and cells outside the list. Recomputed from state per click — the
+   * same walk `focusedItemRowRange` performs — so a measurement render at another width
+   * cannot leave a stale row map behind.
+   */
+  itemAt(x: number, y: number, width: number): number | undefined {
+    if (x < 0 || y < 0) return undefined;
+    const { startIndex, endIndex } = this.computeVisibleWindow();
+    const numberWidth = String(Math.max(1, this.totalItemsForNumbering)).length;
+    let row = 0;
+    for (let i = startIndex; i < endIndex; i++) {
+      const item = this.items[i];
+      if (!item) continue;
+      const rowCount = this.computeItemRowCount(item, i, this.itemIsActive(i), width, numberWidth);
+      if (y >= row && y < row + rowCount) return i;
+      row += rowCount;
+    }
+    return undefined;
+  }
+
   private scanWindowForSelectedRow(width: number, numberWidth: number): [number, number] {
     const { startIndex, endIndex } = this.computeVisibleWindow();
     let row = 0;
