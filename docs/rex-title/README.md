@@ -1,18 +1,28 @@
 # Rex Title
 
-`/rex-title` generates a short title for the current Pi session and applies it to the originating Rex pane.
+Rex Title summarizes the current Pi session and applies the generated title to the originating Rex pane. It refreshes automatically after every agent run started by a user message, or manually through `/rex-title`.
 
 ## Usage
 
-Run:
+Automatic refresh runs in the interactive TUI after each user-message turn completes. Every refresh reads all user messages from the active session branch in chronological order, including earlier refinements and corrections; assistant and tool output are excluded. Long transcripts retain every request, with long individual requests clipped around their head and tail to keep the side-call bounded.
+
+A newer refresh cancels an unfinished older one so stale output cannot replace a newer title. Automatic failures leave the existing pane title unchanged and are recorded in the extension log.
+
+To force a refresh, run:
 
 ```text
 /rex-title
 ```
 
-The command waits for the active agent turn to finish, serializes the current session branch, and makes one side-call with the session's active model. It does not add a message to the main conversation or run automatically after agent turns. Run it again after the session changes direction to refresh the title.
+The manual command waits for the active agent turn to finish before reading the branch. It does not add a message to the main conversation.
 
-The generated title uses the conversation's primary language, is collapsed to one line, and is limited to 60 Unicode characters. A model call times out after 60 seconds. Concurrent invocations and sessions without conversation messages or an active model are rejected with a notification.
+The generated title uses the conversation's primary language, is collapsed to one line, and is limited to 60 Unicode characters. A model call times out after 60 seconds. Concurrent manual invocations supersede earlier ones.
+
+## Model configuration
+
+Open `/config` and select **Rex Title → Title Model** to choose a model independently of the session model. The select lists available chat models from Pi's model registry and reads the current registry whenever its options are requested, so asynchronously registered provider catalogs such as Magpie are included.
+
+The default **(session default)** option uses the session's active model. Selecting another model applies it only to title side-calls; it does not change the session model used for agent responses. If a configured model is no longer available, title generation reports an error instead of silently using a different model.
 
 ## Rex integration
 
