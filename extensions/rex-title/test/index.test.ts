@@ -1,17 +1,15 @@
-import type { Message } from "@earendil-works/pi-ai";
-import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { isExtensionDisabled } from "@htwang-contrib/common/extension-disable";
-import { getLocalRexContext, type RexContext, renameRexPane } from "@htwang-contrib/common/rex";
-import { executeSideCall } from "@htwang-contrib/common/side-call";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import rexTitleExtension, { buildTitlePrompt, parseTitle } from "../src/index.ts";
+import { registerRexTitleConfigItems } from "../src/config.ts";
+import rexTitleExtension from "../src/index.ts";
+import { createTitleUpdater, type TitleUpdater } from "../src/title-updater.ts";
 
 vi.mock("@htwang-contrib/common/extension-disable", () => ({ isExtensionDisabled: vi.fn() }));
-vi.mock("@htwang-contrib/common/rex", () => ({
-  getLocalRexContext: vi.fn(),
-  renameRexPane: vi.fn(),
+vi.mock("../src/config.ts", () => ({
+  registerRexTitleConfigItems: vi.fn(),
 }));
-vi.mock("@htwang-contrib/common/side-call", () => ({ executeSideCall: vi.fn() }));
+vi.mock("../src/title-updater.ts", () => ({ createTitleUpdater: vi.fn() }));
 
 type Handler = (...args: unknown[]) => unknown;
 
@@ -22,13 +20,6 @@ interface MockPi {
   on: (event: string, handler: Handler) => void;
   registerCommand: (name: string, options: { handler: Handler }) => void;
 }
-
-const rex: RexContext = {
-  executable: "/bin/rex",
-  endpoint: "unix:///run/rex/server.sock",
-  sessionId: "session:test",
-  blockId: "block:test",
-};
 
 function mockPi(): MockPi {
   const handlers = new Map<string, Handler[]>();
@@ -46,11 +37,25 @@ function mockPi(): MockPi {
   };
 }
 
-async function start(pi: MockPi, mode = "tui"): Promise<void> {
+function mockCtx(mode = "tui"): ExtensionCommandContext {
+  return {
+    mode,
+    modelRegistry: {
+      getAvailable: () => [{ provider: "magpie", id: "fast", name: "Fast" }],
+    },
+    waitForIdle: vi.fn().mockResolvedValue(undefined),
+    ui: { notify: vi.fn() },
+  } as unknown as ExtensionCommandContext;
+}
+
+async function emit(pi: MockPi, event: string, payload: unknown, ctx: ExtensionContext): Promise<void> {
+  for (const handler of pi.handlers.get(event) ?? []) await handler(payload, ctx);
+}
+
+async function start(pi: MockPi, ctx = mockCtx()): Promise<ExtensionCommandContext> {
   rexTitleExtension(pi as unknown as ExtensionAPI);
-  for (const handler of pi.handlers.get("session_start") ?? []) {
-    await handler({ reason: "startup" }, { mode });
-  }
+  await emit(pi, "session_start", { reason: "startup" }, ctx);
+  return ctx;
 }
 
 async function runCommand(pi: MockPi, ctx: ExtensionCommandContext): Promise<void> {
@@ -59,84 +64,61 @@ async function runCommand(pi: MockPi, ctx: ExtensionCommandContext): Promise<voi
   await command.handler("", ctx);
 }
 
-function userMessage(text: string): Message {
-  return { role: "user", content: text, timestamp: 1_000 };
-}
-
-function mockCtx(options: { empty?: boolean; noModel?: boolean } = {}): ExtensionCommandContext {
-  const messages = options.empty ? [] : [userMessage("Build an extension that names the current Rex pane")];
-  const branch = messages.map((message, index) => ({
-    type: "message",
-    id: `message:${index}`,
-    parentId: index === 0 ? null : `message:${index - 1}`,
-    timestamp: "2026-01-01T00:00:00.000Z",
-    message,
-  }));
+function updaterMock(): TitleUpdater {
   return {
-    model: options.noModel ? undefined : { provider: "test", id: "model" },
-    modelRegistry: {},
-    sessionManager: { getBranch: () => branch },
-    waitForIdle: vi.fn().mockResolvedValue(undefined),
-    ui: { notify: vi.fn() },
-  } as unknown as ExtensionCommandContext;
+    refresh: vi.fn(),
+    run: vi.fn().mockResolvedValue({ ok: true, title: "Generated title" }),
+    cancel: vi.fn(),
+  };
 }
 
-function respond(answer: string): void {
-  vi.mocked(executeSideCall).mockResolvedValue({
-    ok: true,
-    answer,
-    stopReason: "stop",
-    assistantMessage: {
-      role: "assistant",
-      content: [{ type: "text", text: answer }],
-      api: "openai-completions",
-      provider: "test",
-      model: "model",
-      usage: {
-        input: 0,
-        output: 0,
-        cacheRead: 0,
-        cacheWrite: 0,
-        totalTokens: 0,
-        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-      },
-      stopReason: "stop",
-      timestamp: 0,
-    },
-  });
-}
+let updater: TitleUpdater;
 
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(isExtensionDisabled).mockReturnValue(false);
-  vi.mocked(getLocalRexContext).mockResolvedValue(rex);
-  vi.mocked(renameRexPane).mockResolvedValue(undefined);
-  vi.mocked(executeSideCall).mockReset();
+  updater = updaterMock();
+  vi.mocked(createTitleUpdater).mockReturnValue(updater);
 });
 
-describe("title formatting", () => {
-  it("collapses whitespace and control characters and removes wrapping punctuation", () => {
-    expect(parseTitle('  "Fix\nRex\tlabels."  ')).toBe("Fix Rex labels");
-    expect(parseTitle("Build\u0000 Rex title")).toBe("Build Rex title");
+describe("extension lifecycle", () => {
+  it("binds the model setting to the live session registry", async () => {
+    const pi = mockPi();
+    const ctx = await start(pi);
+    expect(registerRexTitleConfigItems).toHaveBeenCalledWith(ctx.modelRegistry);
   });
 
-  it("truncates by Unicode code point within the display budget", () => {
-    const title = parseTitle("🦀".repeat(80));
-    expect(Array.from(title)).toHaveLength(60);
-    expect(title).toBe(`${"🦀".repeat(59)}…`);
+  it("refreshes after every user-message agent run in the TUI", async () => {
+    const pi = mockPi();
+    const ctx = await start(pi);
+    await emit(pi, "before_agent_start", { messageType: "user" }, ctx);
+    await emit(pi, "agent_end", { messages: [] }, ctx);
+    expect(updater.refresh).toHaveBeenCalledWith(ctx);
   });
 
-  it("returns an empty title for blank model output", () => {
-    expect(parseTitle(" \n\t ")).toBe("");
+  it("also detects user messages from the agent_end payload", async () => {
+    const pi = mockPi();
+    const ctx = await start(pi);
+    await emit(pi, "agent_end", { messages: [{ role: "user", content: "hello", timestamp: 1 }] }, ctx);
+    expect(updater.refresh).toHaveBeenCalledOnce();
   });
-});
 
-describe("buildTitlePrompt", () => {
-  it("includes the transcript and retains the latest text within the budget", () => {
-    const prompt = buildTitlePrompt([userMessage("H".repeat(13_000)), userMessage("latest task")]);
-    const conversation = prompt.split("<conversation>\n")[1]?.split("\n</conversation>")[0] ?? "";
-    expect(conversation).toHaveLength(12_000);
-    expect(conversation.endsWith("latest task")).toBe(true);
+  it("does not refresh for assistant-only runs, custom continuations, or non-TUI sessions", async () => {
+    const pi = mockPi();
+    const ctx = await start(pi);
+    await emit(pi, "agent_end", { messages: [{ role: "assistant", content: [] }] }, ctx);
+    await emit(pi, "before_agent_start", { messageType: "custom" }, ctx);
+    await emit(pi, "agent_end", { messages: [] }, ctx);
+    await emit(pi, "agent_end", { messages: [{ role: "user", content: "hello", timestamp: 1 }] }, mockCtx("rpc"));
+    expect(updater.refresh).not.toHaveBeenCalled();
+  });
+
+  it("cancels pending work on session changes and shutdown", async () => {
+    const pi = mockPi();
+    const ctx = await start(pi);
+    await emit(pi, "session_start", { reason: "resume" }, ctx);
+    await emit(pi, "session_shutdown", { reason: "quit" }, ctx);
+    expect(updater.cancel).toHaveBeenCalledTimes(3);
   });
 });
 
@@ -147,93 +129,33 @@ describe("/rex-title", () => {
     expect(tui.commands.has("rex-title")).toBe(true);
 
     const rpc = mockPi();
-    await start(rpc, "rpc");
+    await start(rpc, mockCtx("rpc"));
     expect(rpc.commands.has("rex-title")).toBe(false);
   });
 
-  it("summarizes the current branch and renames the originating pane", async () => {
+  it("waits for idle and reports a successful forced refresh", async () => {
     const pi = mockPi();
-    const ctx = mockCtx();
-    await start(pi);
-    respond("Build Rex title extension");
-
+    const ctx = await start(pi);
     await runCommand(pi, ctx);
-
     expect(ctx.waitForIdle).toHaveBeenCalledOnce();
-    expect(executeSideCall).toHaveBeenCalledWith(
-      expect.objectContaining({
-        model: ctx.model,
-        modelRegistry: ctx.modelRegistry,
-        commandName: "rex-title",
-      }),
-    );
-    const call = vi.mocked(executeSideCall).mock.calls[0]?.[0];
-    expect(call?.messages[0]?.content).toContain("Build an extension that names the current Rex pane");
-    expect(renameRexPane).toHaveBeenCalledWith(pi.exec, rex, "Build Rex title extension");
-    expect(ctx.ui.notify).toHaveBeenCalledWith('Rex pane renamed to "Build Rex title extension".', "info");
+    expect(updater.run).toHaveBeenCalledWith(ctx);
+    expect(ctx.ui.notify).toHaveBeenCalledWith('Rex pane renamed to "Generated title".', "info");
   });
 
-  it("skips model and Rex calls for an empty session", async () => {
+  it("reports model and timeout failures but stays quiet for superseded runs", async () => {
     const pi = mockPi();
-    const ctx = mockCtx({ empty: true });
-    await start(pi);
+    const ctx = await start(pi);
+    vi.mocked(updater.run)
+      .mockResolvedValueOnce({ ok: false, error: "model unavailable" })
+      .mockResolvedValueOnce({ ok: false, error: "timed out", timedOut: true })
+      .mockResolvedValueOnce({ ok: false, error: "cancelled", cancelled: true });
 
     await runCommand(pi, ctx);
-
-    expect(ctx.ui.notify).toHaveBeenCalledWith("Start a conversation before generating a Rex title.", "warning");
-    expect(getLocalRexContext).not.toHaveBeenCalled();
-    expect(executeSideCall).not.toHaveBeenCalled();
-  });
-
-  it("reports a missing active model without making a side-call", async () => {
-    const pi = mockPi();
-    const ctx = mockCtx({ noModel: true });
-    await start(pi);
-
+    await runCommand(pi, ctx);
     await runCommand(pi, ctx);
 
-    expect(ctx.ui.notify).toHaveBeenCalledWith("No active model is available for Rex title generation.", "warning");
-    expect(executeSideCall).not.toHaveBeenCalled();
-    expect(renameRexPane).not.toHaveBeenCalled();
-  });
-
-  it("times out the model side-call without renaming the pane", async () => {
-    const timeoutController = new AbortController();
-    const timeout = vi.spyOn(AbortSignal, "timeout").mockReturnValue(timeoutController.signal);
-    try {
-      const pi = mockPi();
-      const ctx = mockCtx();
-      await start(pi);
-      vi.mocked(executeSideCall).mockImplementation(({ signal }) => {
-        return new Promise((resolve) => {
-          signal.addEventListener("abort", () => resolve({ ok: false, aborted: true, stopReason: "aborted" }), {
-            once: true,
-          });
-        });
-      });
-
-      const run = runCommand(pi, ctx);
-      await vi.waitFor(() => expect(executeSideCall).toHaveBeenCalled());
-      timeoutController.abort();
-      await run;
-
-      expect(timeout).toHaveBeenCalledWith(60_000);
-      expect(renameRexPane).not.toHaveBeenCalled();
-      expect(ctx.ui.notify).toHaveBeenCalledWith("Rex title generation timed out.", "warning");
-    } finally {
-      timeout.mockRestore();
-    }
-  });
-
-  it("reports model failures without renaming the pane", async () => {
-    const pi = mockPi();
-    const ctx = mockCtx();
-    await start(pi);
-    vi.mocked(executeSideCall).mockResolvedValue({ ok: false, error: "model unavailable" });
-
-    await runCommand(pi, ctx);
-
-    expect(renameRexPane).not.toHaveBeenCalled();
-    expect(ctx.ui.notify).toHaveBeenCalledWith("Could not update Rex title: model unavailable", "error");
+    expect(ctx.ui.notify).toHaveBeenNthCalledWith(1, "Could not update Rex title: model unavailable", "error");
+    expect(ctx.ui.notify).toHaveBeenNthCalledWith(2, "timed out", "warning");
+    expect(ctx.ui.notify).toHaveBeenCalledTimes(2);
   });
 });
