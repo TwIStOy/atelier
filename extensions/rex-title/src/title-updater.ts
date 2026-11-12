@@ -2,7 +2,6 @@ import type { Message, UserMessage } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionContext, SessionEntry } from "@earendil-works/pi-coding-agent";
 import { createLogger } from "@htwang-contrib/common/log";
 import { extractMessageText } from "@htwang-contrib/common/message-text";
-import { getLocalRexContext, renameRexPane } from "@htwang-contrib/common/rex";
 import { isStaleCtxError } from "@htwang-contrib/common/session-cache";
 import { executeSideCall } from "@htwang-contrib/common/side-call";
 import { loadRexTitleConfig, resolveRexTitleModel } from "./config.ts";
@@ -87,8 +86,6 @@ async function updateTitle(pi: ExtensionAPI, ctx: ExtensionContext, signal: Abor
   if (!model)
     return failure("No model is available for Rex title generation. Check Rex Title > Title Model in /config.");
 
-  const rex = await getLocalRexContext(pi.exec);
-  if (signal.aborted) return failure("Rex title generation was cancelled.", { cancelled: true });
   const prompt = buildTitlePrompt(messages);
   if (!prompt) return failure("Add a non-empty user message before generating a Rex title.");
   const timeout = AbortSignal.timeout(MODEL_TIMEOUT_MS);
@@ -107,8 +104,7 @@ async function updateTitle(pi: ExtensionAPI, ctx: ExtensionContext, signal: Abor
 
   const title = parseTitle(result.answer);
   if (!title) return failure("Rex title generation returned an empty title.");
-  await renameRexPane(pi.exec, rex, title);
-  if (signal.aborted) return failure("Rex title generation was cancelled.", { cancelled: true });
+  pi.setSessionName(title);
   return { ok: true, title };
 }
 

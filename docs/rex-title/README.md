@@ -1,12 +1,12 @@
 # Rex Title
 
-Rex Title summarizes the current Pi session and applies the generated title to the originating Rex pane. It refreshes automatically after every agent run started by a user message, or manually through `/rex-title`.
+Rex Title summarizes the current Pi session and sets its native session title. In Rex, Pi's terminal title and Program Status reports provide the pane and tab presentation without changing persistent Rex resource labels. The title refreshes automatically after every agent run started by a user message, or manually through `/rex-title`.
 
 ## Usage
 
 Automatic refresh runs in the interactive TUI after each user-message turn completes. Every refresh reads all user messages from the active session branch in chronological order, including earlier refinements and corrections; assistant and tool output are excluded. Long transcripts retain every request, with long individual requests clipped around their head and tail to keep the side-call bounded.
 
-A newer refresh cancels an unfinished older one so stale output cannot replace a newer title. Automatic failures leave the existing pane title unchanged and are recorded in the extension log.
+A newer refresh cancels an unfinished older one so stale output cannot replace a newer title. Automatic failures leave the existing title unchanged and are recorded in the extension log.
 
 To force a refresh, run:
 
@@ -24,20 +24,21 @@ Open `/config` and select **Rex Title → Title Model** to choose a model indepe
 
 The default **(session default)** option uses the session's active model. Selecting another model applies it only to title side-calls; it does not change the session model used for agent responses. If a configured model is no longer available, title generation reports an error instead of silently using a different model.
 
-## Rex integration
+## Native title integration
 
-Rex calls a terminal pane's underlying resource a **block** and a tab a **window**. A tab displays the label of its active block unless the window has an explicit label. Renaming only Pi's block therefore updates the pane header and lets the tab follow whichever block is active without pinning a separate tab title.
+The extension applies generated titles through:
 
-The extension resolves Pi's originating block through `rex whoami --json`, using Pi's inherited `REX_SESSION` and `REX_BLOCK` environment and requiring a local Unix-socket endpoint. It pins the returned `session_id` and `block_id`, so subsequent focus changes cannot redirect the rename.
-
-The title is applied through:
-
-```text
-session.set_block_label
+```typescript
+pi.setSessionName(title);
 ```
 
-The CLI equivalent is `rex block rename`. The extension uses the JSON API to target Pi's block explicitly and passes arguments directly without shell interpolation. Rex accepts labels up to 128 characters, trims surrounding whitespace, and rejects control characters. This extension imposes the smaller 60-character display budget before calling Rex.
+Pi owns the resulting presentation and lifecycle:
 
-If another client or the user assigned an explicit window label, the extension leaves it untouched; the tab may therefore continue to show that explicit label instead of the active block's new title.
+- The session display name is saved in Pi's session metadata and shown in the footer and session selector.
+- Pi updates the terminal title to `π - <session name> - <cwd>`.
+- Pi's native OSC 7501 Program Status reporter includes the session name as `msg` in `working` and `done` reports.
+- Pi clears its Program Status record when the terminal stops, including on exit.
 
-See Rex's [CLI reference](https://www.superlogical.com/rex/docs/reference/cli) and [server API reference](https://www.superlogical.com/rex/docs/reference/api) for the underlying command and validation rules.
+Pi 1.5.0 does not expose the protocol's separate `title=` field through its extension API. The extension deliberately uses the supported session-name path instead of emitting an independent OSC 7501 root record that Pi's reporter could overwrite.
+
+The extension does not call `rex block rename` or `session.set_block_label`. Those APIs change a persistent Rex block label, which is unrelated to Pi's process title lifecycle and remains after Pi exits. Existing explicit Rex block or window labels are left untouched.

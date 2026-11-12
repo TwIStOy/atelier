@@ -139,7 +139,7 @@ describe("/rex-title", () => {
     await runCommand(pi, ctx);
     expect(ctx.waitForIdle).toHaveBeenCalledOnce();
     expect(updater.run).toHaveBeenCalledWith(ctx);
-    expect(ctx.ui.notify).toHaveBeenCalledWith('Rex pane renamed to "Generated title".', "info");
+    expect(ctx.ui.notify).toHaveBeenCalledWith('Session title set to "Generated title".', "info");
   });
 
   it("reports model and timeout failures but stays quiet for superseded runs", async () => {

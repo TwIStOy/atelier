@@ -1,6 +1,5 @@
 import type { Message } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { getLocalRexContext, type RexContext, renameRexPane } from "@htwang-contrib/common/rex";
 import { executeSideCall, type SideCallResult } from "@htwang-contrib/common/side-call";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { loadRexTitleConfig, resolveRexTitleModel } from "../src/config.ts";
@@ -10,18 +9,8 @@ vi.mock("../src/config.ts", () => ({
   loadRexTitleConfig: vi.fn(),
   resolveRexTitleModel: vi.fn(),
 }));
-vi.mock("@htwang-contrib/common/rex", () => ({
-  getLocalRexContext: vi.fn(),
-  renameRexPane: vi.fn(),
-}));
 vi.mock("@htwang-contrib/common/side-call", () => ({ executeSideCall: vi.fn() }));
 
-const rex: RexContext = {
-  executable: "/bin/rex",
-  endpoint: "unix:///run/rex/server.sock",
-  sessionId: "session:test",
-  blockId: "block:test",
-};
 const sessionModel = { provider: "magpie", id: "session" };
 const titleModel = { provider: "magpie", id: "title" };
 
@@ -82,15 +71,13 @@ function response(answer: string): SideCallResult {
 }
 
 function mockPi(): ExtensionAPI {
-  return { exec: vi.fn() } as unknown as ExtensionAPI;
+  return { setSessionName: vi.fn() } as unknown as ExtensionAPI;
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(loadRexTitleConfig).mockReturnValue({ model: "" });
   vi.mocked(resolveRexTitleModel).mockReturnValue(undefined);
-  vi.mocked(getLocalRexContext).mockResolvedValue(rex);
-  vi.mocked(renameRexPane).mockResolvedValue(undefined);
 });
 
 describe("title formatting", () => {
@@ -157,7 +144,7 @@ describe("createTitleUpdater", () => {
     expect(result).toEqual({ ok: true, title: "Configurable title model" });
     expect(resolveRexTitleModel).toHaveBeenCalledWith(ctx.modelRegistry, { model: "magpie/title" });
     expect(executeSideCall).toHaveBeenCalledWith(expect.objectContaining({ model: titleModel }));
-    expect(renameRexPane).toHaveBeenCalledWith(pi.exec, rex, "Configurable title model");
+    expect(pi.setSessionName).toHaveBeenCalledWith("Configurable title model");
   });
 
   it("uses the current session model when the setting is session default", async () => {
@@ -169,29 +156,32 @@ describe("createTitleUpdater", () => {
     expect(executeSideCall).toHaveBeenCalledWith(expect.objectContaining({ model: sessionModel }));
   });
 
-  it("does not call a model or rename the pane for an empty session", async () => {
-    const result = await createTitleUpdater(mockPi()).run(mockCtx([]));
+  it("does not call a model or set a title for an empty session", async () => {
+    const pi = mockPi();
+    const result = await createTitleUpdater(pi).run(mockCtx([]));
     expect(result).toEqual({ ok: false, error: "Start a conversation before generating a Rex title." });
-    expect(getLocalRexContext).not.toHaveBeenCalled();
     expect(executeSideCall).not.toHaveBeenCalled();
+    expect(pi.setSessionName).not.toHaveBeenCalled();
   });
 
   it("reports unavailable configured or session models", async () => {
+    const pi = mockPi();
     vi.mocked(loadRexTitleConfig).mockReturnValue({ model: "missing" });
-    const result = await createTitleUpdater(mockPi()).run(mockCtx());
+    const result = await createTitleUpdater(pi).run(mockCtx());
     expect(result.ok).toBe(false);
     expect(executeSideCall).not.toHaveBeenCalled();
-    expect(renameRexPane).not.toHaveBeenCalled();
+    expect(pi.setSessionName).not.toHaveBeenCalled();
   });
 
-  it("reports model failures without renaming the pane", async () => {
+  it("reports model failures without setting a title", async () => {
+    const pi = mockPi();
     vi.mocked(executeSideCall).mockResolvedValue({ ok: false, error: "model unavailable" });
-    const result = await createTitleUpdater(mockPi()).run(mockCtx());
+    const result = await createTitleUpdater(pi).run(mockCtx());
     expect(result).toEqual({ ok: false, error: "model unavailable" });
-    expect(renameRexPane).not.toHaveBeenCalled();
+    expect(pi.setSessionName).not.toHaveBeenCalled();
   });
 
-  it("times out the model side-call without renaming the pane", async () => {
+  it("times out the model side-call without setting a title", async () => {
     const timeoutController = new AbortController();
     const timeout = vi.spyOn(AbortSignal, "timeout").mockReturnValue(timeoutController.signal);
     try {
@@ -211,7 +201,7 @@ describe("createTitleUpdater", () => {
 
       expect(timeout).toHaveBeenCalledWith(60_000);
       expect(result).toMatchObject({ ok: false, timedOut: true });
-      expect(renameRexPane).not.toHaveBeenCalled();
+      expect(pi.setSessionName).not.toHaveBeenCalled();
     } finally {
       timeout.mockRestore();
     }
@@ -232,7 +222,8 @@ describe("createTitleUpdater", () => {
         signals.push(signal);
         return Promise.resolve(response("Latest title"));
       });
-    const updater = createTitleUpdater(mockPi());
+    const pi = mockPi();
+    const updater = createTitleUpdater(pi);
     const ctx = mockCtx([userMessage("First request")]);
 
     const first = updater.run(ctx);
@@ -244,7 +235,7 @@ describe("createTitleUpdater", () => {
     expect(signals[1]?.aborted).toBe(false);
     expect(firstResult).toMatchObject({ ok: false, cancelled: true });
     expect(secondResult).toEqual({ ok: true, title: "Latest title" });
-    expect(renameRexPane).toHaveBeenCalledOnce();
-    expect(renameRexPane).toHaveBeenCalledWith(expect.anything(), rex, "Latest title");
+    expect(pi.setSessionName).toHaveBeenCalledOnce();
+    expect(pi.setSessionName).toHaveBeenCalledWith("Latest title");
   });
 });

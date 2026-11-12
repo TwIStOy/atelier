@@ -29,12 +29,12 @@ export default function rexTitleExtension(pi: ExtensionAPI): void {
 
   registerTuiCommands(pi, (api) => {
     api.registerCommand("rex-title", {
-      description: "Summarize this session and rename its Rex pane",
+      description: "Summarize this session and set its title",
       handler: async (_args, ctx) => {
         await ctx.waitForIdle();
         const result = await updater.run(ctx);
         if (result.ok) {
-          ctx.ui.notify(`Rex pane renamed to "${result.title}".`, "info");
+          ctx.ui.notify(`Session title set to "${result.title}".`, "info");
         } else if (result.timedOut) {
           ctx.ui.notify(result.error, "warning");
         } else if (!result.cancelled) {
