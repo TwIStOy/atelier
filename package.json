@@ -25,7 +25,6 @@
       "packages/context-usage",
       "packages/goal",
       "packages/btw",
-      "packages/memory",
       "packages/committer",
       "packages/extension-config-ui",
       "packages/web-tools",
