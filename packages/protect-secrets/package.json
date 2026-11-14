@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@htwang-contrib/common": "*",
-    "unbash": "^6.0.2"
+    "unbash": "^6.0.3"
   },
   "devDependencies": {
     "@earendil-works/pi-coding-agent": "^1.5.0",
