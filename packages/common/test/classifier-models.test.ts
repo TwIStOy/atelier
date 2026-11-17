@@ -1,6 +1,8 @@
-import type { ClassifierModel } from "@earendil-works/pi-ai";
+import type { ClassifierModel, ClassifierResult } from "@earendil-works/pi-ai";
 import { describe, expect, test, vi } from "vitest";
 import {
+  boolProbability,
+  boolQuestion,
   type ClassifierRegistry,
   classifierModelOptions,
   createClassifierCall,
@@ -64,5 +66,28 @@ describe("classifier model selection", () => {
     await call?.(request, signal);
     expect(source.classify).toHaveBeenCalledWith(model, request, { signal });
     expect(createClassifierCall(source, "magpie/missing")).toBeUndefined();
+  });
+});
+
+describe("bool questions", () => {
+  test("turns the first guidance line into the task and the rest into bullets", () => {
+    expect(boolQuestion(["Task?", "First rule.", "Second rule."], { true: "yes", false: "no" })).toEqual({
+      type: "bool",
+      instructions: "Task?\n- First rule.\n- Second rule.",
+      criteria: { true: "yes", false: "no" },
+    });
+  });
+
+  test("reads one bool probability and reports missing or mistyped answers as NaN", () => {
+    const result: ClassifierResult = {
+      api: "typesafe-system-one",
+      provider: "magpie",
+      model: "jev-latest",
+      answers: { ok: { type: "bool", probability: 0.25 } },
+      stopReason: "stop",
+      timestamp: 1,
+    };
+    expect(boolProbability(result, "ok")).toBe(0.25);
+    expect(boolProbability(result, "missing")).toBeNaN();
   });
 });

@@ -115,20 +115,20 @@ afterEach(() => {
 describe("user message complexity annotation", () => {
   test("registers the classifier configuration and refreshes a muted row after the user message", async () => {
     const { emit, ui, startMessage, context } = activate();
-    const probabilities = { flash: 0.1, middle: 0.7, flagship: 0.2 };
+    const probabilities = { hard: 0.3, easy: 0.7 };
     let resolve: (value: MessageComplexity) => void = () => {};
     mocks.classify.mockReturnValueOnce(new Promise<MessageComplexity>((done) => (resolve = done)));
     const { message, component } = startMessage("Fix the bug");
     expect(mocks.classify).not.toHaveBeenCalled();
     expect(context()).toBeUndefined();
-    expect(component.render(100).join("\n")).not.toContain("flash");
+    expect(component.render(100).join("\n")).not.toContain("hard");
     await vi.waitFor(() => expect(mocks.classify).toHaveBeenCalledTimes(1));
     resolve(probabilities);
     await vi.waitFor(() => expect(ui.requestRender).toHaveBeenCalled());
 
     const lines = component.render(100);
     expect(lines.at(-2)).toContain("Fix the bug");
-    expect(lines.at(-1)).toBe("\x1b[90m  flash 10.0% · middle 70.0% · flagship 20.0%\x1b[39m");
+    expect(lines.at(-1)).toBe("\x1b[90m  hard 30.0% · easy 70.0%\x1b[39m");
     expect(mocks.register).toHaveBeenCalledTimes(1);
     expect(message.content).toBe("Fix the bug");
     for (const width of [1, 8, 30, 80]) {
@@ -168,16 +168,16 @@ describe("user message complexity annotation", () => {
     emit("session_shutdown");
     expect(signal.aborted).toBe(true);
     emit("session_start");
-    resolve({ flash: 1, middle: 0, flagship: 0 });
+    resolve({ hard: 0, easy: 1 });
     await new Promise((done) => setImmediate(done));
-    expect(component("Pending").render(80).join("\n")).not.toContain("flash");
+    expect(component("Pending").render(80).join("\n")).not.toContain("hard");
     expect(ui.requestRender).not.toHaveBeenCalled();
     emit("session_shutdown");
   });
 
   test("matches Pi's joined text blocks and the visible user text after a skill block", async () => {
     const { emit, ui, session, component, context } = activate();
-    mocks.classify.mockResolvedValue({ flash: 0.1, middle: 0.7, flagship: 0.2 });
+    mocks.classify.mockResolvedValue({ hard: 0.3, easy: 0.7 });
     const messages = [
       {
         role: "user" as const,
@@ -199,8 +199,8 @@ describe("user message complexity annotation", () => {
     }
     context();
     await vi.waitFor(() => expect(ui.requestRender).toHaveBeenCalledTimes(2));
-    expect(component("Fix the bug").render(100).at(-1)).toContain("middle 70.0%");
-    expect(component("Review the change").render(100).at(-1)).toContain("middle 70.0%");
+    expect(component("Fix the bug").render(100).at(-1)).toContain("easy 70.0%");
+    expect(component("Review the change").render(100).at(-1)).toContain("easy 70.0%");
     expect(mocks.classify.mock.calls.map(([text]) => text)).toEqual(["Fix the bug", "Review the change"]);
     emit("session_shutdown");
   });
@@ -213,7 +213,7 @@ describe("user message complexity annotation", () => {
     await vi.waitFor(() => expect(mocks.warn).toHaveBeenCalled());
     const lines = component.render(80).join("\n");
     expect(lines).toContain("Keep this text");
-    expect(lines).not.toContain("flash");
+    expect(lines).not.toContain("hard");
     emit("session_shutdown");
   });
 
@@ -227,7 +227,7 @@ describe("user message complexity annotation", () => {
 
   test("captures the full context event and system prompt without blocking or reclassifying tool turns", async () => {
     const { emit, ui, startMessage, ctx } = activate();
-    mocks.classify.mockResolvedValueOnce({ flash: 0, middle: 0, flagship: 1 });
+    mocks.classify.mockResolvedValueOnce({ hard: 1, easy: 0 });
     const { message } = startMessage("Continue");
     const messages = [
       { role: "user" as const, content: "Investigate the distributed transaction race", timestamp: 0 },
@@ -264,33 +264,33 @@ describe("user message complexity annotation", () => {
     const restored = component("Continue");
     let resolveFirst: (value: MessageComplexity) => void = () => {};
     mocks.classify.mockReturnValueOnce(new Promise<MessageComplexity>((done) => (resolveFirst = done)));
-    mocks.classify.mockResolvedValueOnce({ flash: 0, middle: 0, flagship: 1 });
+    mocks.classify.mockResolvedValueOnce({ hard: 1, easy: 0 });
     const first = startMessage("Continue", 1).component;
     context();
     await vi.waitFor(() => expect(mocks.classify).toHaveBeenCalledTimes(1));
     const second = startMessage("Continue", 2).component;
     context();
     await vi.waitFor(() => expect(ui.requestRender).toHaveBeenCalledTimes(1));
-    expect(second.render(100).at(-1)).toContain("flagship 100.0%");
-    expect(first.render(100).join("\n")).not.toContain("flash");
-    expect(restored.render(100).join("\n")).not.toContain("flash");
-    resolveFirst({ flash: 1, middle: 0, flagship: 0 });
+    expect(second.render(100).at(-1)).toContain("hard 100.0%");
+    expect(first.render(100).join("\n")).not.toContain("hard");
+    expect(restored.render(100).join("\n")).not.toContain("hard");
+    resolveFirst({ hard: 0, easy: 1 });
     await vi.waitFor(() => expect(ui.requestRender).toHaveBeenCalledTimes(2));
-    expect(first.render(100).at(-1)).toContain("flash 100.0%");
-    expect(second.render(100).at(-1)).toContain("flagship 100.0%");
+    expect(first.render(100).at(-1)).toContain("easy 100.0%");
+    expect(second.render(100).at(-1)).toContain("hard 100.0%");
     expect(mocks.classify.mock.calls[0][1].messages).toHaveLength(2);
     expect(mocks.classify.mock.calls[1][1].messages).toHaveLength(3);
     ui.children.length = 0;
-    expect(component("Continue").render(100).join("\n")).not.toContain("flash");
-    expect(component("Continue").render(100).at(-1)).toContain("flash 100.0%");
-    expect(component("Continue").render(100).at(-1)).toContain("flagship 100.0%");
+    expect(component("Continue").render(100).join("\n")).not.toContain("hard");
+    expect(component("Continue").render(100).at(-1)).toContain("easy 100.0%");
+    expect(component("Continue").render(100).at(-1)).toContain("hard 100.0%");
     expect(mocks.classify).toHaveBeenCalledTimes(2);
     emit("session_shutdown");
   });
 
   test("uses compaction summaries and remaps rows after compaction and tree navigation", async () => {
     const { emit, session, ui, component, startMessage, context } = activate();
-    mocks.classify.mockResolvedValue({ flash: 0, middle: 1, flagship: 0 });
+    mocks.classify.mockResolvedValue({ hard: 1, easy: 0 });
     startMessage("Continue", 1);
     context();
     await vi.waitFor(() => expect(ui.requestRender).toHaveBeenCalledTimes(1));
@@ -307,12 +307,12 @@ describe("user message complexity annotation", () => {
     ]);
     emit("session_compact");
     ui.children.length = 0;
-    expect(component("Continue").render(100).at(-1)).toContain("middle 100.0%");
+    expect(component("Continue").render(100).at(-1)).toContain("hard 100.0%");
     if (!branchPoint) throw new Error("Missing branch point");
     session.branch(branchPoint);
     emit("session_tree");
     ui.children.length = 0;
-    expect(component("Continue").render(100).at(-1)).toContain("middle 100.0%");
+    expect(component("Continue").render(100).at(-1)).toContain("hard 100.0%");
     expect(mocks.classify).toHaveBeenCalledTimes(2);
     emit("session_shutdown");
   });
@@ -328,7 +328,7 @@ describe("user message complexity annotation", () => {
     await vi.waitFor(() => expect(mocks.classify).toHaveBeenCalled());
     controller.abort();
     expect(mocks.classify.mock.calls[0][2].aborted).toBe(true);
-    resolve({ flash: 1, middle: 0, flagship: 0 });
+    resolve({ hard: 0, easy: 1 });
     await new Promise((done) => setImmediate(done));
     expect(ui.requestRender).not.toHaveBeenCalled();
     emit("session_shutdown");

@@ -17,6 +17,25 @@ export interface ClassifierRegistry {
 /** A bound classifier call: picks the configured model and follows the caller's signal. */
 export type ClassifierCall = (request: ClassifierContext, signal: AbortSignal) => Promise<ClassifierResult>;
 
+export interface ClassifierBoolCriteria {
+  true: string;
+  false: string;
+}
+
+export function boolQuestion(guidance: readonly string[], criteria: ClassifierBoolCriteria) {
+  const [task, ...rest] = guidance;
+  return {
+    type: "bool" as const,
+    instructions: [task, ...rest.map((line) => `- ${line}`)].join("\n"),
+    criteria,
+  };
+}
+
+export function boolProbability(result: ClassifierResult, id: string): number {
+  const answer = result.answers[id];
+  return answer?.type === "bool" ? answer.probability : Number.NaN;
+}
+
 export function parseClassifierRef(ref: string): { provider: string; id: string } | undefined {
   const trimmed = ref.trim();
   const separator = trimmed.indexOf("/");

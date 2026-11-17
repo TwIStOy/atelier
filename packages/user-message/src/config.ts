@@ -44,7 +44,7 @@ export function registerUserMessageConfigItems(): void {
           : [...options, { label: current, value: current }];
       },
       description:
-        "Decision model asked for the model-tier probability row. Magpie registers jev-latest; other providers list their own classifier models.",
+        "Decision model asked for the hard/easy probability row. Magpie registers jev-latest; other providers list their own classifier models.",
       extensionLabel: "User Message",
       order: 0,
     },
@@ -53,7 +53,7 @@ export function registerUserMessageConfigItems(): void {
       type: "boolean",
       label: "Complexity Assessment",
       value: () => loadConfig().complexityAssessment,
-      description: "Show model tier probabilities below user messages",
+      description: "Show hard and easy task probabilities below user messages",
       extensionLabel: "User Message",
       order: 1,
     },

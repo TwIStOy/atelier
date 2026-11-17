@@ -1,5 +1,5 @@
-import type { ClassifierContext, ClassifierResult } from "@earendil-works/pi-ai";
-import type { ClassifierCall } from "@htwang-contrib/common/classifier-models";
+import type { ClassifierContext } from "@earendil-works/pi-ai";
+import { boolProbability, boolQuestion, type ClassifierCall } from "@htwang-contrib/common/classifier-models";
 
 export interface BashAssessment {
   destructive: number;
@@ -40,15 +40,6 @@ export function bashAssessmentRequest(command: string, cwd: string): ClassifierC
   };
 }
 
-function boolQuestion(guidance: readonly string[], criteria: { true: string; false: string }) {
-  const [task, ...rest] = guidance;
-  return {
-    type: "bool" as const,
-    instructions: [task, ...rest.map((line) => `- ${line}`)].join("\n"),
-    criteria,
-  };
-}
-
 export async function assessBashCommand(
   command: string,
   cwd: string,
@@ -69,11 +60,6 @@ export async function assessBashCommand(
     }
   }
   return assessment;
-}
-
-function boolProbability(result: ClassifierResult, id: string): number {
-  const answer = result.answers[id];
-  return answer?.type === "bool" ? answer.probability : Number.NaN;
 }
 
 export function formatBashAssessment(value: BashAssessment): string {

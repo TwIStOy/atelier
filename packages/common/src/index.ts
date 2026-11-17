@@ -75,6 +75,9 @@ export {
 } from "./aggregate-rules.ts";
 export { AsyncAnnotations } from "./async-annotations.ts";
 export {
+  boolProbability,
+  boolQuestion,
+  type ClassifierBoolCriteria,
   type ClassifierCall,
   type ClassifierRegistry,
   classifierModelOptions,

@@ -3,26 +3,26 @@ import type { ClassifierCall } from "@htwang-contrib/common/classifier-models";
 import { describe, expect, test } from "vitest";
 import { classifyMessageComplexity, messageComplexityRequest } from "../src/complexity.ts";
 
-function choiceResult(probabilities: Record<string, number>): ClassifierResult {
+function boolResult(probabilities: Record<string, number>): ClassifierResult {
   return {
     api: "typesafe-system-one",
     provider: "magpie",
     model: "jev-latest",
-    answers: {
-      model: { type: "choice", choice: "middle", confidence: 0.9, probabilities },
-    },
+    answers: Object.fromEntries(
+      Object.entries(probabilities).map(([id, probability]) => [id, { type: "bool" as const, probability }]),
+    ),
     stopReason: "stop",
     timestamp: 1,
   };
 }
 
 describe("message complexity", () => {
-  test("asks for all three model tiers in one choice question and preserves their probabilities", async () => {
-    const probabilities = { flash: 0.1, middle: 0.7, flagship: 0.2 };
+  test("asks separate hard and easy bool questions and preserves their probabilities", async () => {
+    const probabilities = { hard: 0.1, easy: 0.9 };
     const requests: ClassifierContext[] = [];
     const classify: ClassifierCall = async (request) => {
       requests.push(request);
-      return choiceResult(probabilities);
+      return boolResult(probabilities);
     };
     const signal = new AbortController().signal;
     const context = {
@@ -38,44 +38,45 @@ describe("message complexity", () => {
         context: { systemPrompt: context.systemPrompt, messages: expect.any(String) },
       },
       questions: {
-        model: {
-          type: "choice",
-          instructions: expect.stringContaining("least expensive model tier"),
-          criteria: {
-            flash: expect.any(String),
-            middle: expect.any(String),
-            flagship: expect.any(String),
-          },
+        hard: {
+          type: "bool",
+          instructions: expect.stringContaining("a hard task"),
+          criteria: { true: expect.stringContaining("a hard task"), false: expect.any(String) },
+        },
+        easy: {
+          type: "bool",
+          instructions: expect.stringContaining("an easy task"),
+          criteria: { true: expect.stringContaining("an easy task"), false: expect.any(String) },
         },
       },
     });
   });
 
   test("rejects an invalid probability before it reaches the renderer", async () => {
-    const classify: ClassifierCall = async () => choiceResult({ flash: 0.1, middle: 0.7 });
+    const classify: ClassifierCall = async () => boolResult({ hard: 0.1 });
     await expect(
       classifyMessageComplexity("test", { systemPrompt: "", messages: [] }, new AbortController().signal, classify),
-    ).rejects.toThrow("flagship");
+    ).rejects.toThrow("easy");
   });
 
   test("rejects a failed or malformed classifier result", async () => {
     const failed: ClassifierCall = async () =>
-      ({ ...choiceResult({}), stopReason: "error", errorMessage: "gateway down" }) as ClassifierResult;
+      ({ ...boolResult({}), stopReason: "error", errorMessage: "gateway down" }) as ClassifierResult;
     await expect(
       classifyMessageComplexity("test", { systemPrompt: "", messages: [] }, new AbortController().signal, failed),
     ).rejects.toThrow("gateway down");
 
-    const malformed: ClassifierCall = async () => ({ ...choiceResult({}), answers: {} }) as unknown as ClassifierResult;
+    const malformed: ClassifierCall = async () => ({ ...boolResult({}), answers: {} }) as ClassifierResult;
     await expect(
       classifyMessageComplexity("test", { systemPrompt: "", messages: [] }, new AbortController().signal, malformed),
-    ).rejects.toThrow("no model tier choice");
+    ).rejects.toThrow("invalid hard probability");
   });
 
   test("preserves conversation, tool output, summaries and image markers without forwarding image bytes", async () => {
     const requests: ClassifierContext[] = [];
     const classify: ClassifierCall = async (request) => {
       requests.push(request);
-      return choiceResult({ flash: 0, middle: 0, flagship: 1 });
+      return boolResult({ hard: 1, easy: 0 });
     };
     const assistant: AssistantMessage = {
       role: "assistant",

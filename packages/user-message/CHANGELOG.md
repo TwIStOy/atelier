@@ -4,6 +4,7 @@
 
 ### Changed
 
+- Message complexity is now two independent bool questions estimating `hard` (designing, debugging, a change across several files, or planning) and `easy` (a quick question, a small edit, a lookup, or running a command) probabilities for the requested work, shown in the muted row below the prompt, replacing the `flash`/`middle`/`flagship` model-tier probabilities.
 - Complexity classification now calls Pi's native classifier models through `ctx.modelRegistry.classify`, selected by a new **User Message → Classifier Model** setting (any registered classifier model, default `magpie/group/classifier`) and gated by **Complexity Assessment**, replacing the removed TypeSafe SDK path. The request rubric and the display are unchanged.
 - Split the sticky-prompt scan (`getPinnedPrompt`) into bracket-search, bounds-trim, and preview-line helpers, and the jump-marker mouse handler into accept/press/click helpers; no behavior change.
 

@@ -104,9 +104,9 @@ command. Each picks its classifier model from every registered one (magpie,
 TypeSafe, Cloudflare, llama.cpp decision models, …) and calls
 `ctx.modelRegistry.classify`:
 
-- **User Message → Classifier Model** and **Complexity Assessment**: one choice
-  question labels the least expensive suitable tier as `flash`, `middle`, or
-  `flagship`; all three probabilities appear in a muted row below the message.
+- **User Message → Classifier Model** and **Complexity Assessment**: two bool
+  questions estimate `hard` and `easy` probabilities for the requested work,
+  shown in a muted row below the message.
   The classifier sees the current system prompt and the complete conversation.
 - **Tool Display → Classifier Model** and **Bash Assessments**: two bool
   questions estimate `destructive` and `exfiltration` probabilities, shown
