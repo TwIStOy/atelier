@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@htwang-contrib/common": "*",
-    "typebox": "1.4.6"
+    "typebox": "1.4.7"
   },
   "devDependencies": {
     "@earendil-works/pi-coding-agent": "^1.5.2",
