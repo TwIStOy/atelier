@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { execFileSync } from "node:child_process";
-import { lstat, mkdir, readdir, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readdir, realpath, rm, symlink } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -50,7 +50,7 @@ async function deployOpenCode() {
   await linkDir(commandsDir, join(configHome, "opencode", "commands"), (entry) => entry.name.endsWith(".md"));
 
   const pluginsDir = join(configHome, "opencode", "plugins");
-  await mkdir(pluginsDir, { recursive: true });
+  const distFile = join(repoRoot, "harness", "opencode", "plugins", "dist", "magpie.js");
   try {
     execFileSync(
       "bun",
@@ -59,37 +59,15 @@ async function deployOpenCode() {
         join(repoRoot, "harness", "opencode", "plugins", "magpie.ts"),
         "--target=bun",
         "--outfile",
-        join(pluginsDir, "magpie.js"),
+        distFile,
       ],
       { stdio: "pipe" },
     );
-    actions.push(`built opencode plugin ${join(pluginsDir, "magpie.js")}`);
+    actions.push(`built opencode plugin ${distFile}`);
+    await ensureLink(distFile, join(pluginsDir, "magpie.js"));
   } catch (error) {
     failed = true;
     actions.push(`FAILED: bun build of the magpie plugin: ${error.message}`);
-  }
-
-  const configPath = join(configHome, "opencode", "opencode.json");
-  let config;
-  try {
-    config = JSON.parse(await readFile(configPath, "utf8"));
-  } catch {
-    config = {};
-  }
-  if (config.provider?.magpie) {
-    actions.push(`kept existing provider.magpie in ${configPath}`);
-    return;
-  }
-  const snippetText = await readFile(join(repoRoot, "harness", "opencode", "provider-magpie.json"), "utf8");
-  config.provider = { ...config.provider, magpie: JSON.parse(snippetText) };
-  try {
-    await writeFile(configPath, `${JSON.stringify(config, null, 2)}\n`, "utf8");
-    actions.push(`merged provider.magpie into ${configPath}`);
-  } catch {
-    const providerJson = JSON.stringify({ provider: { magpie: JSON.parse(snippetText) } }, null, 2);
-    actions.push(
-      `provider.magpie is missing from ${configPath} and the file is not writable (Nix-managed?). Merge this into your opencode config manually:\n${providerJson}`,
-    );
   }
 }
 

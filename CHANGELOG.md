@@ -4,7 +4,7 @@
 
 ### Added
 
-- Multi-harness sharing (see `docs/multi-harness/`): skills moved to `.agents/skills/` with `skills/<name>` kept as relative symlinks so the `pi.skills` manifest keeps working; prompt instruction text moved to `prompts-resource/<name>/BODY.md` with thin Pi prompt shells, OpenCode command shells under `harness/opencode/commands/`, and Cursor skill shells (with in-directory `BODY.md` links) under `harness/cursor/skills/`; a Magpie OpenCode plugin (V1 plugin API: `generate_image` tool plus a `config` hook that pulls the dynamic `/v1/models` catalog) plus a `provider.magpie` config snippet under `harness/opencode/`; and an idempotent `just deploy-harness` recipe (`scripts/deploy-harness.mjs`) that maintains the `~/.agents` stable paths, OpenCode command/plugin links, the provider merge (falling back to printed instructions when the config is Nix-managed and read-only), and Cursor skill links.
+- Multi-harness sharing (see `docs/multi-harness/`): skills moved to `.agents/skills/` with `skills/<name>` kept as relative symlinks so the `pi.skills` manifest keeps working; prompt instruction text moved to `prompts-resource/<name>/BODY.md` with thin Pi prompt shells, OpenCode command shells under `harness/opencode/commands/`, and Cursor skill shells (with in-directory `BODY.md` links) under `harness/cursor/skills/`; a Magpie OpenCode plugin for the opencode2 plugin API (`generate_image` tool plus self-registered `magpie` provider with the dynamic `/v1/models` catalog) under `harness/opencode/`, deployed as a symlinked bundle with no OpenCode config edits; and an idempotent `just deploy-harness` recipe (`scripts/deploy-harness.mjs`) that maintains the `~/.agents` stable paths, OpenCode command/plugin links, and Cursor skill links.
 
 ### Changed
 

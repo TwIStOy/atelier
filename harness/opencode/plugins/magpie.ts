@@ -1,11 +1,19 @@
-import { tool, type Plugin } from "@opencode-ai/plugin";
-import type { Model } from "@opencode-ai/sdk/v2";
+import { Model, Plugin, Provider } from "@opencode/plugin";
+import { existsSync } from "node:fs";
+import { readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 
 const DEFAULT_MAGPIE_URL = "http://poi.li-rankine.ts.net:3425";
 const DEFAULT_MAGPIE_API_KEY = "magpie-private";
+const PROVIDER_ID = "magpie";
+const PROVIDER_NAME = "Magpie";
+const PROVIDER_PACKAGE = "@opencode/ai/providers/openai-compatible";
 const MAX_REFERENCE_IMAGES = 5;
 const IMAGE_TIMEOUT_MS = 300_000;
+const CATALOG_TIMEOUT_MS = 10_000;
 const B64_JSON = "b64_json";
+const DEFAULT_CONTEXT_WINDOW = 200_000;
+const DEFAULT_MAX_TOKENS = 32_000;
 
 interface MagpieConfig {
   baseUrl: string;
@@ -22,100 +30,6 @@ function loadMagpieConfig(): MagpieConfig {
   };
 }
 
-const TOOL_DESCRIPTION = `Generate an image from a text prompt, or edit and combine existing images given as reference_images, through the Magpie gateway's image models.
-
-Use it when the user asks for a visual: a diagram, illustration, icon, mockup, photo edit, or any image artifact. The images are saved as files in the current project directory.
-
-- Generation takes from a few seconds to a few minutes; do not give up early or fire duplicate calls.
-- Write a detailed prompt: subject, style, composition, colours, and any text to render exactly.
-- For edits, pass every target image in reference_images and describe the change in prompt; preserve existing transparency unless asked otherwise.
-- Set background to transparent for cutouts and background removal.
-- Reference the saved file path when the user needs the image in the project.`;
-
-interface GenerateImageParams {
-  prompt: string;
-  size?: string;
-  n?: number;
-  reference_images?: string[];
-  quality?: "low" | "medium" | "high" | "xhigh" | "max" | "auto";
-  background?: "transparent" | "opaque" | "auto";
-  model?: string;
-}
-
-const z = tool.schema;
-
-const generateImageArgs = {
-  prompt: z
-    .string()
-    .describe(
-      "What to draw, or how to change the reference images. Be specific: subject, style, composition, colours, and any text to render exactly.",
-    ),
-  size: z
-    .string()
-    .optional()
-    .describe("WIDTHxHEIGHT (1024x1024, 1536x1024, 1024x1536) or an aspect ratio (16:9). Default: the model's."),
-  n: z.number().int().min(1).max(4).optional().describe("How many images to generate (default 1)."),
-  reference_images: z
-    .array(z.string().describe("Image file path to edit or draw from."))
-    .max(MAX_REFERENCE_IMAGES)
-    .optional()
-    .describe("Images to edit or combine with the prompt, as file paths. Omit for a brand new image."),
-  quality: z
-    .enum(["low", "medium", "high", "xhigh", "max", "auto"])
-    .optional()
-    .describe("Quality level, for models that take it. Default: the model's."),
-  background: z
-    .enum(["transparent", "opaque", "auto"])
-    .optional()
-    .describe("Background of the generated image: transparent for cutouts, opaque, or auto. Default: the model's."),
-  model: z
-    .string()
-    .optional()
-    .describe(
-      "Magpie image model id (provider/model) or routing group (group/<id>). Default: the image model picked in magpie's Settings.",
-    ),
-};
-
-const IMAGE_FORMATS = [
-  { magic: [0x89, 0x50, 0x4e, 0x47], mime: "image/png", extension: "png" },
-  { magic: [0xff, 0xd8, 0xff], mime: "image/jpeg", extension: "jpg" },
-  { magic: [0x57, 0x45, 0x42, 0x50], mime: "image/webp", extension: "webp", offset: 8 },
-  { magic: [0x47, 0x49, 0x46], mime: "image/gif", extension: "gif" },
-] as const;
-
-function sniffImageMime(bytes: Uint8Array): string | undefined {
-  return IMAGE_FORMATS.find(
-    (format) =>
-      bytes.length >= (format.offset ?? 0) + format.magic.length &&
-      format.magic.every((byte, index) => bytes[(format.offset ?? 0) + index] === byte),
-  )?.mime;
-}
-
-function extensionForMime(mimeType: string): string {
-  return IMAGE_FORMATS.find((format) => format.mime === mimeType)?.extension ?? "png";
-}
-
-function promptSlug(prompt: string): string {
-  const slug = prompt
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 40);
-  return slug.length > 0 ? slug : "image";
-}
-
-function timestamp(now: Date): string {
-  const pad = (value: number) => String(value).padStart(2, "0");
-  return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-}
-
-interface MagpieImageData {
-  [key: string]: unknown;
-  url?: string;
-  mime_type?: string;
-  revised_prompt?: string;
-}
-
 interface MagpieCatalogEntry {
   id?: string;
   object?: string;
@@ -123,10 +37,7 @@ interface MagpieCatalogEntry {
   context_window?: number;
   context_length?: number;
   max_output_tokens?: number;
-  modalities?: { input?: string[] };
-  reasoning?: boolean;
-  reasoning_levels?: string[];
-  supported_reasoning_levels?: { effort?: string }[];
+  modalities?: { input?: string[]; output?: string[] };
   pricing?: {
     prompt?: string;
     completion?: string;
@@ -139,12 +50,6 @@ interface MagpieCatalogEntry {
 interface MagpieModelsResponse {
   data?: MagpieCatalogEntry[];
 }
-
-const PROVIDER_ID = "magpie";
-const PROVIDER_NPM = "@ai-sdk/openai-compatible";
-const DEFAULT_CONTEXT_WINDOW = 200_000;
-const DEFAULT_MAX_TOKENS = 16_384;
-const EPOCH_RELEASE_DATE = "1970-01-01T00:00:00.000Z";
 
 function shiftDecimal(whole: string, frac: string, scale: number): { intDigits: string; fracDigits: string } {
   if (frac.length <= scale) return { intDigits: whole + frac.padEnd(scale, "0"), fracDigits: "" };
@@ -165,56 +70,132 @@ function perMillion(perToken: string | undefined): number {
   return Number.isFinite(value) ? value : 0;
 }
 
-function reasoningEfforts(entry: MagpieCatalogEntry): string[] {
-  const named = entry.reasoning_levels;
-  const source = named ?? entry.supported_reasoning_levels?.map((level) => level.effort ?? "") ?? [];
-  return source.map((level) => level.trim().toLowerCase()).filter((level) => level.length > 0);
+function modelInputs(entry: MagpieCatalogEntry): string[] {
+  const advertised = entry.modalities?.input ?? [];
+  const inputs = ["text", ...advertised.filter((modality) => modality !== "text")];
+  return [...new Set(inputs)];
 }
 
-export function magpieModelsToOpenCode(payload: MagpieModelsResponse, baseUrl: string): Record<string, Model> {
-  const models: Record<string, Model> = {};
-  for (const entry of payload.data ?? []) {
-    if (!entry.id || (entry.object !== undefined && entry.object !== "model")) continue;
-    if (models[entry.id]) continue;
-    models[entry.id] = magpieModelToOpenCode(entry, entry.id, baseUrl);
-  }
-  return models;
+function modelOutputs(entry: MagpieCatalogEntry): string[] {
+  const advertised = entry.modalities?.output ?? [];
+  return advertised.length > 0 ? [...new Set(advertised)] : ["text"];
 }
 
-function magpieModelToOpenCode(entry: MagpieCatalogEntry, id: string, baseUrl: string): Model {
-  const efforts = reasoningEfforts(entry);
-  const acceptsImages = entry.modalities?.input?.includes("image") ?? false;
+function toModelInfo(entry: MagpieCatalogEntry, providerID: Provider.ID): Model.Info | undefined {
+  if (!entry.id || (entry.object !== undefined && entry.object !== "model")) return undefined;
   return {
-    id,
-    providerID: PROVIDER_ID,
-    api: { id, url: baseUrl, npm: PROVIDER_NPM },
-    name: entry.display_name?.trim() || id,
+    ...Model.Info.default(providerID, Model.ID.make(entry.id)),
+    name: entry.display_name?.trim() || entry.id,
     capabilities: {
-      temperature: true,
-      reasoning: entry.reasoning === true || efforts.length > 0,
-      attachment: acceptsImages,
-      toolcall: true,
-      input: { text: true, audio: false, image: acceptsImages, video: false, pdf: false },
-      output: { text: true, audio: false, image: false, video: false, pdf: false },
-      interleaved: false,
+      tools: true,
+      input: modelInputs(entry),
+      output: modelOutputs(entry),
     },
-    cost: {
-      input: perMillion(entry.pricing?.prompt),
-      output: perMillion(entry.pricing?.completion),
-      cache: {
-        read: perMillion(entry.pricing?.input_cache_read),
-        write: perMillion(entry.pricing?.input_cache_write),
+    cost: [
+      {
+        input: perMillion(entry.pricing?.prompt),
+        output: perMillion(entry.pricing?.completion),
+        cache: {
+          read: perMillion(entry.pricing?.input_cache_read),
+          write: perMillion(entry.pricing?.input_cache_write),
+        },
       },
-    },
+    ],
     limit: {
       context: entry.context_window ?? entry.context_length ?? DEFAULT_CONTEXT_WINDOW,
       output: entry.max_output_tokens ?? DEFAULT_MAX_TOKENS,
     },
-    status: "active",
-    options: {},
-    headers: {},
-    release_date: entry.created ? new Date(entry.created * 1000).toISOString() : EPOCH_RELEASE_DATE,
+    time: { released: entry.created ?? 0 },
   };
+}
+
+async function fetchMagpieModels(config: MagpieConfig, providerID: Provider.ID): Promise<Model.Info[]> {
+  try {
+    const response = await fetch(`${config.baseUrl}/models`, {
+      headers: { accept: "application/json", authorization: `Bearer ${config.apiKey}` },
+      signal: AbortSignal.timeout(CATALOG_TIMEOUT_MS),
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const payload = (await response.json()) as MagpieModelsResponse;
+    const models: Model.Info[] = [];
+    const seen = new Set<string>();
+    for (const entry of payload.data ?? []) {
+      const model = toModelInfo(entry, providerID);
+      if (!model || seen.has(model.id)) continue;
+      seen.add(model.id);
+      models.push(model);
+    }
+    return models;
+  } catch (error) {
+    console.error(`magpie: model catalog refresh failed: ${error instanceof Error ? error.message : String(error)}`);
+    return [];
+  }
+}
+
+const TOOL_DESCRIPTION = `Generate an image from a text prompt, or edit and combine existing images given as reference_images, through the Magpie gateway's image models.
+
+Use it when the user asks for a visual: a diagram, illustration, icon, mockup, photo edit, or any image artifact. The images are saved as files in the current project directory.
+
+- Generation takes from a few seconds to a few minutes; do not give up early or fire duplicate calls.
+- Write a detailed prompt: subject, style, composition, colours, and any text to render exactly.
+- For edits, pass every target image in reference_images and describe the change in prompt; preserve existing transparency unless asked otherwise.
+- Set background to transparent for cutouts and background removal.
+- Reference the saved file path when the user needs the image in the project.`;
+
+const GENERATE_IMAGE_INPUT = {
+  type: "object",
+  properties: {
+    prompt: {
+      type: "string",
+      description:
+        "What to draw, or how to change the reference images. Be specific: subject, style, composition, colours, and any text to render exactly.",
+    },
+    size: {
+      type: "string",
+      description: "WIDTHxHEIGHT (1024x1024, 1536x1024, 1024x1536) or an aspect ratio (16:9). Default: the model's.",
+    },
+    n: { type: "integer", minimum: 1, maximum: 4, description: "How many images to generate (default 1)." },
+    reference_images: {
+      type: "array",
+      items: { type: "string" },
+      maxItems: MAX_REFERENCE_IMAGES,
+      description: "Images to edit or combine with the prompt, as file paths. Omit for a brand new image.",
+    },
+    quality: {
+      type: "string",
+      enum: ["low", "medium", "high", "xhigh", "max", "auto"],
+      description: "Quality level, for models that take it. Default: the model's.",
+    },
+    background: {
+      type: "string",
+      enum: ["transparent", "opaque", "auto"],
+      description: "Background of the generated image: transparent for cutouts, opaque, or auto. Default: the model's.",
+    },
+    model: {
+      type: "string",
+      description:
+        "Magpie image model id (provider/model) or routing group (group/<id>). Default: the image model picked in magpie's Settings.",
+    },
+  },
+  required: ["prompt"],
+  additionalProperties: false,
+} as const;
+
+interface GenerateImageParams {
+  prompt: string;
+  size?: string;
+  n?: number;
+  reference_images?: string[];
+  quality?: "low" | "medium" | "high" | "xhigh" | "max" | "auto";
+  background?: "transparent" | "opaque" | "auto";
+  model?: string;
+}
+
+interface MagpieImageData {
+  [key: string]: unknown;
+  url?: string;
+  mime_type?: string;
+  revised_prompt?: string;
 }
 
 interface MagpieImagesResponse {
@@ -227,28 +208,65 @@ function errorMessage(payload: MagpieImagesResponse, fallback: string): string {
   return payload.error?.message?.trim() || fallback;
 }
 
+function sniffImageMime(bytes: Uint8Array): string | undefined {
+  if (bytes.length >= 4 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) {
+    return "image/png";
+  }
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
+    return "image/jpeg";
+  }
+  if (bytes.length >= 12 && bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50) {
+    return "image/webp";
+  }
+  if (bytes.length >= 3 && bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46) {
+    return "image/gif";
+  }
+  return undefined;
+}
+
+function extensionForMime(mimeType: string): string {
+  if (mimeType === "image/jpeg") return "jpg";
+  if (mimeType === "image/webp") return "webp";
+  if (mimeType === "image/gif") return "gif";
+  return "png";
+}
+
+function promptSlug(prompt: string): string {
+  const slug = prompt
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40);
+  return slug.length > 0 ? slug : "image";
+}
+
+function timestamp(now: Date): string {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+}
+
+interface SavedImage {
+  path: string;
+  mimeType: string;
+  bytes: number;
+}
+
+function targetPath(projectDir: string, prompt: string, mimeType: string, index: number, now: Date): string {
+  const base = `${promptSlug(prompt)}-${timestamp(now)}`;
+  const extension = extensionForMime(mimeType);
+  let candidate = join(projectDir, index === 0 ? `${base}.${extension}` : `${base}-${index + 1}.${extension}`);
+  for (let suffix = index + 1; existsSync(candidate); suffix += 1) {
+    candidate = join(projectDir, `${base}-${suffix}.${extension}`);
+  }
+  return candidate;
+}
+
 async function readReferenceImage(projectDir: string, path: string): Promise<string> {
-  const resolved = path.startsWith("/") ? path : `${projectDir}/${path}`;
-  const buffer = new Uint8Array(await Bun.file(resolved).arrayBuffer());
+  const resolved = path.startsWith("/") ? path : join(projectDir, path);
+  const buffer = new Uint8Array(await readFile(resolved));
   const mimeType = sniffImageMime(buffer);
   if (!mimeType) throw new Error(`reference image ${path} is not a recognized PNG, JPEG, WebP, or GIF file`);
   return `data:${mimeType};base64,${Buffer.from(buffer).toString("base64")}`;
-}
-
-async function targetPath(
-  projectDir: string,
-  prompt: string,
-  mimeType: string,
-  index: number,
-  now: Date,
-): Promise<string> {
-  const base = `${promptSlug(prompt)}-${timestamp(now)}`;
-  const extension = extensionForMime(mimeType);
-  let candidate = `${projectDir}/${index === 0 ? `${base}.${extension}` : `${base}-${index + 1}.${extension}`}`;
-  for (let suffix = index + 1; await Bun.file(candidate).exists(); suffix += 1) {
-    candidate = `${projectDir}/${base}-${suffix}.${extension}`;
-  }
-  return candidate;
 }
 
 async function executeGenerateImage(
@@ -256,7 +274,7 @@ async function executeGenerateImage(
   projectDir: string,
   config: MagpieConfig,
   signal: AbortSignal | undefined,
-): Promise<{ title: string; output: string }> {
+): Promise<{ content: { type: "text"; text: string }[] | string; images: SavedImage[] }> {
   const body: Record<string, unknown> = { prompt: params.prompt, response_format: B64_JSON };
   if (params.model) body.model = params.model;
   if (params.size) body.size = params.size;
@@ -303,7 +321,7 @@ async function executeGenerateImage(
   }
 
   const now = new Date();
-  const saved: string[] = [];
+  const images: SavedImage[] = [];
   for (const [index, entry] of payload.data.entries()) {
     const inline = entry[B64_JSON];
     let data = typeof inline === "string" ? inline : undefined;
@@ -318,71 +336,69 @@ async function executeGenerateImage(
     if (!data) continue;
     const resolvedMime = mimeType || "image/png";
     const buffer = Buffer.from(data, "base64");
-    const target = await targetPath(projectDir, params.prompt, resolvedMime, index, now);
-    await Bun.write(target, buffer);
-    saved.push(`${target} (${resolvedMime}, ${buffer.byteLength} bytes)`);
+    const target = targetPath(projectDir, params.prompt, resolvedMime, index, now);
+    await writeFile(target, buffer);
+    images.push({ path: target, mimeType: resolvedMime, bytes: buffer.byteLength });
   }
-  if (saved.length === 0) {
+  if (images.length === 0) {
     throw new Error(`Magpie returned no image data (HTTP ${response.status})`);
   }
 
   const revised = payload.data.find((entry) => entry.revised_prompt)?.revised_prompt;
-  const lines = [`Model: ${payload.model || "magpie default"}`, ...saved.map((line) => `Saved ${line}`)];
+  const lines = [`Model: ${payload.model || "magpie default"}`, ...images.map((image) => `Saved ${image.path} (${image.mimeType}, ${image.bytes} bytes)`)];
   if (revised) lines.push(`Revised prompt: ${revised}`);
-  return { title: "Generate Image", output: lines.join("\n") };
+  return { content: lines.map((line) => ({ type: "text", text: line })), images };
 }
 
-interface OpenCodeProviderConfig {
-  models?: Record<string, unknown>;
-}
+const magpiePlugin = Plugin.define({
+  id: "magpie",
+  async setup(ctx) {
+    const config = loadMagpieConfig();
+    const providerID = Provider.ID.make(PROVIDER_ID);
 
-interface OpenCodeConfigLike {
-  provider?: Record<string, OpenCodeProviderConfig>;
-}
-
-async function fetchMagpieModels(config: MagpieConfig): Promise<Record<string, Model>> {
-  try {
-    const response = await fetch(`${config.baseUrl}/models`, {
-      headers: { accept: "application/json", authorization: `Bearer ${config.apiKey}` },
-      signal: AbortSignal.timeout(10_000),
+    const models = await fetchMagpieModels(config, providerID);
+    await ctx.provider.transform((editor) => {
+      editor.add({
+        info: {
+          ...Provider.Info.empty(providerID),
+          name: PROVIDER_NAME,
+          activation: "enabled",
+          package: PROVIDER_PACKAGE,
+          settings: { baseURL: config.baseUrl, apiKey: config.apiKey },
+        },
+        models,
+      });
     });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    return magpieModelsToOpenCode((await response.json()) as MagpieModelsResponse, config.baseUrl);
-  } catch (error) {
-    console.error(`magpie: model catalog refresh failed: ${error instanceof Error ? error.message : String(error)}`);
-    return {};
-  }
-}
 
-const magpiePlugin: Plugin = async () => {
-  return {
-    config: async (config) => {
-      const providerConfig = (config as unknown as OpenCodeConfigLike).provider?.[PROVIDER_ID];
-      if (!providerConfig) return;
-      const models = await fetchMagpieModels(loadMagpieConfig());
-      if (Object.keys(models).length === 0) return;
-      providerConfig.models = { ...(providerConfig.models ?? {}), ...models };
-    },
-    tool: {
-      generate_image: tool({
+    await ctx.tool.transform((editor) => {
+      editor.add({
+        name: "generate_image",
         description: TOOL_DESCRIPTION,
-        args: generateImageArgs,
-        async execute(args, context) {
-          const config = loadMagpieConfig();
+        input: GENERATE_IMAGE_INPUT,
+        async execute(input, context) {
+          const params = input as GenerateImageParams;
+          const toolConfig = loadMagpieConfig();
           try {
-            return await executeGenerateImage(args, context.directory, config, context.abort);
+            const result = await executeGenerateImage(params, ctx.location.directory, toolConfig, context.signal);
+            const files = result.images.map((image) => ({
+              type: "file" as const,
+              uri: `file://${image.path}`,
+              mime: image.mimeType,
+              name: image.path.split("/").pop() ?? image.mimeType,
+            }));
+            return { content: [...(Array.isArray(result.content) ? result.content : []), ...files] };
           } catch (error) {
-            if (context.abort.aborted) throw error;
+            if (context.signal.aborted) throw error;
             const message =
               error instanceof Error && error.name === "TimeoutError"
-                ? `Magpie image generation timed out after ${config.imageTimeoutMs}ms.`
+                ? `Magpie image generation timed out after ${toolConfig.imageTimeoutMs}ms.`
                 : `Magpie image generation failed: ${error instanceof Error ? error.message : String(error)}`;
-            return { title: "Generate Image", output: message, metadata: { isError: true } };
+            return { content: message, metadata: { isError: true } };
           }
         },
-      }),
-    },
-  };
-};
+      });
+    });
+  },
+});
 
 export default magpiePlugin;

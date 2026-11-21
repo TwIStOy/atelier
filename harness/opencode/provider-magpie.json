@@ -1,8 +1,0 @@
-{
-  "npm": "@ai-sdk/openai-compatible",
-  "options": {
-    "baseURL": "http://poi.li-rankine.ts.net:3425/v1",
-    "apiKey": "magpie-private"
-  },
-  "models": {}
-}

@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { chmod, lstat, mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
+import { lstat, mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import fileURLToPathFn from "node:url";
@@ -67,32 +67,13 @@ describe("deploy-harness", () => {
     }
   });
 
-  it("builds the magpie plugin bundle into the opencode plugins dir", async () => {
+  it("builds the magpie plugin bundle and symlinks it into the opencode plugins dir", async () => {
     runDeploy();
-    const bundle = join(home, ".config", "opencode", "plugins", "magpie.js");
-    const content = await readFile(bundle, "utf8");
+    const link = join(home, ".config", "opencode", "plugins", "magpie.js");
+    expect((await lstat(link)).isSymbolicLink()).toBe(true);
+    expect(await realpath(link)).toBe(join(repoRoot, "harness", "opencode", "plugins", "dist", "magpie.js"));
+    const content = await readFile(link, "utf8");
     expect(content).toContain("generate_image");
-  });
-
-  it("merges provider.magpie into opencode.json when absent and preserves an existing value", async () => {
-    const configDir = join(home, ".config", "opencode");
-    await mkdir(configDir, { recursive: true });
-    const configPath = join(configDir, "opencode.json");
-    await writeFile(configPath, JSON.stringify({ theme: "dark" }), "utf8");
-
-    runDeploy();
-    const merged = JSON.parse(await readFile(configPath, "utf8"));
-    expect(merged.theme).toBe("dark");
-    expect(merged.provider.magpie.options.baseURL).toContain("/v1");
-
-    await writeFile(
-      configPath,
-      JSON.stringify({ theme: "dark", provider: { magpie: { options: { baseURL: "http://custom:1/v1" } } } }),
-      "utf8",
-    );
-    runDeploy();
-    const preserved = JSON.parse(await readFile(configPath, "utf8"));
-    expect(preserved.provider.magpie.options.baseURL).toBe("http://custom:1/v1");
   });
 
   it("links cursor skill shells (SKILL.md plus resolving BODY.md) into ~/.cursor/skills", async () => {
@@ -111,24 +92,16 @@ describe("deploy-harness", () => {
     expect(body).toBe(join(repoRoot, "prompts-resource", "implement", "BODY.md"));
   });
 
-  it("falls back to printing the provider snippet when opencode.json is not writable", async () => {
+  it("leaves the opencode config untouched", async () => {
     const configDir = join(home, ".config", "opencode");
     await mkdir(configDir, { recursive: true });
     const configPath = join(configDir, "opencode.json");
-    const original = JSON.stringify({ theme: "dark" });
+    const original = JSON.stringify({ plugin: ["/home/someone/dotcode/dist/index.js"] });
     await writeFile(configPath, original, "utf8");
-    await chmod(configPath, 0o444);
 
-    const output = execFileSync("node", [script], {
-      env: { ...process.env, HOME: home, XDG_CONFIG_HOME: join(home, ".config") },
-      encoding: "utf8",
-      stdio: "pipe",
-    });
+    runDeploy();
 
-    expect(output).toContain("provider.magpie is missing");
-    expect(output).toContain("manually");
     expect(await readFile(configPath, "utf8")).toBe(original);
-    await chmod(configPath, 0o644);
   });
 
   it("is idempotent and never clobbers a pre-existing real directory", async () => {
