@@ -10,7 +10,7 @@ Pi's skills, prompts, and provider gateways in this monorepo are useful in other
 
 ## Consequences
 
-- Skills move to `.agents/skills/` with `skills/<name>` kept as symlinks so the `pi.skills` manifest keeps working; the manifest may later be dropped in favor of native `.agents/skills` discovery.
+- Skills stay in `skills/`; the `pi.skills` manifest keeps pointing at them, and other harnesses reach the same files through the user-level `~/.agents/skills` Deployment Links instead of any in-repo `.agents` layer.
 - No in-repo dogfooding of OpenCode/Cursor behavior; verification happens after deploying links.
 - The deploy recipe is symlinks plus exactly two non-link steps, both for the magpie Gap Fill: building `plugins/magpie.js` from source with `bun build` (a build artifact, not a copy of an asset) and a merge-guarded `provider.magpie` insertion into `opencode.json` that never overwrites an existing value.
 - Plugin capabilities are deliberately not ported: target harnesses' built-in equivalents are preferred, with Gap Fills only where required (first and only first-phase Gap Fill: magpie as an OpenCode plugin; toori and Cursor providers untouched).

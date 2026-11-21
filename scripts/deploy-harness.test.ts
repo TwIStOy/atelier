@@ -19,7 +19,7 @@ function runDeploy(): void {
 }
 
 async function realSkills(): Promise<string[]> {
-  return (await readdir(join(repoRoot, ".agents", "skills"), { withFileTypes: true }))
+  return (await readdir(join(repoRoot, "skills"), { withFileTypes: true }))
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name);
 }
@@ -45,7 +45,7 @@ describe("deploy-harness", () => {
       const link = join(home, ".agents", "skills", name);
       const stat = await lstat(link);
       expect(stat.isSymbolicLink()).toBe(true);
-      expect(await realpath(link)).toBe(join(repoRoot, ".agents", "skills", name));
+      expect(await realpath(link)).toBe(join(repoRoot, "skills", name));
     }
   });
 

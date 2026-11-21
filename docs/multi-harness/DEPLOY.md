@@ -22,7 +22,7 @@ Prompt instruction text (the Prompt Body) lives in `prompts-resource/<name>/BODY
 
 `just deploy-harness` (`scripts/deploy-harness.mjs`) is idempotent and **never edits OpenCode's config file**:
 
-- `~/.agents/skills/<name>` → this repo's `.agents/skills/<name>` (all skills, for Pi/OpenCode/Cursor user-level discovery).
+- `~/.agents/skills/<name>` → this repo's `skills/<name>` (all skills, for Pi/OpenCode/Cursor user-level discovery).
 - `~/.agents/prompts-resource` → this repo's `prompts-resource/`.
 - `$XDG_CONFIG_HOME/opencode/commands/<name>.md` → `harness/opencode/commands/<name>.md`.
 - `$XDG_CONFIG_HOME/opencode/plugins/magpie.js` → a symlink to the bundle built from `harness/opencode/plugins/magpie.ts` with `bun build --target=bun` (output under `harness/opencode/plugins/dist/`, gitignored).

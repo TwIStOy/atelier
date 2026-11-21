@@ -41,7 +41,7 @@ async function linkDir(source, destRoot, keep) {
 }
 
 async function deploySkills() {
-  await linkDir(join(repoRoot, ".agents", "skills"), join(home, ".agents", "skills"), (entry) => entry.isDirectory());
+  await linkDir(join(repoRoot, "skills"), join(home, ".agents", "skills"), (entry) => entry.isDirectory());
   await ensureLink(join(repoRoot, "prompts-resource"), join(home, ".agents", "prompts-resource"));
 }
 
