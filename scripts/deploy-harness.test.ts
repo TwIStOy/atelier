@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { lstat, mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
+import { lstat, mkdir, mkdtemp, readFile, readdir, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import fileURLToPathFn from "node:url";
@@ -76,20 +76,30 @@ describe("deploy-harness", () => {
     expect(content).toContain("generate_image");
   });
 
-  it("links cursor skill shells (SKILL.md plus resolving BODY.md) into ~/.cursor/skills", async () => {
+  it("links the repo skills into ~/.cursor/skills", async () => {
     runDeploy();
+    for (const name of await realSkills()) {
+      const link = join(home, ".cursor", "skills", name);
+      expect((await lstat(link)).isSymbolicLink()).toBe(true);
+      expect(await realpath(link)).toBe(join(repoRoot, "skills", name));
+    }
+  });
+
+  it("prunes stale links into the repo harness dir without touching other entries", async () => {
     const dir = join(home, ".cursor", "skills");
-    const entries = (await readdir(dir, { withFileTypes: true })).filter(
-      (entry) => entry.isDirectory() || entry.isSymbolicLink(),
-    );
-    const expectedSkills = await countEntries(join(repoRoot, "harness", "cursor", "skills"), false);
-    expect(entries.length).toBe(expectedSkills);
-    const implement = join(dir, "implement");
-    expect(await realpath(join(implement, "SKILL.md"))).toBe(
-      join(repoRoot, "harness", "cursor", "skills", "implement", "SKILL.md"),
-    );
-    const body = await realpath(join(implement, "BODY.md"));
-    expect(body).toBe(join(repoRoot, "prompts-resource", "implement", "BODY.md"));
+    await mkdir(dir, { recursive: true });
+    const staleShell = join(repoRoot, "harness", "cursor", "skills", "implement", "SKILL.md");
+    await symlink(staleShell, join(dir, "implement"));
+    const foreign = join(home, "elsewhere");
+    await mkdir(foreign, { recursive: true });
+    await symlink(foreign, join(dir, "foreign"));
+    await mkdir(join(dir, "real-dir"), { recursive: true });
+
+    runDeploy();
+
+    await expect(lstat(join(dir, "implement"))).rejects.toThrow();
+    expect(await realpath(join(dir, "foreign"))).toBe(foreign);
+    expect((await lstat(join(dir, "real-dir"))).isDirectory()).toBe(true);
   });
 
   it("leaves the opencode config untouched", async () => {

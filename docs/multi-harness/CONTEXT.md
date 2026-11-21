@@ -33,7 +33,7 @@ A skill under `.agents/skills/` in this repo, discovered only inside this projec
 _Avoid_: repo skill (that is the deployed one)
 
 **Per-Harness Shell**:
-A tiny harness-native wrapper (Pi prompt, OpenCode command, Cursor skill) whose body points at a shared Prompt Body or Content Asset instead of duplicating it.
+A tiny harness-native wrapper (Pi prompt, OpenCode command) whose body points at a shared Prompt Body instead of duplicating it. Cursor's shell sources are parked in `harness/cursor/skills/` and not deployed — Cursor's skill namespace carries only real skills.
 _Avoid_: wrapper (too vague), adapter (implies code)
 
 **Prompt Body**:

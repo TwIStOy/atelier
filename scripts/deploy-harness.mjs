@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 import { execFileSync } from "node:child_process";
-import { lstat, mkdir, readdir, realpath, rm, symlink } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
+import { lstat, mkdir, readdir, realpath, rm, symlink } from "node:fs/promises";import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -71,12 +70,21 @@ async function deployOpenCode() {
   }
 }
 
+async function pruneHarnessLinks(destRoot) {
+  for (const entry of await readdir(destRoot, { withFileTypes: true }).catch(() => [])) {
+    if (!entry.isSymbolicLink()) continue;
+    const linkPath = join(destRoot, entry.name);
+    const target = await realpath(linkPath).catch(() => null);
+    if (!target?.startsWith(`${join(repoRoot, "harness")}${sep}`)) continue;
+    await rm(linkPath);
+    actions.push(`pruned stale harness link ${linkPath} -> ${target}`);
+  }
+}
+
 async function deployCursor() {
-  await linkDir(
-    join(repoRoot, "harness", "cursor", "skills"),
-    join(home, ".cursor", "skills"),
-    (entry) => entry.isDirectory(),
-  );
+  const dest = join(home, ".cursor", "skills");
+  await pruneHarnessLinks(dest);
+  await linkDir(join(repoRoot, "skills"), dest, (entry) => entry.isDirectory());
 }
 
 await deploySkills();

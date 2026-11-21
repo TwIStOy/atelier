@@ -11,9 +11,8 @@ harness/
 │   └── plugins/magpie.ts         # Magpie provider registration + generate_image (opencode2 plugin API)
 │                                 # dist/magpie.js is the bun-built bundle (gitignored, deploy artifact)
 └── cursor/
-    └── skills/<name>/            # Cursor skill shells (disable-model-invocation)
-        ├── SKILL.md
-        └── BODY.md -> ../../../../prompts-resource/<name>/BODY.md
+    └── skills/<name>/            # Cursor prompt shells — NOT deployed (no command mechanism on Cursor yet;
+                                 # skills are linked directly from the repo's skills/ instead)
 ```
 
 Prompt instruction text (the Prompt Body) lives in `prompts-resource/<name>/BODY.md` at the repo root — one body per prompt, three shells (Pi `prompts/`, OpenCode `harness/opencode/commands/`, Cursor `harness/cursor/skills/`). Pi and OpenCode shells reference the body through the Stable Path `~/.agents/prompts-resource/<name>/BODY.md`, a symlink the deploy script maintains, so no machine-specific path is written into any repo file. Cursor shells instead carry an in-skill `BODY.md` symlink, following the agentskills convention of skill-relative resources.
@@ -26,9 +25,9 @@ Prompt instruction text (the Prompt Body) lives in `prompts-resource/<name>/BODY
 - `~/.agents/prompts-resource` → this repo's `prompts-resource/`.
 - `$XDG_CONFIG_HOME/opencode/commands/<name>.md` → `harness/opencode/commands/<name>.md`.
 - `$XDG_CONFIG_HOME/opencode/plugins/magpie.js` → a symlink to the bundle built from `harness/opencode/plugins/magpie.ts` with `bun build --target=bun` (output under `harness/opencode/plugins/dist/`, gitignored).
-- `~/.cursor/skills/<name>` → `harness/cursor/skills/<name>`.
+- `~/.cursor/skills/<name>` → this repo's `skills/<name>`, the same real skills linked into `~/.agents/skills`. Only real skills live there — no prompt shells. Links into `harness/` left over under `~/.cursor/skills` are pruned (other entries are never touched).
 
-Existing links pointing at this checkout are kept, links pointing elsewhere are repointed, and real directories or files at a target path are skipped with a warning (never clobbered). Links are added and updated, never pruned — remove a link by hand when a source skill goes away. Skills under the repo's `.agents/skills/` are Project-Local Skills (this repo only) and are not deployed. A failed plugin build fails the deploy after the other steps complete.
+Existing links pointing at this checkout are kept, links pointing elsewhere are repointed, and real directories or files at a target path are skipped with a warning (never clobbered). Links are added and updated, never pruned outside the stale-`harness/` case — remove a link by hand when a source skill goes away. Skills under the repo's `.agents/skills/` are Project-Local Skills (this repo only) and are not deployed. A failed plugin build fails the deploy after the other steps complete.
 
 ## Magpie plugin
 
