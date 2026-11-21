@@ -1,6 +1,6 @@
 # Magpie Extension
 
-A pi extension that registers the `magpie` provider against a personal [magpie](https://github.com/yetone/magpie) gateway (default `http://100.65.0.3:3425`), registers its decision models as native Pi classifier models, and exposes a `generate_image` tool backed by the gateway's image API.
+A pi extension that registers the `magpie` provider against a personal [magpie](https://github.com/yetone/magpie) gateway (default `http://poi.li-rankine.ts.net:3425`), registers its decision models as native Pi classifier models, and exposes a `generate_image` tool backed by the gateway's image API.
 
 ## Configuration
 

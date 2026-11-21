@@ -33,7 +33,7 @@ Existing links pointing at this checkout are kept, links pointing elsewhere are 
 
 ## Magpie configuration
 
-`provider-magpie.json` and the plugin default to the same LAN gateway the Pi package ships (`http://100.65.0.3:3425`, key `magpie-private`). Overrides:
+`provider-magpie.json` and the plugin default to the same LAN gateway the Pi package ships (`http://poi.li-rankine.ts.net:3425`, key `magpie-private`). Overrides:
 
 - **Image tool**: set `MAGPIE_BASE_URL` / `MAGPIE_API_KEY` in the environment OpenCode runs in.
 - **Provider**: edit `provider.magpie` in the merged `opencode.json` — e.g. `"apiKey": "{env:MAGPIE_API_KEY}"`. The deploy merge never touches an existing value.

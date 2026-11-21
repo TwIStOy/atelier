@@ -1,6 +1,6 @@
 import { tool, type Plugin } from "@opencode-ai/plugin";
 
-const DEFAULT_MAGPIE_URL = "http://100.65.0.3:3425";
+const DEFAULT_MAGPIE_URL = "http://poi.li-rankine.ts.net:3425";
 const DEFAULT_MAGPIE_API_KEY = "magpie-private";
 const MAX_REFERENCE_IMAGES = 5;
 const IMAGE_TIMEOUT_MS = 300_000;

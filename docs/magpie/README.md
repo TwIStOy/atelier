@@ -10,7 +10,7 @@ classifier models.
 
 | Setting | Environment override | Default | Meaning |
 | --- | --- | --- | --- |
-| Gateway URL | `MAGPIE_BASE_URL` | `http://100.65.0.3:3425` | Gateway root, without `/v1` |
+| Gateway URL | `MAGPIE_BASE_URL` | `http://poi.li-rankine.ts.net:3425` | Gateway root, without `/v1` |
 | API Key | `MAGPIE_API_KEY` | the gateway key shipped with the extension | Literal key or `$VAR` / `{env:VAR}` reference |
 | Classifier Models | — | `group/classifier` | Decision model ids to register, comma or space separated |
 | Classifier Timeout (ms) | — | `10000` | Timeout per attempt, including body delivery |
@@ -20,7 +20,7 @@ classifier models.
 ```json
 {
   "magpie": {
-    "url": "http://100.65.0.3:3425",
+    "url": "http://poi.li-rankine.ts.net:3425",
     "apiKey": "$MAGPIE_KEY",
     "classifierModels": "group/classifier"
   }

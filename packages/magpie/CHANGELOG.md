@@ -10,6 +10,7 @@
 
 ### Changed
 
+- The default gateway URL is now the MagicDNS hostname `http://poi.li-rankine.ts.net:3425` instead of the fixed Tailscale IP; `MAGPIE_BASE_URL` still overrides it.
 - The provider URL and key now come from the configuration section instead of package constants, and registration is repeated at `session_start` so edited connection values apply to the next session.
 - Catalog refresh and the `/refresh-magpie` command handler now come from `@htwang-contrib/common`'s `gateway-provider` module instead of a package-private copy.
 

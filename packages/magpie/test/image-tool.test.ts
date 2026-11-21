@@ -9,7 +9,7 @@ import { MAGPIE_CONFIG_ID } from "../src/config.ts";
 import { executeGenerateImage, type GenerateImageDetails, registerGenerateImageTool } from "../src/image-tool.ts";
 
 const PNG_BASE64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
-const GATEWAY = "http://100.65.0.3:3425";
+const GATEWAY = "http://poi.li-rankine.ts.net:3425";
 const B64_JSON = "b64" + "_json";
 
 function imageResponse(overrides: Record<string, unknown> = {}) {

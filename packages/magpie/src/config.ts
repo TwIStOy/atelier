@@ -7,7 +7,7 @@ import {
 } from "@htwang-contrib/common/config";
 
 export const MAGPIE_CONFIG_ID = "magpie";
-export const DEFAULT_MAGPIE_URL = "http://100.65.0.3:3425";
+export const DEFAULT_MAGPIE_URL = "http://poi.li-rankine.ts.net:3425";
 
 export interface MagpieConfig {
   url: string;
