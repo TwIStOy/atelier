@@ -76,13 +76,20 @@ async function deployOpenCode() {
   } catch {
     config = {};
   }
-  if (!config.provider?.magpie) {
-    const snippet = JSON.parse(await readFile(join(repoRoot, "harness", "opencode", "provider-magpie.json"), "utf8"));
-    config.provider = { ...config.provider, magpie: snippet };
+  if (config.provider?.magpie) {
+    actions.push(`kept existing provider.magpie in ${configPath}`);
+    return;
+  }
+  const snippetText = await readFile(join(repoRoot, "harness", "opencode", "provider-magpie.json"), "utf8");
+  config.provider = { ...config.provider, magpie: JSON.parse(snippetText) };
+  try {
     await writeFile(configPath, `${JSON.stringify(config, null, 2)}\n`, "utf8");
     actions.push(`merged provider.magpie into ${configPath}`);
-  } else {
-    actions.push(`kept existing provider.magpie in ${configPath}`);
+  } catch {
+    const providerJson = JSON.stringify({ provider: { magpie: JSON.parse(snippetText) } }, null, 2);
+    actions.push(
+      `provider.magpie is missing from ${configPath} and the file is not writable (Nix-managed?). Merge this into your opencode config manually:\n${providerJson}`,
+    );
   }
 }
 

@@ -1,4 +1,5 @@
 import { tool, type Plugin } from "@opencode-ai/plugin";
+import type { Model } from "@opencode-ai/sdk/v2";
 
 const DEFAULT_MAGPIE_URL = "http://poi.li-rankine.ts.net:3425";
 const DEFAULT_MAGPIE_API_KEY = "magpie-private";
@@ -113,6 +114,107 @@ interface MagpieImageData {
   url?: string;
   mime_type?: string;
   revised_prompt?: string;
+}
+
+interface MagpieCatalogEntry {
+  id?: string;
+  object?: string;
+  display_name?: string;
+  context_window?: number;
+  context_length?: number;
+  max_output_tokens?: number;
+  modalities?: { input?: string[] };
+  reasoning?: boolean;
+  reasoning_levels?: string[];
+  supported_reasoning_levels?: { effort?: string }[];
+  pricing?: {
+    prompt?: string;
+    completion?: string;
+    input_cache_read?: string;
+    input_cache_write?: string;
+  };
+  created?: number;
+}
+
+interface MagpieModelsResponse {
+  data?: MagpieCatalogEntry[];
+}
+
+const PROVIDER_ID = "magpie";
+const PROVIDER_NPM = "@ai-sdk/openai-compatible";
+const DEFAULT_CONTEXT_WINDOW = 200_000;
+const DEFAULT_MAX_TOKENS = 16_384;
+const EPOCH_RELEASE_DATE = "1970-01-01T00:00:00.000Z";
+
+function shiftDecimal(whole: string, frac: string, scale: number): { intDigits: string; fracDigits: string } {
+  if (frac.length <= scale) return { intDigits: whole + frac.padEnd(scale, "0"), fracDigits: "" };
+  return { intDigits: whole + frac.slice(0, scale), fracDigits: frac.slice(scale).replace(/0+$/, "") };
+}
+
+function perMillion(perToken: string | undefined): number {
+  if (!perToken) return 0;
+  const trimmed = perToken.trim();
+  const decimal = /^(\d+)(?:\.(\d+))?$/.exec(trimmed);
+  if (!decimal) {
+    const numeric = Number(trimmed);
+    return Number.isFinite(numeric) && numeric > 0 ? numeric * 1_000_000 : 0;
+  }
+  const shifted = shiftDecimal(decimal[1] ?? "0", decimal[2] ?? "", 6);
+  const intDigits = shifted.intDigits.replace(/^0+(?=\d)/, "");
+  const value = Number(shifted.fracDigits ? `${intDigits}.${shifted.fracDigits}` : intDigits);
+  return Number.isFinite(value) ? value : 0;
+}
+
+function reasoningEfforts(entry: MagpieCatalogEntry): string[] {
+  const named = entry.reasoning_levels;
+  const source = named ?? entry.supported_reasoning_levels?.map((level) => level.effort ?? "") ?? [];
+  return source.map((level) => level.trim().toLowerCase()).filter((level) => level.length > 0);
+}
+
+export function magpieModelsToOpenCode(payload: MagpieModelsResponse, baseUrl: string): Record<string, Model> {
+  const models: Record<string, Model> = {};
+  for (const entry of payload.data ?? []) {
+    if (!entry.id || (entry.object !== undefined && entry.object !== "model")) continue;
+    if (models[entry.id]) continue;
+    models[entry.id] = magpieModelToOpenCode(entry, entry.id, baseUrl);
+  }
+  return models;
+}
+
+function magpieModelToOpenCode(entry: MagpieCatalogEntry, id: string, baseUrl: string): Model {
+  const efforts = reasoningEfforts(entry);
+  const acceptsImages = entry.modalities?.input?.includes("image") ?? false;
+  return {
+    id,
+    providerID: PROVIDER_ID,
+    api: { id, url: baseUrl, npm: PROVIDER_NPM },
+    name: entry.display_name?.trim() || id,
+    capabilities: {
+      temperature: true,
+      reasoning: entry.reasoning === true || efforts.length > 0,
+      attachment: acceptsImages,
+      toolcall: true,
+      input: { text: true, audio: false, image: acceptsImages, video: false, pdf: false },
+      output: { text: true, audio: false, image: false, video: false, pdf: false },
+      interleaved: false,
+    },
+    cost: {
+      input: perMillion(entry.pricing?.prompt),
+      output: perMillion(entry.pricing?.completion),
+      cache: {
+        read: perMillion(entry.pricing?.input_cache_read),
+        write: perMillion(entry.pricing?.input_cache_write),
+      },
+    },
+    limit: {
+      context: entry.context_window ?? entry.context_length ?? DEFAULT_CONTEXT_WINDOW,
+      output: entry.max_output_tokens ?? DEFAULT_MAX_TOKENS,
+    },
+    status: "active",
+    options: {},
+    headers: {},
+    release_date: entry.created ? new Date(entry.created * 1000).toISOString() : EPOCH_RELEASE_DATE,
+  };
 }
 
 interface MagpieImagesResponse {
@@ -230,8 +332,37 @@ async function executeGenerateImage(
   return { title: "Generate Image", output: lines.join("\n") };
 }
 
+interface OpenCodeProviderConfig {
+  models?: Record<string, unknown>;
+}
+
+interface OpenCodeConfigLike {
+  provider?: Record<string, OpenCodeProviderConfig>;
+}
+
+async function fetchMagpieModels(config: MagpieConfig): Promise<Record<string, Model>> {
+  try {
+    const response = await fetch(`${config.baseUrl}/models`, {
+      headers: { accept: "application/json", authorization: `Bearer ${config.apiKey}` },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return magpieModelsToOpenCode((await response.json()) as MagpieModelsResponse, config.baseUrl);
+  } catch (error) {
+    console.error(`magpie: model catalog refresh failed: ${error instanceof Error ? error.message : String(error)}`);
+    return {};
+  }
+}
+
 const magpiePlugin: Plugin = async () => {
   return {
+    config: async (config) => {
+      const providerConfig = (config as unknown as OpenCodeConfigLike).provider?.[PROVIDER_ID];
+      if (!providerConfig) return;
+      const models = await fetchMagpieModels(loadMagpieConfig());
+      if (Object.keys(models).length === 0) return;
+      providerConfig.models = { ...(providerConfig.models ?? {}), ...models };
+    },
     tool: {
       generate_image: tool({
         description: TOOL_DESCRIPTION,

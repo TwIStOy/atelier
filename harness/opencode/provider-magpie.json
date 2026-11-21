@@ -4,9 +4,5 @@
     "baseURL": "http://poi.li-rankine.ts.net:3425/v1",
     "apiKey": "magpie-private"
   },
-  "models": {
-    "group/smart-split": { "name": "Magpie Smart Split" },
-    "group/cn-flagships": { "name": "Magpie CN Flagships" },
-    "group/cheap": { "name": "Magpie Cheap" }
-  }
+  "models": {}
 }

@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { lstat, mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
+import { chmod, lstat, mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import fileURLToPathFn from "node:url";
@@ -109,6 +109,26 @@ describe("deploy-harness", () => {
     );
     const body = await realpath(join(implement, "BODY.md"));
     expect(body).toBe(join(repoRoot, "prompts-resource", "implement", "BODY.md"));
+  });
+
+  it("falls back to printing the provider snippet when opencode.json is not writable", async () => {
+    const configDir = join(home, ".config", "opencode");
+    await mkdir(configDir, { recursive: true });
+    const configPath = join(configDir, "opencode.json");
+    const original = JSON.stringify({ theme: "dark" });
+    await writeFile(configPath, original, "utf8");
+    await chmod(configPath, 0o444);
+
+    const output = execFileSync("node", [script], {
+      env: { ...process.env, HOME: home, XDG_CONFIG_HOME: join(home, ".config") },
+      encoding: "utf8",
+      stdio: "pipe",
+    });
+
+    expect(output).toContain("provider.magpie is missing");
+    expect(output).toContain("manually");
+    expect(await readFile(configPath, "utf8")).toBe(original);
+    await chmod(configPath, 0o644);
   });
 
   it("is idempotent and never clobbers a pre-existing real directory", async () => {

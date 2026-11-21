@@ -26,7 +26,7 @@ Prompt instruction text (the Prompt Body) lives in `prompts-resource/<name>/BODY
 - `~/.agents/prompts-resource` → this repo's `prompts-resource/`.
 - `$XDG_CONFIG_HOME/opencode/commands/<name>.md` → `harness/opencode/commands/<name>.md`.
 - `$XDG_CONFIG_HOME/opencode/plugins/magpie.js` — built from `harness/opencode/plugins/magpie.ts` with `bun build --target=bun` (the bundle is a build artifact; the source here is the single source).
-- `$XDG_CONFIG_HOME/opencode/opencode.json` — merges `provider.magpie` from `harness/opencode/provider-magpie.json` only when the key is absent; existing values are never overwritten.
+- `$XDG_CONFIG_HOME/opencode/opencode.json` — merges `provider.magpie` from `harness/opencode/provider-magpie.json` only when the key is absent; existing values are never overwritten. When the file is not writable (e.g. home-manager/Nix symlink into the store), the merge is skipped and the snippet is printed for manual merging instead — the deploy still succeeds.
 - `~/.cursor/skills/<name>` → `harness/cursor/skills/<name>`.
 
 Existing links pointing at this checkout are kept, links pointing elsewhere are repointed, and real directories or files at a target path are skipped with a warning (never clobbered). A failed plugin build fails the deploy after the other steps complete.
@@ -37,11 +37,12 @@ Existing links pointing at this checkout are kept, links pointing elsewhere are 
 
 - **Image tool**: set `MAGPIE_BASE_URL` / `MAGPIE_API_KEY` in the environment OpenCode runs in.
 - **Provider**: edit `provider.magpie` in the merged `opencode.json` — e.g. `"apiKey": "{env:MAGPIE_API_KEY}"`. The deploy merge never touches an existing value.
-- **Model list**: static (the three routing groups mirroring the Pi settings); edit the snippet or the merged config and re-run deploy. Pi keeps the dynamic `/v1/models` refresh; OpenCode does not.
+- **Model catalog**: dynamic. The plugin's `config` hook fetches `<baseURL>/models` at startup (10s timeout) and injects every chat model the gateway advertises — the same catalog Pi refreshes — into `provider.magpie.models`, including display names, context windows, pricing, and reasoning/attachment capabilities. On failure it logs to stderr and leaves the provider without models. The V1 `provider` hook is **not** consulted by the 1.19.x host (verified empirically), so the config hook is the mechanism. Startup therefore makes one gateway request; the list is not cached across restarts.
 
 ## Caveats
 
-- **OpenCode version**: written for the installed 1.19.x line (V1 function-style plugin API, `provider` config key, `@ai-sdk/openai-compatible` npm packages). OpenCode V2 renames these (`Plugin.define`, `providers` plural, `@opencode/ai/providers/openai-compatible`); the plugin and snippet need adjusting on upgrade.
+- **Plugin loading**: `magpie.js` is auto-discovered from `~/.config/opencode/plugins/`; a config `plugin` array entry with the absolute path works too. OpenCode caches plugin builds by path — after rebuilding, restart OpenCode (or change the file path) before verifying.
+- **OpenCode version**: written for the installed 1.19.x line (V1 function-style plugin API, `provider` config key, `@ai-sdk/openai-compatible` npm packages). OpenCode V2 renames these (`Plugin.define`, `providers` plural, `@opencode/ai/providers/openai-compatible`) and its catalog draft has no `add`; the plugin and snippet need adjusting on upgrade.
 - **`@file` command injection is not used**: V1 never documented its path resolution and V2 removes the feature entirely, so OpenCode shells instruct the agent to read the body via the Stable Path instead.
 - **Cursor cloud sync does not follow symlinks** (community-reported): the linked skills work locally but do not sync to Cursor Cloud Agents. Copy instead of linking if that matters.
 - **Cursor IDE symlink discovery** had a known bug (the CLI follows symlinks since June 2026); if skills do not appear, copy the directories.
