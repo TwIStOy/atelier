@@ -24,6 +24,14 @@ _Avoid_: sync, compilation, adapter output
 Harness-agnostic material consumed as-is or referenced from a shell: skill bodies, prompt bodies, prompt resources, personas.
 _Avoid_: config (too broad), plugin (wrong kind)
 
+**Repo Skill**:
+A skill under `skills/`, shipped with the pi package and deployed to `~/.agents/skills/` for every project.
+_Avoid_: shared skill (vague), global skill
+
+**Project-Local Skill**:
+A skill under `.agents/skills/` in this repo, discovered only inside this project (e.g. `pi-self-extension`) and never deployed.
+_Avoid_: repo skill (that is the deployed one)
+
 **Per-Harness Shell**:
 A tiny harness-native wrapper (Pi prompt, OpenCode command, Cursor skill) whose body points at a shared Prompt Body or Content Asset instead of duplicating it.
 _Avoid_: wrapper (too vague), adapter (implies code)
