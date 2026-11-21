@@ -28,7 +28,7 @@ Prompt instruction text (the Prompt Body) lives in `prompts-resource/<name>/BODY
 - `$XDG_CONFIG_HOME/opencode/plugins/magpie.js` → a symlink to the bundle built from `harness/opencode/plugins/magpie.ts` with `bun build --target=bun` (output under `harness/opencode/plugins/dist/`, gitignored).
 - `~/.cursor/skills/<name>` → `harness/cursor/skills/<name>`.
 
-Existing links pointing at this checkout are kept, links pointing elsewhere are repointed, and real directories or files at a target path are skipped with a warning (never clobbered). A failed plugin build fails the deploy after the other steps complete.
+Existing links pointing at this checkout are kept, links pointing elsewhere are repointed, and real directories or files at a target path are skipped with a warning (never clobbered). Links are added and updated, never pruned — remove a link by hand when a source skill goes away. Skills under the repo's `.agents/skills/` are Project-Local Skills (this repo only) and are not deployed. A failed plugin build fails the deploy after the other steps complete.
 
 ## Magpie plugin
 
