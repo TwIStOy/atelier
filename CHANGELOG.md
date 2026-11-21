@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Multi-harness sharing (see `docs/multi-harness/`): skills moved to `.agents/skills/` with `skills/<name>` kept as relative symlinks so the `pi.skills` manifest keeps working; prompt instruction text moved to `prompts-resource/<name>/BODY.md` with thin Pi prompt shells, OpenCode command shells under `harness/opencode/commands/`, and Cursor skill shells (with in-directory `BODY.md` links) under `harness/cursor/skills/`; a Magpie OpenCode plugin (`generate_image` tool, V1 plugin API) plus a `provider.magpie` config snippet under `harness/opencode/`; and an idempotent `just deploy-harness` recipe (`scripts/deploy-harness.mjs`) that maintains the `~/.agents` stable paths, OpenCode command/plugin links, the provider merge, and Cursor skill links.
+
 ### Changed
 
 - Every extension package now declares `pi.extensions: ["./index.ts"]` pointing at a one-line `export { default } from "./src/index.ts";` re-export, so Pi's startup extension list shows the bare package name instead of `<name>/src`. Pi derives that label from the entry file path: it strips a trailing `index.ts` and then takes the shortest path suffix unique across all loaded extensions, and `src` was never unique.
