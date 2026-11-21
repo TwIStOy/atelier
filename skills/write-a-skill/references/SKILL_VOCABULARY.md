@@ -8,7 +8,7 @@ Read this when refining an existing skill or diagnosing why one misbehaves, not 
 
 Every skill pays exactly one of two costs — pick deliberately.
 
-- **Model-invoked** (this repo: lives in `.agents/skills/`, has a `description`) — the agent can fire it on its own and other skills can reach it. Pays **context load**: the description sits in the system prompt every turn, spending tokens and attention. Keep only when the agent must reach it without a human nudge.
+- **Model-invoked** (this repo: lives in `skills/`, has a `description`) — the agent can fire it on its own and other skills can reach it. Pays **context load**: the description sits in the system prompt every turn, spending tokens and attention. Keep only when the agent must reach it without a human nudge.
 - **User-invoked** (this repo: lives in `prompts/`) — only the human triggers it by name. Pays **cognitive load**: the human must remember it exists and when to reach for it. Zero context load. Use when it never fires except by hand.
 
 When user-invoked prompts multiply past what you can hold, add a **router** prompt that names the others and when to use each — one thing to remember instead of many.
