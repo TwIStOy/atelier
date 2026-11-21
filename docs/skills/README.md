@@ -41,7 +41,7 @@
   - `docs/agents/domain.md` — `CONTEXT.md` / ADR 布局
   - 在 `AGENTS.md`(优先)或 `CLAUDE.md` 里写一段 `## Agent skills` 索引
 - **纪律**:先 explore 再问;每节一次问题,推荐答案放前;`ask_user_question` 优先。
-- **资源**:`prompts-resource/setup-agent-repo-context/{issue-tracker-github,issue-tracker-gitlab,issue-tracker-local,triage-labels,domain}.md`。
+- **资源**:`~/.agents/prompts-resource/setup-agent-repo-context/{issue-tracker-github,issue-tracker-gitlab,issue-tracker-local,triage-labels,domain}.md`。
 
 ### `/grill-with-docs` —— 边盘问边建领域模型
 
@@ -54,7 +54,7 @@
 - **怎么用**:`/triage` 或 `/triage #42` / `/triage show me what needs attention`。
 - **何时用**:维护者要把外部 issue 或 PR 分类、核实、必要时盘问,并写成 agent-ready brief。
 - **状态机**:每个 issue 一个 category(`bug`/`enhancement`) + 一个 state(`needs-triage`/`needs-info`/`ready-for-agent`/`ready-for-human`/`wontfix`)。
-- **产物**:GitHub 评论上的 agent brief(见 `prompts-resource/triage/AGENT-BRIEF.md`);被拒的 enhancement 写入 `.out-of-scope/`(见 `prompts-resource/triage/OUT-OF-SCOPE.md`)。
+- **产物**:GitHub 评论上的 agent brief(见 `~/.agents/prompts-resource/triage/AGENT-BRIEF.md`);被拒的 enhancement 写入 `.out-of-scope/`(见 `~/.agents/prompts-resource/triage/OUT-OF-SCOPE.md`)。
 - **Tracker**:默认 `gh`;无 GitHub 时回落到 `.scratch/<slug>/`。
 
 ### `/improve-codebase-architecture` —— 找加深(deepening)机会
@@ -66,7 +66,7 @@
   2. 用 `subagent`/`explore` 扫代码,按 deep-module 词汇(module/interface/depth/seam/adapter/leverage/locality)记摩擦点。
   3. 写一份中文自包含 HTML 报告到 `$TMPDIR/architecture-review-<ts>/index.html`(Tailwind + Mermaid CDN);macOS 上直接 `open`,其余环境用 `python3 -m http.server --bind 0.0.0.0` 起后台服务，按局域网/Tailscale/公网各 IPv4 地址给出可点击 URL，供用户从 Mac 访问。
   4. 用户选中后进入 `grilling` + `domain-modeling` 循环;需要备选接口时用 `codebase-design` 的 design-it-twice 模式。
-- **资源**:`prompts-resource/improve-codebase-architecture/HTML-REPORT.md`。
+- **资源**:`~/.agents/prompts-resource/improve-codebase-architecture/HTML-REPORT.md`。
 
 ### `codebase-design` —— deep module 设计词汇表
 
@@ -119,7 +119,7 @@
   2. **红 → 绿** —— 先写失败的测试,再写刚够让它过的代码。
   3. **纵切** —— 一个测试 → 一个实现 → 循环;每个测试是发曳光弹(tracer bullet),响应上一轮学到的东西。
   4. **重构不在这个循环里** —— 它归 `code-review` 阶段。
-- **它标记的反模式**:implementation-coupled(重构就红)、tautological(按构造必过)、horizontal slicing(测的是想象中的行为)。见 `skills/tdd/references/{tests,mocking}.md`。
+- **它标记的反模式**:implementation-coupled(重构就红)、tautological(按构造必过)、horizontal slicing(测的是想象中的行为)。见 `.agents/skills/tdd/references/{tests,mocking}.md`。
 
 ### `code-review` —— 双轴并行评审
 
@@ -138,7 +138,7 @@
 - **铁律**:**没有 tight、red-capable 的反馈回路,不准提假设。** Phase 1 才是「这个 skill 的本体」——其余都是机械操作。在你拿不出一条能复现 bug 的、快速、确定、断言用户确切症状的命令前,agent 拒绝理论化。
 - **脱敏先行**:展示任何命令、输出或抓包之前先把 secret 打成 `<REDACTED>`;回路用环境变量携带凭据;抓包只引用携带信号的那几行。
 - **6 个阶段**:建回路并收紧 → 复现并最小化 → 提假设(3–5 条排序、可证伪)→ 插桩(一次只动一个变量,日志打 `[DEBUG-xxxx]` 标签)→ 修 + 在正确的 seam 上写回归测试 → 清理。
-- **人肉回路兜底**:当必须人来点击时,用自带的 `skills/diagnosing-bugs/scripts/hitl-loop.template.sh` 把回路结构化。
+- **人肉回路兜底**:当必须人来点击时,用自带的 `.agents/skills/diagnosing-bugs/scripts/hitl-loop.template.sh` 把回路结构化。
 
 ### `research` —— 后台子 agent 调研落盘
 
@@ -197,9 +197,9 @@
 - **`tdd` ↔ `code-review` 是闭环。** `tdd` 明确把重构推迟到评审阶段并指向 `code-review`。只用一个,循环就只闭合了一半。
 - **`code-review` 真的会起子 agent。** 你会看到两个 `general-purpose` 子任务并发跑、上下文彼此隔离。这种隔离正是要点——别把它们合并。
 - **`code-review` 要一个固定点。** 给它 `review since main`、`review since HEAD~5`、`review since <tag>` 等。不给的话它会问你要。
-- **`diagnosing-bugs` 强制顺序。** 在 tight、red-capable 的反馈回路建立前,它拒绝理论化——如果你觉得它「不肯直接猜」很慢,那正是纪律在起作用。遇到必须人肉点击的 bug,它会回落到自带的 `skills/diagnosing-bugs/scripts/hitl-loop.template.sh`。
+- **`diagnosing-bugs` 强制顺序。** 在 tight、red-capable 的反馈回路建立前,它拒绝理论化——如果你觉得它「不肯直接猜」很慢,那正是纪律在起作用。遇到必须人肉点击的 bug,它会回落到自带的 `.agents/skills/diagnosing-bugs/scripts/hitl-loop.template.sh`。
 - **交叉引用都能解析。** `tdd` 指向 `code-review`;`grill-with-docs` / `triage` / `improve-codebase-architecture` 加载 `grilling` + `domain-modeling`;`improve-codebase-architecture` 还加载 `codebase-design`(词汇 + design-it-twice);`implement` 加载 `tdd` + `code-review`;`tdd`、`domain-modeling`、`diagnosing-bugs`、`improve-codebase-architecture` 都读 `CONTEXT.md`。所有目标在本仓库都存在。
-- **Prompt 资源路径从仓库根解析。** 例如 `prompts-resource/triage/AGENT-BRIEF.md`、`prompts-resource/improve-codebase-architecture/HTML-REPORT.md`、`prompts-resource/setup-agent-repo-context/`——pi 从 cwd 解析路径,不是从 prompt 文件所在目录。
+- **Prompt 正文（Body）与壳分离。** 每个 prompt 的指令正文在 `prompts-resource/<name>/BODY.md`;`prompts/<name>.md` 只是指向正文的薄壳（附上调用参数）。正文里的交叉引用统一走稳定路径:`~/.agents/skills/<skill>/...`、`~/.agents/prompts-resource/<name>/...`——这两处由部署脚本(`just deploy-harness`)软链到本仓库,任何项目、任何 harness 里都能解析。OpenCode/Cursor 的命令壳在 `harness/` 目录,详见 `docs/multi-harness/`。
 - **`docs/agents/*` 是 per-repo 配置。** `/triage`、`/to-spec`、`/to-tickets`、`/implement` 优先读它们;缺失时回落到内联的 `gh` / `.scratch` 默认。
 
 ## 来源与适配
@@ -210,7 +210,7 @@
 - **`/skill-name` 交叉调用 → 显式加载。** pi 的 skill 不是斜杠命令,所以 prompt 点名 skill 并让 agent 去读它们的 `SKILL.md`(例如 `implement` 加载 `tdd` + `code-review`)。
 - **`code-review` 的子 agent 机制。** 原文「两个 `Agent` 工具调用」改成一次 `subagent` 调用、`tasks` 数组里放两项(`agent_type: "general-purpose"`),并发执行且上下文隔离。
 - **`setup-matt-pocock-skills` → `/setup-agent-repo-context`。** 改名并去掉所有 Matt 专属字样;产物仍写 `docs/agents/{issue-tracker,triage-labels,domain}.md`。优先编辑 `AGENTS.md`(pi 约定),其次 `CLAUDE.md`。`/triage` / `/to-spec` / `/to-tickets` / `/implement` 优先读这些文件,缺失时回落到内联 `gh` / `.scratch` 默认。
-- **`improve-codebase-architecture` 加载 `codebase-design` 获取词汇。** 上游同样让该命令调用 model-invoked 的 `codebase-design` skill;本仓库把 prompt 里原内联的词汇表换成显式加载 `skills/codebase-design/SKILL.md`,避免双份维护。接口备选指向上游吸收了 `design-an-interface` 的 `references/DESIGN-IT-TWICE.md`。
+- **`improve-codebase-architecture` 加载 `codebase-design` 获取词汇。** 上游同样让该命令调用 model-invoked 的 `codebase-design` skill;本仓库把 prompt 里原内联的词汇表换成显式加载 `.agents/skills/codebase-design/SKILL.md`,避免双份维护。接口备选指向上游吸收了 `design-an-interface` 的 `references/DESIGN-IT-TWICE.md`。
 - **`design-an-interface` 已删除(2026-09)。** 上游把它废弃并吸收进 `codebase-design`;本仓库同步删除,原 prompt/文档引用改指 `codebase-design`。
 - **`research` 移植为 model-invoked skill(2026-09)。** 上游的 "background agent" 机制适配为 `subagent` 工具的 `background: true` + `subagent_status` 轮询。
 - **Prompt 附带资源放在 `prompts-resource/<name>/`。** 例如 `triage` 的 `AGENT-BRIEF.md` / `OUT-OF-SCOPE.md`,`improve-codebase-architecture` 的 `HTML-REPORT.md`。入口 prompt 用仓库根相对路径引用。
