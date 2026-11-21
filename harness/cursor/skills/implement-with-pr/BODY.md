@@ -1,1 +1,0 @@
-../../../../prompts-resource/implement-with-pr/BODY.md

@@ -14,4 +14,4 @@ Multi-context monorepo of pi extensions. Each context has a `CONTEXT.md` glossar
 
 - **child-sessions → agent-todo-linking**: a child session's Execution Finish settles Task Links via session-links records
 - **tool-display ↔ child-sessions**: subagent tool calls render through tool-display adapters and Aggregate Rules
-- **multi-harness → skills/prompts**: the harness overlay consumes `skills/` and `prompts-resource/` bodies; see `docs/multi-harness/DEPLOY.md` for deployment
+- **multi-harness → skills/prompts**: the harness overlay consumes `skills/` (including User-Invoked Skills, the former prompts); see `docs/multi-harness/DEPLOY.md` for deployment

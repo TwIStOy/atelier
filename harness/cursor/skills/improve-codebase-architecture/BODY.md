@@ -1,1 +1,0 @@
-../../../../prompts-resource/improve-codebase-architecture/BODY.md

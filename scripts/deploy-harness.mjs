@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { execFileSync } from "node:child_process";
-import { lstat, mkdir, readdir, realpath, rm, symlink } from "node:fs/promises";import { dirname, join, resolve, sep } from "node:path";
+import { lstat, mkdir, readdir, readlink, realpath, rm, symlink } from "node:fs/promises";
+import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -32,6 +33,33 @@ async function ensureLink(target, linkPath) {
   actions.push(`linked ${linkPath} -> ${target}`);
 }
 
+async function pruneRepoLinks(destPath, ...repoPrefixes) {
+  const stat = await lstat(destPath).catch(() => null);
+  if (!stat) return;
+  const matchesRepo = async (linkPath) => {
+    const target = await readlink(linkPath).catch(() => null);
+    return target !== null && repoPrefixes.some((prefix) => target.startsWith(prefix));
+  };
+  if (stat.isSymbolicLink()) {
+    if (await matchesRepo(destPath)) {
+      await rm(destPath);
+      actions.push(`pruned stale link ${destPath}`);
+    }
+    return;
+  }
+  if (!stat.isDirectory()) return;
+  for (const entry of await readdir(destPath, { withFileTypes: true })) {
+    if (!entry.isSymbolicLink()) continue;
+    const linkPath = join(destPath, entry.name);
+    if (!(await matchesRepo(linkPath))) continue;
+    await rm(linkPath);
+    actions.push(`pruned stale link ${linkPath}`);
+  }
+}
+
+const harnessDir = `${join(repoRoot, "harness")}${sep}`;
+const promptsResourceDir = join(repoRoot, "prompts-resource");
+
 async function linkDir(source, destRoot, keep) {
   for (const entry of await readdir(source, { withFileTypes: true })) {
     if (!keep(entry)) continue;
@@ -41,12 +69,11 @@ async function linkDir(source, destRoot, keep) {
 
 async function deploySkills() {
   await linkDir(join(repoRoot, "skills"), join(home, ".agents", "skills"), (entry) => entry.isDirectory());
-  await ensureLink(join(repoRoot, "prompts-resource"), join(home, ".agents", "prompts-resource"));
+  await pruneRepoLinks(join(home, ".agents", "prompts-resource"), promptsResourceDir);
 }
 
 async function deployOpenCode() {
-  const commandsDir = join(repoRoot, "harness", "opencode", "commands");
-  await linkDir(commandsDir, join(configHome, "opencode", "commands"), (entry) => entry.name.endsWith(".md"));
+  await pruneRepoLinks(join(configHome, "opencode", "commands"), harnessDir);
 
   const pluginsDir = join(configHome, "opencode", "plugins");
   const distFile = join(repoRoot, "harness", "opencode", "plugins", "dist", "magpie.js");
@@ -70,20 +97,9 @@ async function deployOpenCode() {
   }
 }
 
-async function pruneHarnessLinks(destRoot) {
-  for (const entry of await readdir(destRoot, { withFileTypes: true }).catch(() => [])) {
-    if (!entry.isSymbolicLink()) continue;
-    const linkPath = join(destRoot, entry.name);
-    const target = await realpath(linkPath).catch(() => null);
-    if (!target?.startsWith(`${join(repoRoot, "harness")}${sep}`)) continue;
-    await rm(linkPath);
-    actions.push(`pruned stale harness link ${linkPath} -> ${target}`);
-  }
-}
-
 async function deployCursor() {
   const dest = join(home, ".cursor", "skills");
-  await pruneHarnessLinks(dest);
+  await pruneRepoLinks(dest, harnessDir);
   await linkDir(join(repoRoot, "skills"), dest, (entry) => entry.isDirectory());
 }
 

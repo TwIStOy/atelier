@@ -1,1 +1,0 @@
-../../../../prompts-resource/handoff/BODY.md

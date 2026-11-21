@@ -1,1 +1,0 @@
-../../../../prompts-resource/land/BODY.md

@@ -49,22 +49,28 @@ describe("deploy-harness", () => {
     }
   });
 
-  it("links prompts-resource to the repo checkout", async () => {
-    runDeploy();
+  it("prunes the stale prompts-resource link from the retired layout", async () => {
     const link = join(home, ".agents", "prompts-resource");
-    expect((await lstat(link)).isSymbolicLink()).toBe(true);
-    expect(await realpath(link)).toBe(join(repoRoot, "prompts-resource"));
+    await mkdir(join(home, ".agents"), { recursive: true });
+    await symlink(join(repoRoot, "prompts-resource"), link);
+
+    runDeploy();
+
+    await expect(lstat(link)).rejects.toThrow();
   });
 
-  it("links opencode command shells into the opencode config dir", async () => {
-    runDeploy();
+  it("prunes stale opencode command links but leaves foreign ones", async () => {
     const dir = join(home, ".config", "opencode", "commands");
-    const files = (await readdir(dir)).filter((name) => name.endsWith(".md"));
-    const expectedCommands = await countEntries(join(repoRoot, "harness", "opencode", "commands"), true);
-    expect(files.length).toBe(expectedCommands);
-    for (const file of files) {
-      expect(await realpath(join(dir, file))).toBe(join(repoRoot, "harness", "opencode", "commands", file));
-    }
+    await mkdir(dir, { recursive: true });
+    await symlink(join(repoRoot, "harness", "opencode", "commands", "triage.md"), join(dir, "triage.md"));
+    const foreign = join(home, "own-command.md");
+    await writeFile(foreign, "# own", "utf8");
+    await symlink(foreign, join(dir, "own.md"));
+
+    runDeploy();
+
+    await expect(lstat(join(dir, "triage.md"))).rejects.toThrow();
+    expect(await realpath(join(dir, "own.md"))).toBe(foreign);
   });
 
   it("builds the magpie plugin bundle and symlinks it into the opencode plugins dir", async () => {
@@ -97,7 +103,7 @@ describe("deploy-harness", () => {
 
     runDeploy();
 
-    await expect(lstat(join(dir, "implement"))).rejects.toThrow();
+    expect(await realpath(join(dir, "implement"))).toBe(join(repoRoot, "skills", "implement"));
     expect(await realpath(join(dir, "foreign"))).toBe(foreign);
     expect((await lstat(join(dir, "real-dir"))).isDirectory()).toBe(true);
   });

@@ -52,13 +52,27 @@
       "skills/codebase-design",
       "skills/diagnosing-bugs",
       "skills/domain-modeling",
+      "skills/grill-with-docs",
       "skills/grilling",
+      "skills/handoff",
+      "skills/implement",
+      "skills/implement-many",
+      "skills/implement-with-pr",
+      "skills/improve-codebase-architecture",
+      "skills/land",
       "skills/obsidian-bases",
       "skills/obsidian-markdown",
       "skills/research",
       "skills/seed-pi-session",
+      "skills/setup-agent-repo-context",
       "skills/tdd",
+      "skills/teach",
+      "skills/to-spec",
+      "skills/to-tickets",
       "skills/todoist",
+      "skills/triage",
+      "skills/wait-what",
+      "skills/wizard",
       "skills/workflow-dsl",
       "skills/write-a-skill"
     ],
@@ -78,9 +92,6 @@
       "themes/synthwave-84.json",
       "themes/zed-dark.json",
       "themes/zed-light.json"
-    ],
-    "prompts": [
-      "prompts"
     ],
     "agents": [
       "./agents"

@@ -11,7 +11,7 @@
 | 类型 | 如何触发 | 成员 |
 |---|---|---|
 | **Skill**(model-invoked) | 正常说话——agent 把你的请求和每个 skill 的 `description` 做语义匹配,自动加载。不需要斜杠命令。 | `grilling`、`domain-modeling`、`tdd`、`code-review`、`codebase-design`、`diagnosing-bugs`、`research`、`write-a-skill` |
-| **Prompt**(user-invoked) | 显式打 `/command`。只能手动触发。 | `/setup-agent-repo-context`、`/grill-with-docs`、`/triage`、`/improve-codebase-architecture`、`/to-spec`、`/to-tickets`、`/implement`、`/wizard`、`/wait-what` |
+| **User-invoked skill**(`disable-model-invocation`) | pi 打 `/skill:xxx`,opencode/cursor 打 `/skill:skill-xxx`,只能手动触发;参数以纯文本跟在调用后。三家同一份 `skills/<name>/SKILL.md`,随部署软链分发。 | `setup-agent-repo-context`、`grill-with-docs`、`triage`、`improve-codebase-architecture`、`to-spec`、`to-tickets`、`implement`、`implement-with-pr`、`implement-many`、`land`、`wizard`、`wait-what`、`teach`、`handoff` |
 
 触发是**语义匹配**,所以中文英文都行——但英文关键词最稳。拿不准就直接点名:"用 tdd skill 来做"。
 
@@ -31,7 +31,7 @@
 - **产物**:`CONTEXT.md`(一份词汇表——鲜明的正典术语配 `_Avoid_` 同义词,不含实现细节)和 `docs/adr/NNNN-slug.md`(1–3 句的决策记录)。
 - **纪律**:术语一敲定就当场记下(绝不攒批);只有三个条件**全满足**才提 ADR——难撤销、没上下文会让人困惑、是真有取舍的结果。
 
-### `/setup-agent-repo-context` —— 给仓库装 agent 上下文
+### `setup-agent-repo-context`(user-invoked) —— 给仓库装 agent 上下文
 
 - **怎么用**:`/setup-agent-repo-context`(重配时加 `reconfigure`)。
 - **何时用**:第一次在某个仓库用 `/triage` / `/to-spec` / `/to-tickets` / `/implement` 之前,跑一次。
@@ -43,13 +43,13 @@
 - **纪律**:先 explore 再问;每节一次问题,推荐答案放前;`ask_user_question` 优先。
 - **资源**:`~/.agents/prompts-resource/setup-agent-repo-context/{issue-tracker-github,issue-tracker-gitlab,issue-tracker-local,triage-labels,domain}.md`。
 
-### `/grill-with-docs` —— 边盘问边建领域模型
+### `grill-with-docs`(user-invoked) —— 边盘问边建领域模型
 
-- **怎么用**:打 `/grill-with-docs`。
+- **怎么用**:打 `/skill:grill-with-docs`。
 - **何时用**:同 `grilling`,但带着代码库——你想让盘问同时持久化一份共享词汇。
 - **机制**:一个薄 prompt,组合 `grilling` 和 `domain-modeling` 两个 skill,告诉 agent 加载两者的 `SKILL.md` 并一起应用。
 
-### `/triage` —— 把 issue/PR 过 triage 状态机
+### `triage`(user-invoked) —— 把 issue/PR 过 triage 状态机
 
 - **怎么用**:`/triage` 或 `/triage #42` / `/triage show me what needs attention`。
 - **何时用**:维护者要把外部 issue 或 PR 分类、核实、必要时盘问,并写成 agent-ready brief。
@@ -57,7 +57,7 @@
 - **产物**:GitHub 评论上的 agent brief(见 `~/.agents/prompts-resource/triage/AGENT-BRIEF.md`);被拒的 enhancement 写入 `.out-of-scope/`(见 `~/.agents/prompts-resource/triage/OUT-OF-SCOPE.md`)。
 - **Tracker**:默认 `gh`;无 GitHub 时回落到 `.scratch/<slug>/`。
 
-### `/improve-codebase-architecture` —— 找加深(deepening)机会
+### `improve-codebase-architecture`(user-invoked) —— 找加深(deepening)机会
 
 - **怎么用**:`/improve-codebase-architecture` 或 `/improve-codebase-architecture Order intake`。
 - **何时用**:代码库浅模块多、测试难、AI 不好导航,想系统扫一遍并挑一个做加深。
@@ -77,36 +77,36 @@
 - **资源**:`references/DEEPENING.md`(按依赖类别安全地加深模块簇:in-process / local-substitutable / remote-but-owned / true external,以及 replace-don't-layer 测试策略);`references/DESIGN-IT-TWICE.md`(并行子 agent 生成 3+ 个截然不同的接口方案再对比)。
 - **历史**:上游把 `design-an-interface` 吸收进了这个 skill(design-it-twice 成为其参考文件);本仓库 2026-09 同步时随之删除了 `design-an-interface`。
 
-### `/to-spec` —— 把当前对话收成一份 spec
+### `to-spec`(user-invoked) —— 把当前对话收成一份 spec
 
 - **怎么用**:`/to-spec` 或 `/to-spec my-feature`。
 - **何时用**:已经讨论清楚,想落一份 PRD/spec,不再面试用户——只合成已知内容。
 - **产物**:GitHub issue(标 `ready-for-agent`),或本地 `.scratch/<slug>/spec.md`。
 - **纪律**:先画出要测的 seam 并和用户确认;用户故事要长而全;不写会过期的文件路径。
 
-### `/to-tickets` —— 拆成 tracer-bullet 工单
+### `to-tickets`(user-invoked) —— 拆成 tracer-bullet 工单
 
 - **怎么用**:`/to-tickets` 或 `/to-tickets #42` / `/to-tickets path/to/spec.md`。
 - **何时用**:有一份 plan/spec/对话,要拆成可独立交付、带阻塞边的纵切工单。
 - **纪律**:每张票是垂直切片(schema+API+UI+tests),不是水平切一层;先 prefactor 再做功能;宽重构用 expand–contract,不硬塞进 tracer bullet。
 - **产物**:GitHub issues(带 `Blocked by` / native deps)或 `.scratch/<slug>/issues/NN-*.md`。
 
-### `/implement` —— 按 spec/票实现
+### `implement`(user-invoked) —— 按 spec/票实现
 
 - **怎么用**:`/implement #42` 或 `/implement path/to/ticket.md`。
 - **何时用**:有一张 `ready-for-agent` 票或一份 spec,要真正动手写代码。
 - **机制**:加载 `tdd`(在约定 seam 上)→ 持续 typecheck/单测 → 结束时 `code-review` → 提交到当前分支。不扩 scope。
 
-### `/wizard` —— 生成人肉步骤向导脚本
+### `wizard`(user-invoked) —— 生成人肉步骤向导脚本
 
 - **怎么用**:`/wizard 配置 Stripe 测试密钥` / `/wizard 数据库迁移到新集群`。
 - **何时用**:有一段只有人能做的流程(开第三方控制台、配 CI secret、 provisioning、一次性迁移),每次重讲给 AI 很烦。
 - **产物**:一个 bash 向导脚本——逐阶段清屏、开 URL、告诉你点哪复制哪、隐藏输入 secret、幂等写 `.env` / `gh secret`,带进度和收尾总结。默认一次性,放 scratch;可重复使用的才提交进仓库。
 - **资源**:库与模板在 `prompts-resource/wizard/template.sh`;`STAGES` 标记以上是固定库,不许手改。
 
-### `/wait-what` —— 没看懂,重讲
+### `wait-what`(user-invoked) —— 没看懂,重讲
 
-- **怎么用**:任何时刻打 `/wait-what`。
+- **怎么用**:任何时刻打 `/skill:wait-what`。
 - **何时用**:agent 上一条消息没看懂——丢了上下文、跳了步骤、或术语飘了。
 - **机制**:要求 agent 用简化技术英语(ASD-STE100)重新 pitch,并带上你缺的上下文;术语跟 `CONTEXT.md`(多上下文仓库按 `CONTEXT-MAP.md` 索引)。
 
@@ -199,8 +199,8 @@
 - **`code-review` 要一个固定点。** 给它 `review since main`、`review since HEAD~5`、`review since <tag>` 等。不给的话它会问你要。
 - **`diagnosing-bugs` 强制顺序。** 在 tight、red-capable 的反馈回路建立前,它拒绝理论化——如果你觉得它「不肯直接猜」很慢,那正是纪律在起作用。遇到必须人肉点击的 bug,它会回落到自带的 `skills/diagnosing-bugs/scripts/hitl-loop.template.sh`。
 - **交叉引用都能解析。** `tdd` 指向 `code-review`;`grill-with-docs` / `triage` / `improve-codebase-architecture` 加载 `grilling` + `domain-modeling`;`improve-codebase-architecture` 还加载 `codebase-design`(词汇 + design-it-twice);`implement` 加载 `tdd` + `code-review`;`tdd`、`domain-modeling`、`diagnosing-bugs`、`improve-codebase-architecture` 都读 `CONTEXT.md`。所有目标在本仓库都存在。
-- **Prompt 正文（Body）与壳分离。** 每个 prompt 的指令正文在 `prompts-resource/<name>/BODY.md`;`prompts/<name>.md` 只是指向正文的薄壳（附上调用参数）。正文里的交叉引用统一走稳定路径:`~/.agents/skills/<skill>/...`、`~/.agents/prompts-resource/<name>/...`——这两处由部署脚本(`just deploy-harness`)软链到本仓库,任何项目、任何 harness 里都能解析。OpenCode/Cursor 的命令壳在 `harness/` 目录,详见 `docs/multi-harness/`。
-- **`docs/agents/*` 是 per-repo 配置。** `/triage`、`/to-spec`、`/to-tickets`、`/implement` 优先读它们;缺失时回落到内联的 `gh` / `.scratch` 默认。
+- **原 prompt 已全部转为 user-invoked skill。** 每个原命令的指令正文就是 `skills/<name>/SKILL.md`（带 `disable-model-invocation`），附带资源在同目录 `references/`。正文里引用其他 skill 走稳定路径 `~/.agents/skills/<skill>/...`，由部署脚本(`just deploy-harness`)软链到本仓库，任何项目、任何 harness 里都能解析。跨 harness 共享详见 `docs/multi-harness/`。
+- **`docs/agents/*` 是 per-repo 配置。** `triage`、`to-spec`、`to-tickets`、`implement` 优先读它们;缺失时回落到内联的 `gh` / `.scratch` 默认。
 
 ## 来源与适配
 

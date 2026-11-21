@@ -7,7 +7,7 @@ Sharing this monorepo's assets and capabilities with other coding-agent harnesse
 ### Sharing architecture
 
 **Harness**:
-A coding-agent runtime that discovers skills, prompts, providers, and plugins — Pi, OpenCode, Cursor.
+A coding-agent runtime that discovers skills, providers, and plugins — Pi, OpenCode, Cursor.
 _Avoid_: agent (ambiguous with personas), host, client
 
 **Single Source**:
@@ -15,13 +15,13 @@ This repository, the only place shared assets are edited. Other harnesses consum
 _Avoid_: source of truth copy, sync target
 
 **Native Discovery**:
-A harness finding shared assets through its own built-in discovery paths (e.g. `.agents/skills/`), with no build or generation step.
+A harness finding shared assets through its own built-in discovery paths (e.g. `~/.agents/skills/`), with no build or generation step.
 _Avoid_: sync, compilation, adapter output
 
 ### Asset kinds
 
 **Content Asset**:
-Harness-agnostic material consumed as-is or referenced from a shell: skill bodies, prompt bodies, prompt resources, personas.
+Harness-agnostic material consumed as-is: skill bodies, skill references, personas.
 _Avoid_: config (too broad), plugin (wrong kind)
 
 **Repo Skill**:
@@ -32,13 +32,9 @@ _Avoid_: shared skill (vague), global skill
 A skill under `.agents/skills/` in this repo, discovered only inside this project (e.g. `pi-self-extension`) and never deployed.
 _Avoid_: repo skill (that is the deployed one)
 
-**Per-Harness Shell**:
-A tiny harness-native wrapper (Pi prompt, OpenCode command) whose body points at a shared Prompt Body instead of duplicating it. Cursor's shell sources are parked in `harness/cursor/skills/` and not deployed — Cursor's skill namespace carries only real skills.
-_Avoid_: wrapper (too vague), adapter (implies code)
-
-**Prompt Body**:
-The shared instruction text of a prompt, stored under `prompts-resource/<name>/` and referenced by every harness's shell. Carries no frontmatter and no shell-specific invocation syntax.
-_Avoid_: prompt template (that is the Pi shell form), command body
+**User-Invoked Skill**:
+A Repo Skill with `disable-model-invocation: true` that fires only when the human names it — the successor of the old prompt commands. Former prompts live here with their resources in `references/`.
+_Avoid_: prompt, command, shell
 
 **Provider Gateway**:
 An OpenAI-compatible HTTP endpoint (Toori, Magpie) that any harness consumes through plain provider configuration rather than ported code.
@@ -60,13 +56,13 @@ _Avoid_: port (ambiguous with content porting)
 ### Repo and deployment
 
 **Harness Overlay**:
-The repo's central `harness/<harness>/` tree holding deploy-only artifacts for each target (OpenCode plugin and command shells, Cursor skill shells). Not auto-discovered inside this repo; consumed only through deployment links.
+The repo's central `harness/<harness>/` tree holding deploy-only build artifacts (the OpenCode Magpie plugin). Not auto-discovered inside this repo; consumed only through deployment links.
 _Avoid_: dotdir overlay, per-package overlay
 
 **Deployment Link**:
-A symlink from a harness's user-level discovery path (`~/.agents/skills/`, `~/.config/opencode/`, `~/.cursor/skills/`) back into this repo, created by the idempotent deploy recipe.
+A symlink from a harness's user-level discovery path (`~/.agents/skills/`, `~/.config/opencode/plugins/`, `~/.cursor/skills/`) back into this repo, created by the idempotent deploy recipe.
 _Avoid_: install, copy, sync
 
 **Stable Path**:
-A user-level path (`~/.agents/skills/...`, `~/.agents/prompts-resource/...`) whose target the deploy recipe maintains, so shells and bodies can reference shared assets without machine-specific checkout paths.
+A user-level path (`~/.agents/skills/<skill>/...`) whose target the deploy recipe maintains, so skill bodies can reference shared assets without machine-specific checkout paths.
 _Avoid_: absolute path, hardcoded path

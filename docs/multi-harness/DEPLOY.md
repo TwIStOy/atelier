@@ -4,30 +4,28 @@ Operational guide for the Harness Overlay (`harness/`) and the deploy recipe. De
 
 ## Layout
 
+Everything user-facing — skills and User-Invoked Skills alike — lives in `skills/` at the repo root. `harness/` holds only build artifacts for the Magpie OpenCode plugin:
+
 ```
-harness/
-├── opencode/
-│   ├── commands/<name>.md        # OpenCode command shells (thin, point at the shared BODY)
-│   └── plugins/magpie.ts         # Magpie provider registration + generate_image (opencode2 plugin API)
-│                                 # dist/magpie.js is the bun-built bundle (gitignored, deploy artifact)
-└── cursor/
-    └── skills/<name>/            # Cursor prompt shells — NOT deployed (no command mechanism on Cursor yet;
-                                 # skills are linked directly from the repo's skills/ instead)
+skills/<name>/SKILL.md              # every skill, including former prompts
+  └── references/...                # skill resources (brief formats, templates)
+harness/opencode/plugins/magpie.ts  # Magpie provider registration + generate_image (opencode2 plugin API)
+                                    # dist/magpie.js is the bun-built bundle (gitignored, deploy artifact)
 ```
 
-Prompt instruction text (the Prompt Body) lives in `prompts-resource/<name>/BODY.md` at the repo root — one body per prompt, three shells (Pi `prompts/`, OpenCode `harness/opencode/commands/`, Cursor `harness/cursor/skills/`). Pi and OpenCode shells reference the body through the Stable Path `~/.agents/prompts-resource/<name>/BODY.md`, a symlink the deploy script maintains, so no machine-specific path is written into any repo file. Cursor shells instead carry an in-skill `BODY.md` symlink, following the agentskills convention of skill-relative resources.
+Former prompt commands are User-Invoked Skills: `disable-model-invocation: true` (Pi, Cursor) plus `metadata.opencode/autoinvoke: false` (OpenCode), invoked as `/skill:name` on Pi and `/skill-name` on OpenCode/Cursor. Their resources live in each skill's `references/`; cross-skill references use the Stable Path `~/.agents/skills/<skill>/...`.
 
 ## What deploy does
 
-`just deploy-harness` (`scripts/deploy-harness.mjs`) is idempotent and **never edits OpenCode's config file**:
+`just deploy-harness` (`scripts/deploy-harness.mjs`) is idempotent and never edits OpenCode's config file:
 
 - `~/.agents/skills/<name>` → this repo's `skills/<name>` (all skills, for Pi/OpenCode/Cursor user-level discovery).
-- `~/.agents/prompts-resource` → this repo's `prompts-resource/`.
-- `$XDG_CONFIG_HOME/opencode/commands/<name>.md` → `harness/opencode/commands/<name>.md`.
 - `$XDG_CONFIG_HOME/opencode/plugins/magpie.js` → a symlink to the bundle built from `harness/opencode/plugins/magpie.ts` with `bun build --target=bun` (output under `harness/opencode/plugins/dist/`, gitignored).
-- `~/.cursor/skills/<name>` → this repo's `skills/<name>`, the same real skills linked into `~/.agents/skills`. Only real skills live there — no prompt shells. Links into `harness/` left over under `~/.cursor/skills` are pruned (other entries are never touched).
+- `~/.cursor/skills/<name>` → this repo's `skills/<name>`, the same links as `~/.agents/skills`.
 
-Existing links pointing at this checkout are kept, links pointing elsewhere are repointed, and real directories or files at a target path are skipped with a warning (never clobbered). Links are added and updated, never pruned outside the stale-`harness/` case — remove a link by hand when a source skill goes away. Skills under the repo's `.agents/skills/` are Project-Local Skills (this repo only) and are not deployed. A failed plugin build fails the deploy after the other steps complete.
+It also prunes links left by retired layouts — anything pointing into this repo's `harness/` under `~/.cursor/skills` or the OpenCode commands dir, and a `~/.agents/prompts-resource` symlink — without touching any other entry.
+
+Existing links pointing at this checkout are kept, links pointing elsewhere are repointed, and real directories or files at a target path are skipped with a warning (never clobbered). Links are added and updated, never pruned outside the retired-layout cases above — remove a link by hand when a source skill goes away. Skills under the repo's `.agents/skills/` are Project-Local Skills (this repo only) and are not deployed.
 
 ## Magpie plugin
 
@@ -40,8 +38,9 @@ Gateway defaults match the Pi package: `http://poi.li-rankine.ts.net:3425` with 
 
 ## Caveats
 
-- **opencode2 only**: the plugin needs the 2.x plugin runtime (`@opencode/plugin`). The pre-2.x line (`@opencode-ai/plugin`, V1 hooks) is deliberately unsupported — its config-hook/provider-hook behavior differed and it required a `provider.magpie` entry in `opencode.json`. Nothing links or edits that file anymore.
-- **Tool content**: image results are returned as `file` content with `file://` URIs; if a future runtime rejects that scheme, the text lines still carry the saved paths.
+- **opencode2 only**: the plugin needs the 2.x plugin runtime (`@opencode/plugin`). The pre-2.x line (`@opencode-ai/plugin`, V1 hooks) is deliberately unsupported. Nothing links or edits `opencode.json`.
+- **Skill invocation syntax differs per harness**: Pi uses `/skill:name`, OpenCode and Cursor use `/skill-name`. Skill bodies say "the text typed alongside the invocation" and stay syntax-neutral.
+- **Pi hides User-Invoked Skills from the model**: `disable-model-invocation: true` keeps them out of automatic selection; the `enableSkillCommands` setting controls whether they appear in interactive command discovery, and manually entered `/skill:name` always works.
 - **Plugin reload**: OpenCode caches plugin builds by path — restart OpenCode after the deploy rebuilds `magpie.js` before verifying.
 - **Cursor cloud sync does not follow symlinks** (community-reported): the linked skills work locally but do not sync to Cursor Cloud Agents. Copy instead of linking if that matters.
 - **Cursor IDE symlink discovery** had a known bug (the CLI follows symlinks since June 2026); if skills do not appear, copy the directories.

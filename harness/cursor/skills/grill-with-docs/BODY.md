@@ -1,1 +1,0 @@
-../../../../prompts-resource/grill-with-docs/BODY.md

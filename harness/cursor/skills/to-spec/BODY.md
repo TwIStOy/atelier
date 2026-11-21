@@ -1,1 +1,0 @@
-../../../../prompts-resource/to-spec/BODY.md

@@ -1,6 +1,6 @@
 ---
 name: seed-pi-session
-description: Spin up a pi agent primed for a task by passing a prompt template (`/implement #N`, `/triage`, …) as the CLI initial message — typically in its own git worktree + tmux window. Use when launching or starting one or more pi agents to work on issues/tasks, creating worktrees or tmux tabs for pi, or seeding pi via `/implement`.
+description: Spin up a pi agent primed for a task by passing a user-invoked skill (`/skill:implement #N`, `/skill:triage`, …) as the CLI initial message — typically in its own git worktree + tmux window. Use when launching or starting one or more pi agents to work on issues/tasks, creating worktrees or tmux tabs for pi, or seeding pi via `/skill:implement`.
 ---
 
 # Seed a pi session with a prompt template
@@ -23,8 +23,8 @@ pi '/implement #3'     # expands prompts/implement.md with $@ = #3, then starts 
 - **Short seed** — `pi '/implement #3'` is a few bytes; a pasted brief is kilobytes. Big prompts
   handed to a freshly-launched agent can get silently mangled (see the `herdr-worktree` skill's
   *Launch a pi agent* note). A template invocation never does.
-- **Structured workflow for free** — `/implement` drives load-context → TDD → code-review → commit;
-  `/triage`, `/to-tickets`, etc. each carry their own discipline. You don't reinvent it per launch.
+- **Structured workflow for free** — `/skill:implement` drives load-context → TDD → code-review → commit;
+  `/skill:triage`, `/skill:to-tickets`, etc. each carry their own discipline. You don't reinvent it per launch.
 
 ## Quick start — one agent per worktree + tmux tab
 
@@ -53,14 +53,14 @@ The expanded template is large; a blank/dead pane means it didn't fire. After ~5
 tmux capture-pane -t <session>:<short-name> -p | tail -20
 ```
 
-Expect the template's body (e.g. `/implement`'s "…Commit … Stage only the files you changed … TDD
-…") and the agent bootstrapping — **not** the bare string `/implement #N`.
+Expect the template's body (e.g. `/skill:implement`'s "…Commit … Stage only the files you changed … TDD
+…") and the agent bootstrapping — **not** the bare string `/skill:implement #N`.
 
 ## Where templates come from
 
 This user's templates are supplied globally by the installed package `~/pi-extensions`
-(`settings.json` → `packages`), under `~/pi-extensions/prompts/*.md`: `/implement`, `/triage`,
-`/to-tickets`, `/grill-with-docs`, `/teach`, `/implement-many`, … `~/.pi/agent/prompts/` does not
+(`settings.json` → `packages`), under `~/pi-extensions/skills/`: `implement`, `triage`,
+`to-tickets`, `grill-with-docs`, `teach`, `implement-many`, … `~/.pi/agent/skills/` does not
 exist; don't look there. Load extras ad hoc with `--prompt-template <path>`.
 
 ## Related
@@ -68,4 +68,4 @@ exist; don't look there. Load extras ad hoc with `--prompt-template <path>`.
 - **`herdr-worktree`** — the herdr-managed variant (herdr workspaces/panes, not plain git worktrees
   + tmux tabs). Its *Launch a pi agent* note warns about big-prompt mangling — the template-seed
   technique above sidesteps it entirely.
-- **`/implement`** — turns `#<issue>` into a full implement → TDD → review → commit run.
+- **`/skill:implement`** — turns `#<issue>` into a full implement → TDD → review → commit run.
