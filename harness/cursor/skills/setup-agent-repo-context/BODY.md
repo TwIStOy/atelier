@@ -1,0 +1,1 @@
+../../../../prompts-resource/setup-agent-repo-context/BODY.md

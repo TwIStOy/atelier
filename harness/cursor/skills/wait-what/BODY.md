@@ -1,0 +1,1 @@
+../../../../prompts-resource/wait-what/BODY.md

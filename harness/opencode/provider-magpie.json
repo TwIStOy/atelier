@@ -1,0 +1,12 @@
+{
+  "npm": "@ai-sdk/openai-compatible",
+  "options": {
+    "baseURL": "http://100.65.0.3:3425/v1",
+    "apiKey": "magpie-private"
+  },
+  "models": {
+    "group/smart-split": { "name": "Magpie Smart Split" },
+    "group/cn-flagships": { "name": "Magpie CN Flagships" },
+    "group/cheap": { "name": "Magpie Cheap" }
+  }
+}

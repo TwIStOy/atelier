@@ -1,0 +1,1 @@
+../../../../prompts-resource/implement-many/BODY.md

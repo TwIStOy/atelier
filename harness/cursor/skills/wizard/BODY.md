@@ -1,0 +1,1 @@
+../../../../prompts-resource/wizard/BODY.md

@@ -1,0 +1,1 @@
+../../../../prompts-resource/to-tickets/BODY.md

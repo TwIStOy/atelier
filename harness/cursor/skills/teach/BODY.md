@@ -1,0 +1,1 @@
+../../../../prompts-resource/teach/BODY.md
