@@ -48,7 +48,7 @@ describe("registerWorkflowTool", () => {
 
   it("keeps only invocation policy in the prompt and moves DSL mechanics into the workflow-dsl skill", () => {
     const guidelines = registeredWorkflowTool().promptGuidelines.join("\n");
-    const skill = readFileSync(new URL("../../../skills/workflow-dsl/SKILL.md", import.meta.url), "utf8");
+    const skill = readFileSync(new URL("../../../.agents/skills/workflow-dsl/SKILL.md", import.meta.url), "utf8");
 
     expect(guidelines).toContain("workflow-dsl");
     expect(guidelines).not.toContain("JavaScript, not TypeScript");
