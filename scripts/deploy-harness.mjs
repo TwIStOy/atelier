@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-import { execFileSync } from "node:child_process";
 import { lstat, mkdir, readdir, readlink, realpath, rm, symlink } from "node:fs/promises";
 import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -10,7 +9,6 @@ if (!home) throw new Error("HOME is not set");
 const configHome = process.env.XDG_CONFIG_HOME || join(home, ".config");
 
 const actions = [];
-let failed = false;
 
 async function ensureLink(target, linkPath) {
   await mkdir(dirname(linkPath), { recursive: true });
@@ -76,25 +74,14 @@ async function deployOpenCode() {
   await pruneRepoLinks(join(configHome, "opencode", "commands"), harnessDir);
 
   const pluginsDir = join(configHome, "opencode", "plugins");
-  const distFile = join(repoRoot, "harness", "opencode", "plugins", "dist", "magpie.js");
-  try {
-    execFileSync(
-      "bun",
-      [
-        "build",
-        join(repoRoot, "harness", "opencode", "plugins", "magpie.ts"),
-        "--target=bun",
-        "--outfile",
-        distFile,
-      ],
-      { stdio: "pipe" },
-    );
-    actions.push(`built opencode plugin ${distFile}`);
-    await ensureLink(distFile, join(pluginsDir, "magpie.js"));
-  } catch (error) {
-    failed = true;
-    actions.push(`FAILED: bun build of the magpie plugin: ${error.message}`);
+  const retiredBundle = join(pluginsDir, "magpie.js");
+  const bundleStat = await lstat(retiredBundle).catch(() => null);
+  if (bundleStat?.isSymbolicLink()) {
+    await rm(retiredBundle);
+    actions.push(`pruned retired bundle link ${retiredBundle}`);
   }
+  const pluginFile = join(repoRoot, "harness", "opencode", "plugins", "magpie.ts");
+  await ensureLink(pluginFile, join(pluginsDir, "magpie.ts"));
 }
 
 async function deployCursor() {
@@ -111,6 +98,3 @@ for (const action of actions) {
   console.log(action);
 }
 console.log(`deploy-harness: ${actions.length} actions from ${repoRoot}`);
-if (failed) {
-  process.exitCode = 1;
-}

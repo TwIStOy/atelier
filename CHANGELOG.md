@@ -4,7 +4,7 @@
 
 ### Added
 
-- Multi-harness sharing (see `docs/multi-harness/`): former prompt commands became User-Invoked Skills under `skills/` (`disable-model-invocation`, resources in `references/`), removing `prompts/`, `prompts-resource/`, and the per-harness command shells; a Magpie OpenCode plugin for the opencode2 plugin API (`generate_image` tool plus self-registered `magpie` provider with the dynamic `/v1/models` catalog) under `harness/opencode/`, deployed as a symlinked bundle with no OpenCode config edits; and an idempotent `just deploy-harness` recipe (`scripts/deploy-harness.mjs`) that maintains the `~/.agents/skills` and `~/.cursor/skills` links and prunes links left by retired layouts.
+- Multi-harness sharing (see `docs/multi-harness/`): former prompt commands became User-Invoked Skills under `skills/` (`disable-model-invocation`, resources in `references/`), removing `prompts/`, `prompts-resource/`, and the per-harness command shells; a Magpie OpenCode plugin for the opencode2 plugin API (`generate_image` tool plus self-registered `magpie` provider with the dynamic `/v1/models` catalog) under `harness/opencode/`, deployed as a direct source-file symlink with no build step and no OpenCode config edits; and an idempotent `just deploy-harness` recipe (`scripts/deploy-harness.mjs`) that maintains the `~/.agents/skills` and `~/.cursor/skills` links and prunes links left by retired layouts.
 
 ### Changed
 

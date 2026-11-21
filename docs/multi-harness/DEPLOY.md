@@ -4,13 +4,12 @@ Operational guide for the Harness Overlay (`harness/`) and the deploy recipe. De
 
 ## Layout
 
-Everything user-facing — skills and User-Invoked Skills alike — lives in `skills/` at the repo root. `harness/` holds only build artifacts for the Magpie OpenCode plugin:
+Everything user-facing — skills and User-Invoked Skills alike — lives in `skills/` at the repo root. `harness/` holds only the Magpie OpenCode plugin source:
 
 ```
 skills/<name>/SKILL.md              # every skill, including former prompts
   └── references/...                # skill resources (brief formats, templates)
 harness/opencode/plugins/magpie.ts  # Magpie provider registration + generate_image (opencode2 plugin API)
-                                    # dist/magpie.js is the bun-built bundle (gitignored, deploy artifact)
 ```
 
 Former prompt commands are User-Invoked Skills: `disable-model-invocation: true` (Pi, Cursor) plus `metadata.opencode/autoinvoke: false` (OpenCode), invoked as `/skill:name` on Pi and `/skill-name` on OpenCode/Cursor. Their resources live in each skill's `references/`; cross-skill references use the Stable Path `~/.agents/skills/<skill>/...`.
@@ -20,7 +19,7 @@ Former prompt commands are User-Invoked Skills: `disable-model-invocation: true`
 `just deploy-harness` (`scripts/deploy-harness.mjs`) is idempotent and never edits OpenCode's config file:
 
 - `~/.agents/skills/<name>` → this repo's `skills/<name>` (all skills, for Pi/OpenCode/Cursor user-level discovery).
-- `$XDG_CONFIG_HOME/opencode/plugins/magpie.js` → a symlink to the bundle built from `harness/opencode/plugins/magpie.ts` with `bun build --target=bun` (output under `harness/opencode/plugins/dist/`, gitignored).
+- `$XDG_CONFIG_HOME/opencode/plugins/magpie.ts` → a direct symlink to `harness/opencode/plugins/magpie.ts`. OpenCode auto-loads bare `.ts` files from its plugins directories (opencode2 docs), so there is no build step: the host does a plain dynamic import of the entry, and Bun resolves `@opencode/plugin` from this repo's `node_modules` (module resolution follows the symlink's realpath). Deploy therefore requires `npm install` to have run in this checkout. A retired `magpie.js` bundle link from the earlier bundled layout is pruned when present.
 - `~/.cursor/skills/<name>` → this repo's `skills/<name>`, the same links as `~/.agents/skills`.
 
 It also prunes links left by retired layouts — anything pointing into this repo's `harness/` under `~/.cursor/skills` or the OpenCode commands dir, and a `~/.agents/prompts-resource` symlink — without touching any other entry.
@@ -41,6 +40,7 @@ Gateway defaults match the Pi package: `http://poi.li-rankine.ts.net:3425` with 
 - **opencode2 only**: the plugin needs the 2.x plugin runtime (`@opencode/plugin`). The pre-2.x line (`@opencode-ai/plugin`, V1 hooks) is deliberately unsupported. Nothing links or edits `opencode.json`.
 - **Skill invocation syntax differs per harness**: Pi uses `/skill:name`, OpenCode and Cursor use `/skill-name`. Skill bodies say "the text typed alongside the invocation" and stay syntax-neutral.
 - **Pi hides User-Invoked Skills from the model**: `disable-model-invocation: true` keeps them out of automatic selection; the `enableSkillCommands` setting controls whether they appear in interactive command discovery, and manually entered `/skill:name` always works.
-- **Plugin reload**: OpenCode caches plugin builds by path — restart OpenCode after the deploy rebuilds `magpie.js` before verifying.
+- **Deploy from the main checkout**: `magpie.ts` resolves `@opencode/plugin` through the linked checkout's `node_modules` at load time. Deploying from a throwaway worktree breaks plugin loading once that worktree and its dependencies are deleted.
+- **Plugin reload**: OpenCode caches loaded plugin modules by path — restart OpenCode (or touch the linked `magpie.ts` under a watched config directory) after deploy changes before verifying.
 - **Cursor cloud sync does not follow symlinks** (community-reported): the linked skills work locally but do not sync to Cursor Cloud Agents. Copy instead of linking if that matters.
 - **Cursor IDE symlink discovery** had a known bug (the CLI follows symlinks since June 2026); if skills do not appear, copy the directories.

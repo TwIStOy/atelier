@@ -1,5 +1,4 @@
 node_modules/
 packages/*/dist/
 extensions/*/dist/
-harness/*/plugins/dist/
 coverage/

@@ -73,13 +73,27 @@ describe("deploy-harness", () => {
     expect(await realpath(join(dir, "own.md"))).toBe(foreign);
   });
 
-  it("builds the magpie plugin bundle and symlinks it into the opencode plugins dir", async () => {
+  it("links the magpie plugin source into the opencode plugins dir", async () => {
     runDeploy();
-    const link = join(home, ".config", "opencode", "plugins", "magpie.js");
+    const link = join(home, ".config", "opencode", "plugins", "magpie.ts");
     expect((await lstat(link)).isSymbolicLink()).toBe(true);
-    expect(await realpath(link)).toBe(join(repoRoot, "harness", "opencode", "plugins", "dist", "magpie.js"));
+    expect(await realpath(link)).toBe(join(repoRoot, "harness", "opencode", "plugins", "magpie.ts"));
     const content = await readFile(link, "utf8");
     expect(content).toContain("generate_image");
+  });
+
+  it("prunes a retired magpie bundle link without touching real files", async () => {
+    const dir = join(home, ".config", "opencode", "plugins");
+    await mkdir(dir, { recursive: true });
+    await symlink(join(home, "deleted-worktree", "dist", "magpie.js"), join(dir, "magpie.js"));
+    const foreign = join(dir, "own-plugin.js");
+    await writeFile(foreign, "// own", "utf8");
+
+    runDeploy();
+
+    await expect(lstat(join(dir, "magpie.js"))).rejects.toThrow();
+    expect((await lstat(join(dir, "magpie.ts"))).isSymbolicLink()).toBe(true);
+    expect(await readFile(foreign, "utf8")).toBe("// own");
   });
 
   it("links the repo skills into ~/.cursor/skills", async () => {
