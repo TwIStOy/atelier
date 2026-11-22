@@ -1,4 +1,5 @@
 import { Model, Plugin, Provider } from "@opencode/plugin";
+import { Money } from "@opencode/schema";
 import { existsSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -34,8 +35,10 @@ interface MagpieCatalogEntry {
   id?: string;
   object?: string;
   display_name?: string;
+  magpie_label?: string;
   context_window?: number;
   context_length?: number;
+  max_input_tokens?: number;
   max_output_tokens?: number;
   modalities?: { input?: string[]; output?: string[] };
   pricing?: {
@@ -45,6 +48,12 @@ interface MagpieCatalogEntry {
     input_cache_write?: string;
   };
   created?: number;
+  created_at?: string;
+  reasoning?: boolean;
+  reasoning_levels?: string[];
+  supported_parameters?: string[];
+  supported_reasoning_levels?: { effort?: string }[];
+  tool_call?: boolean;
 }
 
 interface MagpieModelsResponse {
@@ -81,31 +90,61 @@ function modelOutputs(entry: MagpieCatalogEntry): string[] {
   return advertised.length > 0 ? [...new Set(advertised)] : ["text"];
 }
 
+function modelTools(entry: MagpieCatalogEntry): boolean {
+  if (entry.supported_parameters) return entry.supported_parameters.includes("tools");
+  return entry.tool_call ?? true;
+}
+
+function modelVariants(entry: MagpieCatalogEntry): Model.Info["variants"] {
+  if (entry.reasoning === false) return [];
+  const efforts = new Set<string>();
+  for (const level of entry.supported_reasoning_levels ?? []) {
+    if (level.effort) efforts.add(level.effort);
+  }
+  if (efforts.size === 0) {
+    for (const level of entry.reasoning_levels ?? []) {
+      if (level) efforts.add(level);
+    }
+  }
+  return [...efforts].map((effort) => ({
+    id: Model.VariantID.make(effort),
+    settings: { reasoningEffort: effort },
+  }));
+}
+
+function releasedAt(entry: MagpieCatalogEntry): number {
+  if (entry.created && entry.created > 0) return entry.created;
+  const parsed = entry.created_at ? Date.parse(entry.created_at) : Number.NaN;
+  return Number.isFinite(parsed) ? Math.floor(parsed / 1000) : 0;
+}
+
 function toModelInfo(entry: MagpieCatalogEntry, providerID: Provider.ID): Model.Info | undefined {
   if (!entry.id || (entry.object !== undefined && entry.object !== "model")) return undefined;
   return {
     ...Model.Info.default(providerID, Model.ID.make(entry.id)),
-    name: entry.display_name?.trim() || entry.id,
+    name: entry.magpie_label?.trim() || entry.display_name?.trim() || entry.id,
     capabilities: {
-      tools: true,
+      tools: modelTools(entry),
       input: modelInputs(entry),
       output: modelOutputs(entry),
     },
     cost: [
       {
-        input: perMillion(entry.pricing?.prompt),
-        output: perMillion(entry.pricing?.completion),
+        input: Money.USDPerMillionTokens.make(perMillion(entry.pricing?.prompt)),
+        output: Money.USDPerMillionTokens.make(perMillion(entry.pricing?.completion)),
         cache: {
-          read: perMillion(entry.pricing?.input_cache_read),
-          write: perMillion(entry.pricing?.input_cache_write),
+          read: Money.USDPerMillionTokens.make(perMillion(entry.pricing?.input_cache_read)),
+          write: Money.USDPerMillionTokens.make(perMillion(entry.pricing?.input_cache_write)),
         },
       },
     ],
+    variants: modelVariants(entry),
     limit: {
       context: entry.context_window ?? entry.context_length ?? DEFAULT_CONTEXT_WINDOW,
+      ...(entry.max_input_tokens !== undefined ? { input: entry.max_input_tokens } : {}),
       output: entry.max_output_tokens ?? DEFAULT_MAX_TOKENS,
     },
-    time: { released: entry.created ?? 0 },
+    time: { released: releasedAt(entry) },
   };
 }
 
