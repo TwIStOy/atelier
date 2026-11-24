@@ -9,8 +9,8 @@
     "@sinclair/typebox": "^0.34.52"
   },
   "devDependencies": {
-    "@earendil-works/pi-ai": "^1.5.2",
-    "@earendil-works/pi-coding-agent": "^1.5.2",
+    "@earendil-works/pi-ai": "^1.6.0",
+    "@earendil-works/pi-coding-agent": "^1.6.0",
     "@earendil-works/pi-tui": "^1.0.0",
     "@types/node": "^26.6.6",
     "typescript": "^7.0.2",
