@@ -98,7 +98,7 @@
     ]
   },
   "devDependencies": {
-    "@biomejs/biome": "2.6.6",
+    "@biomejs/biome": "2.6.8",
     "@opencode/plugin": "2.3.2",
     "@opencode/schema": "2.3.2",
     "@types/node": "^26.6.6",
